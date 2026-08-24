@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint, Typecheck, Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: growfast
+          POSTGRES_PASSWORD: growfast_ci
+          POSTGRES_DB: growfast_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://growfast:growfast_ci@localhost:5432/growfast_test?schema=public
+      JWT_SECRET: ci-test-secret
+      JWT_EXPIRES_IN: 1h
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting
+        run: npm run format:check
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=prisma/schema.prisma
+
+      - name: Typecheck shared-types
+        run: npm run typecheck --workspace=packages/shared-types
+
+      - name: Build shared-types
+        run: npm run build --workspace=packages/shared-types
+
+      - name: Typecheck UI package
+        run: npm run typecheck --workspace=packages/ui
+
+      - name: Typecheck backend
+        run: npm run typecheck --workspace=apps/backend
+
+      - name: Build backend
+        run: npm run build --workspace=apps/backend
+
+      - name: Test backend
+        run: npm run test --workspace=apps/backend
+
+      - name: Typecheck frontend
+        run: npm run typecheck --workspace=apps/web
+
+      - name: Build frontend
+        run: npm run build --workspace=apps/web

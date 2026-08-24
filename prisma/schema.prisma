@@ -1,0 +1,351 @@
+// This is your Prisma schema file.
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── STORE ──────────────────────────────────────────────────────────
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees Employee[]
+  orders    Order[]
+
+  @@map("stores")
+}
+
+// ─── EMPLOYEE ───────────────────────────────────────────────────────
+
+model Employee {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?  @unique
+  pinHash   String   @map("pin_hash")
+  role      Role
+  storeId   String   @map("store_id")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store             Store            @relation(fields: [storeId], references: [id])
+  createdOrders     Order[]          @relation("OrderCreatedBy")
+  receivedPayments  Payment[]        @relation("PaymentReceivedBy")
+  deliveryRecords   DeliveryRecord[] @relation("DeliveryRider")
+
+  @@index([storeId])
+  @@index([role])
+  @@index([isActive])
+  @@map("employees")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  COUNTER
+  DELIVERY
+}
+
+// ─── CUSTOMER ───────────────────────────────────────────────────────
+
+model Customer {
+  id                 String          @id @default(cuid())
+  name               String
+  phone              String          @unique
+  email              String?
+  address            String?
+  pincode            String?
+  membership         MembershipTier  @default(NONE)
+  discountPercent    Float           @default(0)
+  preferences        Json?           // fragrance, starch, fold pref, etc.
+  registrationSource String          @default("WALK_IN") @map("registration_source")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  orders Order[]
+
+  @@index([phone])
+  @@index([name])
+  @@map("customers")
+}
+
+enum MembershipTier {
+  NONE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+// ─── GARMENT CATALOG ────────────────────────────────────────────────
+
+model GarmentCatalog {
+  id        String          @id @default(cuid())
+  name      String
+  category  GarmentCategory
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([category])
+  @@map("garment_catalog")
+}
+
+enum GarmentCategory {
+  MEN
+  WOMEN
+  KIDS
+  HOUSEHOLD
+  SHOES
+  SPECIAL
+}
+
+// ─── SERVICE TYPE ───────────────────────────────────────────────────
+
+model ServiceType {
+  id            String          @id @default(cuid())
+  name          String
+  category      ServiceCategory
+  estimatedDays Int             @default(2)
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([category])
+  @@map("service_types")
+}
+
+enum ServiceCategory {
+  DRY_CLEAN
+  STEAM_PRESS
+  WASH
+  WASH_IRON
+  SHOE_CLEAN
+  LEATHER_CLEAN
+  STAIN_REMOVAL
+  WEIGHT_BASED
+}
+
+// ─── ORDER ──────────────────────────────────────────────────────────
+
+model Order {
+  id                     String        @id @default(cuid())
+  orderNumber            String        @unique @map("order_number")
+  customerId             String        @map("customer_id")
+  orderDate              DateTime      @default(now()) @map("order_date")
+  systemDueDate          DateTime      @map("system_due_date")
+  effectiveDueDate       DateTime      @map("effective_due_date")
+  dueDateOverrideReason  String?       @map("due_date_override_reason")
+  dueDateOverriddenBy    String?       @map("due_date_overridden_by")
+  isExpress              Boolean       @default(false) @map("is_express")
+  serviceSummary         String?       @map("service_summary")
+  status                 OrderStatus   @default(RECEIVED)
+  subtotal               Float         @default(0)
+  discountAmount         Float         @default(0) @map("discount_amount")
+  expressSurcharge       Float         @default(0) @map("express_surcharge")
+  taxAmount              Float         @default(0) @map("tax_amount")
+  totalAmount            Float         @default(0) @map("total_amount")
+  amountPaid             Float         @default(0) @map("amount_paid")
+  amountDue              Float         @default(0) @map("amount_due")
+  paymentStatus          PaymentStatus @default(PENDING) @map("payment_status")
+  pickupType             PickupType    @default(STORE_PICKUP) @map("pickup_type")
+  priority               OrderPriority @default(STANDARD)
+  notes                  String?
+  syncStatus             SyncStatus    @default(SYNCED) @map("sync_status")
+  createdById            String        @map("created_by_id")
+  storeId                String        @map("store_id")
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  createdBy       Employee         @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  store           Store            @relation(fields: [storeId], references: [id])
+  items           OrderItem[]
+  payments        Payment[]
+  photos          OrderPhoto[]
+  deliveryRecords DeliveryRecord[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([orderDate])
+  @@index([storeId])
+  @@index([createdById])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  RECEIVED
+  SORTING
+  PROCESSING
+  DRYING
+  IRONING
+  QUALITY_CHECK
+  PACKED
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum PickupType {
+  STORE_PICKUP
+  HOME_DELIVERY
+}
+
+enum OrderPriority {
+  STANDARD
+  EXPRESS
+  VIP
+}
+
+enum SyncStatus {
+  SYNCED
+  PENDING
+  FAILED
+}
+
+// ─── ORDER ITEM ─────────────────────────────────────────────────────
+
+model OrderItem {
+  id                String       @id @default(cuid())
+  orderId           String       @map("order_id")
+  garmentCatalogId  String       @map("garment_catalog_id")
+  serviceTypeId     String       @map("service_type_id")
+  quantity          Int          @default(1)
+  unitPrice         Float        @map("unit_price")
+  lineTotal         Float        @map("line_total")
+  colorTags         String[]     @default([]) @map("color_tags")
+  defectNotes       String?      @map("defect_notes")
+  itemStatus        ItemStatus   @default(RECEIVED) @map("item_status")
+  deliveredQuantity Int          @default(0) @map("delivered_quantity")
+  itemDueDate       DateTime?    @map("item_due_date")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  garmentCatalog GarmentCatalog @relation(fields: [garmentCatalogId], references: [id])
+  serviceType    ServiceType    @relation(fields: [serviceTypeId], references: [id])
+  photos         OrderPhoto[]
+
+  @@index([orderId])
+  @@index([itemStatus])
+  @@map("order_items")
+}
+
+enum ItemStatus {
+  RECEIVED
+  PROCESSING
+  QUALITY_CHECK
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+// ─── ORDER PHOTO ────────────────────────────────────────────────────
+
+model OrderPhoto {
+  id          String    @id @default(cuid())
+  orderId     String    @map("order_id")
+  orderItemId String?   @map("order_item_id")
+  type        PhotoType
+  url         String
+  uploadedAt  DateTime  @default(now()) @map("uploaded_at")
+
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([orderItemId])
+  @@map("order_photos")
+}
+
+enum PhotoType {
+  FRONT
+  BACK
+  DAMAGE
+  STAIN
+  TAG
+  DELIVERY_PROOF
+}
+
+// ─── PAYMENT ────────────────────────────────────────────────────────
+
+model Payment {
+  id           String      @id @default(cuid())
+  orderId      String      @map("order_id")
+  amount       Float
+  mode         PaymentMode
+  reference    String?
+  receivedById String      @map("received_by_id")
+  createdAt    DateTime    @default(now())
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  receivedBy Employee @relation("PaymentReceivedBy", fields: [receivedById], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CARD
+  ONLINE
+  STORE_CREDIT
+}
+
+// ─── DELIVERY RECORD ────────────────────────────────────────────────
+
+model DeliveryRecord {
+  id            String         @id @default(cuid())
+  orderId       String         @map("order_id")
+  address       String
+  riderId       String?        @map("rider_id")
+  status        DeliveryStatus @default(SCHEDULED)
+  scheduledAt   DateTime?      @map("scheduled_at")
+  completedAt   DateTime?      @map("completed_at")
+  proofPhotoUrl String?        @map("proof_photo_url")
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  order Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rider Employee? @relation("DeliveryRider", fields: [riderId], references: [id])
+
+  @@index([orderId])
+  @@index([riderId])
+  @@index([status])
+  @@map("delivery_records")
+}
+
+enum DeliveryStatus {
+  SCHEDULED
+  ASSIGNED
+  IN_TRANSIT
+  COMPLETED
+  FAILED
+}

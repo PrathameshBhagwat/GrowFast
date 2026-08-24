@@ -1,32 +1,72 @@
-# React + TypeScript + Vite
+# GrowFast — Laundry & Dry-Cleaning Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A production-quality laundry management system built as a TypeScript monorepo.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Layer    | Technology                                |
+| -------- | ----------------------------------------- |
+| Backend  | NestJS + TypeScript + Prisma + PostgreSQL |
+| Frontend | React + Vite + TypeScript + Tailwind CSS  |
+| Shared   | TypeScript shared types, enums, DTOs      |
+| Database | PostgreSQL 16 (Docker)                    |
+| Auth     | JWT + bcrypt PIN                          |
+| CI       | GitHub Actions                            |
 
-## React Compiler
+## Quick Start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# 1. Copy environment file
+cp .env.example .env
 
-## Expanding the Oxlint configuration
+# 2. Start PostgreSQL
+docker compose up -d
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+# 3. Install dependencies
+npm install
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# 4. Setup database
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+
+# 5. Start development
+npm run dev:backend   # Terminal 1 — http://localhost:3000/api
+npm run dev:web       # Terminal 2 — http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Project Structure
+
+```
+apps/
+  backend/           NestJS REST API
+  web/               React PWA frontend
+packages/
+  shared-types/      Shared enums, DTOs, contracts
+  ui/                Reusable design system
+docs/                Project documentation
+prisma/              Database schema & migrations
+.github/workflows/   CI/CD
+```
+
+## Documentation
+
+- [Requirements Analysis](docs/requirements-analysis.md)
+- [Architecture](docs/architecture.md)
+- [Database](docs/database.md)
+- [API](docs/api.md)
+- [Business Rules](docs/business-rules.md)
+- [Development Guide](docs/development-guide.md)
+- [Testing](docs/testing.md)
+- [Roadmap](docs/roadmap.md)
+
+## Development Credentials
+
+| Role     | Employee ID      | PIN    |
+| -------- | ---------------- | ------ |
+| Owner    | emp-owner-001    | 111111 |
+| Manager  | emp-mgr-001      | 222222 |
+| Counter  | emp-counter-001  | 333333 |
+| Delivery | emp-delivery-001 | 444444 |
+
+⚠️ Development only — never use in production.

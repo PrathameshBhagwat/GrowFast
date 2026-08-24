@@ -1,26 +1,43 @@
 {
-  "name": "tumbledry",
+  "name": "growfast-laundry",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "0.1.0",
+  "description": "Laundry & Dry-Cleaning Management System",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "dev": "npm run dev --workspace=apps/backend & npm run dev --workspace=apps/web",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:shared": "npm run build --workspace=packages/shared-types",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "npx prisma migrate dev --schema=prisma/schema.prisma",
+    "db:migrate:deploy": "npx prisma migrate deploy --schema=prisma/schema.prisma",
+    "db:seed": "npx tsx prisma/seed.ts",
+    "db:generate": "npx prisma generate --schema=prisma/schema.prisma",
+    "db:studio": "npx prisma studio --schema=prisma/schema.prisma",
+    "db:reset": "npx prisma migrate reset --schema=prisma/schema.prisma --force",
+    "clean": "rimraf apps/*/dist apps/*/node_modules packages/*/dist packages/*/node_modules node_modules"
   },
-  "dependencies": {
-    "lucide-react": "^1.33.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+  "engines": {
+    "node": ">=20.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
-    "oxlint": "^1.75.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^2.4.3",
+    "prettier": "^3.3.0",
+    "prisma": "^5.20.0",
+    "rimraf": "^6.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.6.0"
   }
 }
