@@ -40,3 +40,6 @@ prisma/*.db-journal
 
 # OS
 Thumbs.db
+
+# Photo uploads (local dev)
+uploads/

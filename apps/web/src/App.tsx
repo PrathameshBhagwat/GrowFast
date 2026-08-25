@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { PhotoCaptureView } from './pages/PhotoCaptureView';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -24,6 +25,14 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/orders/:orderId/photos"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'COUNTER', 'DELIVERY']}>
+            <PhotoCaptureView />
           </ProtectedRoute>
         }
       />
