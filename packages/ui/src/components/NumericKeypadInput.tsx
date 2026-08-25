@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Delete } from 'lucide-react';
 
 export interface NumericKeypadInputProps {
@@ -12,7 +12,7 @@ export interface NumericKeypadInputProps {
 
 /**
  * NumericKeypadInput — large tap-target numeric keypad for PIN entry.
- * Designed for minimal typing and mobile-friendly interaction.
+ * Supports both on-screen touch keypad and physical keyboard input.
  * Each key is 64×56px minimum for easy touch targeting.
  */
 export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
@@ -46,6 +46,35 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
     setInternalValue('');
     onChange('');
   }, [onChange]);
+
+  // Physical keyboard listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If user is focused on an input element, ignore
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleKeyPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleDelete();
+      } else if (e.key === 'Escape' || e.key === 'Delete') {
+        e.preventDefault();
+        handleClear();
+      } else if (e.key === 'Enter') {
+        if (value.length === maxLength && onSubmit) {
+          e.preventDefault();
+          onSubmit();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyPress, handleDelete, handleClear, value.length, maxLength, onSubmit]);
 
   const displayValue = masked ? '●'.repeat(value.length) : value;
 

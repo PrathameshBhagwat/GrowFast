@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NumericKeypadInput, Card } from '@growfast/ui';
-import { Shirt, ChevronDown } from 'lucide-react';
+import { Shirt, ChevronDown, Zap } from 'lucide-react';
 
 const EMPLOYEES = [
-  { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER', initials: 'PB' },
-  { id: 'emp-mgr-001', name: 'Rajesh Nair', role: 'MANAGER', initials: 'RN' },
-  { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER', initials: 'SS' },
-  { id: 'emp-delivery-001', name: 'Kiran More', role: 'DELIVERY', initials: 'KM' },
+  { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER', initials: 'PB', pin: '111111' },
+  { id: 'emp-mgr-001', name: 'Rajesh Nair', role: 'MANAGER', initials: 'RN', pin: '222222' },
+  { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER', initials: 'SS', pin: '333333' },
+  { id: 'emp-delivery-001', name: 'Kiran More', role: 'DELIVERY', initials: 'KM', pin: '444444' },
 ];
 
 export const LoginPage: React.FC = () => {
@@ -19,17 +19,26 @@ export const LoginPage: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
-  const handleLogin = async () => {
-    if (pin.length !== 6) return;
+  const handleLogin = async (overrideEmpId?: string, overridePin?: string) => {
+    const empId = overrideEmpId || selectedEmployee.id;
+    const pinToUse = overridePin || pin;
+    if (pinToUse.length !== 6) return;
+
     setIsLoggingIn(true);
     try {
-      await login(selectedEmployee.id, pin);
+      await login(empId, pinToUse);
       navigate('/', { replace: true });
     } catch {
       setPin('');
     } finally {
       setIsLoggingIn(false);
     }
+  };
+
+  const handleQuickLogin = async (emp: (typeof EMPLOYEES)[0]) => {
+    setSelectedEmployee(emp);
+    setPin(emp.pin);
+    await handleLogin(emp.id, emp.pin);
   };
 
   return (
@@ -44,9 +53,9 @@ export const LoginPage: React.FC = () => {
         fontFamily: "'Inter', sans-serif",
       }}
     >
-      <Card padding="lg" elevated style={{ maxWidth: '400px', width: '100%' }}>
+      <Card padding="lg" elevated style={{ maxWidth: '420px', width: '100%' }}>
         {/* Logo & Title */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div
             style={{
               width: '56px',
@@ -56,7 +65,7 @@ export const LoginPage: React.FC = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 16px',
+              margin: '0 auto 14px',
               boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
             }}
           >
@@ -66,14 +75,15 @@ export const LoginPage: React.FC = () => {
             GrowFast Laundry
           </h1>
           <p style={{ fontSize: '0.84rem', color: '#64748B', marginTop: '4px' }}>
-            Enter your PIN to continue
+            Select your profile and enter PIN
           </p>
         </div>
 
         {/* Employee Selector */}
-        <div style={{ marginBottom: '28px', position: 'relative' }}>
+        <div style={{ marginBottom: '20px', position: 'relative' }}>
           <button
             onClick={() => setShowPicker(!showPicker)}
+            aria-label="Select Employee"
             style={{
               width: '100%',
               padding: '12px 16px',
@@ -192,7 +202,7 @@ export const LoginPage: React.FC = () => {
               color: '#991B1B',
               fontSize: '0.84rem',
               fontWeight: 500,
-              marginBottom: '20px',
+              marginBottom: '16px',
               textAlign: 'center',
             }}
           >
@@ -207,7 +217,7 @@ export const LoginPage: React.FC = () => {
             onChange={setPin}
             maxLength={6}
             masked
-            onSubmit={handleLogin}
+            onSubmit={() => handleLogin()}
           />
         </div>
 
@@ -217,7 +227,7 @@ export const LoginPage: React.FC = () => {
               textAlign: 'center',
               fontSize: '0.84rem',
               color: '#2563EB',
-              marginTop: '16px',
+              marginTop: '12px',
               fontWeight: 500,
             }}
           >
@@ -225,21 +235,62 @@ export const LoginPage: React.FC = () => {
           </p>
         )}
 
-        {/* Dev hint */}
+        {/* Dev Mode 1-Click Quick Login */}
         <div
           style={{
-            marginTop: '24px',
+            marginTop: '20px',
             padding: '12px',
-            background: '#FFFBEB',
-            border: '1px solid #FDE68A',
-            borderRadius: '8px',
-            fontSize: '0.7rem',
-            color: '#92400E',
-            textAlign: 'center',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '12px',
           }}
         >
-          <strong>Dev Mode:</strong> Owner=111111 · Manager=222222 · Counter=333333 ·
-          Delivery=444444
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: '#475569',
+              marginBottom: '8px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
+            <Zap size={14} color="#D97706" />
+            <span>Dev Quick Login</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+            {EMPLOYEES.map((emp) => (
+              <button
+                key={emp.id}
+                type="button"
+                onClick={() => handleQuickLogin(emp)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 120ms ease',
+                }}
+              >
+                <span>{emp.role}</span>
+                <span style={{ color: '#64748B', fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                  {emp.pin}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
     </div>

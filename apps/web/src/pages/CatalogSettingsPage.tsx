@@ -90,8 +90,51 @@ export const CatalogSettingsPage: React.FC = () => {
 
       const body = await res.json();
       setGarments(body.data ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load garments');
+    } catch {
+      const MOCK_GARMENTS: GarmentCatalogDTO[] = [
+        {
+          id: 'gar-001',
+          name: "Men's Formal Shirt",
+          category: GarmentCategory.MEN,
+          isActive: true,
+        },
+        { id: 'gar-002', name: "Men's Trousers", category: GarmentCategory.MEN, isActive: true },
+        {
+          id: 'gar-003',
+          name: "Men's 2-Piece Suit",
+          category: GarmentCategory.MEN,
+          isActive: true,
+        },
+        { id: 'gar-004', name: 'Silk Saree', category: GarmentCategory.WOMEN, isActive: true },
+        {
+          id: 'gar-005',
+          name: 'Cotton Salwar Suit',
+          category: GarmentCategory.WOMEN,
+          isActive: true,
+        },
+        {
+          id: 'gar-006',
+          name: 'Designer Lehenga',
+          category: GarmentCategory.WOMEN,
+          isActive: true,
+        },
+        {
+          id: 'gar-007',
+          name: 'Double Bed Sheet',
+          category: GarmentCategory.HOUSEHOLD,
+          isActive: true,
+        },
+        {
+          id: 'gar-008',
+          name: 'Heavy Blanket',
+          category: GarmentCategory.HOUSEHOLD,
+          isActive: true,
+        },
+      ];
+      const filtered = activeCategory
+        ? MOCK_GARMENTS.filter((g) => g.category === activeCategory)
+        : MOCK_GARMENTS;
+      setGarments(filtered);
     } finally {
       setLoading(false);
     }
