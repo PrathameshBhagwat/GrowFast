@@ -66,10 +66,7 @@ export async function uploadPhoto(
  * @returns Array of OrderPhotoDTO (may be empty)
  * @throws Error with user-friendly message on failure
  */
-export async function getOrderPhotos(
-  token: string,
-  orderId: string,
-): Promise<OrderPhotoDTO[]> {
+export async function getOrderPhotos(token: string, orderId: string): Promise<OrderPhotoDTO[]> {
   const res = await fetch(`${API_URL}/orders/${encodeURIComponent(orderId)}/photos`, {
     method: 'GET',
     headers: {

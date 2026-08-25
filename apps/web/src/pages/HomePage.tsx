@@ -419,8 +419,7 @@ export const HomePage: React.FC = () => {
               <div style={{ display: 'grid', gap: '12px' }}>
                 {customers.map((c) => {
                   const isSelected = selectedCustomer?.id === c.id;
-                  const tierStyle =
-                    MEMBERSHIP_COLORS[c.membership] || MEMBERSHIP_COLORS.NONE!;
+                  const tierStyle = MEMBERSHIP_COLORS[c.membership] || MEMBERSHIP_COLORS.NONE!;
 
                   return (
                     <div

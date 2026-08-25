@@ -5,14 +5,7 @@ import { PhotoCapture, Button, Card, LoadingState, EmptyState, ErrorState } from
 import { PhotoType } from '@growfast/shared-types';
 import type { OrderPhotoDTO } from '@growfast/shared-types';
 import { uploadPhoto, getOrderPhotos } from '../services/photo.api';
-import {
-  ArrowLeft,
-  Camera,
-  CheckCircle,
-  SkipForward,
-  AlertCircle,
-  ImageIcon,
-} from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle, SkipForward, AlertCircle, ImageIcon } from 'lucide-react';
 
 // ── Photo category configuration ────────────────────────────────────
 
@@ -221,9 +214,7 @@ export const PhotoCaptureView: React.FC = () => {
         </Button>
         <div style={{ flex: 1 }}>
           <h1 style={styles.headerTitle}>Order Photos</h1>
-          <p style={styles.headerSubtitle}>
-            Order: {orderId.substring(0, 8)}…
-          </p>
+          <p style={styles.headerSubtitle}>Order: {orderId.substring(0, 8)}…</p>
         </div>
         <div style={styles.headerIcon}>
           <Camera size={24} />
@@ -257,18 +248,12 @@ export const PhotoCaptureView: React.FC = () => {
       {/* Gallery Section */}
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Photo Gallery</h2>
-        <p style={styles.sectionSubtitle}>
-          All photos attached to this order.
-        </p>
+        <p style={styles.sectionSubtitle}>All photos attached to this order.</p>
 
         {galleryLoading ? (
           <LoadingState message="Loading photos..." />
         ) : galleryError ? (
-          <ErrorState
-            title="Could not load photos"
-            message={galleryError}
-            onRetry={loadGallery}
-          />
+          <ErrorState title="Could not load photos" message={galleryError} onRetry={loadGallery} />
         ) : galleryPhotos.length === 0 ? (
           <EmptyState
             title="No photos yet"
@@ -309,12 +294,8 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
         <div style={{ flex: 1 }}>
           <div style={styles.categoryLabelRow}>
             <span style={styles.categoryLabel}>{category.label}</span>
-            {!category.skippable && (
-              <span style={styles.requiredBadge}>Required</span>
-            )}
-            {category.skippable && (
-              <span style={styles.optionalBadge}>Optional</span>
-            )}
+            {!category.skippable && <span style={styles.requiredBadge}>Required</span>}
+            {category.skippable && <span style={styles.optionalBadge}>Optional</span>}
           </div>
           <p style={styles.categoryDescription}>{category.description}</p>
         </div>
@@ -374,9 +355,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
           <div style={styles.statusArea}>
             <div style={styles.errorRow}>
               <AlertCircle size={20} color="#EF4444" />
-              <span style={styles.errorText}>
-                {state.error || 'Upload failed'}
-              </span>
+              <span style={styles.errorText}>{state.error || 'Upload failed'}</span>
             </div>
             <Button
               variant="outline"

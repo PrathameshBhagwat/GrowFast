@@ -101,9 +101,9 @@ describe('PaymentService', () => {
         return cb(tx);
       });
 
-      await expect(
-        service.recordPayment(mockEmployeeId, mockStoreId, validDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.recordPayment(mockEmployeeId, mockStoreId, validDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw ForbiddenException if order belongs to a different store', async () => {
@@ -116,9 +116,9 @@ describe('PaymentService', () => {
         return cb(tx);
       });
 
-      await expect(
-        service.recordPayment(mockEmployeeId, mockStoreId, validDto),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.recordPayment(mockEmployeeId, mockStoreId, validDto)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw BadRequestException on overpayment', async () => {
@@ -208,9 +208,9 @@ describe('PaymentService', () => {
         payments: [],
       });
 
-      await expect(
-        service.getOrderPayments(mockOrder.id, mockStoreId),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getOrderPayments(mockOrder.id, mockStoreId)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecordPaymentRequest, PaymentDTO } from '@growfast/shared-types';
 import { PaymentStatus, Prisma } from '@prisma/client';
@@ -44,7 +49,7 @@ export class PaymentService {
         // 4. Calculate new totals
         const newAmountPaid = order.amountPaid + dto.amount;
         const newAmountDue = order.totalAmount - newAmountPaid;
-        
+
         let newPaymentStatus = order.paymentStatus;
         if (newAmountDue <= 0) {
           newPaymentStatus = PaymentStatus.PAID;

@@ -12,15 +12,8 @@ export class PaymentController {
 
   @Post()
   @Roles('OWNER', 'MANAGER', 'COUNTER', 'DELIVERY')
-  async recordPayment(
-    @Request() req: any,
-    @Body() body: RecordPaymentRequest,
-  ) {
-    const payment = await this.paymentService.recordPayment(
-      req.user.id,
-      req.user.storeId,
-      body,
-    );
+  async recordPayment(@Request() req: any, @Body() body: RecordPaymentRequest) {
+    const payment = await this.paymentService.recordPayment(req.user.id, req.user.storeId, body);
     return {
       success: true,
       data: payment,
@@ -35,14 +28,8 @@ export class OrderPaymentController {
 
   @Get()
   @Roles('OWNER', 'MANAGER', 'COUNTER', 'DELIVERY')
-  async getOrderPayments(
-    @Request() req: any,
-    @Param('orderId') orderId: string,
-  ) {
-    const payments = await this.paymentService.getOrderPayments(
-      orderId,
-      req.user.storeId,
-    );
+  async getOrderPayments(@Request() req: any, @Param('orderId') orderId: string) {
+    const payments = await this.paymentService.getOrderPayments(orderId, req.user.storeId);
     return {
       success: true,
       data: payments,

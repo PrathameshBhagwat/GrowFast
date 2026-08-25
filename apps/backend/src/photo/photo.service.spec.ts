@@ -342,9 +342,9 @@ describe('PhotoService', () => {
     it('should reject retrieval for non-existent order', async () => {
       mockPrismaService.order.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getOrderPhotos('order-nonexistent', MOCK_STORE_ID),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getOrderPhotos('order-nonexistent', MOCK_STORE_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should only return photos belonging to the requested order', async () => {
@@ -413,9 +413,9 @@ describe('PhotoService', () => {
         storeId: 'store-other',
       });
 
-      await expect(
-        service.getOrderPhotos('order-001', MOCK_STORE_ID),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getOrderPhotos('order-001', MOCK_STORE_ID)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(mockPrismaService.orderPhoto.findMany).not.toHaveBeenCalled();
     });
