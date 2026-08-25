@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { CustomerProfilePage } from './pages/CustomerProfilePage';
 import { PhotoCaptureView } from './pages/PhotoCaptureView';
 import { CatalogSettingsPage } from './pages/CatalogSettingsPage';
 import { MasterDataPage } from './pages/MasterDataPage';
@@ -27,6 +28,15 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Developer A — Customer Profile (A3) */}
+      <Route
+        path="/customers/:customerId"
+        element={
+          <ProtectedRoute>
+            <CustomerProfilePage />
           </ProtectedRoute>
         }
       />

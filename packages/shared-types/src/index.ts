@@ -34,6 +34,7 @@ export type {
   EmployeeSummary,
   CustomerDTO,
   CreateCustomerRequest,
+  UpdateCustomerRequest,
   OrderSummaryDTO,
   OrderDetailDTO,
   OrderItemDTO,
