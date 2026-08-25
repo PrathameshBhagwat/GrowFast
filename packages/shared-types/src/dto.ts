@@ -160,6 +160,12 @@ export interface GarmentCatalogDTO {
   isActive: boolean;
 }
 
+export interface UpdateGarmentRequest {
+  name?: string;
+  category?: GarmentCategory;
+  isActive?: boolean;
+}
+
 export interface ServiceTypeDTO {
   id: string;
   name: string;

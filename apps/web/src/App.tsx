@@ -4,6 +4,8 @@ import { useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { CatalogSettingsPage } from './pages/CatalogSettingsPage';
+import { MasterDataPage } from './pages/MasterDataPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -24,6 +26,23 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Developer B — Catalog Management (B1) */}
+      <Route
+        path="/catalog"
+        element={
+          <ProtectedRoute>
+            <CatalogSettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/master-data"
+        element={
+          <ProtectedRoute>
+            <MasterDataPage />
           </ProtectedRoute>
         }
       />
