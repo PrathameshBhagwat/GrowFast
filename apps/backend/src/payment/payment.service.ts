@@ -11,6 +11,8 @@ import {
   PaymentDTO,
   PaymentMode,
   PaymentSummaryDTO,
+  PaymentStatus as SharedPaymentStatus,
+  PaymentMode as SharedPaymentMode,
 } from '@growfast/shared-types';
 import { PaymentStatus, OrderStatus, Prisma } from '@prisma/client';
 
@@ -170,7 +172,7 @@ export class PaymentService {
             id: payment.id,
             orderId: payment.orderId,
             amount: payment.amount,
-            mode: payment.mode as any,
+            mode: payment.mode as unknown as SharedPaymentMode,
             reference: payment.reference,
             receivedById: payment.receivedById,
             receivedByName: payment.receivedBy.name,
@@ -237,7 +239,7 @@ export class PaymentService {
       totalAmount: order.totalAmount,
       amountPaid: computedPaid,
       amountDue: computedDue,
-      paymentStatus: computedStatus as any,
+      paymentStatus: computedStatus as unknown as SharedPaymentStatus,
       paymentCount: order.payments.length,
       isConsistent,
     };
@@ -266,7 +268,7 @@ export class PaymentService {
       id: p.id,
       orderId: p.orderId,
       amount: p.amount,
-      mode: p.mode as any,
+      mode: p.mode as unknown as SharedPaymentMode,
       reference: p.reference,
       receivedById: p.receivedById,
       receivedByName: p.receivedBy.name,
