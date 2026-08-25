@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
-import { GarmentCategory } from '@prisma/client';
+import { GarmentCategory } from '@growfast/shared-types';
 
 /**
  * DTO for PATCH /api/garments/:id.

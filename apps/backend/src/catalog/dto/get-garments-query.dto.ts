@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum } from 'class-validator';
-import { GarmentCategory } from '@prisma/client';
+import { GarmentCategory } from '@growfast/shared-types';
 
 /**
  * Query DTO for GET /api/garments.

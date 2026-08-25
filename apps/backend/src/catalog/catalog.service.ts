@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { GarmentCategory } from '@prisma/client';
+import { GarmentCategory } from '@growfast/shared-types';
 import { UpdateGarmentDto } from './dto/update-garment.dto';
 
 /**

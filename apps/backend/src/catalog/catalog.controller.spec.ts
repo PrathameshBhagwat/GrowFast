@@ -4,15 +4,7 @@ import { CatalogService } from './catalog.service';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../auth/roles.decorator';
 
-// GarmentCategory values — matching @prisma/client enum values
-const GarmentCategory = {
-  MEN: 'MEN' as const,
-  WOMEN: 'WOMEN' as const,
-  KIDS: 'KIDS' as const,
-  HOUSEHOLD: 'HOUSEHOLD' as const,
-  SHOES: 'SHOES' as const,
-  SPECIAL: 'SPECIAL' as const,
-};
+import { GarmentCategory } from '@growfast/shared-types';
 
 // Mock CatalogService
 const mockCatalogService = {
