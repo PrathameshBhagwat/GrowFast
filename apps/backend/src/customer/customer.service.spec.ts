@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { MembershipTier } from '@growfast/shared-types';
+import { MembershipTier, RegistrationSource } from '@growfast/shared-types';
 
 describe('CustomerService', () => {
   let service: CustomerService;
@@ -12,6 +12,8 @@ describe('CustomerService', () => {
       findMany: jest.fn(),
       count: jest.fn(),
       findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -57,6 +59,171 @@ describe('CustomerService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('createCustomer', () => {
+    it('1. should create a customer with valid required fields', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(null);
+      mockPrismaService.customer.create.mockResolvedValue({
+        id: 'cust-100',
+        name: 'Aarav Kumar',
+        phone: '9876512345',
+        email: null,
+        address: null,
+        pincode: null,
+        membership: 'NONE',
+        discountPercent: 0,
+        preferences: null,
+        registrationSource: 'WALK_IN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.createCustomer({
+        name: '  Aarav Kumar  ',
+        phone: '  9876512345  ',
+      });
+
+      expect(result).toBeDefined();
+      expect(result.name).toBe('Aarav Kumar');
+      expect(result.phone).toBe('9876512345');
+      expect(result.membership).toBe(MembershipTier.NONE);
+      expect(mockPrismaService.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: 'Aarav Kumar',
+            phone: '9876512345',
+            registrationSource: 'WALK_IN',
+          }),
+        }),
+      );
+    });
+
+    it('2. should throw BadRequestException if name is missing or empty', async () => {
+      await expect(
+        service.createCustomer({ name: '   ', phone: '9876512345' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('3. should throw BadRequestException if phone is missing or empty', async () => {
+      await expect(
+        service.createCustomer({ name: 'Aarav Kumar', phone: '   ' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('4. should throw BadRequestException if phone format is invalid', async () => {
+      await expect(
+        service.createCustomer({ name: 'Aarav Kumar', phone: '123' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('5. should throw BadRequestException if email format is invalid', async () => {
+      await expect(
+        service.createCustomer({
+          name: 'Aarav Kumar',
+          phone: '9876512345',
+          email: 'not-an-email',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('6. should throw ConflictException if phone number already exists', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
+
+      await expect(
+        service.createCustomer({
+          name: 'New Person',
+          phone: '9876543210',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('7. should create customer with all optional fields', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(null);
+      mockPrismaService.customer.create.mockResolvedValue({
+        id: 'cust-101',
+        name: 'Neha Gupta',
+        phone: '9876543211',
+        email: 'neha@example.com',
+        address: '101 Lotus Colony',
+        pincode: '411038',
+        membership: 'GOLD',
+        discountPercent: 10,
+        preferences: { fragrance: 'jasmine', starch: 'medium' },
+        registrationSource: 'REFERRAL',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.createCustomer({
+        name: 'Neha Gupta',
+        phone: '9876543211',
+        email: 'neha@example.com',
+        address: '101 Lotus Colony',
+        pincode: '411038',
+        membership: MembershipTier.GOLD,
+        discountPercent: 10,
+        preferences: { fragrance: 'jasmine', starch: 'medium' },
+        registrationSource: RegistrationSource.REFERRAL,
+      });
+
+      expect(result.id).toBe('cust-101');
+      expect(result.membership).toBe(MembershipTier.GOLD);
+      expect(result.preferences).toEqual({ fragrance: 'jasmine', starch: 'medium' });
+      expect(result.registrationSource).toBe('REFERRAL');
+    });
+
+    it('8. should throw BadRequestException for invalid membership tier', async () => {
+      await expect(
+        service.createCustomer({
+          name: 'Test',
+          phone: '9876512345',
+          membership: 'INVALID_TIER' as any,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('9. should handle Prisma unique constraint P2002 error gracefully', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(null);
+      const prismaError: any = new Error('Unique constraint failed');
+      prismaError.code = 'P2002';
+      mockPrismaService.customer.create.mockRejectedValue(prismaError);
+
+      await expect(
+        service.createCustomer({
+          name: 'Duplicate Test',
+          phone: '9876512345',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('10. should throw BadRequestException for invalid discount percent', async () => {
+      await expect(
+        service.createCustomer({
+          name: 'Discount Test',
+          phone: '9876512345',
+          discountPercent: 150,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.createCustomer({
+          name: 'Discount Test',
+          phone: '9876512345',
+          discountPercent: -5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('11. should throw BadRequestException for invalid preferences payload', async () => {
+      await expect(
+        service.createCustomer({
+          name: 'Preferences Test',
+          phone: '9876512345',
+          preferences: 'not-an-object' as any,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('searchCustomers', () => {
@@ -192,4 +359,85 @@ describe('CustomerService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('updateCustomer', () => {
+    it('1. should perform valid partial update and return mapped CustomerDTO', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
+      mockPrismaService.customer.update.mockResolvedValue({
+        ...mockCustomers[0],
+        name: 'Rahul Updated',
+        discountPercent: 15,
+      });
+
+      const result = await service.updateCustomer('cust-001', {
+        name: 'Rahul Updated',
+        discountPercent: 15,
+      });
+
+      expect(result.name).toBe('Rahul Updated');
+      expect(result.discountPercent).toBe(15);
+      expect(mockPrismaService.customer.update).toHaveBeenCalledWith({
+        where: { id: 'cust-001' },
+        data: expect.objectContaining({
+          name: 'Rahul Updated',
+          discountPercent: 15,
+        }),
+      });
+    });
+
+    it('2. should throw NotFoundException when updating non-existent customer', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateCustomer('cust-999', { name: 'Test' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('3. should allow retaining current customer phone number without conflict', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
+      mockPrismaService.customer.update.mockResolvedValue(mockCustomers[0]);
+
+      const result = await service.updateCustomer('cust-001', {
+        phone: '9876543210',
+      });
+
+      expect(result.phone).toBe('9876543210');
+      expect(mockPrismaService.customer.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('4. should throw ConflictException when updating to phone belonging to another customer', async () => {
+      mockPrismaService.customer.findUnique
+        .mockResolvedValueOnce(mockCustomers[0]) // existing customer to update
+        .mockResolvedValueOnce(mockCustomers[1]); // existing conflict customer
+
+      await expect(
+        service.updateCustomer('cust-001', { phone: '9876500000' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('5. should throw BadRequestException for invalid phone format', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
+
+      await expect(
+        service.updateCustomer('cust-001', { phone: '123' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('6. should throw BadRequestException for invalid email format', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
+
+      await expect(
+        service.updateCustomer('cust-001', { email: 'bad-email' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('7. should throw BadRequestException for invalid discount percentage', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
+
+      await expect(
+        service.updateCustomer('cust-001', { discountPercent: 200 }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });
+

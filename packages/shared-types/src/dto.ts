@@ -67,6 +67,18 @@ export interface CreateCustomerRequest {
   registrationSource?: string;
 }
 
+export interface UpdateCustomerRequest {
+  name?: string;
+  phone?: string;
+  email?: string | null;
+  address?: string | null;
+  pincode?: string | null;
+  membership?: MembershipTier;
+  discountPercent?: number;
+  preferences?: Record<string, string> | null;
+  registrationSource?: string;
+}
+
 // ─── Order DTOs ─────────────────────────────────────────────────────
 
 export interface OrderSummaryDTO {

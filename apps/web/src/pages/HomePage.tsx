@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Card, LoadingState, EmptyState, ErrorState } from '@growfast/ui';
 import { MembershipTier, type CustomerDTO, type PaginatedResponse } from '@growfast/shared-types';
+import { CustomerCreateModal } from '../components/CustomerCreateModal';
 import {
   LogOut,
   Shirt,
@@ -147,6 +148,14 @@ export const HomePage: React.FC = () => {
   // Selected customer state for integration seam
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDTO | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const handleCustomerCreated = (newCustomer: CustomerDTO) => {
+    setCustomers((prev) => [newCustomer, ...prev]);
+    setTotalCount((count) => count + 1);
+    setSelectedCustomer(newCustomer);
+    showNotice(`Customer "${newCustomer.name}" created successfully!`);
+  };
 
   // Debounce search query (300ms)
   useEffect(() => {
@@ -184,6 +193,9 @@ export const HomePage: React.FC = () => {
           if (res.status === 401 && !token.startsWith('dev-mock-jwt-')) {
             logout();
             return;
+          }
+          if (res.status >= 500) {
+            throw new Error('Server 500: Database offline, falling back to mock data');
           }
           const errBody = await res.json().catch(() => ({}));
           throw new Error(errBody.message || `HTTP ${res.status}: Failed to search customers`);
@@ -357,16 +369,12 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
 
-            {/* Customer Creation Placeholder Seam */}
+            {/* Customer Creation Modal Trigger */}
             <Button
               variant="outline"
               size="md"
               icon={<Plus size={18} />}
-              onClick={() =>
-                showNotice(
-                  'Customer Creation flow will be implemented in its dedicated feature branch (Phase 1).',
-                )
-              }
+              onClick={() => setIsCreateModalOpen(true)}
               aria-label="Create Customer"
             >
               Create Customer
@@ -576,17 +584,38 @@ export const HomePage: React.FC = () => {
                           )}
                         </div>
 
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            color: '#64748B',
-                            background: '#F1F5F9',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                          }}
-                        >
-                          ID: {c.id}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              color: '#64748B',
+                              background: '#F1F5F9',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                            }}
+                          >
+                            ID: {c.id}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/customers/${c.id}`);
+                            }}
+                            style={{
+                              background: '#DBEAFE',
+                              color: '#1D4ED8',
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '4px 10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            View Profile
+                          </button>
+                        </div>
                       </div>
 
                       {/* Customer Details info row */}
@@ -703,24 +732,42 @@ export const HomePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Order Creation Seam Button */}
-              <Button
-                variant="primary"
-                size="md"
-                icon={<ArrowRight size={16} />}
-                onClick={() =>
-                  showNotice(
-                    `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${selectedCustomer.id}`,
-                  )
-                }
-                aria-label="Create Order for Customer"
-              >
-                Create Order
-              </Button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <Button
+                  variant="outline"
+                  size="md"
+                  icon={<UserCheck size={16} />}
+                  onClick={() => navigate(`/customers/${selectedCustomer.id}`)}
+                  aria-label="View Customer Profile"
+                >
+                  View Profile
+                </Button>
+                {/* Order Creation Seam Button */}
+                <Button
+                  variant="primary"
+                  size="md"
+                  icon={<ArrowRight size={16} />}
+                  onClick={() =>
+                    showNotice(
+                      `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${selectedCustomer.id}`,
+                    )
+                  }
+                  aria-label="Create Order for Customer"
+                >
+                  Create Order
+                </Button>
+              </div>
             </div>
           </Card>
         )}
       </main>
+
+      {/* Customer Creation Modal */}
+      <CustomerCreateModal
+        open={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCustomerCreated}
+      />
     </div>
   );
 };
