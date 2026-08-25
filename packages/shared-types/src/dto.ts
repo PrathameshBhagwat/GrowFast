@@ -151,6 +151,16 @@ export interface RecordPaymentRequest {
   reference?: string;
 }
 
+export interface PaymentSummaryDTO {
+  orderId: string;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  paymentStatus: PaymentStatus;
+  paymentCount: number;
+  isConsistent: boolean;
+}
+
 // ─── Catalog DTOs ───────────────────────────────────────────────────
 
 export interface GarmentCatalogDTO {

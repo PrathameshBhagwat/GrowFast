@@ -3,13 +3,58 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RecordPaymentRequest, PaymentDTO, PaymentMode } from '@growfast/shared-types';
+import {
+  RecordPaymentRequest,
+  PaymentDTO,
+  PaymentMode,
+  PaymentSummaryDTO,
+} from '@growfast/shared-types';
 import { PaymentStatus, OrderStatus, Prisma } from '@prisma/client';
 
 /** Canonical set of valid payment modes for fast lookup */
 const VALID_PAYMENT_MODES = new Set<string>(Object.values(PaymentMode));
+
+/**
+ * Canonical payment status derivation — ONE source of truth.
+ *
+ * Rules:
+ * - REFUNDED is never overwritten by payment activity.
+ * - amountPaid === 0  → PENDING
+ * - 0 < amountPaid < totalAmount → PARTIAL
+ * - amountPaid >= totalAmount → PAID
+ *
+ * Uses .toFixed(2) precision to mitigate Float drift.
+ */
+export function derivePaymentStatus(
+  amountPaid: number,
+  totalAmount: number,
+  currentStatus: PaymentStatus,
+): PaymentStatus {
+  // Never overwrite a legitimate REFUNDED state
+  if (currentStatus === PaymentStatus.REFUNDED) {
+    return PaymentStatus.REFUNDED;
+  }
+
+  const safePaid = Number(amountPaid.toFixed(2));
+  const safeDue = Number((totalAmount - safePaid).toFixed(2));
+
+  if (safeDue < 0) {
+    throw new ConflictException(
+      `Financial inconsistency: amountPaid (${safePaid}) exceeds totalAmount (${totalAmount})`,
+    );
+  }
+
+  if (safeDue === 0) {
+    return PaymentStatus.PAID;
+  }
+  if (safePaid > 0) {
+    return PaymentStatus.PARTIAL;
+  }
+  return PaymentStatus.PENDING;
+}
 
 @Injectable()
 export class PaymentService {
@@ -89,12 +134,12 @@ export class PaymentService {
           const newAmountPaid = Number((order.amountPaid + dto.amount).toFixed(2));
           const newAmountDue = Number((order.totalAmount - newAmountPaid).toFixed(2));
 
-          let newPaymentStatus = order.paymentStatus;
-          if (newAmountDue <= 0) {
-            newPaymentStatus = PaymentStatus.PAID;
-          } else if (newAmountPaid > 0) {
-            newPaymentStatus = PaymentStatus.PARTIAL;
-          }
+          // 5b. Derive canonical payment status
+          const newPaymentStatus = derivePaymentStatus(
+            newAmountPaid,
+            order.totalAmount,
+            order.paymentStatus,
+          );
 
           // 6. Insert payment
           const payment = await tx.payment.create({
@@ -137,6 +182,65 @@ export class PaymentService {
         },
       ),
     );
+  }
+
+  /**
+   * C4 — Payment Summary with Balance Reconciliation.
+   *
+   * Returns the authoritative financial state for an order by computing
+   * amountPaid from the actual sum of Payment records, then deriving
+   * amountDue and paymentStatus canonically.
+   *
+   * The `isConsistent` flag indicates whether the persisted order financial
+   * fields match the computed values. An inconsistency means the persisted
+   * order.amountPaid has drifted from the authoritative sum of payments.
+   */
+  async getPaymentSummary(orderId: string, storeId: string): Promise<PaymentSummaryDTO> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payments: {
+          select: { amount: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+
+    if (order.storeId !== storeId) {
+      throw new ForbiddenException('Cannot access orders from a different store');
+    }
+
+    // Authoritative sum from actual payment records
+    const computedPaid = Number(
+      order.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2),
+    );
+    const computedDue = Number((order.totalAmount - computedPaid).toFixed(2));
+    const computedStatus = derivePaymentStatus(
+      computedPaid,
+      order.totalAmount,
+      order.paymentStatus,
+    );
+
+    // Consistency check: do persisted values match computed values exactly?
+    const persistedPaid = Number(order.amountPaid.toFixed(2));
+    const persistedDue = Number(order.amountDue.toFixed(2));
+    const isConsistent =
+      persistedPaid === computedPaid &&
+      persistedDue === computedDue &&
+      order.paymentStatus === computedStatus;
+
+    return {
+      orderId: order.id,
+      totalAmount: order.totalAmount,
+      amountPaid: computedPaid,
+      amountDue: computedDue,
+      paymentStatus: computedStatus as any,
+      paymentCount: order.payments.length,
+      isConsistent,
+    };
   }
 
   async getOrderPayments(orderId: string, storeId: string): Promise<PaymentDTO[]> {

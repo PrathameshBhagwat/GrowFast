@@ -35,4 +35,14 @@ export class OrderPaymentController {
       data: payments,
     };
   }
+
+  @Get('summary')
+  @Roles('OWNER', 'MANAGER', 'COUNTER', 'DELIVERY')
+  async getPaymentSummary(@Request() req: any, @Param('orderId') orderId: string) {
+    const summary = await this.paymentService.getPaymentSummary(orderId, req.user.storeId);
+    return {
+      success: true,
+      data: summary,
+    };
+  }
 }
