@@ -65,7 +65,7 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^@growfast/shared-types$": "<rootDir>/../../packages/shared-types/src"
+      "^@growfast/shared-types$": "<rootDir>/../../../packages/shared-types/src"
     }
   }
 }

@@ -10,7 +10,6 @@
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "sourceMap": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
