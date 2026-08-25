@@ -107,6 +107,10 @@ export const HomePage: React.FC = () => {
         });
 
         if (!res.ok) {
+          if (res.status === 401) {
+            logout();
+            return;
+          }
           const errBody = await res.json().catch(() => ({}));
           throw new Error(errBody.message || `HTTP ${res.status}: Failed to search customers`);
         }

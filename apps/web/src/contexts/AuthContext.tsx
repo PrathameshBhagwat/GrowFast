@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [error, setError] = useState<string | null>(null);
 
-  // Restore session from localStorage on mount
+  // Restore session from localStorage on mount and verify token validity
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     const employeeStr = localStorage.getItem(EMPLOYEE_KEY);
@@ -38,12 +38,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token && employeeStr) {
       try {
         const employee = JSON.parse(employeeStr) as EmployeeSummary;
-        setState({
-          isAuthenticated: true,
-          token,
-          employee,
-          isLoading: false,
-        });
+
+        // Verify token with backend
+        fetch(`${API_URL}/auth/me`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => {
+            if (res.ok) {
+              setState({
+                isAuthenticated: true,
+                token,
+                employee,
+                isLoading: false,
+              });
+            } else {
+              // Token invalid or expired — clear storage
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(EMPLOYEE_KEY);
+              setState({
+                isAuthenticated: false,
+                token: null,
+                employee: null,
+                isLoading: false,
+              });
+            }
+          })
+          .catch(() => {
+            // Network or server unreachable — keep local state or allow offline fallback
+            setState({
+              isAuthenticated: true,
+              token,
+              employee,
+              isLoading: false,
+            });
+          });
       } catch {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(EMPLOYEE_KEY);
