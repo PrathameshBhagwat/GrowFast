@@ -14,15 +14,17 @@ const OTHER_STORE_ID = 'store-other';
 const ORDER_ID = 'order-1';
 
 /** Factory: create a mock order with sensible defaults */
-function makeOrder(overrides: Partial<{
-  id: string;
-  storeId: string;
-  totalAmount: number;
-  amountPaid: number;
-  amountDue: number;
-  paymentStatus: PaymentStatus;
-  status: OrderStatus;
-}> = {}) {
+function makeOrder(
+  overrides: Partial<{
+    id: string;
+    storeId: string;
+    totalAmount: number;
+    amountPaid: number;
+    amountDue: number;
+    paymentStatus: PaymentStatus;
+    status: OrderStatus;
+  }> = {},
+) {
   return {
     id: ORDER_ID,
     storeId: STORE_ID,
@@ -36,13 +38,16 @@ function makeOrder(overrides: Partial<{
 }
 
 /** Factory: create a mock payment result */
-function makePaymentResult(amount: number, overrides: Partial<{
-  id: string;
-  orderId: string;
-  mode: string;
-  reference: string | null;
-  receivedById: string;
-}> = {}) {
+function makePaymentResult(
+  amount: number,
+  overrides: Partial<{
+    id: string;
+    orderId: string;
+    mode: string;
+    reference: string | null;
+    receivedById: string;
+  }> = {},
+) {
   return {
     id: overrides.id ?? 'pay-1',
     orderId: overrides.orderId ?? ORDER_ID,
@@ -81,10 +86,7 @@ describe('PaymentService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PaymentService,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [PaymentService, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     service = module.get<PaymentService>(PaymentService);
@@ -156,7 +158,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder(),
         paymentResult: makePaymentResult(1000),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 1000 }));
@@ -173,11 +177,15 @@ describe('PaymentService', () => {
         paymentResult: makePaymentResult(500, { mode: 'UPI', reference: 'UPI-REF-123' }),
       });
 
-      const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({
-        amount: 500,
-        mode: PaymentMode.UPI,
-        reference: 'UPI-REF-123',
-      }));
+      const result = await service.recordPayment(
+        EMPLOYEE_ID,
+        STORE_ID,
+        makeDto({
+          amount: 500,
+          mode: PaymentMode.UPI,
+          reference: 'UPI-REF-123',
+        }),
+      );
 
       expect(result.amount).toBe(500);
       expect(result.reference).toBe('UPI-REF-123');
@@ -205,7 +213,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder({ amountPaid: 0, amountDue: 1000, paymentStatus: PaymentStatus.PENDING }),
         paymentResult: makePaymentResult(400),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 400 }));
@@ -220,7 +230,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder({ amountPaid: 400, amountDue: 600, paymentStatus: PaymentStatus.PARTIAL }),
         paymentResult: makePaymentResult(300),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 300 }));
@@ -235,7 +247,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder({ amountPaid: 700, amountDue: 300, paymentStatus: PaymentStatus.PARTIAL }),
         paymentResult: makePaymentResult(300),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 300 }));
@@ -257,7 +271,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder({ totalAmount: 1000, amountPaid: 0, amountDue: 1000 }),
         paymentResult: makePaymentResult(400),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 400 }));
@@ -271,7 +287,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder({ totalAmount: 1000, amountPaid: 400, amountDue: 600 }),
         paymentResult: makePaymentResult(300),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 300 }));
@@ -285,7 +303,9 @@ describe('PaymentService', () => {
       setupTransaction({
         order: makeOrder({ totalAmount: 1000, amountPaid: 0, amountDue: 1000 }),
         paymentResult: makePaymentResult(1000),
-        onUpdate: (data) => { capturedUpdate = data; },
+        onUpdate: (data) => {
+          capturedUpdate = data;
+        },
       });
 
       await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 1000 }));
@@ -378,7 +398,11 @@ describe('PaymentService', () => {
         paymentResult: makePaymentResult(400, { mode: 'CASH' }),
       });
 
-      const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ mode: PaymentMode.CASH }));
+      const result = await service.recordPayment(
+        EMPLOYEE_ID,
+        STORE_ID,
+        makeDto({ mode: PaymentMode.CASH }),
+      );
       expect(result).toBeDefined();
     });
 
@@ -388,7 +412,11 @@ describe('PaymentService', () => {
         paymentResult: makePaymentResult(400, { mode: 'UPI' }),
       });
 
-      const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ mode: PaymentMode.UPI }));
+      const result = await service.recordPayment(
+        EMPLOYEE_ID,
+        STORE_ID,
+        makeDto({ mode: PaymentMode.UPI }),
+      );
       expect(result).toBeDefined();
     });
 
@@ -398,7 +426,11 @@ describe('PaymentService', () => {
         paymentResult: makePaymentResult(400, { mode: 'CARD' }),
       });
 
-      const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ mode: PaymentMode.CARD }));
+      const result = await service.recordPayment(
+        EMPLOYEE_ID,
+        STORE_ID,
+        makeDto({ mode: PaymentMode.CARD }),
+      );
       expect(result).toBeDefined();
     });
 
@@ -423,9 +455,9 @@ describe('PaymentService', () => {
     it('should reject payment for non-existent order (404)', async () => {
       setupTransaction({ order: null });
 
-      await expect(
-        service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto()),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto())).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should reject payment for cancelled order', async () => {
@@ -433,9 +465,9 @@ describe('PaymentService', () => {
         order: makeOrder({ status: OrderStatus.CANCELLED }),
       });
 
-      await expect(
-        service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto()),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto())).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should accept payment for RECEIVED order', async () => {
@@ -479,9 +511,9 @@ describe('PaymentService', () => {
         order: makeOrder({ storeId: OTHER_STORE_ID }),
       });
 
-      await expect(
-        service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto()),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto())).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -571,9 +603,9 @@ describe('PaymentService', () => {
         shouldFailOnCreate: new Error('DB write failed'),
       });
 
-      await expect(
-        service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto()),
-      ).rejects.toThrow('DB write failed');
+      await expect(service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto())).rejects.toThrow(
+        'DB write failed',
+      );
 
       // The transaction should roll back — no order update should persist
     });
@@ -585,9 +617,9 @@ describe('PaymentService', () => {
         shouldFailOnUpdate: new Error('Order update failed'),
       });
 
-      await expect(
-        service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto()),
-      ).rejects.toThrow('Order update failed');
+      await expect(service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto())).rejects.toThrow(
+        'Order update failed',
+      );
 
       // The transaction should roll back — payment should not persist
     });
@@ -640,11 +672,15 @@ describe('PaymentService', () => {
         paymentResult: makePaymentResult(400, { id: 'pay-abc', mode: 'UPI', reference: 'REF-X' }),
       });
 
-      const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({
-        amount: 400,
-        mode: PaymentMode.UPI,
-        reference: 'REF-X',
-      }));
+      const result = await service.recordPayment(
+        EMPLOYEE_ID,
+        STORE_ID,
+        makeDto({
+          amount: 400,
+          mode: PaymentMode.UPI,
+          reference: 'REF-X',
+        }),
+      );
 
       expect(result).toEqual({
         id: 'pay-abc',
@@ -715,9 +751,9 @@ describe('PaymentService', () => {
     it('should reject retrieval for non-existent order (404)', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getOrderPayments('non-existent-order', STORE_ID),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getOrderPayments('non-existent-order', STORE_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should reject cross-store payment retrieval (IDOR)', async () => {
@@ -738,9 +774,9 @@ describe('PaymentService', () => {
         ],
       });
 
-      await expect(
-        service.getOrderPayments(ORDER_ID, STORE_ID),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getOrderPayments(ORDER_ID, STORE_ID)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should not expose payment data when cross-store access is attempted', async () => {
