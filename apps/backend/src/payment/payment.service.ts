@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RecordPaymentRequest, PaymentDTO } from '@growfast/shared-types';
-import { PaymentStatus, Prisma } from '@prisma/client';
+import { RecordPaymentRequest, PaymentDTO, PaymentMode } from '@growfast/shared-types';
+import { PaymentStatus, OrderStatus, Prisma } from '@prisma/client';
+
+/** Canonical set of valid payment modes for fast lookup */
+const VALID_PAYMENT_MODES = new Set<string>(Object.values(PaymentMode));
 
 @Injectable()
 export class PaymentService {
@@ -12,13 +15,21 @@ export class PaymentService {
     storeId: string,
     dto: RecordPaymentRequest,
   ): Promise<PaymentDTO> {
+    // 0a. Amount validation — reject zero, negative, NaN, Infinity
     if (dto.amount <= 0 || !Number.isFinite(dto.amount)) {
       throw new BadRequestException('Payment amount must be greater than zero');
     }
 
+    // 0b. PaymentMode validation — reject invalid modes before DB round-trip
+    if (!VALID_PAYMENT_MODES.has(dto.mode)) {
+      throw new BadRequestException(
+        `Invalid payment mode: ${dto.mode}. Valid modes: ${[...VALID_PAYMENT_MODES].join(', ')}`,
+      );
+    }
+
     return this.prisma.$transaction(
       async (tx) => {
-        // 1. Fetch order with exclusive lock or rely on Serializable isolation
+        // 1. Fetch order — Serializable isolation prevents concurrent races
         const order = await tx.order.findUnique({
           where: { id: dto.orderId },
         });
@@ -32,16 +43,19 @@ export class PaymentService {
           throw new ForbiddenException('Cannot access orders from a different store');
         }
 
-        // 3. Financial validation
-        // We round the values to 2 decimal places to avoid floating point issues if applicable,
-        // but for safety we just check > amountDue.
+        // 3. Cancelled order guard — do not accept payment for cancelled orders
+        if (order.status === OrderStatus.CANCELLED) {
+          throw new BadRequestException('Cannot record payment for a cancelled order');
+        }
+
+        // 4. Financial validation — reject overpayment
         if (dto.amount > order.amountDue) {
           throw new BadRequestException(
             `Payment amount (${dto.amount}) exceeds amount due (${order.amountDue})`,
           );
         }
 
-        // 4. Calculate new totals
+        // 5. Calculate new totals
         const newAmountPaid = order.amountPaid + dto.amount;
         const newAmountDue = order.totalAmount - newAmountPaid;
         
@@ -52,7 +66,7 @@ export class PaymentService {
           newPaymentStatus = PaymentStatus.PARTIAL;
         }
 
-        // 5. Insert payment
+        // 6. Insert payment
         const payment = await tx.payment.create({
           data: {
             orderId: dto.orderId,
@@ -66,7 +80,7 @@ export class PaymentService {
           },
         });
 
-        // 6. Update order financial state
+        // 7. Update order financial state atomically
         await tx.order.update({
           where: { id: dto.orderId },
           data: {
