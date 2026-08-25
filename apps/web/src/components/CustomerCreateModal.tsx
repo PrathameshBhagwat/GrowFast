@@ -246,7 +246,10 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
   return (
     <Modal open={open} onClose={onClose} title="Create New Customer" width="560px">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+      >
         {apiError && (
           <div
             style={{

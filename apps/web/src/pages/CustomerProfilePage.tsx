@@ -226,7 +226,13 @@ export const CustomerProfilePage: React.FC = () => {
     }
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: '12px',
+        }}
+      >
         {Object.entries(prefs).map(([key, val]) => {
           const readableCategory = key.charAt(0).toUpperCase() + key.slice(1);
           const readableVal = PREFERENCE_LABELS[key]?.[String(val)] || String(val);
@@ -241,8 +247,17 @@ export const CustomerProfilePage: React.FC = () => {
                 border: '1px solid #E2E8F0',
               }}
             >
-              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>{readableCategory}</div>
-              <div style={{ fontSize: '0.875rem', color: '#1E293B', fontWeight: 600, marginTop: '2px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                {readableCategory}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.875rem',
+                  color: '#1E293B',
+                  fontWeight: 600,
+                  marginTop: '2px',
+                }}
+              >
                 {readableVal}
               </div>
             </div>
@@ -389,8 +404,12 @@ export const CustomerProfilePage: React.FC = () => {
                 </div>
 
                 <div style={{ flex: 1, minWidth: '220px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}
+                  >
+                    <h2
+                      style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: '#0F172A' }}
+                    >
                       {customer.name}
                     </h2>
 
@@ -421,12 +440,28 @@ export const CustomerProfilePage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '0.9rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: '#475569',
+                        fontSize: '0.9rem',
+                      }}
+                    >
                       <Phone size={16} color="#2563EB" />
                       <span>{customer.phone}</span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '0.9rem' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: '#475569',
+                        fontSize: '0.9rem',
+                      }}
+                    >
                       <Mail size={16} color="#2563EB" />
                       <span>{customer.email || 'No email provided'}</span>
                     </div>
@@ -436,7 +471,13 @@ export const CustomerProfilePage: React.FC = () => {
             </Card>
 
             {/* Profile Grid: Left 2 Cols, Right 1 Col */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: '20px',
+              }}
+            >
               {/* Contact & Address Card */}
               <Card style={{ padding: '20px' }}>
                 <h3
@@ -456,30 +497,58 @@ export const CustomerProfilePage: React.FC = () => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Phone Number</div>
-                    <div style={{ fontSize: '0.95rem', color: '#1E293B', fontWeight: 600, marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                      Phone Number
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.95rem',
+                        color: '#1E293B',
+                        fontWeight: 600,
+                        marginTop: '2px',
+                      }}
+                    >
                       {customer.phone}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Email Address</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                      Email Address
+                    </div>
                     <div style={{ fontSize: '0.95rem', color: '#1E293B', marginTop: '2px' }}>
-                      {customer.email || <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>}
+                      {customer.email || (
+                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>
+                      )}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Postal Address</div>
-                    <div style={{ fontSize: '0.95rem', color: '#1E293B', marginTop: '2px', lineHeight: '1.4' }}>
-                      {customer.address || <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>}
+                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                      Postal Address
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.95rem',
+                        color: '#1E293B',
+                        marginTop: '2px',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {customer.address || (
+                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>
+                      )}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Pincode</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                      Pincode
+                    </div>
                     <div style={{ fontSize: '0.95rem', color: '#1E293B', marginTop: '2px' }}>
-                      {customer.pincode || <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>}
+                      {customer.pincode || (
+                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -531,14 +600,25 @@ export const CustomerProfilePage: React.FC = () => {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Registration Source</div>
-                      <div style={{ fontSize: '0.9rem', color: '#1E293B', fontWeight: 600, marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                        Registration Source
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.9rem',
+                          color: '#1E293B',
+                          fontWeight: 600,
+                          marginTop: '2px',
+                        }}
+                      >
                         {customer.registrationSource || 'WALK_IN'}
                       </div>
                     </div>
 
                     <div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>Member Since</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                        Member Since
+                      </div>
                       <div style={{ fontSize: '0.9rem', color: '#1E293B', marginTop: '2px' }}>
                         {formatDate(customer.createdAt)}
                       </div>

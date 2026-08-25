@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService, derivePaymentStatus } from './payment.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { BadRequestException, ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { RecordPaymentRequest, PaymentMode } from '@growfast/shared-types';
 
@@ -1033,10 +1038,7 @@ describe('PaymentService', () => {
 
     it('should not leak cross-store financial data in error messages', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(
-        makeOrderWithPayments(
-          { storeId: OTHER_STORE_ID, totalAmount: 9999 },
-          [{ amount: 5000 }],
-        ),
+        makeOrderWithPayments({ storeId: OTHER_STORE_ID, totalAmount: 9999 }, [{ amount: 5000 }]),
       );
 
       try {
@@ -1068,9 +1070,7 @@ describe('derivePaymentStatus', () => {
   });
 
   it('should throw ConflictException when amountPaid exceeds totalAmount', () => {
-    expect(() => derivePaymentStatus(1200, 1000, PaymentStatus.PARTIAL)).toThrow(
-      ConflictException,
-    );
+    expect(() => derivePaymentStatus(1200, 1000, PaymentStatus.PARTIAL)).toThrow(ConflictException);
   });
 
   it('should preserve REFUNDED status and never overwrite it', () => {

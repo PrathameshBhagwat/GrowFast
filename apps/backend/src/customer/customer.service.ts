@@ -1,6 +1,16 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { CustomerDTO, CreateCustomerRequest, UpdateCustomerRequest, PaginatedResponse } from '@growfast/shared-types';
+import type {
+  CustomerDTO,
+  CreateCustomerRequest,
+  UpdateCustomerRequest,
+  PaginatedResponse,
+} from '@growfast/shared-types';
 import { MembershipTier, RegistrationSource } from '@growfast/shared-types';
 
 @Injectable()
@@ -31,9 +41,7 @@ export class CustomerService {
     // Conservative phone validation: 10-15 digits, allowing optional leading +
     const cleanPhoneDigits = phone.replace(/[\s\-()]/g, '');
     if (!/^\+?[0-9]{10,15}$/.test(cleanPhoneDigits)) {
-      throw new BadRequestException(
-        'Invalid phone number format. Must contain 10-15 digits.',
-      );
+      throw new BadRequestException('Invalid phone number format. Must contain 10-15 digits.');
     }
 
     // ── 3. Validate Email (Optional) ───────────────────────────────────
@@ -63,9 +71,7 @@ export class CustomerService {
     let registrationSource = 'WALK_IN';
     if (dto.registrationSource) {
       if (
-        !Object.values(RegistrationSource).includes(
-          dto.registrationSource as RegistrationSource,
-        )
+        !Object.values(RegistrationSource).includes(dto.registrationSource as RegistrationSource)
       ) {
         throw new BadRequestException(
           `Invalid registration source. Allowed values: ${Object.values(RegistrationSource).join(', ')}`,
@@ -103,7 +109,9 @@ export class CustomerService {
     });
 
     if (existing) {
-      throw new ConflictException(`Customer with phone number '${cleanPhoneDigits}' already exists.`);
+      throw new ConflictException(
+        `Customer with phone number '${cleanPhoneDigits}' already exists.`,
+      );
     }
 
     // ── 10. Persistence ───────────────────────────────────────────────
@@ -251,9 +259,7 @@ export class CustomerService {
 
       const cleanPhoneDigits = phone.replace(/[\s\-()]/g, '');
       if (!/^\+?[0-9]{10,15}$/.test(cleanPhoneDigits)) {
-        throw new BadRequestException(
-          'Invalid phone number format. Must contain 10-15 digits.',
-        );
+        throw new BadRequestException('Invalid phone number format. Must contain 10-15 digits.');
       }
 
       // Duplicate phone check if phone number is changing
@@ -307,9 +313,7 @@ export class CustomerService {
     // ── 7. Validate Registration Source (Optional) ────────────────────
     if (dto.registrationSource !== undefined) {
       if (
-        !Object.values(RegistrationSource).includes(
-          dto.registrationSource as RegistrationSource,
-        )
+        !Object.values(RegistrationSource).includes(dto.registrationSource as RegistrationSource)
       ) {
         throw new BadRequestException(
           `Invalid registration source. Allowed values: ${Object.values(RegistrationSource).join(', ')}`,
@@ -379,4 +383,3 @@ export class CustomerService {
     };
   }
 }
-

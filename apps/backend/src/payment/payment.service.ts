@@ -216,9 +216,7 @@ export class PaymentService {
     }
 
     // Authoritative sum from actual payment records
-    const computedPaid = Number(
-      order.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2),
-    );
+    const computedPaid = Number(order.payments.reduce((sum, p) => sum + p.amount, 0).toFixed(2));
     const computedDue = Number((order.totalAmount - computedPaid).toFixed(2));
     const computedStatus = derivePaymentStatus(
       computedPaid,

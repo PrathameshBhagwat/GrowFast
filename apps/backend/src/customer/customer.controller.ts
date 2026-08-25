@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Body, Query, Param, UseGuards, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Query,
+  Param,
+  UseGuards,
+  NotFoundException,
+} from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -65,10 +75,7 @@ export class CustomerController {
    */
   @Patch(':id')
   @Roles('OWNER', 'MANAGER', 'COUNTER')
-  async updateCustomer(
-    @Param('id') id: string,
-    @Body() dto: UpdateCustomerRequest,
-  ) {
+  async updateCustomer(@Param('id') id: string, @Body() dto: UpdateCustomerRequest) {
     const customer = await this.customerService.updateCustomer(id, dto);
     return {
       success: true,
@@ -76,4 +83,3 @@ export class CustomerController {
     };
   }
 }
-

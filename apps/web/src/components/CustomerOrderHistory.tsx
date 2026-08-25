@@ -79,7 +79,9 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
           setOrders([]);
         } else if (res && (res.status === 401 || res.status === 403)) {
           const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody.message || `Access denied to customer order history (HTTP ${res.status}).`);
+          throw new Error(
+            errBody.message || `Access denied to customer order history (HTTP ${res.status}).`,
+          );
         } else if (res && res.status >= 500) {
           throw new Error(`Order service error (HTTP ${res.status}). Please retry.`);
         } else if (res) {
@@ -87,7 +89,9 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
           throw new Error(errBody.message || `Failed to fetch order history (HTTP ${res.status}).`);
         } else {
           // Network fetch failure when backend server is offline or unreachable
-          throw new Error('Unable to connect to backend order service. Please check network connection.');
+          throw new Error(
+            'Unable to connect to backend order service. Please check network connection.',
+          );
         }
       } else {
         // Dev mock fallback - Developer B order backend not implemented yet
@@ -182,8 +186,8 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
             Cross-Team Order Query Integration Seam
           </div>
           <div style={{ fontSize: '0.825rem', color: '#64748B', maxWidth: '480px' }}>
-            Developer A frontend customer profile is ready. Pending Developer B implementation of backend endpoint{' '}
-            <code>GET /api/orders?customerId={customerId}</code>.
+            Developer A frontend customer profile is ready. Pending Developer B implementation of
+            backend endpoint <code>GET /api/orders?customerId={customerId}</code>.
           </div>
           <Button
             variant="outline"
@@ -317,7 +321,9 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
                       try {
                         navigate(`/orders/${order.id}`);
                       } catch {
-                        handleNotify(`Navigating to Developer B Order Details via /orders/${order.id}`);
+                        handleNotify(
+                          `Navigating to Developer B Order Details via /orders/${order.id}`,
+                        );
                       }
                     }}
                   >

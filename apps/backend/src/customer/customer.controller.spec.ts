@@ -104,9 +104,7 @@ describe('CustomerController', () => {
     it('should throw NotFoundException if customer is not found', async () => {
       mockCustomerService.getCustomerById.mockResolvedValue(null);
 
-      await expect(controller.getCustomerById('cust-999')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.getCustomerById('cust-999')).rejects.toThrow(NotFoundException);
     });
   });
 

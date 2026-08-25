@@ -69,7 +69,9 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   const [address, setAddress] = useState(customer.address || '');
   const [pincode, setPincode] = useState(customer.pincode || '');
   const [membership, setMembership] = useState<string>(customer.membership || MembershipTier.NONE);
-  const [discountPercent, setDiscountPercent] = useState<string>(String(customer.discountPercent ?? 0));
+  const [discountPercent, setDiscountPercent] = useState<string>(
+    String(customer.discountPercent ?? 0),
+  );
   const [registrationSource, setRegistrationSource] = useState<string>(
     customer.registrationSource || RegistrationSource.WALK_IN,
   );
@@ -249,7 +251,10 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 
   return (
     <Modal open={open} onClose={onClose} title={`Edit Customer (${customer.id})`} width="560px">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+      >
         {apiError && (
           <div
             style={{

@@ -100,21 +100,21 @@ describe('CustomerService', () => {
     });
 
     it('2. should throw BadRequestException if name is missing or empty', async () => {
-      await expect(
-        service.createCustomer({ name: '   ', phone: '9876512345' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createCustomer({ name: '   ', phone: '9876512345' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('3. should throw BadRequestException if phone is missing or empty', async () => {
-      await expect(
-        service.createCustomer({ name: 'Aarav Kumar', phone: '   ' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createCustomer({ name: 'Aarav Kumar', phone: '   ' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('4. should throw BadRequestException if phone format is invalid', async () => {
-      await expect(
-        service.createCustomer({ name: 'Aarav Kumar', phone: '123' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.createCustomer({ name: 'Aarav Kumar', phone: '123' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('5. should throw BadRequestException if email format is invalid', async () => {
@@ -388,9 +388,9 @@ describe('CustomerService', () => {
     it('2. should throw NotFoundException when updating non-existent customer', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.updateCustomer('cust-999', { name: 'Test' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.updateCustomer('cust-999', { name: 'Test' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('3. should allow retaining current customer phone number without conflict', async () => {
@@ -410,34 +410,33 @@ describe('CustomerService', () => {
         .mockResolvedValueOnce(mockCustomers[0]) // existing customer to update
         .mockResolvedValueOnce(mockCustomers[1]); // existing conflict customer
 
-      await expect(
-        service.updateCustomer('cust-001', { phone: '9876500000' }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.updateCustomer('cust-001', { phone: '9876500000' })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('5. should throw BadRequestException for invalid phone format', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
 
-      await expect(
-        service.updateCustomer('cust-001', { phone: '123' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.updateCustomer('cust-001', { phone: '123' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('6. should throw BadRequestException for invalid email format', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
 
-      await expect(
-        service.updateCustomer('cust-001', { email: 'bad-email' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.updateCustomer('cust-001', { email: 'bad-email' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('7. should throw BadRequestException for invalid discount percentage', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
 
-      await expect(
-        service.updateCustomer('cust-001', { discountPercent: 200 }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.updateCustomer('cust-001', { discountPercent: 200 })).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });
-
