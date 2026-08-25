@@ -1,11 +1,17 @@
 import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { Roles } from './roles.decorator';
 
-class LoginDto {
+export class LoginDto {
+  @IsString()
+  @IsNotEmpty()
   employeeId!: string;
+
+  @IsString()
+  @IsNotEmpty()
   pin!: string;
 }
 

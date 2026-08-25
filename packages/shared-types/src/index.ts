@@ -42,6 +42,7 @@ export type {
   PaymentDTO,
   RecordPaymentRequest,
   GarmentCatalogDTO,
+  UpdateGarmentRequest,
   ServiceTypeDTO,
   OrderPhotoDTO,
   DeliveryRecordDTO,

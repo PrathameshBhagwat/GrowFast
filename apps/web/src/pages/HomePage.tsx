@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Card } from '@growfast/ui';
 import { LogOut, Shirt, Shield, Users, Package, Truck } from 'lucide-react';
@@ -28,6 +29,7 @@ const ROLE_CONFIG: Record<string, { icon: React.ReactNode; color: string; module
 
 export const HomePage: React.FC = () => {
   const { employee, logout } = useAuth();
+  const navigate = useNavigate();
 
   if (!employee) return null;
 
@@ -144,16 +146,20 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
 
-        <p
-          style={{
-            fontSize: '0.8rem',
-            color: '#94A3B8',
-            fontStyle: 'italic',
-            marginBottom: '20px',
-          }}
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}
         >
-          Feature modules will be implemented in Phase 1+
-        </p>
+          <Button
+            id="home-garment-catalog"
+            variant="primary"
+            size="md"
+            onClick={() => navigate('/catalog')}
+            icon={<Shirt size={16} />}
+            fullWidth
+          >
+            Garment Catalog
+          </Button>
+        </div>
 
         <Button variant="ghost" size="md" onClick={logout} icon={<LogOut size={16} />} fullWidth>
           Sign Out
