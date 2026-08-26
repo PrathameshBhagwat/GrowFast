@@ -4,7 +4,7 @@ import { CatalogService } from '../catalog/catalog.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
-import { OrderPriority, PaymentStatus } from '@growfast/shared-types';
+import { OrderPriority, PaymentStatus, calculateOrderTotals, PricingItemInput } from '@growfast/shared-types';
 
 @Injectable()
 export class OrderService {
@@ -37,9 +37,21 @@ export class OrderService {
       const garmentMap = new Map(garments.map((g) => [g.id, g]));
       const serviceMap = new Map(services.map((s) => [s.id, s]));
 
+      // 3. Fetch Pricing
+      const prices = await tx.serviceGarmentPrice.findMany({
+        where: {
+          garmentCatalogId: { in: garmentIds },
+          serviceTypeId: { in: serviceIds },
+        }
+      });
+      const priceMap = new Map(
+        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price])
+      );
+
       // Validate items
       const orderItemsData = [];
       const serviceCounts = new Map<string, number>();
+      const pricingInputs: PricingItemInput[] = [];
 
       for (const item of dto.items) {
         const garment = garmentMap.get(item.garmentCatalogId);
@@ -58,6 +70,10 @@ export class OrderService {
           throw new BadRequestException(`Service type "${service.name}" is not active`);
         }
 
+        const priceKey = `${garment.id}_${service.id}`;
+        const unitPrice = priceMap.get(priceKey) ?? 0;
+        const lineTotal = unitPrice * item.quantity;
+
         // For summary
         serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
 
@@ -65,12 +81,20 @@ export class OrderService {
           garmentCatalogId: garment.id,
           serviceTypeId: service.id,
           quantity: item.quantity,
-          unitPrice: 0, // Deferred to B5
-          lineTotal: 0, // Deferred to B5
+          unitPrice,
+          lineTotal,
           colorTags: item.colorTags || [],
           defectNotes: item.defectNotes,
         });
+
+        pricingInputs.push({
+          unitPrice,
+          quantity: item.quantity,
+        });
       }
+
+      // Calculate Totals
+      const totals = calculateOrderTotals(pricingInputs);
 
       // 4. Due date placeholder (Deferred to B6)
       const orderDate = new Date();
@@ -98,6 +122,11 @@ export class OrderService {
           effectiveDueDate: orderDate, // Deferred to B6
           isExpress: dto.isExpress,
           serviceSummary,
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
           paymentStatus: PaymentStatus.PENDING,
           pickupType: dto.pickupType,
           priority: dto.isExpress ? OrderPriority.EXPRESS : OrderPriority.STANDARD,
@@ -227,13 +256,30 @@ export class OrderService {
         );
       }
 
-      // 5. Update OrderItem
+      // 5. Calculate new line total
+      const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
+      const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
+      
+      const priceRecord = await tx.serviceGarmentPrice.findUnique({
+        where: {
+          garmentCatalogId_serviceTypeId: {
+            garmentCatalogId,
+            serviceTypeId,
+          }
+        }
+      });
+      const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
+      const lineTotal = unitPrice * newQuantity;
+
+      // 6. Update OrderItem
       await tx.orderItem.update({
         where: { id: itemId },
         data: {
           garmentCatalogId: dto.garmentCatalogId,
           serviceTypeId: dto.serviceTypeId,
           quantity: dto.quantity,
+          unitPrice,
+          lineTotal,
           colorTags: dto.colorTags,
           defectNotes: dto.defectNotes,
           itemStatus: dto.itemStatus,
@@ -241,7 +287,30 @@ export class OrderService {
         },
       });
 
-      // 6. Return updated order detail
+      // 7. Recalculate Order Totals
+      const updatedOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      
+      const pricingInputs = updatedOrder!.items.map(i => ({
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+      }));
+      const totals = calculateOrderTotals(pricingInputs);
+      
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: totals.totalAmount - updatedOrder!.amountPaid,
+        }
+      });
+
+      // 8. Return updated order detail
       return await this.findOrderById(orderId);
     });
   }
@@ -259,6 +328,9 @@ export class OrderService {
       isExpress: order.isExpress,
       priority: order.priority,
       status: order.status,
+      subtotal: order.subtotal,
+      discountAmount: order.discountAmount,
+      taxAmount: order.taxAmount,
       totalAmount: order.totalAmount,
       amountPaid: order.amountPaid,
       amountDue: order.amountDue,

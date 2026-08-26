@@ -25,9 +25,14 @@ const mockPrismaService: any = {
     create: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    update: jest.fn(),
   },
   orderItem: {
     update: jest.fn(),
+  },
+  serviceGarmentPrice: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
   },
 };
 
@@ -98,6 +103,11 @@ describe('OrderService', () => {
       mockPrismaService.serviceType.findMany.mockResolvedValue([mockService]);
       mockPrismaService.order.count.mockResolvedValue(0);
       mockPrismaService.order.create.mockResolvedValue(mockCreatedOrder);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([{
+        garmentCatalogId: 'g1',
+        serviceTypeId: 's1',
+        price: 150
+      }]);
     });
 
     it('should create an order successfully', async () => {
@@ -176,6 +186,12 @@ describe('OrderService', () => {
     beforeEach(() => {
       mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
       mockPrismaService.orderItem.update.mockResolvedValue({});
+      mockPrismaService.order.update.mockResolvedValue({});
+      mockPrismaService.serviceGarmentPrice.findUnique.mockResolvedValue({
+        garmentCatalogId: 'g1',
+        serviceTypeId: 's1',
+        price: 150
+      });
     });
 
     it('should update an order item successfully', async () => {

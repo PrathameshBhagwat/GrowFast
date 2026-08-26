@@ -95,8 +95,20 @@ export function OrderDetailPage() {
           <h2 className="text-lg font-semibold mb-4">Payment Summary</h2>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-500">Total Amount</span>
-              <span className="font-medium text-gray-900">₹{order.totalAmount}</span>
+              <span className="text-gray-500">Subtotal</span>
+              <span className="font-medium text-gray-900">₹{order.subtotal}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Discount</span>
+              <span className="font-medium text-green-600">-₹{order.discountAmount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">GST (18%)</span>
+              <span className="font-medium text-gray-900">₹{order.taxAmount}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t">
+              <span className="font-semibold text-gray-900">Total Amount</span>
+              <span className="font-bold text-gray-900">₹{order.totalAmount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Amount Paid</span>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, Button, LoadingState, ErrorState } from '@growfast/ui';
 import { useAuth } from '../contexts/AuthContext';
-import { CustomerDTO } from '@growfast/shared-types';
+import { CustomerDTO, calculateOrderTotals, PricingItemInput } from '@growfast/shared-types';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -20,6 +20,20 @@ export function OrderWizardPage() {
   const [customerError, setCustomerError] = useState<string | null>(null);
 
   const [items, setItems] = useState<any[]>([]);
+  const [prices, setPrices] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (token) {
+      fetch(`${API_URL}/pricing`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(body => {
+          if (body.success) setPrices(body.data);
+        })
+        .catch(err => console.error('Failed to load pricing:', err));
+    }
+  }, [token]);
 
   useEffect(() => {
     if (initialCustomerId && token) {
@@ -194,23 +208,56 @@ export function OrderWizardPage() {
           </div>
         )}
 
-        {step === 3 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Review Order</h2>
-            <div className="bg-gray-50 p-6 rounded-lg border">
-              <div className="space-y-2 mb-6">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Customer ID:</span>
-                  <span className="font-medium">{selectedCustomerId || 'None'}</span>
+        {step === 3 && (() => {
+          const pricingInputs: PricingItemInput[] = items.map(item => {
+            const p = prices.find(
+              (priceItem) => priceItem.garmentCatalogId === item.garmentCatalogId && priceItem.serviceTypeId === item.serviceTypeId
+            );
+            return {
+              quantity: item.quantity,
+              unitPrice: p ? p.price : 0,
+            };
+          });
+          const totals = calculateOrderTotals(pricingInputs);
+
+          return (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Review Order</h2>
+              <div className="bg-gray-50 p-6 rounded-lg border">
+                <div className="space-y-2 mb-6 border-b pb-4">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Customer ID:</span>
+                    <span className="font-medium">{selectedCustomerId || 'None'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total Items:</span>
+                    <span className="font-medium">{items.reduce((s, i) => s + i.quantity, 0)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Items:</span>
-                  <span className="font-medium">{items.reduce((s, i) => s + i.quantity, 0)}</span>
+                
+                <h3 className="font-semibold mb-3">Financial Breakdown</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span>₹{totals.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Discount:</span>
+                    <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">GST (18%):</span>
+                    <span>₹{totals.taxAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-base pt-2 border-t mt-2">
+                    <span>Total Amount:</span>
+                    <span>₹{totals.totalAmount.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="flex justify-between pt-6 border-t mt-6">
           <Button variant="outline" onClick={handlePrev} disabled={step === 1}>

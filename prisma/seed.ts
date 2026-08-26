@@ -156,6 +156,44 @@ async function main() {
   }
   console.log(`✅ Service types: ${services.length} items`);
 
+  // ─── Service Garment Prices ─────────────────────────────────────
+  const pricingData = [
+    { garmentId: 'garment-dress', serviceId: 'svc-dry-clean', price: 180 },
+    { garmentId: 'garment-shirt', serviceId: 'svc-dry-clean', price: 80 },
+    { garmentId: 'garment-saree', serviceId: 'svc-dry-clean', price: 280 },
+    { garmentId: 'garment-suit', serviceId: 'svc-dry-clean', price: 320 },
+    { garmentId: 'garment-bedsheet', serviceId: 'svc-wash-iron', price: 90 },
+    // Defaults for others
+    { garmentId: 'garment-shirt', serviceId: 'svc-wash', price: 40 },
+    { garmentId: 'garment-shirt', serviceId: 'svc-wash-iron', price: 50 },
+    { garmentId: 'garment-trouser', serviceId: 'svc-wash', price: 50 },
+    { garmentId: 'garment-trouser', serviceId: 'svc-wash-iron', price: 60 },
+    { garmentId: 'garment-trouser', serviceId: 'svc-dry-clean', price: 100 },
+    { garmentId: 'garment-kurta', serviceId: 'svc-wash-iron', price: 70 },
+    { garmentId: 'garment-kurta', serviceId: 'svc-dry-clean', price: 120 },
+    { garmentId: 'garment-saree', serviceId: 'svc-steam-press', price: 100 },
+    { garmentId: 'garment-sneakers', serviceId: 'svc-shoe-clean', price: 250 },
+  ];
+
+  for (const p of pricingData) {
+    await prisma.serviceGarmentPrice.upsert({
+      where: {
+        garmentCatalogId_serviceTypeId: {
+          garmentCatalogId: p.garmentId,
+          serviceTypeId: p.serviceId,
+        },
+      },
+      update: { price: p.price },
+      create: {
+        garmentCatalogId: p.garmentId,
+        serviceTypeId: p.serviceId,
+        price: p.price,
+      },
+    });
+  }
+  console.log(`✅ Service Garment Prices: ${pricingData.length} records`);
+
+
   // ─── Customers ────────────────────────────────────────────────
   const customers = [
     {
