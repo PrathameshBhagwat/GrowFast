@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
 import { OrderPriority, PaymentStatus } from '@growfast/shared-types';
 
@@ -174,6 +175,75 @@ export class OrderService {
       page,
       pageSize,
     };
+  }
+
+  async updateOrderItem(orderId: string, itemId: string, dto: UpdateOrderItemDto, storeId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Validate order exists and belongs to store
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new BadRequestException(`Order does not belong to your store`);
+      }
+
+      // 2. Validate order item belongs to order
+      const orderItem = order.items.find((item) => item.id === itemId);
+      if (!orderItem) {
+        throw new NotFoundException(
+          `OrderItem with ID "${itemId}" not found in order "${orderId}"`,
+        );
+      }
+
+      // 3. Validate garment / service if updated
+      if (dto.garmentCatalogId) {
+        const garment = await tx.garmentCatalog.findUnique({ where: { id: dto.garmentCatalogId } });
+        if (!garment)
+          throw new NotFoundException(`Garment with ID "${dto.garmentCatalogId}" not found`);
+        if (!garment.isActive)
+          throw new BadRequestException(`Garment "${garment.name}" is not active`);
+      }
+      if (dto.serviceTypeId) {
+        const service = await tx.serviceType.findUnique({ where: { id: dto.serviceTypeId } });
+        if (!service)
+          throw new NotFoundException(`Service type with ID "${dto.serviceTypeId}" not found`);
+        if (!service.isActive)
+          throw new BadRequestException(`Service type "${service.name}" is not active`);
+      }
+
+      // 4. Validate quantities
+      const newQuantity = dto.quantity !== undefined ? dto.quantity : orderItem.quantity;
+      const newDeliveredQuantity =
+        dto.deliveredQuantity !== undefined ? dto.deliveredQuantity : orderItem.deliveredQuantity;
+
+      if (newDeliveredQuantity > newQuantity) {
+        throw new BadRequestException(
+          `Delivered quantity (${newDeliveredQuantity}) cannot exceed total quantity (${newQuantity})`,
+        );
+      }
+
+      // 5. Update OrderItem
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          garmentCatalogId: dto.garmentCatalogId,
+          serviceTypeId: dto.serviceTypeId,
+          quantity: dto.quantity,
+          colorTags: dto.colorTags,
+          defectNotes: dto.defectNotes,
+          itemStatus: dto.itemStatus,
+          deliveredQuantity: dto.deliveredQuantity,
+        },
+      });
+
+      // 6. Return updated order detail
+      return await this.findOrderById(orderId);
+    });
   }
 
   // --- Helpers ---

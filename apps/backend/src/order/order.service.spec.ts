@@ -3,7 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
-import { PaymentStatus, PickupType, OrderPriority } from '@growfast/shared-types';
+import { PaymentStatus, PickupType, OrderPriority, ItemStatus } from '@growfast/shared-types';
 
 const mockPrismaService: any = {
   $transaction: jest.fn(async (cb: any) => {
@@ -14,15 +14,20 @@ const mockPrismaService: any = {
   },
   garmentCatalog: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
   },
   serviceType: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
   },
   order: {
     count: jest.fn(),
     create: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
+  },
+  orderItem: {
+    update: jest.fn(),
   },
 };
 
@@ -139,6 +144,80 @@ describe('OrderService', () => {
       await expect(service.createOrder(validDto, 'emp1', 'store1')).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe('updateOrderItem', () => {
+    const mockOrder = {
+      id: 'o1',
+      storeId: 'store1',
+      items: [
+        {
+          id: 'item1',
+          quantity: 2,
+          deliveredQuantity: 0,
+        },
+      ],
+      customer: { name: 'Test', phone: '123' },
+      orderDate: new Date(),
+      effectiveDueDate: new Date(),
+      systemDueDate: new Date(),
+      isExpress: false,
+      priority: OrderPriority.STANDARD,
+      status: 'RECEIVED',
+      totalAmount: 90,
+      amountPaid: 0,
+      amountDue: 90,
+      paymentStatus: PaymentStatus.PENDING,
+      pickupType: PickupType.STORE_PICKUP,
+      createdBy: { name: 'Emp' },
+    };
+
+    beforeEach(() => {
+      mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
+      mockPrismaService.orderItem.update.mockResolvedValue({});
+    });
+
+    it('should update an order item successfully', async () => {
+      // FindOrderById is called at the end, so we mock it by reusing mockOrder
+      jest.spyOn(service, 'findOrderById').mockResolvedValue(mockOrder as any);
+
+      const result = await service.updateOrderItem(
+        'o1',
+        'item1',
+        { quantity: 3, itemStatus: ItemStatus.PROCESSING },
+        'store1',
+      );
+      expect(result).toBeDefined();
+      expect(mockPrismaService.orderItem.update).toHaveBeenCalledWith({
+        where: { id: 'item1' },
+        data: expect.objectContaining({ quantity: 3, itemStatus: ItemStatus.PROCESSING }),
+      });
+    });
+
+    it('should throw NotFoundException if order not found', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(null);
+      await expect(service.updateOrderItem('o1', 'item1', {}, 'store1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException if order does not belong to store', async () => {
+      await expect(service.updateOrderItem('o1', 'item1', {}, 'wrongStore')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw NotFoundException if item not found in order', async () => {
+      await expect(service.updateOrderItem('o1', 'wrongItem', {}, 'store1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException if deliveredQuantity exceeds total quantity', async () => {
+      await expect(
+        service.updateOrderItem('o1', 'item1', { deliveredQuantity: 5 }, 'store1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

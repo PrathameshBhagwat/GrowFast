@@ -40,6 +40,7 @@ export type {
   OrderItemDTO,
   CreateOrderRequest,
   CreateOrderItemRequest,
+  UpdateOrderItemRequest,
   PaymentDTO,
   RecordPaymentRequest,
   PaymentSummaryDTO,

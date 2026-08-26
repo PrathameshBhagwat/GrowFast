@@ -143,6 +143,16 @@ export interface CreateOrderItemRequest {
   defectNotes?: string;
 }
 
+export interface UpdateOrderItemRequest {
+  garmentCatalogId?: string;
+  serviceTypeId?: string;
+  quantity?: number;
+  colorTags?: string[];
+  defectNotes?: string | null;
+  itemStatus?: ItemStatus;
+  deliveredQuantity?: number;
+}
+
 // ─── Payment DTOs ───────────────────────────────────────────────────
 
 export interface PaymentDTO {
