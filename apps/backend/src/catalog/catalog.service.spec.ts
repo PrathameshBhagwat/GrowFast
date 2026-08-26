@@ -3,11 +3,16 @@ import { NotFoundException } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-import { GarmentCategory } from '@growfast/shared-types';
+import { GarmentCategory, ServiceCategory } from '@growfast/shared-types';
 
 // Mock PrismaService
 const mockPrismaService = {
   garmentCatalog: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  serviceType: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
@@ -170,6 +175,152 @@ describe('CatalogService', () => {
 
       try {
         await service.updateGarment('bad-id', { name: 'Test' });
+        fail('Expected NotFoundException');
+      } catch (err: any) {
+        expect(err.message).toContain('bad-id');
+      }
+    });
+  });
+
+  describe('findAllServices', () => {
+    const mockServices = [
+      {
+        id: 's1',
+        name: 'Dry Clean',
+        category: 'DRY_CLEAN',
+        estimatedDays: 2,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 's2',
+        name: 'Wash',
+        category: 'WASH',
+        estimatedDays: 1,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    it('should return all services when no category filter is provided', async () => {
+      mockPrismaService.serviceType.findMany.mockResolvedValue(mockServices);
+
+      const result = await service.findAllServices();
+
+      expect(result).toEqual(mockServices);
+      expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
+        where: {},
+        orderBy: { name: 'asc' },
+      });
+    });
+
+    it('should return filtered services when category is provided', async () => {
+      const washServices = mockServices.filter((s) => s.category === 'WASH');
+      mockPrismaService.serviceType.findMany.mockResolvedValue(washServices);
+
+      const result = await service.findAllServices(ServiceCategory.WASH);
+
+      expect(result).toEqual(washServices);
+      expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
+        where: { category: ServiceCategory.WASH },
+        orderBy: { name: 'asc' },
+      });
+    });
+
+    it('should return empty array when no services match the category', async () => {
+      mockPrismaService.serviceType.findMany.mockResolvedValue([]);
+
+      const result = await service.findAllServices(ServiceCategory.STAIN_REMOVAL);
+
+      expect(result).toEqual([]);
+      expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
+        where: { category: ServiceCategory.STAIN_REMOVAL },
+        orderBy: { name: 'asc' },
+      });
+    });
+
+    it('should filter by each valid category value', async () => {
+      for (const cat of Object.values(ServiceCategory)) {
+        mockPrismaService.serviceType.findMany.mockResolvedValue([]);
+        await service.findAllServices(cat);
+        expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
+          where: { category: cat },
+          orderBy: { name: 'asc' },
+        });
+      }
+    });
+  });
+
+  describe('updateService', () => {
+    const existingService = {
+      id: 's1',
+      name: 'Dry Clean',
+      category: 'DRY_CLEAN',
+      estimatedDays: 2,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should update and return the service when it exists', async () => {
+      const updateDto = { name: 'Premium Dry Clean' };
+      const updatedService = { ...existingService, ...updateDto };
+
+      mockPrismaService.serviceType.findUnique.mockResolvedValue(existingService);
+      mockPrismaService.serviceType.update.mockResolvedValue(updatedService);
+
+      const result = await service.updateService('s1', updateDto);
+
+      expect(result.name).toBe('Premium Dry Clean');
+      expect(mockPrismaService.serviceType.findUnique).toHaveBeenCalledWith({
+        where: { id: 's1' },
+      });
+      expect(mockPrismaService.serviceType.update).toHaveBeenCalledWith({
+        where: { id: 's1' },
+        data: updateDto,
+      });
+    });
+
+    it('should update the category field', async () => {
+      const updateDto = { category: ServiceCategory.WASH };
+      const updatedService = { ...existingService, category: ServiceCategory.WASH };
+
+      mockPrismaService.serviceType.findUnique.mockResolvedValue(existingService);
+      mockPrismaService.serviceType.update.mockResolvedValue(updatedService);
+
+      const result = await service.updateService('s1', updateDto);
+
+      expect(result.category).toBe(ServiceCategory.WASH);
+    });
+
+    it('should update the isActive field', async () => {
+      const updateDto = { isActive: false };
+      const updatedService = { ...existingService, isActive: false };
+
+      mockPrismaService.serviceType.findUnique.mockResolvedValue(existingService);
+      mockPrismaService.serviceType.update.mockResolvedValue(updatedService);
+
+      const result = await service.updateService('s1', updateDto);
+
+      expect(result.isActive).toBe(false);
+    });
+
+    it('should throw NotFoundException when service does not exist', async () => {
+      mockPrismaService.serviceType.findUnique.mockResolvedValue(null);
+
+      await expect(service.updateService('nonexistent', { name: 'Test' })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockPrismaService.serviceType.update).not.toHaveBeenCalled();
+    });
+
+    it('should include service ID in NotFoundException message', async () => {
+      mockPrismaService.serviceType.findUnique.mockResolvedValue(null);
+
+      try {
+        await service.updateService('bad-id', { name: 'Test' });
         fail('Expected NotFoundException');
       } catch (err: any) {
         expect(err.message).toContain('bad-id');

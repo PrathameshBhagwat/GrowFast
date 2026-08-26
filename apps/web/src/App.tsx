@@ -8,6 +8,8 @@ import { CustomerProfilePage } from './pages/CustomerProfilePage';
 import { PhotoCaptureView } from './pages/PhotoCaptureView';
 import { CatalogSettingsPage } from './pages/CatalogSettingsPage';
 import { MasterDataPage } from './pages/MasterDataPage';
+import { OrderWizardPage } from './pages/OrderWizardPage';
+import { OrderDetailPage } from './pages/OrderDetailPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -62,6 +64,23 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <MasterDataPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Developer B — Order Management (B3) */}
+      <Route
+        path="/orders/new"
+        element={
+          <ProtectedRoute>
+            <OrderWizardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/orders/:orderId"
+        element={
+          <ProtectedRoute>
+            <OrderDetailPage />
           </ProtectedRoute>
         }
       />

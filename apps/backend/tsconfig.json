@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "composite": true,
     "target": "ES2022",
     "module": "commonjs",
     "moduleResolution": "node",
@@ -20,5 +21,6 @@
     "baseUrl": "."
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"],
+  "references": [{ "path": "../../packages/shared-types" }]
 }
