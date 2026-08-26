@@ -103,18 +103,58 @@ describe('OrderService', () => {
       mockPrismaService.serviceType.findMany.mockResolvedValue([mockService]);
       mockPrismaService.order.count.mockResolvedValue(0);
       mockPrismaService.order.create.mockResolvedValue(mockCreatedOrder);
-      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([{
-        garmentCatalogId: 'g1',
-        serviceTypeId: 's1',
-        price: 150
-      }]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+        {
+          garmentCatalogId: 'g1',
+          serviceTypeId: 's1',
+          price: 150,
+        },
+      ]);
     });
 
-    it('should create an order successfully', async () => {
+    it('should create an order successfully and calculate due dates', async () => {
       const result = await service.createOrder(validDto, 'emp1', 'store1');
       expect(result).toBeDefined();
       expect(result.orderNumber).toBe('ORD-0001');
-      expect(mockPrismaService.order.create).toHaveBeenCalled();
+
+      // Expected logic: today + 2 days
+      const expectedDueDate = new Date();
+      expectedDueDate.setDate(expectedDueDate.getDate() + 2);
+
+      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            systemDueDate: expect.any(Date),
+            effectiveDueDate: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should calculate the exact same due date even if isExpress is true (B6 Regression)', async () => {
+      const expressDto = { ...validDto, isExpress: true };
+      await service.createOrder(expressDto, 'emp1', 'store1');
+
+      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            systemDueDate: expect.any(Date),
+            effectiveDueDate: expect.any(Date),
+            priority: OrderPriority.EXPRESS,
+            isExpress: true,
+          }),
+        }),
+      );
+
+      // We'll capture the call and check that systemDueDate has the normal +2 days logic
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+
+      const orderDate = callArgs.data.orderDate;
+      const expectedSystemDueDate = new Date(orderDate);
+      // It should be strictly +2 days as mocked in mockService.estimatedDays = 2
+      expectedSystemDueDate.setDate(expectedSystemDueDate.getDate() + 2);
+
+      expect(callArgs.data.systemDueDate).toEqual(expectedSystemDueDate);
     });
 
     it('should throw NotFoundException if customer not found', async () => {
@@ -190,7 +230,7 @@ describe('OrderService', () => {
       mockPrismaService.serviceGarmentPrice.findUnique.mockResolvedValue({
         garmentCatalogId: 'g1',
         serviceTypeId: 's1',
-        price: 150
+        price: 150,
       });
     });
 
@@ -234,6 +274,49 @@ describe('OrderService', () => {
       await expect(
         service.updateOrderItem('o1', 'item1', { deliveredQuantity: 5 }, 'store1'),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateDueDate', () => {
+    const mockOrder = {
+      id: 'o1',
+      systemDueDate: new Date(),
+      effectiveDueDate: new Date(),
+    };
+
+    beforeEach(() => {
+      mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
+      mockPrismaService.order.update.mockResolvedValue({});
+    });
+
+    it('should update effective due date and log audit fields', async () => {
+      jest
+        .spyOn(service, 'findOrderById')
+        .mockResolvedValue({ id: 'o1', effectiveDueDate: new Date('2026-09-01') } as any);
+
+      const result = await service.updateDueDate(
+        'o1',
+        '2026-09-01T10:00:00Z',
+        'Customer requested early delivery',
+        'mgr1',
+      );
+
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith({
+        where: { id: 'o1' },
+        data: {
+          effectiveDueDate: expect.any(Date),
+          dueDateOverrideReason: 'Customer requested early delivery',
+          dueDateOverriddenBy: 'mgr1',
+        },
+      });
+      expect(result).toBeDefined();
+    });
+
+    it('should throw NotFoundException if order not found', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(null);
+      await expect(
+        service.updateDueDate('wrong_id', '2026-09-01T10:00:00Z', 'Reason', 'mgr1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

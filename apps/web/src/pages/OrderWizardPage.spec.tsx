@@ -23,6 +23,12 @@ global.fetch = vi.fn();
 describe('OrderWizardPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/pricing')) {
+        return { ok: true, json: async () => ({ success: true, data: [] }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
   });
 
   const renderWithRouter = (initialRoute = '/orders/new') => {
@@ -35,17 +41,36 @@ describe('OrderWizardPage', () => {
     );
   };
 
-  it('renders normal flow without customerId', () => {
+  it('renders normal flow without customerId', async () => {
     renderWithRouter('/orders/new');
+
+    // Wait for the pricing fetch to complete
+    await waitFor(() => {
+      expect(screen.getByText('Select Mock Customer')).toBeInTheDocument();
+    });
+
     expect(screen.getByText('Customer search component will go here.')).toBeInTheDocument();
-    expect(screen.getByText('Select Mock Customer')).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
+
+    // Verify it fetched pricing, but did NOT fetch customer
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/pricing'),
+      expect.any(Object),
+    );
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/customers'),
+      expect.any(Object),
+    );
   });
 
   it('reads customerId from URL, fetches customer, and pre-selects it', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ data: mockCustomer }),
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/pricing')) {
+        return { ok: true, json: async () => ({ success: true, data: [] }) };
+      }
+      if (url.includes('/customers/cust-003')) {
+        return { ok: true, json: async () => ({ data: mockCustomer }) };
+      }
+      return { ok: true, json: async () => ({}) };
     });
 
     renderWithRouter('/orders/new?customerId=cust-003');
@@ -70,10 +95,14 @@ describe('OrderWizardPage', () => {
   });
 
   it('handles invalid customerId gracefully', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => ({ message: 'Customer not found' }),
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/pricing')) {
+        return { ok: true, json: async () => ({ success: true, data: [] }) };
+      }
+      if (url.includes('/customers/invalid-123')) {
+        return { ok: false, status: 404, json: async () => ({ message: 'Customer not found' }) };
+      }
+      return { ok: true, json: async () => ({}) };
     });
 
     renderWithRouter('/orders/new?customerId=invalid-123');

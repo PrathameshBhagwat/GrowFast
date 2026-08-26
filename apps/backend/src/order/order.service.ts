@@ -4,7 +4,12 @@ import { CatalogService } from '../catalog/catalog.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
-import { OrderPriority, PaymentStatus, calculateOrderTotals, PricingItemInput } from '@growfast/shared-types';
+import {
+  OrderPriority,
+  PaymentStatus,
+  calculateOrderTotals,
+  PricingItemInput,
+} from '@growfast/shared-types';
 
 @Injectable()
 export class OrderService {
@@ -42,16 +47,17 @@ export class OrderService {
         where: {
           garmentCatalogId: { in: garmentIds },
           serviceTypeId: { in: serviceIds },
-        }
+        },
       });
       const priceMap = new Map(
-        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price])
+        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price]),
       );
 
       // Validate items
       const orderItemsData = [];
       const serviceCounts = new Map<string, number>();
       const pricingInputs: PricingItemInput[] = [];
+      let maxEstimatedDays = 0;
 
       for (const item of dto.items) {
         const garment = garmentMap.get(item.garmentCatalogId);
@@ -91,6 +97,10 @@ export class OrderService {
           unitPrice,
           quantity: item.quantity,
         });
+
+        if (service.estimatedDays > maxEstimatedDays) {
+          maxEstimatedDays = service.estimatedDays;
+        }
       }
 
       // Calculate Totals
@@ -112,14 +122,18 @@ export class OrderService {
       }
       const serviceSummary = serviceSummaryParts.join(', ');
 
-      // 7. Create Order
+      // 7. Calculate Due Date (B6)
+      const systemDueDate = new Date(orderDate);
+      systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+
+      // 8. Create Order
       const order = await tx.order.create({
         data: {
           orderNumber,
           customerId: dto.customerId,
           orderDate,
-          systemDueDate: orderDate, // Deferred to B6
-          effectiveDueDate: orderDate, // Deferred to B6
+          systemDueDate,
+          effectiveDueDate: systemDueDate,
           isExpress: dto.isExpress,
           serviceSummary,
           subtotal: totals.subtotal,
@@ -177,12 +191,13 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto) {
-    const { status, paymentStatus, page = 1, pageSize = 10 } = query;
+    const { status, paymentStatus, customerId, page = 1, pageSize = 10 } = query;
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (customerId) where.customerId = customerId;
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -259,14 +274,14 @@ export class OrderService {
       // 5. Calculate new line total
       const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
       const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
-      
+
       const priceRecord = await tx.serviceGarmentPrice.findUnique({
         where: {
           garmentCatalogId_serviceTypeId: {
             garmentCatalogId,
             serviceTypeId,
-          }
-        }
+          },
+        },
       });
       const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
       const lineTotal = unitPrice * newQuantity;
@@ -292,13 +307,13 @@ export class OrderService {
         where: { id: orderId },
         include: { items: true },
       });
-      
-      const pricingInputs = updatedOrder!.items.map(i => ({
+
+      const pricingInputs = updatedOrder!.items.map((i) => ({
         unitPrice: i.unitPrice,
         quantity: i.quantity,
       }));
       const totals = calculateOrderTotals(pricingInputs);
-      
+
       await tx.order.update({
         where: { id: orderId },
         data: {
@@ -307,10 +322,36 @@ export class OrderService {
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
           amountDue: totals.totalAmount - updatedOrder!.amountPaid,
-        }
+        },
       });
 
       // 8. Return updated order detail
+      return await this.findOrderById(orderId);
+    });
+  }
+
+  // --- B6 Due Date Override ---
+  async updateDueDate(
+    orderId: string,
+    effectiveDueDate: string,
+    reason: string,
+    employeeId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          effectiveDueDate: new Date(effectiveDueDate),
+          dueDateOverrideReason: reason,
+          dueDateOverriddenBy: employeeId,
+        },
+      });
+
       return await this.findOrderById(orderId);
     });
   }
@@ -344,6 +385,7 @@ export class OrderService {
     const summary = this.mapToSummaryDto(order);
     return {
       ...summary,
+      itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
       systemDueDate: order.systemDueDate.toISOString(),
       dueDateOverrideReason: order.dueDateOverrideReason,
       dueDateOverriddenBy: order.dueDateOverriddenBy,

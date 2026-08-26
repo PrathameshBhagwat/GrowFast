@@ -27,11 +27,11 @@ export function OrderWizardPage() {
       fetch(`${API_URL}/pricing`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-        .then(res => res.json())
-        .then(body => {
+        .then((res) => res.json())
+        .then((body) => {
           if (body.success) setPrices(body.data);
         })
-        .catch(err => console.error('Failed to load pricing:', err));
+        .catch((err) => console.error('Failed to load pricing:', err));
     }
   }, [token]);
 
@@ -73,7 +73,7 @@ export function OrderWizardPage() {
         customerId: selectedCustomerId,
         isExpress: false,
         pickupType: 'STORE_PICKUP',
-        items: items.map(item => ({
+        items: items.map((item) => ({
           garmentCatalogId: item.garmentCatalogId,
           serviceTypeId: item.serviceTypeId,
           quantity: item.quantity,
@@ -170,7 +170,17 @@ export function OrderWizardPage() {
             ) : (
               <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
                 <p className="text-gray-500 mb-4">Customer search component will go here.</p>
-                <Button onClick={() => setSelectedCustomerId('mock-customer-id')}>
+                <Button
+                  onClick={() => {
+                    setSelectedCustomerId('cust-003');
+                    setCustomer({
+                      id: 'cust-003',
+                      name: 'Amit Shah',
+                      phone: '+919811122334',
+                      email: 'amit.shah@techcorp.in',
+                    } as any);
+                  }}
+                >
                   Select Mock Customer
                 </Button>
               </div>
@@ -183,13 +193,19 @@ export function OrderWizardPage() {
             <h2 className="text-xl font-semibold">Add Items</h2>
             <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
               <p className="text-gray-500 mb-4">Item catalog and selection will go here.</p>
-              <Button onClick={() => setItems([{ 
-                garmentCatalogId: 'garment-shirt', 
-                serviceTypeId: 'svc-wash', 
-                quantity: 2,
-                garmentName: 'Shirt',
-                serviceName: 'Wash'
-              }])}>
+              <Button
+                onClick={() =>
+                  setItems([
+                    {
+                      garmentCatalogId: 'garment-shirt',
+                      serviceTypeId: 'svc-wash',
+                      quantity: 2,
+                      garmentName: 'Shirt',
+                      serviceName: 'Wash',
+                    },
+                  ])
+                }
+              >
                 Add Mock Item
               </Button>
             </div>
@@ -208,56 +224,61 @@ export function OrderWizardPage() {
           </div>
         )}
 
-        {step === 3 && (() => {
-          const pricingInputs: PricingItemInput[] = items.map(item => {
-            const p = prices.find(
-              (priceItem) => priceItem.garmentCatalogId === item.garmentCatalogId && priceItem.serviceTypeId === item.serviceTypeId
-            );
-            return {
-              quantity: item.quantity,
-              unitPrice: p ? p.price : 0,
-            };
-          });
-          const totals = calculateOrderTotals(pricingInputs);
+        {step === 3 &&
+          (() => {
+            const pricingInputs: PricingItemInput[] = items.map((item) => {
+              const p = prices.find(
+                (priceItem) =>
+                  priceItem.garmentCatalogId === item.garmentCatalogId &&
+                  priceItem.serviceTypeId === item.serviceTypeId,
+              );
+              return {
+                quantity: item.quantity,
+                unitPrice: p ? p.price : 0,
+              };
+            });
+            const totals = calculateOrderTotals(pricingInputs);
 
-          return (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Review Order</h2>
-              <div className="bg-gray-50 p-6 rounded-lg border">
-                <div className="space-y-2 mb-6 border-b pb-4">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Customer ID:</span>
-                    <span className="font-medium">{selectedCustomerId || 'None'}</span>
+            return (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">Review Order</h2>
+                <div className="bg-gray-50 p-6 rounded-lg border">
+                  <div className="space-y-2 mb-6 border-b pb-4">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Customer ID:</span>
+                      <span className="font-medium">{selectedCustomerId || 'None'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total Items:</span>
+                      <span className="font-medium">
+                        {items.reduce((s, i) => s + i.quantity, 0)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total Items:</span>
-                    <span className="font-medium">{items.reduce((s, i) => s + i.quantity, 0)}</span>
-                  </div>
-                </div>
-                
-                <h3 className="font-semibold mb-3">Financial Breakdown</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span>₹{totals.subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Discount:</span>
-                    <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">GST (18%):</span>
-                    <span>₹{totals.taxAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-base pt-2 border-t mt-2">
-                    <span>Total Amount:</span>
-                    <span>₹{totals.totalAmount.toFixed(2)}</span>
+
+                  <h3 className="font-semibold mb-3">Financial Breakdown</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span>₹{totals.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Discount:</span>
+                      <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">GST (18%):</span>
+                      <span>₹{totals.taxAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-base pt-2 border-t mt-2">
+                      <span>Total Amount:</span>
+                      <span>₹{totals.totalAmount.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
 
         <div className="flex justify-between pt-6 border-t mt-6">
           <Button variant="outline" onClick={handlePrev} disabled={step === 1}>
@@ -268,9 +289,9 @@ export function OrderWizardPage() {
               Next Step
             </Button>
           ) : (
-            <Button 
-              variant="primary" 
-              onClick={handleCreateOrder} 
+            <Button
+              variant="primary"
+              onClick={handleCreateOrder}
               disabled={isSubmitting || items.length === 0}
             >
               {isSubmitting ? 'Creating...' : 'Create Order'}

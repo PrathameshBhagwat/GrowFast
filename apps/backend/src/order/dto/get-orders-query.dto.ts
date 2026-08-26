@@ -1,8 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Min, IsString } from 'class-validator';
 import { OrderStatus, PaymentStatus } from '@growfast/shared-types';
 
 export class GetOrdersQueryDto {
+  @IsOptional()
+  @IsString()
+  customerId?: string;
+
   @IsOptional()
   @IsEnum(OrderStatus, { message: 'status must be a valid OrderStatus' })
   status?: OrderStatus;

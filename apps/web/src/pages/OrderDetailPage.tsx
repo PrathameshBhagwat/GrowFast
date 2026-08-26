@@ -4,7 +4,8 @@ import { Card, Button, StatusChip, LoadingState, ErrorState } from '@growfast/ui
 import { useAuth } from '../contexts/AuthContext';
 import { OrderDetailDTO, OrderItemDTO, Role } from '@growfast/shared-types';
 import { OrderItemEditModal } from '../components/OrderItemEditModal';
-import { ArrowLeft, Edit2 } from 'lucide-react';
+import { DueDateEditModal } from '../components/DueDateEditModal';
+import { ArrowLeft, Edit2, Calendar } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -18,6 +19,7 @@ export function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [editItem, setEditItem] = useState<OrderItemDTO | null>(null);
+  const [editDueDate, setEditDueDate] = useState(false);
 
   const fetchOrder = async () => {
     setLoading(true);
@@ -88,6 +90,30 @@ export function OrderDetailPage() {
               <span className="text-gray-500">Phone</span>
               <span className="font-medium text-gray-900">{order.customerPhone}</span>
             </div>
+            <div className="flex justify-between pt-2 border-t mt-2">
+              <span className="text-gray-500 flex items-center gap-1">
+                <Calendar size={14} /> Due Date
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">
+                  {new Date(order.effectiveDueDate).toLocaleDateString()}
+                </span>
+                {(employee?.role === Role.OWNER || employee?.role === Role.MANAGER) && (
+                  <button
+                    onClick={() => setEditDueDate(true)}
+                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                    title="Edit Due Date"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+            {order.dueDateOverrideReason && (
+              <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded mt-2">
+                <strong>Overridden:</strong> {order.dueDateOverrideReason}
+              </div>
+            )}
           </div>
         </Card>
 
@@ -193,6 +219,16 @@ export function OrderDetailPage() {
           onClose={() => setEditItem(null)}
           orderId={order.id}
           item={editItem}
+          onSuccess={fetchOrder}
+        />
+      )}
+
+      {editDueDate && (
+        <DueDateEditModal
+          open={editDueDate}
+          onClose={() => setEditDueDate(false)}
+          orderId={order.id}
+          currentDueDate={order.effectiveDueDate}
           onSuccess={fetchOrder}
         />
       )}

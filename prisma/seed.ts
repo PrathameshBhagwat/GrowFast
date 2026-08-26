@@ -193,7 +193,6 @@ async function main() {
   }
   console.log(`✅ Service Garment Prices: ${pricingData.length} records`);
 
-
   // ─── Customers ────────────────────────────────────────────────
   const customers = [
     {

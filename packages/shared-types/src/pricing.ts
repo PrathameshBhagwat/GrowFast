@@ -1,6 +1,6 @@
 /**
  * Shared pricing calculation utility.
- * 
+ *
  * Centralizes the calculation logic for order financial fields.
  */
 
@@ -20,7 +20,7 @@ export function calculateOrderTotals(
   items: PricingItemInput[],
   options?: {
     discountPercent?: number; // Kept at 0 for V1 based on user preference
-  }
+  },
 ): PricingTotals {
   let subtotal = 0;
 
@@ -40,7 +40,7 @@ export function calculateOrderTotals(
 
   // 2. Tax (V1: 18% GST as per user choice)
   // GST applies on the discounted subtotal
-  const TAX_RATE = 0.18; 
+  const TAX_RATE = 0.18;
   const taxAmount = discountedSubtotal * TAX_RATE;
 
   // 3. Total Amount

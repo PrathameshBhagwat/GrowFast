@@ -13,6 +13,7 @@ import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
+import { UpdateDueDateDto } from './dto/update-due-date.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -65,6 +66,23 @@ export class OrderController {
   ) {
     const storeId = req.user.storeId;
     const order = await this.orderService.updateOrderItem(orderId, itemId, dto, storeId);
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
+  @Patch(':id/due-date')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'MANAGER')
+  async updateDueDate(@Param('id') id: string, @Body() dto: UpdateDueDateDto, @Request() req: any) {
+    const employeeId = req.user.id;
+    const order = await this.orderService.updateDueDate(
+      id,
+      dto.effectiveDueDate,
+      dto.reason,
+      employeeId,
+    );
     return {
       success: true,
       data: order,

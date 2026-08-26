@@ -81,10 +81,7 @@ export class CatalogService {
    */
   async findAllPrices() {
     return this.prisma.serviceGarmentPrice.findMany({
-      orderBy: [
-        { garmentCatalogId: 'asc' },
-        { serviceTypeId: 'asc' }
-      ]
+      orderBy: [{ garmentCatalogId: 'asc' }, { serviceTypeId: 'asc' }],
     });
   }
 
@@ -97,12 +94,14 @@ export class CatalogService {
         garmentCatalogId_serviceTypeId: {
           garmentCatalogId,
           serviceTypeId,
-        }
-      }
+        },
+      },
     });
 
     if (!priceRecord) {
-      throw new NotFoundException(`Pricing not found for garment ${garmentCatalogId} and service ${serviceTypeId}`);
+      throw new NotFoundException(
+        `Pricing not found for garment ${garmentCatalogId} and service ${serviceTypeId}`,
+      );
     }
 
     return priceRecord.price;
