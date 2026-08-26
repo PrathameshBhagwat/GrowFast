@@ -1,7 +1,7 @@
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { ServiceCategory, UpdateServiceTypeRequest } from '@growfast/shared-types';
+import { ServiceCategory } from '@growfast/shared-types';
 
-export class UpdateServiceDto implements UpdateServiceTypeRequest {
+export class UpdateServiceDto {
   @IsOptional()
   @IsString()
   name?: string;

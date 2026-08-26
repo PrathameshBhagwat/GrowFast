@@ -26,6 +26,7 @@
     "db:generate": "npx prisma generate --schema=prisma/schema.prisma",
     "db:studio": "npx prisma studio --schema=prisma/schema.prisma",
     "db:reset": "npx prisma migrate reset --schema=prisma/schema.prisma --force",
+    "validate:enums": "node scripts/validate-enum-sync.js",
     "clean": "rimraf apps/*/dist apps/*/node_modules packages/*/dist packages/*/node_modules node_modules"
   },
   "engines": {
