@@ -50,6 +50,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate --schema=prisma/schema.prisma
 
+      - name: Validate Prisma ↔ shared-types enum sync
+        run: npm run validate:enums
+
       - name: Typecheck shared-types
         run: npm run typecheck --workspace=packages/shared-types
 

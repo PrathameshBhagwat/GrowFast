@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { GarmentCategory } from '@growfast/shared-types';
+import { GarmentCategory, ServiceCategory } from '@growfast/shared-types';
 import { UpdateGarmentDto } from './dto/update-garment.dto';
+import { UpdateServiceDto } from './dto/update-service.dto';
 
 /**
  * Catalog Service — business logic for garment catalog management.
@@ -39,6 +40,37 @@ export class CatalogService {
     }
 
     return this.prisma.garmentCatalog.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  /**
+   * List service types, optionally filtered by category.
+   */
+  async findAllServices(category?: ServiceCategory) {
+    const where = category ? { category } : {};
+
+    return this.prisma.serviceType.findMany({
+      where,
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  /**
+   * Update a service type by ID.
+   * Validates existence before updating.
+   */
+  async updateService(id: string, dto: UpdateServiceDto) {
+    const existing = await this.prisma.serviceType.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Service type with ID "${id}" not found`);
+    }
+
+    return this.prisma.serviceType.update({
       where: { id },
       data: dto,
     });
