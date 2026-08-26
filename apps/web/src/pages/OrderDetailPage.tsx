@@ -9,7 +9,7 @@ import { ArrowLeft, Edit2 } from 'lucide-react';
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export function OrderDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { orderId: id } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { token, employee } = useAuth();
 

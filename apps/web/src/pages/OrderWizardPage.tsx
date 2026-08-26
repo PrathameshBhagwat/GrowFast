@@ -1,13 +1,93 @@
-import { useState } from 'react';
-import { Card, Button } from '@growfast/ui';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Card, Button, LoadingState, ErrorState } from '@growfast/ui';
+import { useAuth } from '../contexts/AuthContext';
+import { CustomerDTO } from '@growfast/shared-types';
+
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export function OrderWizardPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const initialCustomerId = searchParams.get('customerId');
+  const { token } = useAuth();
+
   const [step, setStep] = useState(1);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialCustomerId);
+  const [customer, setCustomer] = useState<CustomerDTO | null>(null);
+  const [customerLoading, setCustomerLoading] = useState(!!initialCustomerId);
+  const [customerError, setCustomerError] = useState<string | null>(null);
+
   const [items, setItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (initialCustomerId && token) {
+      const fetchCustomer = async () => {
+        try {
+          const res = await fetch(`${API_URL}/customers/${initialCustomerId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (!res.ok) {
+            throw new Error(`Failed to load customer (${res.status})`);
+          }
+          const body = await res.json();
+          setCustomer(body.data);
+          setSelectedCustomerId(body.data.id);
+        } catch (err: any) {
+          setCustomerError(err.message || 'Failed to load customer');
+          setSelectedCustomerId(null);
+        } finally {
+          setCustomerLoading(false);
+        }
+      };
+      fetchCustomer();
+    }
+  }, [initialCustomerId, token]);
 
   const handleNext = () => setStep((s) => Math.min(s + 1, 3));
   const handlePrev = () => setStep((s) => Math.max(s - 1, 1));
+
+  const handleCreateOrder = async () => {
+    if (!selectedCustomerId || items.length === 0) return;
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        customerId: selectedCustomerId,
+        isExpress: false,
+        pickupType: 'STORE_PICKUP',
+        items: items.map(item => ({
+          garmentCatalogId: item.garmentCatalogId,
+          serviceTypeId: item.serviceTypeId,
+          quantity: item.quantity,
+        })),
+        notes: 'Created via wizard mock',
+      };
+
+      const res = await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to create order (${res.status})`);
+      }
+
+      const body = await res.json();
+      navigate(`/orders/${body.data.id}`);
+    } catch (err: any) {
+      alert(`Error creating order: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -45,12 +125,42 @@ export function OrderWizardPage() {
         {step === 1 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Select Customer</h2>
-            <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
-              <p className="text-gray-500 mb-4">Customer search component will go here.</p>
-              <Button onClick={() => setSelectedCustomerId('mock-customer-id')}>
-                Select Mock Customer
-              </Button>
-            </div>
+
+            {customerLoading ? (
+              <LoadingState message="Loading customer details..." />
+            ) : customerError ? (
+              <ErrorState
+                message={customerError}
+                onRetry={() => {
+                  setCustomerError(null);
+                  setSelectedCustomerId(null);
+                }}
+              />
+            ) : customer ? (
+              <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                <h3 className="font-semibold text-green-900 text-lg">{customer.name}</h3>
+                <p className="text-green-700">{customer.phone}</p>
+                <p className="text-green-700">{customer.email}</p>
+                <div className="mt-4 flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCustomer(null);
+                      setSelectedCustomerId(null);
+                    }}
+                  >
+                    Change Customer
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                <p className="text-gray-500 mb-4">Customer search component will go here.</p>
+                <Button onClick={() => setSelectedCustomerId('mock-customer-id')}>
+                  Select Mock Customer
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -59,7 +169,13 @@ export function OrderWizardPage() {
             <h2 className="text-xl font-semibold">Add Items</h2>
             <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
               <p className="text-gray-500 mb-4">Item catalog and selection will go here.</p>
-              <Button onClick={() => setItems([{ garment: 'Shirt', service: 'Wash', qty: 2 }])}>
+              <Button onClick={() => setItems([{ 
+                garmentCatalogId: 'garment-shirt', 
+                serviceTypeId: 'svc-wash', 
+                quantity: 2,
+                garmentName: 'Shirt',
+                serviceName: 'Wash'
+              }])}>
                 Add Mock Item
               </Button>
             </div>
@@ -69,7 +185,7 @@ export function OrderWizardPage() {
                 <ul className="list-disc pl-5">
                   {items.map((item, idx) => (
                     <li key={idx}>
-                      {item.qty}x {item.garment} ({item.service})
+                      {item.quantity}x {item.garmentName} ({item.serviceName})
                     </li>
                   ))}
                 </ul>
@@ -89,7 +205,7 @@ export function OrderWizardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Items:</span>
-                  <span className="font-medium">{items.reduce((s, i) => s + i.qty, 0)}</span>
+                  <span className="font-medium">{items.reduce((s, i) => s + i.quantity, 0)}</span>
                 </div>
               </div>
             </div>
@@ -105,7 +221,13 @@ export function OrderWizardPage() {
               Next Step
             </Button>
           ) : (
-            <Button variant="primary">Create Order</Button>
+            <Button 
+              variant="primary" 
+              onClick={handleCreateOrder} 
+              disabled={isSubmitting || items.length === 0}
+            >
+              {isSubmitting ? 'Creating...' : 'Create Order'}
+            </Button>
           )}
         </div>
       </Card>
