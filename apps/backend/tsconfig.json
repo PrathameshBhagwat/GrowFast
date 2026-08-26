@@ -22,7 +22,5 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts"],
-  "references": [
-    { "path": "../../packages/shared-types" }
-  ]
+  "references": [{ "path": "../../packages/shared-types" }]
 }
