@@ -43,6 +43,8 @@ export type {
   OrderItemDTO,
   CreateOrderRequest,
   CreateOrderItemRequest,
+  UpdateOrderItemRequest,
+  UpdateDueDateRequest,
   PaymentDTO,
   RecordPaymentRequest,
   PaymentSummaryDTO,
@@ -59,3 +61,7 @@ export type {
 // Order Status Contract
 export { deriveOrderStatus, ORDER_STATUS_COLORS } from './order-status';
 export type { OrderItemStatusInput } from './order-status';
+
+// Pricing Contract
+export { calculateOrderTotals } from './pricing';
+export type { PricingItemInput, PricingTotals } from './pricing';

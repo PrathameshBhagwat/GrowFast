@@ -193,11 +193,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
             variant="outline"
             size="sm"
             icon={<ArrowRight size={14} />}
-            onClick={() =>
-              handleNotify(
-                `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customerId}`,
-              )
-            }
+            onClick={() => navigate(`/orders/new?customerId=${customerId}`)}
           >
             Create Order for {customerName}
           </Button>
@@ -211,11 +207,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
               variant="primary"
               size="sm"
               icon={<ArrowRight size={14} />}
-              onClick={() =>
-                handleNotify(
-                  `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customerId}`,
-                )
-              }
+              onClick={() => navigate(`/orders/new?customerId=${customerId}`)}
             >
               Create First Order
             </Button>

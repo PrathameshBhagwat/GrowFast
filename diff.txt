@@ -1,0 +1,897 @@
+On branch Order_Workflow_Dev_B
+Your branch is up to date with 'origin/Order_Workflow_Dev_B'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   apps/backend/src/catalog/catalog.service.ts
+	modified:   apps/backend/src/order/dto/get-orders-query.dto.ts
+	modified:   apps/backend/src/order/order.controller.ts
+	modified:   apps/backend/src/order/order.service.spec.ts
+	modified:   apps/backend/src/order/order.service.ts
+	modified:   apps/web/src/components/CustomerOrderHistory.tsx
+	modified:   apps/web/src/pages/HomePage.tsx
+	modified:   apps/web/src/pages/OrderDetailPage.tsx
+	modified:   apps/web/src/pages/OrderWizardPage.spec.tsx
+	modified:   apps/web/src/pages/OrderWizardPage.tsx
+	modified:   packages/shared-types/src/dto.ts
+	modified:   packages/shared-types/src/index.ts
+	modified:   packages/shared-types/src/pricing.ts
+	modified:   prisma/seed.ts
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	apps/backend/src/order/dto/update-due-date.dto.ts
+	apps/web/src/components/DueDateEditModal.tsx
+	diff.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+ apps/backend/src/catalog/catalog.service.ts        |  13 +-
+ apps/backend/src/order/dto/get-orders-query.dto.ts |   6 +-
+ apps/backend/src/order/order.controller.ts         |  18 +++
+ apps/backend/src/order/order.service.spec.ts       |  99 +++++++++++++--
+ apps/backend/src/order/order.service.ts            |  70 ++++++++--
+ apps/web/src/components/CustomerOrderHistory.tsx   |  12 +-
+ apps/web/src/pages/HomePage.tsx                    |   6 +-
+ apps/web/src/pages/OrderDetailPage.tsx             |  38 +++++-
+ apps/web/src/pages/OrderWizardPage.spec.tsx        |  49 +++++--
+ apps/web/src/pages/OrderWizardPage.tsx             | 141 ++++++++++++---------
+ packages/shared-types/src/dto.ts                   |   8 ++
+ packages/shared-types/src/index.ts                 |   1 +
+ packages/shared-types/src/pricing.ts               |   6 +-
+ prisma/seed.ts                                     |   1 -
+ 14 files changed, 348 insertions(+), 120 deletions(-)
+diff --git a/apps/backend/src/catalog/catalog.service.ts b/apps/backend/src/catalog/catalog.service.ts
+index 866e49b..288f21e 100644
+--- a/apps/backend/src/catalog/catalog.service.ts
++++ b/apps/backend/src/catalog/catalog.service.ts
+@@ -81,10 +81,7 @@ export class CatalogService {
+    */
+   async findAllPrices() {
+     return this.prisma.serviceGarmentPrice.findMany({
+-      orderBy: [
+-        { garmentCatalogId: 'asc' },
+-        { serviceTypeId: 'asc' }
+-      ]
++      orderBy: [{ garmentCatalogId: 'asc' }, { serviceTypeId: 'asc' }],
+     });
+   }
+ 
+@@ -97,12 +94,14 @@ export class CatalogService {
+         garmentCatalogId_serviceTypeId: {
+           garmentCatalogId,
+           serviceTypeId,
+-        }
+-      }
++        },
++      },
+     });
+ 
+     if (!priceRecord) {
+-      throw new NotFoundException(`Pricing not found for garment ${garmentCatalogId} and service ${serviceTypeId}`);
++      throw new NotFoundException(
++        `Pricing not found for garment ${garmentCatalogId} and service ${serviceTypeId}`,
++      );
+     }
+ 
+     return priceRecord.price;
+diff --git a/apps/backend/src/order/dto/get-orders-query.dto.ts b/apps/backend/src/order/dto/get-orders-query.dto.ts
+index 0ab90af..ca42baa 100644
+--- a/apps/backend/src/order/dto/get-orders-query.dto.ts
++++ b/apps/backend/src/order/dto/get-orders-query.dto.ts
+@@ -1,8 +1,12 @@
+ import { Type } from 'class-transformer';
+-import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
++import { IsEnum, IsInt, IsOptional, Min, IsString } from 'class-validator';
+ import { OrderStatus, PaymentStatus } from '@growfast/shared-types';
+ 
+ export class GetOrdersQueryDto {
++  @IsOptional()
++  @IsString()
++  customerId?: string;
++
+   @IsOptional()
+   @IsEnum(OrderStatus, { message: 'status must be a valid OrderStatus' })
+   status?: OrderStatus;
+diff --git a/apps/backend/src/order/order.controller.ts b/apps/backend/src/order/order.controller.ts
+index 30f80b8..591fed2 100644
+--- a/apps/backend/src/order/order.controller.ts
++++ b/apps/backend/src/order/order.controller.ts
+@@ -13,6 +13,7 @@ import { OrderService } from './order.service';
+ import { CreateOrderDto } from './dto/create-order.dto';
+ import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
+ import { UpdateOrderItemDto } from './dto/update-order-item.dto';
++import { UpdateDueDateDto } from './dto/update-due-date.dto';
+ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+ import { RolesGuard } from '../auth/roles.guard';
+ import { Roles } from '../auth/roles.decorator';
+@@ -70,4 +71,21 @@ export class OrderController {
+       data: order,
+     };
+   }
++
++  @Patch(':id/due-date')
++  @UseGuards(JwtAuthGuard, RolesGuard)
++  @Roles('OWNER', 'MANAGER')
++  async updateDueDate(@Param('id') id: string, @Body() dto: UpdateDueDateDto, @Request() req: any) {
++    const employeeId = req.user.id;
++    const order = await this.orderService.updateDueDate(
++      id,
++      dto.effectiveDueDate,
++      dto.reason,
++      employeeId,
++    );
++    return {
++      success: true,
++      data: order,
++    };
++  }
+ }
+diff --git a/apps/backend/src/order/order.service.spec.ts b/apps/backend/src/order/order.service.spec.ts
+index 15c6809..cd8c20c 100644
+--- a/apps/backend/src/order/order.service.spec.ts
++++ b/apps/backend/src/order/order.service.spec.ts
+@@ -103,18 +103,58 @@ describe('OrderService', () => {
+       mockPrismaService.serviceType.findMany.mockResolvedValue([mockService]);
+       mockPrismaService.order.count.mockResolvedValue(0);
+       mockPrismaService.order.create.mockResolvedValue(mockCreatedOrder);
+-      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([{
+-        garmentCatalogId: 'g1',
+-        serviceTypeId: 's1',
+-        price: 150
+-      }]);
++      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
++        {
++          garmentCatalogId: 'g1',
++          serviceTypeId: 's1',
++          price: 150,
++        },
++      ]);
+     });
+ 
+-    it('should create an order successfully', async () => {
++    it('should create an order successfully and calculate due dates', async () => {
+       const result = await service.createOrder(validDto, 'emp1', 'store1');
+       expect(result).toBeDefined();
+       expect(result.orderNumber).toBe('ORD-0001');
+-      expect(mockPrismaService.order.create).toHaveBeenCalled();
++
++      // Expected logic: today + 2 days
++      const expectedDueDate = new Date();
++      expectedDueDate.setDate(expectedDueDate.getDate() + 2);
++
++      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
++        expect.objectContaining({
++          data: expect.objectContaining({
++            systemDueDate: expect.any(Date),
++            effectiveDueDate: expect.any(Date),
++          }),
++        }),
++      );
++    });
++
++    it('should calculate the exact same due date even if isExpress is true (B6 Regression)', async () => {
++      const expressDto = { ...validDto, isExpress: true };
++      await service.createOrder(expressDto, 'emp1', 'store1');
++
++      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
++        expect.objectContaining({
++          data: expect.objectContaining({
++            systemDueDate: expect.any(Date),
++            effectiveDueDate: expect.any(Date),
++            priority: OrderPriority.EXPRESS,
++            isExpress: true,
++          }),
++        }),
++      );
++
++      // We'll capture the call and check that systemDueDate has the normal +2 days logic
++      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
++
++      const orderDate = callArgs.data.orderDate;
++      const expectedSystemDueDate = new Date(orderDate);
++      // It should be strictly +2 days as mocked in mockService.estimatedDays = 2
++      expectedSystemDueDate.setDate(expectedSystemDueDate.getDate() + 2);
++
++      expect(callArgs.data.systemDueDate).toEqual(expectedSystemDueDate);
+     });
+ 
+     it('should throw NotFoundException if customer not found', async () => {
+@@ -190,7 +230,7 @@ describe('OrderService', () => {
+       mockPrismaService.serviceGarmentPrice.findUnique.mockResolvedValue({
+         garmentCatalogId: 'g1',
+         serviceTypeId: 's1',
+-        price: 150
++        price: 150,
+       });
+     });
+ 
+@@ -236,4 +276,47 @@ describe('OrderService', () => {
+       ).rejects.toThrow(BadRequestException);
+     });
+   });
++
++  describe('updateDueDate', () => {
++    const mockOrder = {
++      id: 'o1',
++      systemDueDate: new Date(),
++      effectiveDueDate: new Date(),
++    };
++
++    beforeEach(() => {
++      mockPrismaService.order.findUnique.mockResolvedValue(mockOrder);
++      mockPrismaService.order.update.mockResolvedValue({});
++    });
++
++    it('should update effective due date and log audit fields', async () => {
++      jest
++        .spyOn(service, 'findOrderById')
++        .mockResolvedValue({ id: 'o1', effectiveDueDate: new Date('2026-09-01') } as any);
++
++      const result = await service.updateDueDate(
++        'o1',
++        '2026-09-01T10:00:00Z',
++        'Customer requested early delivery',
++        'mgr1',
++      );
++
++      expect(mockPrismaService.order.update).toHaveBeenCalledWith({
++        where: { id: 'o1' },
++        data: {
++          effectiveDueDate: expect.any(Date),
++          dueDateOverrideReason: 'Customer requested early delivery',
++          dueDateOverriddenBy: 'mgr1',
++        },
++      });
++      expect(result).toBeDefined();
++    });
++
++    it('should throw NotFoundException if order not found', async () => {
++      mockPrismaService.order.findUnique.mockResolvedValue(null);
++      await expect(
++        service.updateDueDate('wrong_id', '2026-09-01T10:00:00Z', 'Reason', 'mgr1'),
++      ).rejects.toThrow(NotFoundException);
++    });
++  });
+ });
+diff --git a/apps/backend/src/order/order.service.ts b/apps/backend/src/order/order.service.ts
+index 4fbf0f3..e5eb459 100644
+--- a/apps/backend/src/order/order.service.ts
++++ b/apps/backend/src/order/order.service.ts
+@@ -4,7 +4,12 @@ import { CatalogService } from '../catalog/catalog.service';
+ import { CreateOrderDto } from './dto/create-order.dto';
+ import { UpdateOrderItemDto } from './dto/update-order-item.dto';
+ import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
+-import { OrderPriority, PaymentStatus, calculateOrderTotals, PricingItemInput } from '@growfast/shared-types';
++import {
++  OrderPriority,
++  PaymentStatus,
++  calculateOrderTotals,
++  PricingItemInput,
++} from '@growfast/shared-types';
+ 
+ @Injectable()
+ export class OrderService {
+@@ -42,16 +47,17 @@ export class OrderService {
+         where: {
+           garmentCatalogId: { in: garmentIds },
+           serviceTypeId: { in: serviceIds },
+-        }
++        },
+       });
+       const priceMap = new Map(
+-        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price])
++        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price]),
+       );
+ 
+       // Validate items
+       const orderItemsData = [];
+       const serviceCounts = new Map<string, number>();
+       const pricingInputs: PricingItemInput[] = [];
++      let maxEstimatedDays = 0;
+ 
+       for (const item of dto.items) {
+         const garment = garmentMap.get(item.garmentCatalogId);
+@@ -91,6 +97,10 @@ export class OrderService {
+           unitPrice,
+           quantity: item.quantity,
+         });
++
++        if (service.estimatedDays > maxEstimatedDays) {
++          maxEstimatedDays = service.estimatedDays;
++        }
+       }
+ 
+       // Calculate Totals
+@@ -112,14 +122,18 @@ export class OrderService {
+       }
+       const serviceSummary = serviceSummaryParts.join(', ');
+ 
+-      // 7. Create Order
++      // 7. Calculate Due Date (B6)
++      const systemDueDate = new Date(orderDate);
++      systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
++
++      // 8. Create Order
+       const order = await tx.order.create({
+         data: {
+           orderNumber,
+           customerId: dto.customerId,
+           orderDate,
+-          systemDueDate: orderDate, // Deferred to B6
+-          effectiveDueDate: orderDate, // Deferred to B6
++          systemDueDate,
++          effectiveDueDate: systemDueDate,
+           isExpress: dto.isExpress,
+           serviceSummary,
+           subtotal: totals.subtotal,
+@@ -177,12 +191,13 @@ export class OrderService {
+   }
+ 
+   async findAllOrders(query: GetOrdersQueryDto) {
+-    const { status, paymentStatus, page = 1, pageSize = 10 } = query;
++    const { status, paymentStatus, customerId, page = 1, pageSize = 10 } = query;
+     const skip = (page - 1) * pageSize;
+ 
+     const where: any = {};
+     if (status) where.status = status;
+     if (paymentStatus) where.paymentStatus = paymentStatus;
++    if (customerId) where.customerId = customerId;
+ 
+     const [orders, total] = await Promise.all([
+       this.prisma.order.findMany({
+@@ -259,14 +274,14 @@ export class OrderService {
+       // 5. Calculate new line total
+       const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
+       const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
+-      
++
+       const priceRecord = await tx.serviceGarmentPrice.findUnique({
+         where: {
+           garmentCatalogId_serviceTypeId: {
+             garmentCatalogId,
+             serviceTypeId,
+-          }
+-        }
++          },
++        },
+       });
+       const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
+       const lineTotal = unitPrice * newQuantity;
+@@ -292,13 +307,13 @@ export class OrderService {
+         where: { id: orderId },
+         include: { items: true },
+       });
+-      
+-      const pricingInputs = updatedOrder!.items.map(i => ({
++
++      const pricingInputs = updatedOrder!.items.map((i) => ({
+         unitPrice: i.unitPrice,
+         quantity: i.quantity,
+       }));
+       const totals = calculateOrderTotals(pricingInputs);
+-      
++
+       await tx.order.update({
+         where: { id: orderId },
+         data: {
+@@ -307,7 +322,7 @@ export class OrderService {
+           taxAmount: totals.taxAmount,
+           totalAmount: totals.totalAmount,
+           amountDue: totals.totalAmount - updatedOrder!.amountPaid,
+-        }
++        },
+       });
+ 
+       // 8. Return updated order detail
+@@ -315,6 +330,32 @@ export class OrderService {
+     });
+   }
+ 
++  // --- B6 Due Date Override ---
++  async updateDueDate(
++    orderId: string,
++    effectiveDueDate: string,
++    reason: string,
++    employeeId: string,
++  ) {
++    return this.prisma.$transaction(async (tx) => {
++      const order = await tx.order.findUnique({ where: { id: orderId } });
++      if (!order) {
++        throw new NotFoundException(`Order with ID "${orderId}" not found`);
++      }
++
++      await tx.order.update({
++        where: { id: orderId },
++        data: {
++          effectiveDueDate: new Date(effectiveDueDate),
++          dueDateOverrideReason: reason,
++          dueDateOverriddenBy: employeeId,
++        },
++      });
++
++      return await this.findOrderById(orderId);
++    });
++  }
++
+   // --- Helpers ---
+   private mapToSummaryDto(order: any) {
+     return {
+@@ -344,6 +385,7 @@ export class OrderService {
+     const summary = this.mapToSummaryDto(order);
+     return {
+       ...summary,
++      itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
+       systemDueDate: order.systemDueDate.toISOString(),
+       dueDateOverrideReason: order.dueDateOverrideReason,
+       dueDateOverriddenBy: order.dueDateOverriddenBy,
+diff --git a/apps/web/src/components/CustomerOrderHistory.tsx b/apps/web/src/components/CustomerOrderHistory.tsx
+index 97db3e4..2929d21 100644
+--- a/apps/web/src/components/CustomerOrderHistory.tsx
++++ b/apps/web/src/components/CustomerOrderHistory.tsx
+@@ -193,11 +193,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
+             variant="outline"
+             size="sm"
+             icon={<ArrowRight size={14} />}
+-            onClick={() =>
+-              handleNotify(
+-                `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customerId}`,
+-              )
+-            }
++            onClick={() => navigate(`/orders/new?customerId=${customerId}`)}
+           >
+             Create Order for {customerName}
+           </Button>
+@@ -211,11 +207,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
+               variant="primary"
+               size="sm"
+               icon={<ArrowRight size={14} />}
+-              onClick={() =>
+-                handleNotify(
+-                  `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customerId}`,
+-                )
+-              }
++              onClick={() => navigate(`/orders/new?customerId=${customerId}`)}
+             >
+               Create First Order
+             </Button>
+diff --git a/apps/web/src/pages/HomePage.tsx b/apps/web/src/pages/HomePage.tsx
+index 10554ed..e1cfd1a 100644
+--- a/apps/web/src/pages/HomePage.tsx
++++ b/apps/web/src/pages/HomePage.tsx
+@@ -747,11 +747,7 @@ export const HomePage: React.FC = () => {
+                   variant="primary"
+                   size="md"
+                   icon={<ArrowRight size={16} />}
+-                  onClick={() =>
+-                    showNotice(
+-                      `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${selectedCustomer.id}`,
+-                    )
+-                  }
++                  onClick={() => navigate(`/orders/new?customerId=${selectedCustomer.id}`)}
+                   aria-label="Create Order for Customer"
+                 >
+                   Create Order
+diff --git a/apps/web/src/pages/OrderDetailPage.tsx b/apps/web/src/pages/OrderDetailPage.tsx
+index 23180f0..e079874 100644
+--- a/apps/web/src/pages/OrderDetailPage.tsx
++++ b/apps/web/src/pages/OrderDetailPage.tsx
+@@ -4,7 +4,8 @@ import { Card, Button, StatusChip, LoadingState, ErrorState } from '@growfast/ui
+ import { useAuth } from '../contexts/AuthContext';
+ import { OrderDetailDTO, OrderItemDTO, Role } from '@growfast/shared-types';
+ import { OrderItemEditModal } from '../components/OrderItemEditModal';
+-import { ArrowLeft, Edit2 } from 'lucide-react';
++import { DueDateEditModal } from '../components/DueDateEditModal';
++import { ArrowLeft, Edit2, Calendar } from 'lucide-react';
+ 
+ const API_URL = import.meta.env.VITE_API_URL || '/api';
+ 
+@@ -18,6 +19,7 @@ export function OrderDetailPage() {
+   const [error, setError] = useState<string | null>(null);
+ 
+   const [editItem, setEditItem] = useState<OrderItemDTO | null>(null);
++  const [editDueDate, setEditDueDate] = useState(false);
+ 
+   const fetchOrder = async () => {
+     setLoading(true);
+@@ -88,6 +90,30 @@ export function OrderDetailPage() {
+               <span className="text-gray-500">Phone</span>
+               <span className="font-medium text-gray-900">{order.customerPhone}</span>
+             </div>
++            <div className="flex justify-between pt-2 border-t mt-2">
++              <span className="text-gray-500 flex items-center gap-1">
++                <Calendar size={14} /> Due Date
++              </span>
++              <div className="flex items-center gap-2">
++                <span className="font-medium text-gray-900">
++                  {new Date(order.effectiveDueDate).toLocaleDateString()}
++                </span>
++                {(employee?.role === Role.OWNER || employee?.role === Role.MANAGER) && (
++                  <button
++                    onClick={() => setEditDueDate(true)}
++                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"
++                    title="Edit Due Date"
++                  >
++                    <Edit2 size={14} />
++                  </button>
++                )}
++              </div>
++            </div>
++            {order.dueDateOverrideReason && (
++              <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded mt-2">
++                <strong>Overridden:</strong> {order.dueDateOverrideReason}
++              </div>
++            )}
+           </div>
+         </Card>
+ 
+@@ -196,6 +222,16 @@ export function OrderDetailPage() {
+           onSuccess={fetchOrder}
+         />
+       )}
++
++      {editDueDate && (
++        <DueDateEditModal
++          open={editDueDate}
++          onClose={() => setEditDueDate(false)}
++          orderId={order.id}
++          currentDueDate={order.effectiveDueDate}
++          onSuccess={fetchOrder}
++        />
++      )}
+     </div>
+   );
+ }
+diff --git a/apps/web/src/pages/OrderWizardPage.spec.tsx b/apps/web/src/pages/OrderWizardPage.spec.tsx
+index c340c64..1944b7c 100644
+--- a/apps/web/src/pages/OrderWizardPage.spec.tsx
++++ b/apps/web/src/pages/OrderWizardPage.spec.tsx
+@@ -23,6 +23,12 @@ global.fetch = vi.fn();
+ describe('OrderWizardPage', () => {
+   beforeEach(() => {
+     vi.resetAllMocks();
++    (global.fetch as any).mockImplementation(async (url: string) => {
++      if (url.includes('/pricing')) {
++        return { ok: true, json: async () => ({ success: true, data: [] }) };
++      }
++      return { ok: true, json: async () => ({}) };
++    });
+   });
+ 
+   const renderWithRouter = (initialRoute = '/orders/new') => {
+@@ -35,17 +41,36 @@ describe('OrderWizardPage', () => {
+     );
+   };
+ 
+-  it('renders normal flow without customerId', () => {
++  it('renders normal flow without customerId', async () => {
+     renderWithRouter('/orders/new');
++
++    // Wait for the pricing fetch to complete
++    await waitFor(() => {
++      expect(screen.getByText('Select Mock Customer')).toBeInTheDocument();
++    });
++
+     expect(screen.getByText('Customer search component will go here.')).toBeInTheDocument();
+-    expect(screen.getByText('Select Mock Customer')).toBeInTheDocument();
+-    expect(global.fetch).not.toHaveBeenCalled();
++
++    // Verify it fetched pricing, but did NOT fetch customer
++    expect(global.fetch).toHaveBeenCalledWith(
++      expect.stringContaining('/pricing'),
++      expect.any(Object),
++    );
++    expect(global.fetch).not.toHaveBeenCalledWith(
++      expect.stringContaining('/customers'),
++      expect.any(Object),
++    );
+   });
+ 
+   it('reads customerId from URL, fetches customer, and pre-selects it', async () => {
+-    (global.fetch as any).mockResolvedValueOnce({
+-      ok: true,
+-      json: async () => ({ data: mockCustomer }),
++    (global.fetch as any).mockImplementation(async (url: string) => {
++      if (url.includes('/pricing')) {
++        return { ok: true, json: async () => ({ success: true, data: [] }) };
++      }
++      if (url.includes('/customers/cust-003')) {
++        return { ok: true, json: async () => ({ data: mockCustomer }) };
++      }
++      return { ok: true, json: async () => ({}) };
+     });
+ 
+     renderWithRouter('/orders/new?customerId=cust-003');
+@@ -70,10 +95,14 @@ describe('OrderWizardPage', () => {
+   });
+ 
+   it('handles invalid customerId gracefully', async () => {
+-    (global.fetch as any).mockResolvedValueOnce({
+-      ok: false,
+-      status: 404,
+-      json: async () => ({ message: 'Customer not found' }),
++    (global.fetch as any).mockImplementation(async (url: string) => {
++      if (url.includes('/pricing')) {
++        return { ok: true, json: async () => ({ success: true, data: [] }) };
++      }
++      if (url.includes('/customers/invalid-123')) {
++        return { ok: false, status: 404, json: async () => ({ message: 'Customer not found' }) };
++      }
++      return { ok: true, json: async () => ({}) };
+     });
+ 
+     renderWithRouter('/orders/new?customerId=invalid-123');
+diff --git a/apps/web/src/pages/OrderWizardPage.tsx b/apps/web/src/pages/OrderWizardPage.tsx
+index 6c9bd1d..dd5ce62 100644
+--- a/apps/web/src/pages/OrderWizardPage.tsx
++++ b/apps/web/src/pages/OrderWizardPage.tsx
+@@ -27,11 +27,11 @@ export function OrderWizardPage() {
+       fetch(`${API_URL}/pricing`, {
+         headers: { Authorization: `Bearer ${token}` },
+       })
+-        .then(res => res.json())
+-        .then(body => {
++        .then((res) => res.json())
++        .then((body) => {
+           if (body.success) setPrices(body.data);
+         })
+-        .catch(err => console.error('Failed to load pricing:', err));
++        .catch((err) => console.error('Failed to load pricing:', err));
+     }
+   }, [token]);
+ 
+@@ -73,7 +73,7 @@ export function OrderWizardPage() {
+         customerId: selectedCustomerId,
+         isExpress: false,
+         pickupType: 'STORE_PICKUP',
+-        items: items.map(item => ({
++        items: items.map((item) => ({
+           garmentCatalogId: item.garmentCatalogId,
+           serviceTypeId: item.serviceTypeId,
+           quantity: item.quantity,
+@@ -170,7 +170,17 @@ export function OrderWizardPage() {
+             ) : (
+               <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                 <p className="text-gray-500 mb-4">Customer search component will go here.</p>
+-                <Button onClick={() => setSelectedCustomerId('mock-customer-id')}>
++                <Button
++                  onClick={() => {
++                    setSelectedCustomerId('cust-003');
++                    setCustomer({
++                      id: 'cust-003',
++                      name: 'Amit Shah',
++                      phone: '+919811122334',
++                      email: 'amit.shah@techcorp.in',
++                    } as any);
++                  }}
++                >
+                   Select Mock Customer
+                 </Button>
+               </div>
+@@ -183,13 +193,19 @@ export function OrderWizardPage() {
+             <h2 className="text-xl font-semibold">Add Items</h2>
+             <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
+               <p className="text-gray-500 mb-4">Item catalog and selection will go here.</p>
+-              <Button onClick={() => setItems([{ 
+-                garmentCatalogId: 'garment-shirt', 
+-                serviceTypeId: 'svc-wash', 
+-                quantity: 2,
+-                garmentName: 'Shirt',
+-                serviceName: 'Wash'
+-              }])}>
++              <Button
++                onClick={() =>
++                  setItems([
++                    {
++                      garmentCatalogId: 'garment-shirt',
++                      serviceTypeId: 'svc-wash',
++                      quantity: 2,
++                      garmentName: 'Shirt',
++                      serviceName: 'Wash',
++                    },
++                  ])
++                }
++              >
+                 Add Mock Item
+               </Button>
+             </div>
+@@ -208,56 +224,61 @@ export function OrderWizardPage() {
+           </div>
+         )}
+ 
+-        {step === 3 && (() => {
+-          const pricingInputs: PricingItemInput[] = items.map(item => {
+-            const p = prices.find(
+-              (priceItem) => priceItem.garmentCatalogId === item.garmentCatalogId && priceItem.serviceTypeId === item.serviceTypeId
+-            );
+-            return {
+-              quantity: item.quantity,
+-              unitPrice: p ? p.price : 0,
+-            };
+-          });
+-          const totals = calculateOrderTotals(pricingInputs);
++        {step === 3 &&
++          (() => {
++            const pricingInputs: PricingItemInput[] = items.map((item) => {
++              const p = prices.find(
++                (priceItem) =>
++                  priceItem.garmentCatalogId === item.garmentCatalogId &&
++                  priceItem.serviceTypeId === item.serviceTypeId,
++              );
++              return {
++                quantity: item.quantity,
++                unitPrice: p ? p.price : 0,
++              };
++            });
++            const totals = calculateOrderTotals(pricingInputs);
+ 
+-          return (
+-            <div className="space-y-4">
+-              <h2 className="text-xl font-semibold">Review Order</h2>
+-              <div className="bg-gray-50 p-6 rounded-lg border">
+-                <div className="space-y-2 mb-6 border-b pb-4">
+-                  <div className="flex justify-between">
+-                    <span className="text-gray-600">Customer ID:</span>
+-                    <span className="font-medium">{selectedCustomerId || 'None'}</span>
+-                  </div>
+-                  <div className="flex justify-between">
+-                    <span className="text-gray-600">Total Items:</span>
+-                    <span className="font-medium">{items.reduce((s, i) => s + i.quantity, 0)}</span>
+-                  </div>
+-                </div>
+-                
+-                <h3 className="font-semibold mb-3">Financial Breakdown</h3>
+-                <div className="space-y-2 text-sm">
+-                  <div className="flex justify-between">
+-                    <span className="text-gray-600">Subtotal:</span>
+-                    <span>₹{totals.subtotal.toFixed(2)}</span>
++            return (
++              <div className="space-y-4">
++                <h2 className="text-xl font-semibold">Review Order</h2>
++                <div className="bg-gray-50 p-6 rounded-lg border">
++                  <div className="space-y-2 mb-6 border-b pb-4">
++                    <div className="flex justify-between">
++                      <span className="text-gray-600">Customer ID:</span>
++                      <span className="font-medium">{selectedCustomerId || 'None'}</span>
++                    </div>
++                    <div className="flex justify-between">
++                      <span className="text-gray-600">Total Items:</span>
++                      <span className="font-medium">
++                        {items.reduce((s, i) => s + i.quantity, 0)}
++                      </span>
++                    </div>
+                   </div>
+-                  <div className="flex justify-between">
+-                    <span className="text-gray-600">Discount:</span>
+-                    <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
+-                  </div>
+-                  <div className="flex justify-between">
+-                    <span className="text-gray-600">GST (18%):</span>
+-                    <span>₹{totals.taxAmount.toFixed(2)}</span>
+-                  </div>
+-                  <div className="flex justify-between font-bold text-base pt-2 border-t mt-2">
+-                    <span>Total Amount:</span>
+-                    <span>₹{totals.totalAmount.toFixed(2)}</span>
++
++                  <h3 className="font-semibold mb-3">Financial Breakdown</h3>
++                  <div className="space-y-2 text-sm">
++                    <div className="flex justify-between">
++                      <span className="text-gray-600">Subtotal:</span>
++                      <span>₹{totals.subtotal.toFixed(2)}</span>
++                    </div>
++                    <div className="flex justify-between">
++                      <span className="text-gray-600">Discount:</span>
++                      <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
++                    </div>
++                    <div className="flex justify-between">
++                      <span className="text-gray-600">GST (18%):</span>
++                      <span>₹{totals.taxAmount.toFixed(2)}</span>
++                    </div>
++                    <div className="flex justify-between font-bold text-base pt-2 border-t mt-2">
++                      <span>Total Amount:</span>
++                      <span>₹{totals.totalAmount.toFixed(2)}</span>
++                    </div>
+                   </div>
+                 </div>
+               </div>
+-            </div>
+-          );
+-        })()}
++            );
++          })()}
+ 
+         <div className="flex justify-between pt-6 border-t mt-6">
+           <Button variant="outline" onClick={handlePrev} disabled={step === 1}>
+@@ -268,9 +289,9 @@ export function OrderWizardPage() {
+               Next Step
+             </Button>
+           ) : (
+-            <Button 
+-              variant="primary" 
+-              onClick={handleCreateOrder} 
++            <Button
++              variant="primary"
++              onClick={handleCreateOrder}
+               disabled={isSubmitting || items.length === 0}
+             >
+               {isSubmitting ? 'Creating...' : 'Create Order'}
+diff --git a/packages/shared-types/src/dto.ts b/packages/shared-types/src/dto.ts
+index ac8fc97..0aaa201 100644
+--- a/packages/shared-types/src/dto.ts
++++ b/packages/shared-types/src/dto.ts
+@@ -92,6 +92,9 @@ export interface OrderSummaryDTO {
+   isExpress: boolean;
+   priority: OrderPriority;
+   status: OrderStatus;
++  subtotal: number;
++  discountAmount: number;
++  taxAmount: number;
+   totalAmount: number;
+   amountPaid: number;
+   amountDue: number;
+@@ -143,6 +146,11 @@ export interface CreateOrderItemRequest {
+   defectNotes?: string;
+ }
+ 
++export interface UpdateDueDateRequest {
++  effectiveDueDate: string;
++  reason: string;
++}
++
+ export interface UpdateOrderItemRequest {
+   garmentCatalogId?: string;
+   serviceTypeId?: string;
+diff --git a/packages/shared-types/src/index.ts b/packages/shared-types/src/index.ts
+index c70e186..8e91018 100644
+--- a/packages/shared-types/src/index.ts
++++ b/packages/shared-types/src/index.ts
+@@ -41,6 +41,7 @@ export type {
+   CreateOrderRequest,
+   CreateOrderItemRequest,
+   UpdateOrderItemRequest,
++  UpdateDueDateRequest,
+   PaymentDTO,
+   RecordPaymentRequest,
+   PaymentSummaryDTO,
+diff --git a/packages/shared-types/src/pricing.ts b/packages/shared-types/src/pricing.ts
+index 375d621..1a69b3e 100644
+--- a/packages/shared-types/src/pricing.ts
++++ b/packages/shared-types/src/pricing.ts
+@@ -1,6 +1,6 @@
+ /**
+  * Shared pricing calculation utility.
+- * 
++ *
+  * Centralizes the calculation logic for order financial fields.
+  */
+ 
+@@ -20,7 +20,7 @@ export function calculateOrderTotals(
+   items: PricingItemInput[],
+   options?: {
+     discountPercent?: number; // Kept at 0 for V1 based on user preference
+-  }
++  },
+ ): PricingTotals {
+   let subtotal = 0;
+ 
+@@ -40,7 +40,7 @@ export function calculateOrderTotals(
+ 
+   // 2. Tax (V1: 18% GST as per user choice)
+   // GST applies on the discounted subtotal
+-  const TAX_RATE = 0.18; 
++  const TAX_RATE = 0.18;
+   const taxAmount = discountedSubtotal * TAX_RATE;
+ 
+   // 3. Total Amount
+diff --git a/prisma/seed.ts b/prisma/seed.ts
+index b3fa8bf..cf4f062 100644
+--- a/prisma/seed.ts
++++ b/prisma/seed.ts
+@@ -193,7 +193,6 @@ async function main() {
+   }
+   console.log(`✅ Service Garment Prices: ${pricingData.length} records`);
+ 
+-
+   // ─── Customers ────────────────────────────────────────────────
+   const customers = [
+     {

@@ -124,6 +124,9 @@ export interface OrderSummaryDTO {
   isExpress: boolean;
   priority: OrderPriority;
   status: OrderStatus;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
   totalAmount: number;
   amountPaid: number;
   amountDue: number;
@@ -173,6 +176,21 @@ export interface CreateOrderItemRequest {
   quantity: number;
   colorTags?: string[];
   defectNotes?: string;
+}
+
+export interface UpdateDueDateRequest {
+  effectiveDueDate: string;
+  reason: string;
+}
+
+export interface UpdateOrderItemRequest {
+  garmentCatalogId?: string;
+  serviceTypeId?: string;
+  quantity?: number;
+  colorTags?: string[];
+  defectNotes?: string | null;
+  itemStatus?: ItemStatus;
+  deliveredQuantity?: number;
 }
 
 // ─── Payment DTOs ───────────────────────────────────────────────────

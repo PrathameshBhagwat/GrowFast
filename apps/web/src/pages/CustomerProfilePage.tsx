@@ -344,11 +344,7 @@ export const CustomerProfilePage: React.FC = () => {
               variant="primary"
               size="md"
               icon={<ArrowRight size={16} />}
-              onClick={() =>
-                showNotice(
-                  `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customer.id}`,
-                )
-              }
+              onClick={() => navigate(`/orders/new?customerId=${customer.id}`)}
               aria-label="Create Order for Customer"
             >
               Create Order

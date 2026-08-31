@@ -4,6 +4,7 @@ import { CatalogService } from './catalog.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 import { ServicesController } from './services.controller';
+import { PricingController } from './pricing.controller';
 
 /**
  * CatalogModule — garment catalog management.
@@ -13,7 +14,7 @@ import { ServicesController } from './services.controller';
  */
 @Module({
   imports: [PrismaModule],
-  controllers: [CatalogController, ServicesController],
+  controllers: [CatalogController, ServicesController, PricingController],
   providers: [CatalogService],
   exports: [CatalogService],
 })

@@ -8,6 +8,7 @@ const mockOrderService = {
   createOrder: jest.fn(),
   findAllOrders: jest.fn(),
   findOrderById: jest.fn(),
+  updateOrderItem: jest.fn(),
 };
 
 describe('OrderController', () => {
@@ -29,5 +30,28 @@ describe('OrderController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('updateOrderItem', () => {
+    it('should call OrderService.updateOrderItem and return success', async () => {
+      const mockResult = { id: 'order1' };
+      mockOrderService.updateOrderItem.mockResolvedValue(mockResult);
+
+      const req = { user: { storeId: 'store1' } };
+      const dto = { quantity: 2 };
+
+      const response = await controller.updateOrderItem('order1', 'item1', dto, req);
+
+      expect(mockOrderService.updateOrderItem).toHaveBeenCalledWith(
+        'order1',
+        'item1',
+        dto,
+        'store1',
+      );
+      expect(response).toEqual({
+        success: true,
+        data: mockResult,
+      });
+    });
   });
 });
