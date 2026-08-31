@@ -2,8 +2,14 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
-import { OrderPriority, PaymentStatus } from '@growfast/shared-types';
+import {
+  OrderPriority,
+  PaymentStatus,
+  calculateOrderTotals,
+  PricingItemInput,
+} from '@growfast/shared-types';
 
 @Injectable()
 export class OrderService {
@@ -36,9 +42,22 @@ export class OrderService {
       const garmentMap = new Map(garments.map((g) => [g.id, g]));
       const serviceMap = new Map(services.map((s) => [s.id, s]));
 
+      // 3. Fetch Pricing
+      const prices = await tx.serviceGarmentPrice.findMany({
+        where: {
+          garmentCatalogId: { in: garmentIds },
+          serviceTypeId: { in: serviceIds },
+        },
+      });
+      const priceMap = new Map(
+        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price]),
+      );
+
       // Validate items
       const orderItemsData = [];
       const serviceCounts = new Map<string, number>();
+      const pricingInputs: PricingItemInput[] = [];
+      let maxEstimatedDays = 0;
 
       for (const item of dto.items) {
         const garment = garmentMap.get(item.garmentCatalogId);
@@ -57,6 +76,10 @@ export class OrderService {
           throw new BadRequestException(`Service type "${service.name}" is not active`);
         }
 
+        const priceKey = `${garment.id}_${service.id}`;
+        const unitPrice = priceMap.get(priceKey) ?? 0;
+        const lineTotal = unitPrice * item.quantity;
+
         // For summary
         serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
 
@@ -64,12 +87,24 @@ export class OrderService {
           garmentCatalogId: garment.id,
           serviceTypeId: service.id,
           quantity: item.quantity,
-          unitPrice: 0, // Deferred to B5
-          lineTotal: 0, // Deferred to B5
+          unitPrice,
+          lineTotal,
           colorTags: item.colorTags || [],
           defectNotes: item.defectNotes,
         });
+
+        pricingInputs.push({
+          unitPrice,
+          quantity: item.quantity,
+        });
+
+        if (service.estimatedDays > maxEstimatedDays) {
+          maxEstimatedDays = service.estimatedDays;
+        }
       }
+
+      // Calculate Totals
+      const totals = calculateOrderTotals(pricingInputs);
 
       // 4. Due date placeholder (Deferred to B6)
       const orderDate = new Date();
@@ -87,16 +122,25 @@ export class OrderService {
       }
       const serviceSummary = serviceSummaryParts.join(', ');
 
-      // 7. Create Order
+      // 7. Calculate Due Date (B6)
+      const systemDueDate = new Date(orderDate);
+      systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+
+      // 8. Create Order
       const order = await tx.order.create({
         data: {
           orderNumber,
           customerId: dto.customerId,
           orderDate,
-          systemDueDate: orderDate, // Deferred to B6
-          effectiveDueDate: orderDate, // Deferred to B6
+          systemDueDate,
+          effectiveDueDate: systemDueDate,
           isExpress: dto.isExpress,
           serviceSummary,
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
           paymentStatus: PaymentStatus.PENDING,
           pickupType: dto.pickupType,
           priority: dto.isExpress ? OrderPriority.EXPRESS : OrderPriority.STANDARD,
@@ -147,12 +191,14 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto) {
-    const { status, paymentStatus, page = 1, pageSize = 10 } = query;
+    const { customerId, status, paymentStatus, page = 1, pageSize = 10 } = query;
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
+    if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (customerId) where.customerId = customerId;
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -176,6 +222,141 @@ export class OrderService {
     };
   }
 
+  async updateOrderItem(orderId: string, itemId: string, dto: UpdateOrderItemDto, storeId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Validate order exists and belongs to store
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new BadRequestException(`Order does not belong to your store`);
+      }
+
+      // 2. Validate order item belongs to order
+      const orderItem = order.items.find((item) => item.id === itemId);
+      if (!orderItem) {
+        throw new NotFoundException(
+          `OrderItem with ID "${itemId}" not found in order "${orderId}"`,
+        );
+      }
+
+      // 3. Validate garment / service if updated
+      if (dto.garmentCatalogId) {
+        const garment = await tx.garmentCatalog.findUnique({ where: { id: dto.garmentCatalogId } });
+        if (!garment)
+          throw new NotFoundException(`Garment with ID "${dto.garmentCatalogId}" not found`);
+        if (!garment.isActive)
+          throw new BadRequestException(`Garment "${garment.name}" is not active`);
+      }
+      if (dto.serviceTypeId) {
+        const service = await tx.serviceType.findUnique({ where: { id: dto.serviceTypeId } });
+        if (!service)
+          throw new NotFoundException(`Service type with ID "${dto.serviceTypeId}" not found`);
+        if (!service.isActive)
+          throw new BadRequestException(`Service type "${service.name}" is not active`);
+      }
+
+      // 4. Validate quantities
+      const newQuantity = dto.quantity !== undefined ? dto.quantity : orderItem.quantity;
+      const newDeliveredQuantity =
+        dto.deliveredQuantity !== undefined ? dto.deliveredQuantity : orderItem.deliveredQuantity;
+
+      if (newDeliveredQuantity > newQuantity) {
+        throw new BadRequestException(
+          `Delivered quantity (${newDeliveredQuantity}) cannot exceed total quantity (${newQuantity})`,
+        );
+      }
+
+      // 5. Calculate new line total
+      const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
+      const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
+
+      const priceRecord = await tx.serviceGarmentPrice.findUnique({
+        where: {
+          garmentCatalogId_serviceTypeId: {
+            garmentCatalogId,
+            serviceTypeId,
+          },
+        },
+      });
+      const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
+      const lineTotal = unitPrice * newQuantity;
+
+      // 6. Update OrderItem
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          garmentCatalogId: dto.garmentCatalogId,
+          serviceTypeId: dto.serviceTypeId,
+          quantity: dto.quantity,
+          unitPrice,
+          lineTotal,
+          colorTags: dto.colorTags,
+          defectNotes: dto.defectNotes,
+          itemStatus: dto.itemStatus,
+          deliveredQuantity: dto.deliveredQuantity,
+        },
+      });
+
+      // 7. Recalculate Order Totals
+      const updatedOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      const pricingInputs = updatedOrder!.items.map((i) => ({
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+      }));
+      const totals = calculateOrderTotals(pricingInputs);
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: totals.totalAmount - updatedOrder!.amountPaid,
+        },
+      });
+
+      // 8. Return updated order detail
+      return await this.findOrderById(orderId);
+    });
+  }
+
+  // --- B6 Due Date Override ---
+  async updateDueDate(
+    orderId: string,
+    effectiveDueDate: string,
+    reason: string,
+    employeeId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          effectiveDueDate: new Date(effectiveDueDate),
+          dueDateOverrideReason: reason,
+          dueDateOverriddenBy: employeeId,
+        },
+      });
+
+      return await this.findOrderById(orderId);
+    });
+  }
+
   // --- Helpers ---
   private mapToSummaryDto(order: any) {
     return {
@@ -189,6 +370,9 @@ export class OrderService {
       isExpress: order.isExpress,
       priority: order.priority,
       status: order.status,
+      subtotal: order.subtotal,
+      discountAmount: order.discountAmount,
+      taxAmount: order.taxAmount,
       totalAmount: order.totalAmount,
       amountPaid: order.amountPaid,
       amountDue: order.amountDue,
@@ -202,6 +386,7 @@ export class OrderService {
     const summary = this.mapToSummaryDto(order);
     return {
       ...summary,
+      itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
       systemDueDate: order.systemDueDate.toISOString(),
       dueDateOverrideReason: order.dueDateOverrideReason,
       dueDateOverriddenBy: order.dueDateOverriddenBy,

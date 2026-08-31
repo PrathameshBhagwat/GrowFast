@@ -38,6 +38,38 @@ export interface EmployeeSummary {
   storeName: string;
 }
 
+export interface EmployeeDTO {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  role: Role;
+  storeId: string;
+  storeName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeRequest {
+  name: string;
+  phone?: string;
+  email?: string;
+  pin: string;
+  role: Role;
+  storeId?: string;
+}
+
+export interface UpdateEmployeeRequest {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  role?: Role;
+  isActive?: boolean;
+  pin?: string;
+  storeId?: string;
+}
+
 // ─── Customer DTOs ──────────────────────────────────────────────────
 
 export interface CustomerDTO {
@@ -92,6 +124,9 @@ export interface OrderSummaryDTO {
   isExpress: boolean;
   priority: OrderPriority;
   status: OrderStatus;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
   totalAmount: number;
   amountPaid: number;
   amountDue: number;
@@ -141,6 +176,21 @@ export interface CreateOrderItemRequest {
   quantity: number;
   colorTags?: string[];
   defectNotes?: string;
+}
+
+export interface UpdateDueDateRequest {
+  effectiveDueDate: string;
+  reason: string;
+}
+
+export interface UpdateOrderItemRequest {
+  garmentCatalogId?: string;
+  serviceTypeId?: string;
+  quantity?: number;
+  colorTags?: string[];
+  defectNotes?: string | null;
+  itemStatus?: ItemStatus;
+  deliveredQuantity?: number;
 }
 
 // ─── Payment DTOs ───────────────────────────────────────────────────

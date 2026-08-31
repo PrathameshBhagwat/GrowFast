@@ -73,8 +73,8 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
         if (res && res.ok) {
           const body: ApiResponse<OrderSummaryDTO[]> = await res.json();
           setOrders(Array.isArray(body.data) ? body.data : []);
-        } else if (res && res.status === 404) {
-          // Endpoint genuinely not implemented by Developer B yet (404 Not Found)
+        } else if (res && (res.status === 404 || res.status === 400)) {
+          // Endpoint or customerId query filter pending implementation by Developer B (404 Not Found or 400 Bad Request due to non-whitelisted query param)
           setIsCrossTeamSeam(true);
           setOrders([]);
         } else if (res && (res.status === 401 || res.status === 403)) {
@@ -193,11 +193,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
             variant="outline"
             size="sm"
             icon={<ArrowRight size={14} />}
-            onClick={() =>
-              handleNotify(
-                `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customerId}`,
-              )
-            }
+            onClick={() => navigate(`/orders/new?customerId=${customerId}`)}
           >
             Create Order for {customerName}
           </Button>
@@ -211,11 +207,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
               variant="primary"
               size="sm"
               icon={<ArrowRight size={14} />}
-              onClick={() =>
-                handleNotify(
-                  `Integration Seam Contract: Navigating to Developer B Order Wizard via /orders/new?customerId=${customerId}`,
-                )
-              }
+              onClick={() => navigate(`/orders/new?customerId=${customerId}`)}
             >
               Create First Order
             </Button>

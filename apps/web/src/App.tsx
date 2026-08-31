@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { CustomerProfilePage } from './pages/CustomerProfilePage';
+import { StaffManagementPage } from './pages/StaffManagementPage';
 import { PhotoCaptureView } from './pages/PhotoCaptureView';
 import { CatalogSettingsPage } from './pages/CatalogSettingsPage';
 import { MasterDataPage } from './pages/MasterDataPage';
@@ -39,6 +40,15 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <CustomerProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Developer A — Staff Management (A6) */}
+      <Route
+        path="/staff"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER']}>
+            <StaffManagementPage />
           </ProtectedRoute>
         }
       />
