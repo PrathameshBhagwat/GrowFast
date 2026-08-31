@@ -3,7 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
-import { PaymentStatus, PickupType, OrderPriority, ItemStatus } from '@growfast/shared-types';
+import { PaymentStatus, PickupType, OrderPriority, ItemStatus, calculateOrderTotals } from '@growfast/shared-types';
 
 const mockPrismaService: any = {
   $transaction: jest.fn(async (cb: any) => {
@@ -127,35 +127,67 @@ describe('OrderService', () => {
             systemDueDate: expect.any(Date),
             effectiveDueDate: expect.any(Date),
             status: expect.any(String),
+            expressSurcharge: 0,
           }),
         }),
       );
+
+      // Normal order: due date = orderDate + 2 days
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+      const orderDate = callArgs.data.orderDate;
+      const expectedDue = new Date(orderDate);
+      expectedDue.setDate(expectedDue.getDate() + 2);
+      expect(callArgs.data.systemDueDate).toEqual(expectedDue);
     });
 
-    it('should calculate the exact same due date even if isExpress is true (B6 Regression)', async () => {
+    it('should apply B7 express pricing and halved due date for express orders', async () => {
       const expressDto = { ...validDto, isExpress: true };
+      const mockExpressOrder = {
+        ...mockCreatedOrder,
+        isExpress: true,
+        priority: OrderPriority.EXPRESS,
+        expressSurcharge: 150,
+      };
+      mockPrismaService.order.create.mockResolvedValue(mockExpressOrder);
       await service.createOrder(expressDto, 'emp1', 'store1');
 
-      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            systemDueDate: expect.any(Date),
-            effectiveDueDate: expect.any(Date),
-            priority: OrderPriority.EXPRESS,
-            isExpress: true,
-          }),
-        }),
-      );
-
-      // We'll capture the call and check that systemDueDate has the normal +2 days logic
       const callArgs = mockPrismaService.order.create.mock.calls[0][0];
 
+      // B7: Express due date = orderDate + ceil(estimatedDays / 2) = ceil(2/2) = 1
       const orderDate = callArgs.data.orderDate;
-      const expectedSystemDueDate = new Date(orderDate);
-      // It should be strictly +2 days as mocked in mockService.estimatedDays = 2
-      expectedSystemDueDate.setDate(expectedSystemDueDate.getDate() + 2);
+      const expectedExpressDue = new Date(orderDate);
+      expectedExpressDue.setDate(expectedExpressDue.getDate() + Math.ceil(2 / 2));
+      expect(callArgs.data.systemDueDate).toEqual(expectedExpressDue);
 
-      expect(callArgs.data.systemDueDate).toEqual(expectedSystemDueDate);
+      // B7: Express surcharge should be 50% of subtotal
+      // Items: 2 * 150 = 300 subtotal, express surcharge = 150
+      expect(callArgs.data.expressSurcharge).toBe(150);
+
+      // B7: Priority is EXPRESS
+      expect(callArgs.data.priority).toBe(OrderPriority.EXPRESS);
+      expect(callArgs.data.isExpress).toBe(true);
+    });
+
+    it('should calculate correct GST on express order (taxable = subtotal + surcharge)', async () => {
+      const expressDto = { ...validDto, isExpress: true };
+      const mockExpressOrder = {
+        ...mockCreatedOrder,
+        isExpress: true,
+      };
+      mockPrismaService.order.create.mockResolvedValue(mockExpressOrder);
+      await service.createOrder(expressDto, 'emp1', 'store1');
+
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+      // subtotal = 300, expressSurcharge = 150, taxable = 450, GST = 450 * 0.18 = 81
+      // total = 300 + 150 + 81 = 531
+      const expectedTotals = calculateOrderTotals(
+        [{ unitPrice: 150, quantity: 2 }],
+        { isExpress: true },
+      );
+      expect(callArgs.data.subtotal).toBe(expectedTotals.subtotal);
+      expect(callArgs.data.expressSurcharge).toBe(expectedTotals.expressSurcharge);
+      expect(callArgs.data.taxAmount).toBe(expectedTotals.taxAmount);
+      expect(callArgs.data.totalAmount).toBe(expectedTotals.totalAmount);
     });
 
     it('should throw NotFoundException if customer not found', async () => {
@@ -281,6 +313,45 @@ describe('OrderService', () => {
       await expect(
         service.updateOrderItem('o1', 'item1', { deliveredQuantity: 5 }, 'store1'),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should recalculate express surcharge on express order item update', async () => {
+      const expressOrder = {
+        ...mockOrder,
+        isExpress: true,
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 150,
+            deliveredQuantity: 0,
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            itemStatus: ItemStatus.RECEIVED,
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(expressOrder);
+      jest.spyOn(service, 'findOrderById').mockResolvedValue(expressOrder as any);
+
+      await service.updateOrderItem(
+        'o1',
+        'item1',
+        { quantity: 3 },
+        'store1',
+      );
+
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            expressSurcharge: expect.any(Number),
+          }),
+        }),
+      );
+
+      // Verify express surcharge > 0
+      const updateCall = mockPrismaService.order.update.mock.calls[0][0];
+      expect(updateCall.data.expressSurcharge).toBeGreaterThan(0);
     });
   });
 

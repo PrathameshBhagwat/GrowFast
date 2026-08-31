@@ -105,8 +105,8 @@ export class OrderService {
         }
       }
 
-      // Calculate Totals
-      const totals = calculateOrderTotals(pricingInputs);
+      // Calculate Totals (B5 canonical pricing + B7 express surcharge)
+      const totals = calculateOrderTotals(pricingInputs, { isExpress: dto.isExpress });
 
       // 4. Due date placeholder (Deferred to B6)
       const orderDate = new Date();
@@ -124,9 +124,14 @@ export class OrderService {
       }
       const serviceSummary = serviceSummaryParts.join(', ');
 
-      // 7. Calculate Due Date (B6)
+      // 7. Calculate Due Date (B6 normal / B7 express)
       const systemDueDate = new Date(orderDate);
-      systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+      if (dto.isExpress) {
+        // B7: Express orders get halved turnaround (rounded up)
+        systemDueDate.setDate(systemDueDate.getDate() + Math.ceil(maxEstimatedDays / 2));
+      } else {
+        systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+      }
 
       const itemsForStatus = orderItemsData.map((item) => ({
         status: ItemStatus.RECEIVED,
@@ -148,6 +153,7 @@ export class OrderService {
           status: orderStatus,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
           amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
@@ -326,7 +332,7 @@ export class OrderService {
         unitPrice: i.unitPrice,
         quantity: i.quantity,
       }));
-      const totals = calculateOrderTotals(pricingInputs);
+      const totals = calculateOrderTotals(pricingInputs, { isExpress: updatedOrder!.isExpress });
 
       const itemsForStatus = updatedOrder!.items.map((i: any) => ({
         status: i.itemStatus as ItemStatus,
@@ -341,6 +347,7 @@ export class OrderService {
           status: newOrderStatus,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
           amountDue: totals.totalAmount - updatedOrder!.amountPaid,
@@ -399,6 +406,7 @@ export class OrderService {
       discountAmount: order.discountAmount,
       taxAmount: order.taxAmount,
       totalAmount: order.totalAmount,
+      expressSurcharge: order.expressSurcharge,
       amountPaid: order.amountPaid,
       amountDue: order.amountDue,
       paymentStatus: order.paymentStatus,

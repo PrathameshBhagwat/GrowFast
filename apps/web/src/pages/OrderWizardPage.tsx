@@ -21,6 +21,7 @@ export function OrderWizardPage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
+  const [isExpress, setIsExpress] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -71,7 +72,7 @@ export function OrderWizardPage() {
     try {
       const payload = {
         customerId: selectedCustomerId,
-        isExpress: false,
+        isExpress,
         pickupType: 'STORE_PICKUP',
         items: items.map((item) => ({
           garmentCatalogId: item.garmentCatalogId,
@@ -221,6 +222,23 @@ export function OrderWizardPage() {
                 </ul>
               </div>
             )}
+
+            <div className="mt-6 p-4 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isExpress}
+                  onChange={(e) => setIsExpress(e.target.checked)}
+                  className="w-5 h-5 rounded border-orange-400 text-orange-600 focus:ring-orange-500"
+                />
+                <div>
+                  <span className="font-semibold text-orange-900">⚡ Express Service</span>
+                  <p className="text-sm text-orange-700 mt-0.5">
+                    50% surcharge · Faster turnaround (halved estimated days)
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
         )}
 
@@ -237,7 +255,7 @@ export function OrderWizardPage() {
                 unitPrice: p ? p.price : 0,
               };
             });
-            const totals = calculateOrderTotals(pricingInputs);
+            const totals = calculateOrderTotals(pricingInputs, { isExpress });
 
             return (
               <div className="space-y-4">
@@ -266,6 +284,12 @@ export function OrderWizardPage() {
                       <span className="text-gray-600">Discount:</span>
                       <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
                     </div>
+                    {isExpress && (
+                      <div className="flex justify-between text-orange-700">
+                        <span>⚡ Express Surcharge (50%):</span>
+                        <span>₹{totals.expressSurcharge.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">GST (18%):</span>
                       <span>₹{totals.taxAmount.toFixed(2)}</span>
