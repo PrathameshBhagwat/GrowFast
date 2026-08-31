@@ -92,10 +92,7 @@ describe('EmployeeService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EmployeeService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [EmployeeService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<EmployeeService>(EmployeeService);
@@ -161,9 +158,9 @@ describe('EmployeeService', () => {
     it('should enforce Store Isolation on findOne for Manager', async () => {
       prisma.employee.findUnique.mockResolvedValue(mockStaffStore2);
 
-      await expect(
-        service.findOne('emp-003', mockUserContextManager1),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne('emp-003', mockUserContextManager1)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw NotFoundException if employee is not found', async () => {

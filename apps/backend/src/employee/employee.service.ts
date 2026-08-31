@@ -68,7 +68,11 @@ export class EmployeeService {
     }
 
     // Store Isolation: Manager cannot view employees from another store
-    if (currentUser && currentUser.role === Role.MANAGER && employee.storeId !== currentUser.storeId) {
+    if (
+      currentUser &&
+      currentUser.role === Role.MANAGER &&
+      employee.storeId !== currentUser.storeId
+    ) {
       throw new ForbiddenException('Managers can only view employees in their own store');
     }
 
@@ -85,11 +89,7 @@ export class EmployeeService {
     }
 
     // 2. Store Isolation: Manager cannot create employees in another store
-    if (
-      currentUser.role === Role.MANAGER &&
-      dto.storeId &&
-      dto.storeId !== currentUser.storeId
-    ) {
+    if (currentUser.role === Role.MANAGER && dto.storeId && dto.storeId !== currentUser.storeId) {
       throw new ForbiddenException('Managers cannot create employees for another store');
     }
 
@@ -105,9 +105,7 @@ export class EmployeeService {
 
     // 4. Resolve Store ID (Managers use currentUser.storeId)
     const targetStoreId =
-      currentUser.role === Role.MANAGER
-        ? currentUser.storeId
-        : dto.storeId || currentUser.storeId;
+      currentUser.role === Role.MANAGER ? currentUser.storeId : dto.storeId || currentUser.storeId;
 
     const store = await this.prisma.store.findUnique({
       where: { id: targetStoreId },
@@ -139,11 +137,7 @@ export class EmployeeService {
   /**
    * Update employee details, role, status, or PIN with store isolation & security rules.
    */
-  async update(
-    id: string,
-    dto: UpdateEmployeeDto,
-    currentUser: UserContext,
-  ): Promise<EmployeeDTO> {
+  async update(id: string, dto: UpdateEmployeeDto, currentUser: UserContext): Promise<EmployeeDTO> {
     const existing = await this.prisma.employee.findUnique({
       where: { id },
       include: { store: true },
@@ -159,11 +153,7 @@ export class EmployeeService {
     }
 
     // Store Isolation: Manager cannot move an employee to another store
-    if (
-      currentUser.role === Role.MANAGER &&
-      dto.storeId &&
-      dto.storeId !== currentUser.storeId
-    ) {
+    if (currentUser.role === Role.MANAGER && dto.storeId && dto.storeId !== currentUser.storeId) {
       throw new ForbiddenException('Managers cannot move employees to another store');
     }
 
@@ -263,8 +253,10 @@ export class EmployeeService {
       storeId: emp.storeId,
       storeName: emp.store ? emp.store.name : 'Unknown Store',
       isActive: emp.isActive,
-      createdAt: emp.createdAt instanceof Date ? emp.createdAt.toISOString() : String(emp.createdAt),
-      updatedAt: emp.updatedAt instanceof Date ? emp.updatedAt.toISOString() : String(emp.updatedAt),
+      createdAt:
+        emp.createdAt instanceof Date ? emp.createdAt.toISOString() : String(emp.createdAt),
+      updatedAt:
+        emp.updatedAt instanceof Date ? emp.updatedAt.toISOString() : String(emp.updatedAt),
     };
   }
 }

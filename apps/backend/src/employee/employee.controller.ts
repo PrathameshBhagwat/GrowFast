@@ -33,8 +33,7 @@ export class EmployeeController {
     @Query('isActive') isActiveStr?: string,
     @Request() req?: any,
   ) {
-    const isActive =
-      isActiveStr === 'true' ? true : isActiveStr === 'false' ? false : undefined;
+    const isActive = isActiveStr === 'true' ? true : isActiveStr === 'false' ? false : undefined;
     const employees = await this.employeeService.findAll(storeId, isActive, req?.user);
     return {
       success: true,
@@ -79,11 +78,7 @@ export class EmployeeController {
    */
   @Patch(':id')
   @Roles('OWNER', 'MANAGER')
-  async update(
-    @Param('id') id: string,
-    @Body() dto: UpdateEmployeeDto,
-    @Request() req: any,
-  ) {
+  async update(@Param('id') id: string, @Body() dto: UpdateEmployeeDto, @Request() req: any) {
     const employee = await this.employeeService.update(id, dto, req.user);
     return {
       success: true,
