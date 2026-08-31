@@ -30,6 +30,15 @@ export class OrderService {
         throw new NotFoundException(`Customer with ID "${dto.customerId}" not found`);
       }
 
+      // 1.5 Fetch Store config
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      if (!store) {
+        throw new NotFoundException(`Store with ID "${storeId}" not found`);
+      }
+      if (dto.isExpress && store.expressSurchargePercent == null) {
+        throw new BadRequestException(`Express service is not configured for this store`);
+      }
+
       // 2. Fetch all garments and services to validate them and get properties
       const garmentIds = [...new Set(dto.items.map((item) => item.garmentCatalogId))];
       const serviceIds = [...new Set(dto.items.map((item) => item.serviceTypeId))];
@@ -106,7 +115,10 @@ export class OrderService {
       }
 
       // Calculate Totals (B5 canonical pricing + B7 express surcharge)
-      const totals = calculateOrderTotals(pricingInputs, { isExpress: dto.isExpress });
+      const totals = calculateOrderTotals(pricingInputs, { 
+        isExpress: dto.isExpress,
+        expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+      });
 
       // 4. Due date placeholder (Deferred to B6)
       const orderDate = new Date();
@@ -256,6 +268,15 @@ export class OrderService {
         throw new BadRequestException(`Order does not belong to your store`);
       }
 
+      // 1.5 Fetch Store config
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      if (!store) {
+        throw new NotFoundException(`Store with ID "${storeId}" not found`);
+      }
+      if (order.isExpress && store.expressSurchargePercent == null) {
+        throw new BadRequestException(`Express service is not configured for this store`);
+      }
+
       // 2. Validate order item belongs to order
       const orderItem = order.items.find((item) => item.id === itemId);
       if (!orderItem) {
@@ -332,7 +353,10 @@ export class OrderService {
         unitPrice: i.unitPrice,
         quantity: i.quantity,
       }));
-      const totals = calculateOrderTotals(pricingInputs, { isExpress: updatedOrder!.isExpress });
+      const totals = calculateOrderTotals(pricingInputs, { 
+        isExpress: updatedOrder!.isExpress,
+        expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+      });
 
       const itemsForStatus = updatedOrder!.items.map((i: any) => ({
         status: i.itemStatus as ItemStatus,

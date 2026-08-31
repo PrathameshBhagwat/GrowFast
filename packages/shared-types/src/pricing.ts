@@ -22,7 +22,7 @@ export function calculateOrderTotals(
   options?: {
     discountPercent?: number; // Kept at 0 for V1 based on user preference
     isExpress?: boolean;
-    expressSurchargePercent?: number; // Default 50% for V1
+    expressSurchargePercent?: number;
   },
 ): PricingTotals {
   let subtotal = 0;
@@ -41,12 +41,14 @@ export function calculateOrderTotals(
 
   const discountedSubtotal = subtotal - discountAmount;
 
-  // 2. Express Surcharge (B7)
+  // 2. Express Surcharge (B7 Configurable)
   const isExpress = options?.isExpress ?? false;
-  const expressSurchargePercent = options?.expressSurchargePercent ?? 50;
   let expressSurcharge = 0;
   if (isExpress) {
-    expressSurcharge = (discountedSubtotal * expressSurchargePercent) / 100;
+    if (options?.expressSurchargePercent == null) {
+      throw new Error('Express surcharge percent must be provided for express orders');
+    }
+    expressSurcharge = (discountedSubtotal * options.expressSurchargePercent) / 100;
   }
 
   // 3. Tax (V1: 18% GST as per user choice)

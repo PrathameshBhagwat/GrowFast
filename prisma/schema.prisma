@@ -17,9 +17,10 @@ model Store {
   name      String
   address   String?
   phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive                Boolean  @default(true)
+  expressSurchargePercent Float?   @map("express_surcharge_percent")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   employees Employee[]
   orders    Order[]

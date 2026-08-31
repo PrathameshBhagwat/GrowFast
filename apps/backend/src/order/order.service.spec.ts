@@ -34,6 +34,9 @@ const mockPrismaService: any = {
     findMany: jest.fn(),
     findUnique: jest.fn(),
   },
+  store: {
+    findUnique: jest.fn(),
+  },
 };
 
 const mockCatalogService = {};
@@ -110,6 +113,10 @@ describe('OrderService', () => {
           price: 150,
         },
       ]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store1',
+        expressSurchargePercent: 50,
+      });
     });
 
     it('should create an order successfully and calculate due dates', async () => {
@@ -182,7 +189,7 @@ describe('OrderService', () => {
       // total = 300 + 150 + 81 = 531
       const expectedTotals = calculateOrderTotals(
         [{ unitPrice: 150, quantity: 2 }],
-        { isExpress: true },
+        { isExpress: true, expressSurchargePercent: 50 },
       );
       expect(callArgs.data.subtotal).toBe(expectedTotals.subtotal);
       expect(callArgs.data.expressSurcharge).toBe(expectedTotals.expressSurcharge);
@@ -265,6 +272,10 @@ describe('OrderService', () => {
         serviceTypeId: 's1',
         price: 150,
       });
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store1',
+        expressSurchargePercent: 50,
+      });
     });
 
     it('should update an order item successfully', async () => {
@@ -344,14 +355,28 @@ describe('OrderService', () => {
       expect(mockPrismaService.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            expressSurcharge: expect.any(Number),
+            expressSurcharge: 150, // 300 * 0.5 = 150
           }),
         }),
       );
+    });
 
-      // Verify express surcharge > 0
-      const updateCall = mockPrismaService.order.update.mock.calls[0][0];
-      expect(updateCall.data.expressSurcharge).toBeGreaterThan(0);
+    it('should throw BadRequestException if store has no express configuration', async () => {
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: null,
+      });
+
+      const dto = {
+        customerId: 'cust-1',
+        isExpress: true,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [{ garmentCatalogId: 'g1', serviceTypeId: 's1', quantity: 1 }],
+      };
+
+      await expect(service.createOrder(dto, 'emp-1', 'store-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
