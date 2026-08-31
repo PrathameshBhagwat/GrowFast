@@ -9,6 +9,8 @@ import {
   PaymentStatus,
   calculateOrderTotals,
   PricingItemInput,
+  deriveOrderStatus,
+  ItemStatus,
 } from '@growfast/shared-types';
 
 @Injectable()
@@ -126,6 +128,13 @@ export class OrderService {
       const systemDueDate = new Date(orderDate);
       systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
 
+      const itemsForStatus = orderItemsData.map((item) => ({
+        status: ItemStatus.RECEIVED,
+        deliveredQuantity: 0,
+        totalQuantity: item.quantity,
+      }));
+      const orderStatus = deriveOrderStatus(itemsForStatus);
+
       // 8. Create Order
       const order = await tx.order.create({
         data: {
@@ -136,6 +145,7 @@ export class OrderService {
           effectiveDueDate: systemDueDate,
           isExpress: dto.isExpress,
           serviceSummary,
+          status: orderStatus,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
           taxAmount: totals.taxAmount,
@@ -167,7 +177,7 @@ export class OrderService {
     });
   }
 
-  async findOrderById(id: string) {
+  async findOrderById(id: string, storeId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -187,18 +197,21 @@ export class OrderService {
       throw new NotFoundException(`Order with ID "${id}" not found`);
     }
 
+    if (storeId && order.storeId !== storeId) {
+      throw new NotFoundException(`Order with ID "${id}" not found`);
+    }
+
     return this.mapToDetailDto(order);
   }
 
-  async findAllOrders(query: GetOrdersQueryDto) {
+  async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
     const { customerId, status, paymentStatus, page = 1, pageSize = 10 } = query;
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
+    const where: any = { storeId };
     if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
-    if (customerId) where.customerId = customerId;
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -315,9 +328,17 @@ export class OrderService {
       }));
       const totals = calculateOrderTotals(pricingInputs);
 
+      const itemsForStatus = updatedOrder!.items.map((i: any) => ({
+        status: i.itemStatus as ItemStatus,
+        deliveredQuantity: i.deliveredQuantity,
+        totalQuantity: i.quantity,
+      }));
+      const newOrderStatus = deriveOrderStatus(itemsForStatus);
+
       await tx.order.update({
         where: { id: orderId },
         data: {
+          status: newOrderStatus,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
           taxAmount: totals.taxAmount,
@@ -337,11 +358,15 @@ export class OrderService {
     effectiveDueDate: string,
     reason: string,
     employeeId: string,
+    storeId: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) {
         throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new BadRequestException(`Order does not belong to your store`);
       }
 
       await tx.order.update({

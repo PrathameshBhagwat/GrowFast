@@ -37,8 +37,9 @@ export class OrderController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  async findAll(@Query() query: GetOrdersQueryDto) {
-    const result = await this.orderService.findAllOrders(query);
+  async findAll(@Query() query: GetOrdersQueryDto, @Request() req: any) {
+    const storeId = req.user.storeId;
+    const result = await this.orderService.findAllOrders(query, storeId);
     return {
       success: true,
       ...result,
@@ -47,8 +48,9 @@ export class OrderController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  async findOne(@Param('id') id: string) {
-    const order = await this.orderService.findOrderById(id);
+  async findOne(@Param('id') id: string, @Request() req: any) {
+    const storeId = req.user.storeId;
+    const order = await this.orderService.findOrderById(id, storeId);
     return {
       success: true,
       data: order,
@@ -77,11 +79,13 @@ export class OrderController {
   @Roles('OWNER', 'MANAGER')
   async updateDueDate(@Param('id') id: string, @Body() dto: UpdateDueDateDto, @Request() req: any) {
     const employeeId = req.user.id;
+    const storeId = req.user.storeId;
     const order = await this.orderService.updateDueDate(
       id,
       dto.effectiveDueDate,
       dto.reason,
       employeeId,
+      storeId,
     );
     return {
       success: true,

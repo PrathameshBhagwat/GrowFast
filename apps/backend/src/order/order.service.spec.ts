@@ -126,6 +126,7 @@ describe('OrderService', () => {
           data: expect.objectContaining({
             systemDueDate: expect.any(Date),
             effectiveDueDate: expect.any(Date),
+            status: expect.any(String),
           }),
         }),
       );
@@ -249,6 +250,12 @@ describe('OrderService', () => {
         where: { id: 'item1' },
         data: expect.objectContaining({ quantity: 3, itemStatus: ItemStatus.PROCESSING }),
       });
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'o1' },
+          data: expect.objectContaining({ status: expect.any(String) }),
+        }),
+      );
     });
 
     it('should throw NotFoundException if order not found', async () => {
@@ -280,6 +287,7 @@ describe('OrderService', () => {
   describe('updateDueDate', () => {
     const mockOrder = {
       id: 'o1',
+      storeId: 'store1',
       systemDueDate: new Date(),
       effectiveDueDate: new Date(),
     };
@@ -299,6 +307,7 @@ describe('OrderService', () => {
         '2026-09-01T10:00:00Z',
         'Customer requested early delivery',
         'mgr1',
+        'store1',
       );
 
       expect(mockPrismaService.order.update).toHaveBeenCalledWith({
@@ -315,8 +324,44 @@ describe('OrderService', () => {
     it('should throw NotFoundException if order not found', async () => {
       mockPrismaService.order.findUnique.mockResolvedValue(null);
       await expect(
-        service.updateDueDate('wrong_id', '2026-09-01T10:00:00Z', 'Reason', 'mgr1'),
+        service.updateDueDate('wrong_id', '2026-09-01T10:00:00Z', 'Reason', 'mgr1', 'store1'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if order does not belong to store', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue({ id: 'o1', storeId: 'otherStore' });
+      await expect(
+        service.updateDueDate('o1', '2026-09-01T10:00:00Z', 'Reason', 'mgr1', 'store1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('findAllOrders', () => {
+    it('should query orders by storeId', async () => {
+      mockPrismaService.order.findMany.mockResolvedValue([]);
+      mockPrismaService.order.count.mockResolvedValue(0);
+
+      await service.findAllOrders({}, 'store1');
+
+      expect(mockPrismaService.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ storeId: 'store1' }),
+        }),
+      );
+    });
+  });
+
+  describe('findOrderById', () => {
+    it('should throw NotFoundException if order belongs to a different store', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue({
+        id: 'o1',
+        storeId: 'otherStore',
+        customer: {},
+        createdBy: {},
+        items: [],
+      });
+
+      await expect(service.findOrderById('o1', 'store1')).rejects.toThrow(NotFoundException);
     });
   });
 });
