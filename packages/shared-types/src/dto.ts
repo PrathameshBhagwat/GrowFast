@@ -38,6 +38,38 @@ export interface EmployeeSummary {
   storeName: string;
 }
 
+export interface EmployeeDTO {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  role: Role;
+  storeId: string;
+  storeName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEmployeeRequest {
+  name: string;
+  phone?: string;
+  email?: string;
+  pin: string;
+  role: Role;
+  storeId?: string;
+}
+
+export interface UpdateEmployeeRequest {
+  name?: string;
+  phone?: string | null;
+  email?: string | null;
+  role?: Role;
+  isActive?: boolean;
+  pin?: string;
+  storeId?: string;
+}
+
 // ─── Customer DTOs ──────────────────────────────────────────────────
 
 export interface CustomerDTO {

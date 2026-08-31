@@ -147,10 +147,11 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto) {
-    const { status, paymentStatus, page = 1, pageSize = 10 } = query;
+    const { customerId, status, paymentStatus, page = 1, pageSize = 10 } = query;
     const skip = (page - 1) * pageSize;
 
     const where: any = {};
+    if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
 
