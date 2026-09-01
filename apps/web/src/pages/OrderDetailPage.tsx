@@ -128,6 +128,12 @@ export function OrderDetailPage() {
               <span className="text-gray-500">Discount</span>
               <span className="font-medium text-green-600">-₹{order.discountAmount}</span>
             </div>
+            {order.isExpress && (order as any).expressSurcharge > 0 && (
+              <div className="flex justify-between">
+                <span className="text-orange-600">⚡ Express Surcharge</span>
+                <span className="font-medium text-orange-600">₹{(order as any).expressSurcharge}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">GST (18%)</span>
               <span className="font-medium text-gray-900">₹{order.taxAmount}</span>
