@@ -3,7 +3,14 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
-import { PaymentStatus, PickupType, OrderPriority, ItemStatus, OrderStatus, calculateOrderTotals } from '@growfast/shared-types';
+import {
+  PaymentStatus,
+  PickupType,
+  OrderPriority,
+  ItemStatus,
+  OrderStatus,
+  calculateOrderTotals,
+} from '@growfast/shared-types';
 
 const mockPrismaService: any = {
   $transaction: jest.fn(async (cb: any) => {
@@ -187,10 +194,10 @@ describe('OrderService', () => {
       const callArgs = mockPrismaService.order.create.mock.calls[0][0];
       // subtotal = 300, expressSurcharge = 150, taxable = 450, GST = 450 * 0.18 = 81
       // total = 300 + 150 + 81 = 531
-      const expectedTotals = calculateOrderTotals(
-        [{ unitPrice: 150, quantity: 2 }],
-        { isExpress: true, expressSurchargePercent: 50 },
-      );
+      const expectedTotals = calculateOrderTotals([{ unitPrice: 150, quantity: 2 }], {
+        isExpress: true,
+        expressSurchargePercent: 50,
+      });
       expect(callArgs.data.subtotal).toBe(expectedTotals.subtotal);
       expect(callArgs.data.expressSurcharge).toBe(expectedTotals.expressSurcharge);
       expect(callArgs.data.taxAmount).toBe(expectedTotals.taxAmount);
@@ -345,12 +352,7 @@ describe('OrderService', () => {
       mockPrismaService.order.findUnique.mockResolvedValue(expressOrder);
       jest.spyOn(service, 'findOrderById').mockResolvedValue(expressOrder as any);
 
-      await service.updateOrderItem(
-        'o1',
-        'item1',
-        { quantity: 3 },
-        'store1',
-      );
+      await service.updateOrderItem('o1', 'item1', { quantity: 3 }, 'store1');
 
       expect(mockPrismaService.order.update).toHaveBeenCalledWith(
         expect.objectContaining({

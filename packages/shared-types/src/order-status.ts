@@ -39,7 +39,7 @@ const ITEM_PROGRESSION = [
  * 1. If ALL non-cancelled items are DELIVERED → DELIVERED
  * 2. If hasActiveTransitDelivery is true AND items are READY → OUT_FOR_DELIVERY
  * 3. Otherwise, use deterministic progress precedence mapping to the lowest progress item.
- * 4. Preserve explicit granular operational states (SORTING, DRYING, IRONING, PACKED) 
+ * 4. Preserve explicit granular operational states (SORTING, DRYING, IRONING, PACKED)
  *    if the underlying item macro-state still supports it.
  */
 export function deriveOrderStatus(ctx: OrderStatusDerivationContext): OrderStatus {
@@ -73,7 +73,7 @@ export function deriveOrderStatus(ctx: OrderStatusDerivationContext): OrderStatu
   }
 
   // Rule 2: Active Transit
-  // Wait, if it's OUT_FOR_DELIVERY, items must be READY or above. 
+  // Wait, if it's OUT_FOR_DELIVERY, items must be READY or above.
   // If a delivery is active, it takes precedence.
   if (hasActiveTransitDelivery) {
     return OrderStatus.OUT_FOR_DELIVERY;

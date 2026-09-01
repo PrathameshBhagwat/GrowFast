@@ -249,7 +249,8 @@ export function OrderWizardPage() {
                   <div>
                     <span className="font-semibold text-orange-900">⚡ Express Service</span>
                     <p className="text-sm text-orange-700 mt-0.5">
-                      {storeConfig.expressSurchargePercent}% surcharge · Faster turnaround (halved estimated days)
+                      {storeConfig.expressSurchargePercent}% surcharge · Faster turnaround (halved
+                      estimated days)
                     </p>
                   </div>
                 </label>
@@ -271,9 +272,9 @@ export function OrderWizardPage() {
                 unitPrice: p ? p.price : 0,
               };
             });
-            const totals = calculateOrderTotals(pricingInputs, { 
-              isExpress, 
-              expressSurchargePercent: storeConfig?.expressSurchargePercent ?? undefined 
+            const totals = calculateOrderTotals(pricingInputs, {
+              isExpress,
+              expressSurchargePercent: storeConfig?.expressSurchargePercent ?? undefined,
             });
 
             return (

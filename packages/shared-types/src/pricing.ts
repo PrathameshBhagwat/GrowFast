@@ -69,4 +69,3 @@ export function calculateOrderTotals(
     totalAmount: Math.round(totalAmount * 100) / 100,
   };
 }
-

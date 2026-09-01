@@ -131,7 +131,9 @@ export function OrderDetailPage() {
             {order.isExpress && (order as any).expressSurcharge > 0 && (
               <div className="flex justify-between">
                 <span className="text-orange-600">⚡ Express Surcharge</span>
-                <span className="font-medium text-orange-600">₹{(order as any).expressSurcharge}</span>
+                <span className="font-medium text-orange-600">
+                  ₹{(order as any).expressSurcharge}
+                </span>
               </div>
             )}
             <div className="flex justify-between">

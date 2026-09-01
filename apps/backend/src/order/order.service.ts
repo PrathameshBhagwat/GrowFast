@@ -116,7 +116,7 @@ export class OrderService {
       }
 
       // Calculate Totals (B5 canonical pricing + B7 express surcharge)
-      const totals = calculateOrderTotals(pricingInputs, { 
+      const totals = calculateOrderTotals(pricingInputs, {
         isExpress: dto.isExpress,
         expressSurchargePercent: store.expressSurchargePercent ?? undefined,
       });
@@ -355,7 +355,7 @@ export class OrderService {
         unitPrice: i.unitPrice,
         quantity: i.quantity,
       }));
-      const totals = calculateOrderTotals(pricingInputs, { 
+      const totals = calculateOrderTotals(pricingInputs, {
         isExpress: updatedOrder!.isExpress,
         expressSurchargePercent: store.expressSurchargePercent ?? undefined,
       });
