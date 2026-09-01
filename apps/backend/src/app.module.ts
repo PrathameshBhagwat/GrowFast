@@ -9,7 +9,7 @@ import { EmployeeModule } from './employee/employee.module';
 import { PaymentModule } from './payment/payment.module';
 import { OrderModule } from './order/order.module';
 import { StoreModule } from './store/store.module';
-
+import { DeliveryModule } from './delivery/delivery.module';
 @Module({
   imports: [
     PrismaModule,
@@ -22,6 +22,7 @@ import { StoreModule } from './store/store.module';
     PaymentModule,
     OrderModule,
     StoreModule,
+    DeliveryModule,
   ],
 })
 export class AppModule {}

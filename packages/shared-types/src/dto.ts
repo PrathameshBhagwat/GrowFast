@@ -261,6 +261,8 @@ export interface OrderPhotoDTO {
 export interface DeliveryRecordDTO {
   id: string;
   orderId: string;
+  orderNumber: string;
+  customerName: string;
   address: string;
   riderId: string | null;
   riderName: string | null;
@@ -269,6 +271,36 @@ export interface DeliveryRecordDTO {
   completedAt: string | null;
   proofPhotoUrl: string | null;
   notes: string | null;
+  items?: OrderItemDTO[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDeliveryRequest {
+  orderId: string;
+  address: string;
+  scheduledAt?: string;
+}
+
+export interface AssignDriverRequest {
+  riderId: string;
+  scheduledAt?: string;
+}
+
+export interface UpdateDeliveryStatusRequest {
+  status: DeliveryStatus;
+  notes?: string;
+}
+
+export interface DeliveredItemRequest {
+  itemId: string;
+  quantity: number;
+}
+
+export interface CompleteDeliveryRequest {
+  proofPhotoUrl?: string;
+  notes?: string;
+  deliveredItems?: DeliveredItemRequest[];
 }
 
 // ─── API Response Wrappers ──────────────────────────────────────────

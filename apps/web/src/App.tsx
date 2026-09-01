@@ -11,6 +11,7 @@ import { CatalogSettingsPage } from './pages/CatalogSettingsPage';
 import { MasterDataPage } from './pages/MasterDataPage';
 import { OrderWizardPage } from './pages/OrderWizardPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
+import { DeliveryPage } from './pages/DeliveryPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -91,6 +92,15 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <OrderDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Developer C — Delivery Management (C5) */}
+      <Route
+        path="/deliveries"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'COUNTER', 'DELIVERY']}>
+            <DeliveryPage />
           </ProtectedRoute>
         }
       />
