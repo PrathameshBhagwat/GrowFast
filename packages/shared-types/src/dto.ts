@@ -303,7 +303,65 @@ export interface CompleteDeliveryRequest {
   deliveredItems?: DeliveredItemRequest[];
 }
 
-// ─── API Response Wrappers ──────────────────────────────────────────
+// ─── Dashboard DTOs ─────────────────────────────────────────────────
+
+export interface DashboardPeriod {
+  startDate: string;
+  endDate: string;
+}
+
+export interface DashboardOverview {
+  totalOrders: number;
+  totalItems: number;
+  totalCustomers: number;
+}
+
+export interface DashboardOrderMetrics {
+  received: number;
+  sorting: number;
+  processing: number;
+  drying: number;
+  ironing: number;
+  qualityCheck: number;
+  packed: number;
+  ready: number;
+  outForDelivery: number;
+  delivered: number;
+  cancelled: number;
+  overdue: number;
+  dueToday: number;
+}
+
+export interface DashboardFinancialMetrics {
+  totalOrderValue: number;
+  amountPaid: number;
+  amountDue: number;
+  paidOrders: number;
+  partialOrders: number;
+  pendingOrders: number;
+}
+
+export interface DashboardDeliveryMetrics {
+  scheduled: number;
+  assigned: number;
+  inTransit: number;
+  completed: number;
+  failed: number;
+}
+
+export interface DashboardCustomerMetrics {
+  total: number;
+  newInPeriod: number;
+}
+
+export interface DashboardSummaryDTO {
+  period: DashboardPeriod;
+  overview: DashboardOverview;
+  orders: DashboardOrderMetrics;
+  financial: DashboardFinancialMetrics;
+  delivery: DashboardDeliveryMetrics;
+  customers: DashboardCustomerMetrics;
+}
 
 export interface ApiResponse<T> {
   success: boolean;
