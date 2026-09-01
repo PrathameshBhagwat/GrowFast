@@ -17,9 +17,10 @@ model Store {
   name      String
   address   String?
   phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive                Boolean  @default(true)
+  expressSurchargePercent Float?   @map("express_surcharge_percent")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   employees Employee[]
   orders    Order[]
@@ -99,7 +100,8 @@ model GarmentCatalog {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
-  orderItems OrderItem[]
+  orderItems    OrderItem[]
+  servicePrices ServiceGarmentPrice[]
 
   @@index([category])
   @@map("garment_catalog")
@@ -125,7 +127,8 @@ model ServiceType {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  orderItems OrderItem[]
+  orderItems    OrderItem[]
+  servicePrices ServiceGarmentPrice[]
 
   @@index([category])
   @@map("service_types")
@@ -140,6 +143,25 @@ enum ServiceCategory {
   LEATHER_CLEAN
   STAIN_REMOVAL
   WEIGHT_BASED
+}
+
+// ─── PRICING ────────────────────────────────────────────────────────
+
+model ServiceGarmentPrice {
+  id               String         @id @default(cuid())
+  garmentCatalogId String         @map("garment_catalog_id")
+  serviceTypeId    String         @map("service_type_id")
+  price            Float
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  garmentCatalog   GarmentCatalog @relation(fields: [garmentCatalogId], references: [id], onDelete: Cascade)
+  serviceType      ServiceType    @relation(fields: [serviceTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([garmentCatalogId, serviceTypeId])
+  @@index([garmentCatalogId])
+  @@index([serviceTypeId])
+  @@map("service_garment_prices")
 }
 
 // ─── ORDER ──────────────────────────────────────────────────────────

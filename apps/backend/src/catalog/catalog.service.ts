@@ -75,4 +75,35 @@ export class CatalogService {
       data: dto,
     });
   }
+
+  /**
+   * List all service garment prices.
+   */
+  async findAllPrices() {
+    return this.prisma.serviceGarmentPrice.findMany({
+      orderBy: [{ garmentCatalogId: 'asc' }, { serviceTypeId: 'asc' }],
+    });
+  }
+
+  /**
+   * Get price for a specific garment and service combination.
+   */
+  async getPrice(garmentCatalogId: string, serviceTypeId: string): Promise<number> {
+    const priceRecord = await this.prisma.serviceGarmentPrice.findUnique({
+      where: {
+        garmentCatalogId_serviceTypeId: {
+          garmentCatalogId,
+          serviceTypeId,
+        },
+      },
+    });
+
+    if (!priceRecord) {
+      throw new NotFoundException(
+        `Pricing not found for garment ${garmentCatalogId} and service ${serviceTypeId}`,
+      );
+    }
+
+    return priceRecord.price;
+  }
 }

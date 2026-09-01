@@ -248,9 +248,7 @@ export const StaffManagementPage: React.FC = () => {
           }
 
           const body: ApiResponse<EmployeeDTO> = await res.json();
-          setEmployees((prev) =>
-            prev.map((emp) => (emp.id === body.data.id ? body.data : emp)),
-          );
+          setEmployees((prev) => prev.map((emp) => (emp.id === body.data.id ? body.data : emp)));
           showNotice(`Staff member "${body.data.name}" updated successfully!`);
           setIsModalOpen(false);
         }
@@ -329,9 +327,7 @@ export const StaffManagementPage: React.FC = () => {
         setEmployees((prev) =>
           prev.map((e) => (e.id === emp.id ? { ...e, isActive: newActiveState } : e)),
         );
-        showNotice(
-          `Employee "${emp.name}" is now ${newActiveState ? 'ACTIVE' : 'INACTIVE'}.`,
-        );
+        showNotice(`Employee "${emp.name}" is now ${newActiveState ? 'ACTIVE' : 'INACTIVE'}.`);
       } else {
         const res = await fetch(`${API_URL}/employees/${emp.id}`, {
           method: 'PATCH',
@@ -348,9 +344,7 @@ export const StaffManagementPage: React.FC = () => {
         }
 
         const body: ApiResponse<EmployeeDTO> = await res.json();
-        setEmployees((prev) =>
-          prev.map((e) => (e.id === body.data.id ? body.data : e)),
-        );
+        setEmployees((prev) => prev.map((e) => (e.id === body.data.id ? body.data : e)));
         showNotice(
           `Employee "${body.data.name}" is now ${body.data.isActive ? 'ACTIVE' : 'INACTIVE'}.`,
         );
@@ -585,7 +579,13 @@ export const StaffManagementPage: React.FC = () => {
             }
           />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+              gap: '16px',
+            }}
+          >
             {filteredEmployees.map((emp) => {
               const badgeStyle = ROLE_BADGE_STYLE[emp.role] || ROLE_BADGE_STYLE.COUNTER;
               const isSelf = emp.id === currentEmployee?.id;
@@ -670,7 +670,16 @@ export const StaffManagementPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.825rem', color: '#475569', marginBottom: '16px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        fontSize: '0.825rem',
+                        color: '#475569',
+                        marginBottom: '16px',
+                      }}
+                    >
                       {emp.phone && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Phone size={14} color="#64748B" />
@@ -680,18 +689,49 @@ export const StaffManagementPage: React.FC = () => {
                       {emp.email && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Mail size={14} color="#64748B" />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {emp.email}
                           </span>
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          marginTop: '4px',
+                        }}
+                      >
                         {emp.isActive ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#166534', fontWeight: 600, fontSize: '0.75rem' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#166534',
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                            }}
+                          >
                             <CheckCircle size={14} color="#16A34A" /> Active Account
                           </span>
                         ) : (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#991B1B', fontWeight: 600, fontSize: '0.75rem' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#991B1B',
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                            }}
+                          >
                             <XCircle size={14} color="#DC2626" /> Account Deactivated
                           </span>
                         )}
@@ -761,14 +801,26 @@ export const StaffManagementPage: React.FC = () => {
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px',
+              }}
+            >
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
                 {editingEmployee ? `Edit Staff: ${editingEmployee.name}` : 'Add New Staff Member'}
               </h2>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px' }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
                 aria-label="Close modal"
               >
                 <X size={20} color="#64748B" />
@@ -791,9 +843,20 @@ export const StaffManagementPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form
+              onSubmit={handleSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: '#334155',
+                    marginBottom: '4px',
+                  }}
+                >
                   Full Name *
                 </label>
                 <input
@@ -816,7 +879,15 @@ export const StaffManagementPage: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: '#334155',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Phone Number
                   </label>
                   <input
@@ -837,7 +908,15 @@ export const StaffManagementPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: '#334155',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Email Address
                   </label>
                   <input
@@ -860,7 +939,15 @@ export const StaffManagementPage: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: '#334155',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Role *
                   </label>
                   <select
@@ -886,7 +973,15 @@ export const StaffManagementPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: '#334155',
+                      marginBottom: '4px',
+                    }}
+                  >
                     {editingEmployee ? 'New PIN (Optional)' : 'Security PIN *'}
                   </label>
                   <input
@@ -909,7 +1004,9 @@ export const StaffManagementPage: React.FC = () => {
               </div>
 
               {editingEmployee && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}
+                >
                   <input
                     type="checkbox"
                     id="edit-is-active"
@@ -918,13 +1015,23 @@ export const StaffManagementPage: React.FC = () => {
                     disabled={editingEmployee.id === currentEmployee?.id}
                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  <label htmlFor="edit-is-active" style={{ fontSize: '0.875rem', color: '#334155', cursor: 'pointer' }}>
+                  <label
+                    htmlFor="edit-is-active"
+                    style={{ fontSize: '0.875rem', color: '#334155', cursor: 'pointer' }}
+                  >
                     Account Active Status
                   </label>
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end',
+                  marginTop: '12px',
+                }}
+              >
                 <Button
                   type="button"
                   variant="ghost"
