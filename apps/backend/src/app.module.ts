@@ -10,6 +10,8 @@ import { PaymentModule } from './payment/payment.module';
 import { OrderModule } from './order/order.module';
 import { StoreModule } from './store/store.module';
 import { DeliveryModule } from './delivery/delivery.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+
 @Module({
   imports: [
     PrismaModule,
@@ -23,6 +25,7 @@ import { DeliveryModule } from './delivery/delivery.module';
     OrderModule,
     StoreModule,
     DeliveryModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
