@@ -178,9 +178,10 @@ async function main() {
   for (const p of pricingData) {
     await prisma.serviceGarmentPrice.upsert({
       where: {
-        garmentCatalogId_serviceTypeId: {
+        garmentCatalogId_serviceTypeId_storeId: {
           garmentCatalogId: p.garmentId,
           serviceTypeId: p.serviceId,
+          storeId: store.id,
         },
       },
       update: { price: p.price },
@@ -188,6 +189,7 @@ async function main() {
         garmentCatalogId: p.garmentId,
         serviceTypeId: p.serviceId,
         price: p.price,
+        storeId: store.id,
       },
     });
   }
