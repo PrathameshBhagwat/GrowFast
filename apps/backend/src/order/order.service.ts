@@ -11,6 +11,7 @@ import {
   PricingItemInput,
   deriveOrderStatus,
   ItemStatus,
+  OrderStatus,
 } from '@growfast/shared-types';
 
 @Injectable()
@@ -147,10 +148,11 @@ export class OrderService {
 
       const itemsForStatus = orderItemsData.map((item) => ({
         status: ItemStatus.RECEIVED,
-        deliveredQuantity: 0,
-        totalQuantity: item.quantity,
       }));
-      const orderStatus = deriveOrderStatus(itemsForStatus);
+      const orderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        hasActiveTransitDelivery: false,
+      });
 
       // 8. Create Order
       const order = await tx.order.create({
@@ -360,10 +362,12 @@ export class OrderService {
 
       const itemsForStatus = updatedOrder!.items.map((i: any) => ({
         status: i.itemStatus as ItemStatus,
-        deliveredQuantity: i.deliveredQuantity,
-        totalQuantity: i.quantity,
       }));
-      const newOrderStatus = deriveOrderStatus(itemsForStatus);
+      const newOrderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        currentOrderStatus: updatedOrder!.status as OrderStatus,
+        hasActiveTransitDelivery: false,
+      });
 
       await tx.order.update({
         where: { id: orderId },

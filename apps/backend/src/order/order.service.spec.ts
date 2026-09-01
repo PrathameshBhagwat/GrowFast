@@ -3,7 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
-import { PaymentStatus, PickupType, OrderPriority, ItemStatus, calculateOrderTotals } from '@growfast/shared-types';
+import { PaymentStatus, PickupType, OrderPriority, ItemStatus, OrderStatus, calculateOrderTotals } from '@growfast/shared-types';
 
 const mockPrismaService: any = {
   $transaction: jest.fn(async (cb: any) => {
@@ -376,6 +376,63 @@ describe('OrderService', () => {
 
       await expect(service.createOrder(dto, 'emp-1', 'store-1')).rejects.toThrow(
         BadRequestException,
+      );
+    });
+
+    it('should preserve granular operational states (e.g. PACKED) if items are READY', async () => {
+      const packedOrder = {
+        ...mockOrder,
+        status: OrderStatus.PACKED,
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 150,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.READY, // still READY, supports PACKED
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(packedOrder);
+      jest.spyOn(service, 'findOrderById').mockResolvedValue(packedOrder as any);
+
+      await service.updateOrderItem('o1', 'item1', { quantity: 3 }, 'store1');
+
+      // The status should remain PACKED, not revert to READY
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: OrderStatus.PACKED,
+          }),
+        }),
+      );
+    });
+
+    it('should progress to DELIVERED when all items are delivered', async () => {
+      const deliveredOrder = {
+        ...mockOrder,
+        status: OrderStatus.READY,
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 150,
+            deliveredQuantity: 2, // will be updated but itemStatus is what deriveOrderStatus looks at
+            itemStatus: ItemStatus.DELIVERED,
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(deliveredOrder);
+      jest.spyOn(service, 'findOrderById').mockResolvedValue(deliveredOrder as any);
+
+      await service.updateOrderItem('o1', 'item1', { quantity: 2 }, 'store1');
+
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: OrderStatus.DELIVERED,
+          }),
+        }),
       );
     });
   });

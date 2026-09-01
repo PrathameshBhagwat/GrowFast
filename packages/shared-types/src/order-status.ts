@@ -15,25 +15,36 @@ import { OrderStatus, ItemStatus } from './enums';
 
 export interface OrderItemStatusInput {
   status: ItemStatus;
-  deliveredQuantity: number;
-  totalQuantity: number;
 }
+
+export interface OrderStatusDerivationContext {
+  items: OrderItemStatusInput[];
+  currentOrderStatus?: OrderStatus;
+  hasActiveTransitDelivery?: boolean;
+}
+
+// The canonical item progression order (0 = lowest progress)
+const ITEM_PROGRESSION = [
+  ItemStatus.RECEIVED,
+  ItemStatus.PROCESSING,
+  ItemStatus.QUALITY_CHECK,
+  ItemStatus.READY,
+  ItemStatus.DELIVERED,
+];
 
 /**
  * Derive the overall order status from individual item statuses.
  *
  * Rules:
- * 1. If ALL items are DELIVERED → DELIVERED
- * 2. If ANY item is OUT_FOR_DELIVERY → OUT_FOR_DELIVERY
- * 3. If ALL items are READY or DELIVERED → READY
- * 4. If ALL items have passed QC (READY+) → PACKED
- * 5. If ANY item is in QUALITY_CHECK → QUALITY_CHECK
- * 6. If ANY item is PROCESSING → PROCESSING
- * 7. If ALL items are RECEIVED → RECEIVED
- * 8. If ALL items are CANCELLED → CANCELLED
- * 9. Otherwise → the lowest-progress status among non-cancelled items
+ * 1. If ALL non-cancelled items are DELIVERED → DELIVERED
+ * 2. If hasActiveTransitDelivery is true AND items are READY → OUT_FOR_DELIVERY
+ * 3. Otherwise, use deterministic progress precedence mapping to the lowest progress item.
+ * 4. Preserve explicit granular operational states (SORTING, DRYING, IRONING, PACKED) 
+ *    if the underlying item macro-state still supports it.
  */
-export function deriveOrderStatus(items: OrderItemStatusInput[]): OrderStatus {
+export function deriveOrderStatus(ctx: OrderStatusDerivationContext): OrderStatus {
+  const { items, currentOrderStatus, hasActiveTransitDelivery } = ctx;
+
   if (items.length === 0) {
     return OrderStatus.RECEIVED;
   }
@@ -45,29 +56,52 @@ export function deriveOrderStatus(items: OrderItemStatusInput[]): OrderStatus {
     return OrderStatus.CANCELLED;
   }
 
-  // All delivered
-  if (nonCancelled.every((i) => i.status === ItemStatus.DELIVERED)) {
+  // Find lowest item progress
+  let minIndex = ITEM_PROGRESSION.length;
+  for (const item of nonCancelled) {
+    const idx = ITEM_PROGRESSION.indexOf(item.status);
+    if (idx < minIndex) {
+      minIndex = idx;
+    }
+  }
+
+  const lowestItemStatus = ITEM_PROGRESSION[minIndex] || ItemStatus.RECEIVED;
+
+  // Rule 1: All delivered
+  if (lowestItemStatus === ItemStatus.DELIVERED) {
     return OrderStatus.DELIVERED;
   }
 
-  // All ready or delivered
-  if (
-    nonCancelled.every((i) => i.status === ItemStatus.READY || i.status === ItemStatus.DELIVERED)
-  ) {
+  // Rule 2: Active Transit
+  // Wait, if it's OUT_FOR_DELIVERY, items must be READY or above. 
+  // If a delivery is active, it takes precedence.
+  if (hasActiveTransitDelivery) {
+    return OrderStatus.OUT_FOR_DELIVERY;
+  }
+
+  // Map lowest item macro-state to OrderStatus
+  if (lowestItemStatus === ItemStatus.READY) {
+    if (currentOrderStatus === OrderStatus.PACKED) {
+      return OrderStatus.PACKED;
+    }
     return OrderStatus.READY;
   }
 
-  // Any in quality check
-  if (nonCancelled.some((i) => i.status === ItemStatus.QUALITY_CHECK)) {
-    return OrderStatus.QUALITY_CHECK;
-  }
-
-  // Any processing
-  if (nonCancelled.some((i) => i.status === ItemStatus.PROCESSING)) {
+  if (lowestItemStatus === ItemStatus.PROCESSING) {
+    if (
+      currentOrderStatus === OrderStatus.SORTING ||
+      currentOrderStatus === OrderStatus.DRYING ||
+      currentOrderStatus === OrderStatus.IRONING
+    ) {
+      return currentOrderStatus;
+    }
     return OrderStatus.PROCESSING;
   }
 
-  // Default: received
+  if (lowestItemStatus === ItemStatus.QUALITY_CHECK) {
+    return OrderStatus.QUALITY_CHECK;
+  }
+
   return OrderStatus.RECEIVED;
 }
 
