@@ -318,12 +318,11 @@ export class OrderService {
       const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
       const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
 
-      const priceRecord = await tx.serviceGarmentPrice.findUnique({
+      const priceRecord = await tx.serviceGarmentPrice.findFirst({
         where: {
-          garmentCatalogId_serviceTypeId: {
-            garmentCatalogId,
-            serviceTypeId,
-          },
+          garmentCatalogId,
+          serviceTypeId,
+          OR: [{ storeId: null }, { storeId }],
         },
       });
       const unitPrice = priceRecord?.price ?? orderItem.unitPrice;

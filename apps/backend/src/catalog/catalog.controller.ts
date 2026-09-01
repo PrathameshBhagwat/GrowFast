@@ -1,7 +1,8 @@
-import { Controller, Get, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, Req } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { GetGarmentsQueryDto } from './dto/get-garments-query.dto';
 import { UpdateGarmentDto } from './dto/update-garment.dto';
+import { CreateGarmentDto } from './dto/create-garment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -23,11 +24,28 @@ export class CatalogController {
    */
   @Get()
   @UseGuards(JwtAuthGuard)
-  async findAll(@Query() query: GetGarmentsQueryDto) {
-    const garments = await this.catalogService.findAllGarments(query.category);
+  async findAll(@Req() req: any, @Query() query: GetGarmentsQueryDto) {
+    const storeId = req.user.storeId;
+    const garments = await this.catalogService.findAllGarments(storeId, query.category);
     return {
       success: true,
       data: garments,
+    };
+  }
+
+  /**
+   * POST /api/garments
+   * Create a new garment. OWNER role required.
+   */
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER')
+  async create(@Req() req: any, @Body() dto: CreateGarmentDto) {
+    const storeId = req.user.storeId;
+    const garment = await this.catalogService.createGarment(storeId, dto);
+    return {
+      success: true,
+      data: garment,
     };
   }
 

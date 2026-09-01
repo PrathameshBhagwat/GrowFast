@@ -13,7 +13,7 @@ import {
 } from '@growfast/ui';
 import { GarmentCategory, Role } from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
-import { ArrowLeft, Edit2, Shirt } from 'lucide-react';
+import { ArrowLeft, Edit2, Shirt, Plus } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -61,6 +61,13 @@ export const CatalogSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  // Create modal state
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCategory, setNewCategory] = useState<GarmentCategory>(GarmentCategory.MEN);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -143,6 +150,47 @@ export const CatalogSettingsPage: React.FC = () => {
   useEffect(() => {
     fetchGarments();
   }, [fetchGarments]);
+
+  // ─── Create handlers ───────────────────────────────
+  const openCreateModal = () => {
+    setNewName('');
+    setNewCategory(GarmentCategory.MEN);
+    setCreateError(null);
+    setCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    setCreateModalOpen(false);
+    setCreateError(null);
+  };
+
+  const handleCreate = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const body = { name: newName, category: newCategory, isActive: true };
+      const res = await fetch(`${API_URL}/garments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Create failed (${res.status})`);
+      }
+
+      closeCreateModal();
+      await fetchGarments();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Create failed');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   // ─── Edit handlers ─────────────────────────────────
   const openEditModal = (garment: GarmentCatalogDTO) => {
@@ -259,6 +307,16 @@ export const CatalogSettingsPage: React.FC = () => {
               {isOwner ? 'Manage garment names & categories' : 'View garment catalog'}
             </p>
           </div>
+          {isOwner && (
+            <Button
+              id="catalog-create-btn"
+              onClick={openCreateModal}
+              icon={<Plus size={18} />}
+              style={{ background: '#FFFFFF', color: '#7C3AED' }}
+            >
+              Add Garment
+            </Button>
+          )}
         </div>
 
         {/* ── Category Filter Pills ─────────────────── */}
@@ -538,6 +596,54 @@ export const CatalogSettingsPage: React.FC = () => {
               disabled={saving || !editName.trim()}
             >
               {saving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Create Modal (OWNER only) ─────────────────── */}
+      <Modal open={createModalOpen} onClose={closeCreateModal} title="Add New Garment">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <Input
+            id="create-garment-name"
+            label="Garment Name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Enter garment name"
+          />
+
+          <Select
+            id="create-garment-category"
+            label="Category"
+            options={categorySelectOptions}
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value as GarmentCategory)}
+          />
+
+          {createError && (
+            <p style={{ color: '#EF4444', fontSize: '0.84rem', margin: 0 }}>{createError}</p>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <Button
+              id="create-garment-cancel"
+              variant="secondary"
+              size="md"
+              onClick={closeCreateModal}
+              fullWidth
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              id="create-garment-save"
+              variant="primary"
+              size="md"
+              onClick={handleCreate}
+              fullWidth
+              disabled={creating || !newName.trim()}
+            >
+              {creating ? 'Creating…' : 'Create Garment'}
             </Button>
           </div>
         </div>
