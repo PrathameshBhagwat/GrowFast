@@ -207,48 +207,95 @@ export function OrderWizardPage() {
         )}
 
         {step === 2 && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Add Items</h2>
+          <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
+            <h2 className="text-xl font-semibold mb-4 shrink-0">Add Items</h2>
             
-            <ItemSelector 
-              garments={garments}
-              services={services}
-              prices={prices}
-              onAddItem={(item) => setItems((prev) => [...prev, item])}
-            />
-
-            {items.length > 0 && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-                <h3 className="font-semibold mb-2">Selected Items:</h3>
-                <ul className="list-disc pl-5">
-                  {items.map((item, idx) => (
-                    <li key={idx} className="flex justify-between max-w-sm mb-1">
-                      <span>{item.quantity}x {item.garmentName} ({item.serviceName})</span>
-                      <span className="font-semibold">₹{(item.unitPrice * item.quantity).toFixed(2)}</span>
-                    </li>
-                  ))}
-                </ul>
+            <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
+              {/* Left Side: Catalog (Scrollable within ItemSelector) */}
+              <div className="flex-1 flex flex-col min-w-0 bg-white border rounded-lg shadow-sm overflow-hidden">
+                <ItemSelector 
+                  garments={garments}
+                  services={services}
+                  prices={prices}
+                  onAddItem={(item) => {
+                    setItems((prev) => {
+                      const existing = prev.find(
+                        (i) => i.garmentCatalogId === item.garmentCatalogId && i.serviceTypeId === item.serviceTypeId
+                      );
+                      if (existing) {
+                        return prev.map((i) =>
+                          i === existing ? { ...i, quantity: i.quantity + item.quantity } : i
+                        );
+                      }
+                      return [...prev, item];
+                    });
+                  }}
+                />
               </div>
-            )}
 
-            {storeConfig?.expressSurchargePercent != null && (
-              <div className="mt-6 p-4 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isExpress}
-                    onChange={(e) => setIsExpress(e.target.checked)}
-                    className="w-5 h-5 rounded border-orange-400 text-orange-600 focus:ring-orange-500"
-                  />
-                  <div>
-                    <span className="font-semibold text-orange-900">⚡ Express Service</span>
-                    <p className="text-sm text-orange-700 mt-0.5">
-                      {storeConfig.expressSurchargePercent}% surcharge · Faster turnaround (halved estimated days)
-                    </p>
+              {/* Right Side: Order Summary / Bill */}
+              <div className="w-full md:w-80 bg-gray-50 border rounded-lg flex flex-col shrink-0">
+                <div className="p-4 border-b bg-white rounded-t-lg">
+                  <h3 className="font-bold text-lg text-gray-900">Current Order</h3>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {items.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <p>No items added yet.</p>
+                      <p className="text-sm">Select items from the catalog.</p>
+                    </div>
+                  ) : (
+                    items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-start text-sm bg-white p-3 rounded border shadow-sm">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-900">{item.garmentName}</span>
+                          <span className="text-gray-500 text-xs">{item.serviceName}</span>
+                          <span className="text-gray-500 mt-1">Qty: {item.quantity}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="font-bold text-gray-900">₹{(item.unitPrice * item.quantity).toFixed(2)}</span>
+                          <button 
+                            className="text-red-500 text-xs mt-2 hover:underline"
+                            onClick={() => {
+                              setItems(items.filter((_, i) => i !== idx));
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="p-4 border-t bg-white rounded-b-lg">
+                  <div className="flex justify-between font-bold text-lg mb-4">
+                    <span>Subtotal:</span>
+                    <span>
+                      ₹{items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0).toFixed(2)}
+                    </span>
                   </div>
-                </label>
+
+                  {storeConfig?.expressSurchargePercent != null && (
+                    <div className="mb-4 p-3 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isExpress}
+                          onChange={(e) => setIsExpress(e.target.checked)}
+                          className="w-5 h-5 rounded border-orange-400 text-orange-600 focus:ring-orange-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-orange-900 text-sm">⚡ Express</span>
+                          <span className="text-xs text-orange-700">+{storeConfig.expressSurchargePercent}% Surcharge</span>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         )}
 
