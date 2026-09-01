@@ -176,20 +176,27 @@ async function main() {
   ];
 
   for (const p of pricingData) {
-    await prisma.serviceGarmentPrice.upsert({
+    const existing = await prisma.serviceGarmentPrice.findFirst({
       where: {
-        garmentCatalogId_serviceTypeId: {
-          garmentCatalogId: p.garmentId,
-          serviceTypeId: p.serviceId,
-        },
-      },
-      update: { price: p.price },
-      create: {
         garmentCatalogId: p.garmentId,
         serviceTypeId: p.serviceId,
-        price: p.price,
+        storeId: null,
       },
     });
+    if (existing) {
+      await prisma.serviceGarmentPrice.update({
+        where: { id: existing.id },
+        data: { price: p.price },
+      });
+    } else {
+      await prisma.serviceGarmentPrice.create({
+        data: {
+          garmentCatalogId: p.garmentId,
+          serviceTypeId: p.serviceId,
+          price: p.price,
+        },
+      });
+    }
   }
   console.log(`✅ Service Garment Prices: ${pricingData.length} records`);
 
