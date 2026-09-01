@@ -47,19 +47,28 @@ describe('CatalogController', () => {
       const menGarments = [mockGarments[0]];
       mockCatalogService.findAllGarments.mockResolvedValue(menGarments);
 
-      const result = await controller.findAll({ user: { storeId: 'store-1' } }, { category: GarmentCategory.MEN });
+      const result = await controller.findAll(
+        { user: { storeId: 'store-1' } },
+        { category: GarmentCategory.MEN },
+      );
 
       expect(result).toEqual({
         success: true,
         data: menGarments,
       });
-      expect(mockCatalogService.findAllGarments).toHaveBeenCalledWith('store-1', GarmentCategory.MEN);
+      expect(mockCatalogService.findAllGarments).toHaveBeenCalledWith(
+        'store-1',
+        GarmentCategory.MEN,
+      );
     });
 
     it('should return empty array when no garments match', async () => {
       mockCatalogService.findAllGarments.mockResolvedValue([]);
 
-      const result = await controller.findAll({ user: { storeId: 'store-1' } }, { category: GarmentCategory.SPECIAL });
+      const result = await controller.findAll(
+        { user: { storeId: 'store-1' } },
+        { category: GarmentCategory.SPECIAL },
+      );
 
       expect(result).toEqual({
         success: true,

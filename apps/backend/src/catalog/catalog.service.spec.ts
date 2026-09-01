@@ -81,9 +81,9 @@ describe('CatalogService', () => {
 
       expect(result).toEqual(menGarments);
       expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-        where: { 
+        where: {
           category: GarmentCategory.MEN,
-          OR: [{ storeId: null }, { storeId: 'store-1' }]
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
         },
         orderBy: { name: 'asc' },
       });
@@ -96,9 +96,9 @@ describe('CatalogService', () => {
 
       expect(result).toEqual([]);
       expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-        where: { 
+        where: {
           category: GarmentCategory.SPECIAL,
-          OR: [{ storeId: null }, { storeId: 'store-1' }]
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
         },
         orderBy: { name: 'asc' },
       });
@@ -109,9 +109,9 @@ describe('CatalogService', () => {
         mockPrismaService.garmentCatalog.findMany.mockResolvedValue([]);
         await service.findAllGarments('store-1', cat);
         expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-          where: { 
+          where: {
             category: cat,
-            OR: [{ storeId: null }, { storeId: 'store-1' }]
+            OR: [{ storeId: null }, { storeId: 'store-1' }],
           },
           orderBy: { name: 'asc' },
         });
@@ -237,9 +237,9 @@ describe('CatalogService', () => {
 
       expect(result).toEqual(washServices);
       expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-        where: { 
+        where: {
           category: ServiceCategory.WASH,
-          OR: [{ storeId: null }, { storeId: 'store-1' }]
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
         },
         orderBy: { name: 'asc' },
       });
@@ -252,9 +252,9 @@ describe('CatalogService', () => {
 
       expect(result).toEqual([]);
       expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-        where: { 
+        where: {
           category: ServiceCategory.STAIN_REMOVAL,
-          OR: [{ storeId: null }, { storeId: 'store-1' }]
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
         },
         orderBy: { name: 'asc' },
       });
@@ -265,9 +265,9 @@ describe('CatalogService', () => {
         mockPrismaService.serviceType.findMany.mockResolvedValue([]);
         await service.findAllServices('store-1', cat);
         expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-          where: { 
+          where: {
             category: cat,
-            OR: [{ storeId: null }, { storeId: 'store-1' }]
+            OR: [{ storeId: null }, { storeId: 'store-1' }],
           },
           orderBy: { name: 'asc' },
         });
