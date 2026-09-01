@@ -9,6 +9,9 @@ import {
   PaymentStatus,
   calculateOrderTotals,
   PricingItemInput,
+  deriveOrderStatus,
+  ItemStatus,
+  OrderStatus,
 } from '@growfast/shared-types';
 
 @Injectable()
@@ -26,6 +29,15 @@ export class OrderService {
       });
       if (!customer) {
         throw new NotFoundException(`Customer with ID "${dto.customerId}" not found`);
+      }
+
+      // 1.5 Fetch Store config
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      if (!store) {
+        throw new NotFoundException(`Store with ID "${storeId}" not found`);
+      }
+      if (dto.isExpress && store.expressSurchargePercent == null) {
+        throw new BadRequestException(`Express service is not configured for this store`);
       }
 
       // 2. Fetch all garments and services to validate them and get properties
@@ -103,8 +115,11 @@ export class OrderService {
         }
       }
 
-      // Calculate Totals
-      const totals = calculateOrderTotals(pricingInputs);
+      // Calculate Totals (B5 canonical pricing + B7 express surcharge)
+      const totals = calculateOrderTotals(pricingInputs, {
+        isExpress: dto.isExpress,
+        expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+      });
 
       // 4. Due date placeholder (Deferred to B6)
       const orderDate = new Date();
@@ -122,9 +137,22 @@ export class OrderService {
       }
       const serviceSummary = serviceSummaryParts.join(', ');
 
-      // 7. Calculate Due Date (B6)
+      // 7. Calculate Due Date (B6 normal / B7 express)
       const systemDueDate = new Date(orderDate);
-      systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+      if (dto.isExpress) {
+        // B7: Express orders get halved turnaround (rounded up)
+        systemDueDate.setDate(systemDueDate.getDate() + Math.ceil(maxEstimatedDays / 2));
+      } else {
+        systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+      }
+
+      const itemsForStatus = orderItemsData.map((item) => ({
+        status: ItemStatus.RECEIVED,
+      }));
+      const orderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        hasActiveTransitDelivery: false,
+      });
 
       // 8. Create Order
       const order = await tx.order.create({
@@ -136,8 +164,10 @@ export class OrderService {
           effectiveDueDate: systemDueDate,
           isExpress: dto.isExpress,
           serviceSummary,
+          status: orderStatus,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
           amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
@@ -167,7 +197,7 @@ export class OrderService {
     });
   }
 
-  async findOrderById(id: string) {
+  async findOrderById(id: string, storeId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -187,18 +217,21 @@ export class OrderService {
       throw new NotFoundException(`Order with ID "${id}" not found`);
     }
 
+    if (storeId && order.storeId !== storeId) {
+      throw new NotFoundException(`Order with ID "${id}" not found`);
+    }
+
     return this.mapToDetailDto(order);
   }
 
-  async findAllOrders(query: GetOrdersQueryDto) {
+  async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
     const { customerId, status, paymentStatus, page = 1, pageSize = 10 } = query;
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
+    const where: any = { storeId };
     if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
-    if (customerId) where.customerId = customerId;
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -235,6 +268,15 @@ export class OrderService {
       }
       if (order.storeId !== storeId) {
         throw new BadRequestException(`Order does not belong to your store`);
+      }
+
+      // 1.5 Fetch Store config
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      if (!store) {
+        throw new NotFoundException(`Store with ID "${storeId}" not found`);
+      }
+      if (order.isExpress && store.expressSurchargePercent == null) {
+        throw new BadRequestException(`Express service is not configured for this store`);
       }
 
       // 2. Validate order item belongs to order
@@ -313,13 +355,27 @@ export class OrderService {
         unitPrice: i.unitPrice,
         quantity: i.quantity,
       }));
-      const totals = calculateOrderTotals(pricingInputs);
+      const totals = calculateOrderTotals(pricingInputs, {
+        isExpress: updatedOrder!.isExpress,
+        expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+      });
+
+      const itemsForStatus = updatedOrder!.items.map((i: any) => ({
+        status: i.itemStatus as ItemStatus,
+      }));
+      const newOrderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        currentOrderStatus: updatedOrder!.status as OrderStatus,
+        hasActiveTransitDelivery: false,
+      });
 
       await tx.order.update({
         where: { id: orderId },
         data: {
+          status: newOrderStatus,
           subtotal: totals.subtotal,
           discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
           amountDue: totals.totalAmount - updatedOrder!.amountPaid,
@@ -337,11 +393,15 @@ export class OrderService {
     effectiveDueDate: string,
     reason: string,
     employeeId: string,
+    storeId: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) {
         throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new BadRequestException(`Order does not belong to your store`);
       }
 
       await tx.order.update({
@@ -374,6 +434,7 @@ export class OrderService {
       discountAmount: order.discountAmount,
       taxAmount: order.taxAmount,
       totalAmount: order.totalAmount,
+      expressSurcharge: order.expressSurcharge,
       amountPaid: order.amountPaid,
       amountDue: order.amountDue,
       paymentStatus: order.paymentStatus,
