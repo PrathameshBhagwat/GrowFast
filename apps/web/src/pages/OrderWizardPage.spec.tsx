@@ -46,18 +46,12 @@ describe('OrderWizardPage', () => {
 
     // Wait for the pricing fetch to complete
     await waitFor(() => {
-      expect(screen.getByText('Select Mock Customer')).toBeInTheDocument();
+      expect(screen.getByText('Start Customer Search')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Customer search component will go here.')).toBeInTheDocument();
-
-    // Verify it fetched pricing, but did NOT fetch customer
+    // Verify it fetched pricing
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/pricing'),
-      expect.any(Object),
-    );
-    expect(global.fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining('/customers'),
       expect.any(Object),
     );
   });
@@ -91,7 +85,7 @@ describe('OrderWizardPage', () => {
     });
 
     // Verify no manual selection required
-    expect(screen.queryByText('Select Mock Customer')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start Customer Search')).not.toBeInTheDocument();
   });
 
   it('handles invalid customerId gracefully', async () => {

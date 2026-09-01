@@ -43,19 +43,19 @@ describe('ServicesController', () => {
     it('should return all services without a category filter', async () => {
       mockCatalogService.findAllServices.mockResolvedValue(mockServices);
 
-      const result = await controller.findAll({});
+      const result = await controller.findAll({ user: { storeId: 'store-1' } }, {});
 
       expect(result).toEqual({ success: true, data: mockServices });
-      expect(mockCatalogService.findAllServices).toHaveBeenCalledWith(undefined);
+      expect(mockCatalogService.findAllServices).toHaveBeenCalledWith('store-1', undefined);
     });
 
     it('should return services filtered by category', async () => {
       mockCatalogService.findAllServices.mockResolvedValue(mockServices);
 
-      const result = await controller.findAll({ category: ServiceCategory.DRY_CLEAN });
+      const result = await controller.findAll({ user: { storeId: 'store-1' } }, { category: ServiceCategory.DRY_CLEAN });
 
       expect(result).toEqual({ success: true, data: mockServices });
-      expect(mockCatalogService.findAllServices).toHaveBeenCalledWith(ServiceCategory.DRY_CLEAN);
+      expect(mockCatalogService.findAllServices).toHaveBeenCalledWith('store-1', ServiceCategory.DRY_CLEAN);
     });
 
     it('should NOT have roles metadata on findAll (accessible to all authenticated)', () => {

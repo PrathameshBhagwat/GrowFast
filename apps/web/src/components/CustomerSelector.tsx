@@ -70,7 +70,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
         setIsLoading(false);
       }
     },
-    [token, logout]
+    [token, logout],
   );
 
   useEffect(() => {
@@ -161,9 +161,13 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                   gap: '10px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0F172A' }}>{c.name}</span>
+                    <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0F172A' }}>
+                      {c.name}
+                    </span>
                     <span
                       style={{
                         padding: '2px 8px',
@@ -179,7 +183,15 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                     </span>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '0.85rem', color: '#475569' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    fontSize: '0.85rem',
+                    color: '#475569',
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Phone size={14} color="#64748B" />
                     <strong style={{ color: '#0F172A' }}>{c.phone}</strong>

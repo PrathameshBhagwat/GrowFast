@@ -127,7 +127,11 @@ export class CatalogService {
   /**
    * Get price for a specific garment and service combination.
    */
-  async getPrice(garmentCatalogId: string, serviceTypeId: string, storeId: string): Promise<number> {
+  async getPrice(
+    garmentCatalogId: string,
+    serviceTypeId: string,
+    storeId: string,
+  ): Promise<number> {
     const priceRecord = await this.prisma.serviceGarmentPrice.findFirst({
       where: {
         garmentCatalogId,
@@ -159,7 +163,12 @@ export class CatalogService {
   /**
    * Set or update a price for a specific garment and service combination.
    */
-  async setPrice(garmentCatalogId: string, serviceTypeId: string, storeId: string, dto: SetPriceDto) {
+  async setPrice(
+    garmentCatalogId: string,
+    serviceTypeId: string,
+    storeId: string,
+    dto: SetPriceDto,
+  ) {
     return this.prisma.serviceGarmentPrice.upsert({
       where: {
         garmentCatalogId_serviceTypeId_storeId: {

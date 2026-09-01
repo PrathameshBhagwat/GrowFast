@@ -19,9 +19,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   SPECIAL: 'Special',
 };
 
-export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, prices, onAddItem }) => {
-  const activeServices = useMemo(() => services.filter(s => s.isActive), [services]);
-  const activeGarments = useMemo(() => garments.filter(g => g.isActive), [garments]);
+export const ItemSelector: React.FC<ItemSelectorProps> = ({
+  garments,
+  services,
+  prices,
+  onAddItem,
+}) => {
+  const activeServices = useMemo(() => services.filter((s) => s.isActive), [services]);
+  const activeGarments = useMemo(() => garments.filter((g) => g.isActive), [garments]);
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(activeServices[0]?.id || '');
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORIES[0]);
@@ -34,17 +39,17 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, 
   }, [activeServices, selectedServiceId]);
 
   const filteredGarments = useMemo(() => {
-    return activeGarments.filter(g => g.category === selectedCategory);
+    return activeGarments.filter((g) => g.category === selectedCategory);
   }, [activeGarments, selectedCategory]);
 
   const handleGarmentClick = (garment: any) => {
     if (!selectedServiceId) return;
 
-    const service = activeServices.find(s => s.id === selectedServiceId);
+    const service = activeServices.find((s) => s.id === selectedServiceId);
     const priceRecord = prices.find(
-      p => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId
+      (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId,
     );
-    
+
     // Default to 0 if no price found, though ideally shouldn't happen or should be disabled
     const unitPrice = priceRecord ? priceRecord.price : 0;
 
@@ -62,13 +67,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, 
     <div className="flex flex-col h-full bg-white">
       {/* Service Tabs */}
       <div className="flex overflow-x-auto border-b bg-gray-50 hide-scrollbar shrink-0">
-        {activeServices.map(service => (
+        {activeServices.map((service) => (
           <button
             key={service.id}
             onClick={() => setSelectedServiceId(service.id)}
             className={`px-4 py-3 whitespace-nowrap text-sm font-medium border-b-2 transition-colors ${
-              selectedServiceId === service.id 
-                ? 'border-primary-600 text-primary-700 bg-white' 
+              selectedServiceId === service.id
+                ? 'border-primary-600 text-primary-700 bg-white'
                 : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -79,13 +84,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, 
 
       {/* Category Tabs */}
       <div className="flex overflow-x-auto border-b bg-white hide-scrollbar shrink-0">
-        {CATEGORIES.map(category => (
+        {CATEGORIES.map((category) => (
           <button
             key={category}
             onClick={() => setSelectedCategory(category)}
             className={`px-4 py-2 whitespace-nowrap text-xs font-semibold transition-colors ${
-              selectedCategory === category 
-                ? 'text-gray-900 border-b-2 border-gray-900' 
+              selectedCategory === category
+                ? 'text-gray-900 border-b-2 border-gray-900'
                 : 'text-gray-500 hover:text-gray-800'
             }`}
           >
@@ -97,9 +102,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, 
       {/* Garment Grid (Scrollable) */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-          {filteredGarments.map(garment => {
+          {filteredGarments.map((garment) => {
             const priceRecord = prices.find(
-              p => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId
+              (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId,
             );
             const price = priceRecord ? priceRecord.price : 0;
 
@@ -114,11 +119,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, 
                 <div className="absolute top-0 right-0 bg-gray-800 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg">
                   ₹{price}
                 </div>
-                
+
                 <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-primary-500 transition-colors mb-2">
                   <Shirt size={24} strokeWidth={1.5} />
                 </div>
-                
+
                 <span className="text-xs text-center font-medium text-gray-800 line-clamp-2 leading-tight">
                   {garment.name}
                 </span>
@@ -126,7 +131,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({ garments, services, 
             );
           })}
         </div>
-        
+
         {filteredGarments.length === 0 && (
           <div className="flex items-center justify-center h-full text-gray-400 text-sm">
             No garments found in this category.

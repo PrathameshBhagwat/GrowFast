@@ -62,11 +62,13 @@ describe('CatalogService', () => {
     it('should return all garments when no category filter is provided', async () => {
       mockPrismaService.garmentCatalog.findMany.mockResolvedValue(mockGarments);
 
-      const result = await service.findAllGarments();
+      const result = await service.findAllGarments('store-1');
 
       expect(result).toEqual(mockGarments);
       expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: {
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
+        },
         orderBy: { name: 'asc' },
       });
     });
@@ -75,11 +77,14 @@ describe('CatalogService', () => {
       const menGarments = mockGarments.filter((g) => g.category === 'MEN');
       mockPrismaService.garmentCatalog.findMany.mockResolvedValue(menGarments);
 
-      const result = await service.findAllGarments(GarmentCategory.MEN);
+      const result = await service.findAllGarments('store-1', GarmentCategory.MEN);
 
       expect(result).toEqual(menGarments);
       expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-        where: { category: GarmentCategory.MEN },
+        where: { 
+          category: GarmentCategory.MEN,
+          OR: [{ storeId: null }, { storeId: 'store-1' }]
+        },
         orderBy: { name: 'asc' },
       });
     });
@@ -87,11 +92,14 @@ describe('CatalogService', () => {
     it('should return empty array when no garments match the category', async () => {
       mockPrismaService.garmentCatalog.findMany.mockResolvedValue([]);
 
-      const result = await service.findAllGarments(GarmentCategory.SPECIAL);
+      const result = await service.findAllGarments('store-1', GarmentCategory.SPECIAL);
 
       expect(result).toEqual([]);
       expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-        where: { category: GarmentCategory.SPECIAL },
+        where: { 
+          category: GarmentCategory.SPECIAL,
+          OR: [{ storeId: null }, { storeId: 'store-1' }]
+        },
         orderBy: { name: 'asc' },
       });
     });
@@ -99,9 +107,12 @@ describe('CatalogService', () => {
     it('should filter by each valid category value', async () => {
       for (const cat of Object.values(GarmentCategory)) {
         mockPrismaService.garmentCatalog.findMany.mockResolvedValue([]);
-        await service.findAllGarments(cat);
+        await service.findAllGarments('store-1', cat);
         expect(mockPrismaService.garmentCatalog.findMany).toHaveBeenCalledWith({
-          where: { category: cat },
+          where: { 
+            category: cat,
+            OR: [{ storeId: null }, { storeId: 'store-1' }]
+          },
           orderBy: { name: 'asc' },
         });
       }
@@ -207,11 +218,13 @@ describe('CatalogService', () => {
     it('should return all services when no category filter is provided', async () => {
       mockPrismaService.serviceType.findMany.mockResolvedValue(mockServices);
 
-      const result = await service.findAllServices();
+      const result = await service.findAllServices('store-1');
 
       expect(result).toEqual(mockServices);
       expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-        where: {},
+        where: {
+          OR: [{ storeId: null }, { storeId: 'store-1' }],
+        },
         orderBy: { name: 'asc' },
       });
     });
@@ -220,11 +233,14 @@ describe('CatalogService', () => {
       const washServices = mockServices.filter((s) => s.category === 'WASH');
       mockPrismaService.serviceType.findMany.mockResolvedValue(washServices);
 
-      const result = await service.findAllServices(ServiceCategory.WASH);
+      const result = await service.findAllServices('store-1', ServiceCategory.WASH);
 
       expect(result).toEqual(washServices);
       expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-        where: { category: ServiceCategory.WASH },
+        where: { 
+          category: ServiceCategory.WASH,
+          OR: [{ storeId: null }, { storeId: 'store-1' }]
+        },
         orderBy: { name: 'asc' },
       });
     });
@@ -232,11 +248,14 @@ describe('CatalogService', () => {
     it('should return empty array when no services match the category', async () => {
       mockPrismaService.serviceType.findMany.mockResolvedValue([]);
 
-      const result = await service.findAllServices(ServiceCategory.STAIN_REMOVAL);
+      const result = await service.findAllServices('store-1', ServiceCategory.STAIN_REMOVAL);
 
       expect(result).toEqual([]);
       expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-        where: { category: ServiceCategory.STAIN_REMOVAL },
+        where: { 
+          category: ServiceCategory.STAIN_REMOVAL,
+          OR: [{ storeId: null }, { storeId: 'store-1' }]
+        },
         orderBy: { name: 'asc' },
       });
     });
@@ -244,9 +263,12 @@ describe('CatalogService', () => {
     it('should filter by each valid category value', async () => {
       for (const cat of Object.values(ServiceCategory)) {
         mockPrismaService.serviceType.findMany.mockResolvedValue([]);
-        await service.findAllServices(cat);
+        await service.findAllServices('store-1', cat);
         expect(mockPrismaService.serviceType.findMany).toHaveBeenCalledWith({
-          where: { category: cat },
+          where: { 
+            category: cat,
+            OR: [{ storeId: null }, { storeId: 'store-1' }]
+          },
           orderBy: { name: 'asc' },
         });
       }

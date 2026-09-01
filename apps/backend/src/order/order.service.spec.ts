@@ -40,6 +40,7 @@ const mockPrismaService: any = {
   serviceGarmentPrice: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
   },
   store: {
     findUnique: jest.fn(),
@@ -275,6 +276,11 @@ describe('OrderService', () => {
       mockPrismaService.orderItem.update.mockResolvedValue({});
       mockPrismaService.order.update.mockResolvedValue({});
       mockPrismaService.serviceGarmentPrice.findUnique.mockResolvedValue({
+        garmentCatalogId: 'g1',
+        serviceTypeId: 's1',
+        price: 150,
+      });
+      mockPrismaService.serviceGarmentPrice.findFirst.mockResolvedValue({
         garmentCatalogId: 'g1',
         serviceTypeId: 's1',
         price: 150,

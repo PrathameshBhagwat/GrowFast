@@ -195,11 +195,11 @@ export function OrderWizardPage() {
               </div>
             ) : (
               <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
-                <CustomerSelector 
+                <CustomerSelector
                   onSelect={(c) => {
                     setCustomer(c);
                     setSelectedCustomerId(c.id);
-                  }} 
+                  }}
                 />
               </div>
             )}
@@ -209,22 +209,24 @@ export function OrderWizardPage() {
         {step === 2 && (
           <div className="flex flex-col h-[calc(100vh-280px)] min-h-[500px]">
             <h2 className="text-xl font-semibold mb-4 shrink-0">Add Items</h2>
-            
+
             <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
               {/* Left Side: Catalog (Scrollable within ItemSelector) */}
               <div className="flex-1 flex flex-col min-w-0 bg-white border rounded-lg shadow-sm overflow-hidden">
-                <ItemSelector 
+                <ItemSelector
                   garments={garments}
                   services={services}
                   prices={prices}
                   onAddItem={(item) => {
                     setItems((prev) => {
                       const existing = prev.find(
-                        (i) => i.garmentCatalogId === item.garmentCatalogId && i.serviceTypeId === item.serviceTypeId
+                        (i) =>
+                          i.garmentCatalogId === item.garmentCatalogId &&
+                          i.serviceTypeId === item.serviceTypeId,
                       );
                       if (existing) {
                         return prev.map((i) =>
-                          i === existing ? { ...i, quantity: i.quantity + item.quantity } : i
+                          i === existing ? { ...i, quantity: i.quantity + item.quantity } : i,
                         );
                       }
                       return [...prev, item];
@@ -238,7 +240,7 @@ export function OrderWizardPage() {
                 <div className="p-4 border-b bg-white rounded-t-lg">
                   <h3 className="font-bold text-lg text-gray-900">Current Order</h3>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {items.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
@@ -247,15 +249,20 @@ export function OrderWizardPage() {
                     </div>
                   ) : (
                     items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-start text-sm bg-white p-3 rounded border shadow-sm">
+                      <div
+                        key={idx}
+                        className="flex justify-between items-start text-sm bg-white p-3 rounded border shadow-sm"
+                      >
                         <div className="flex flex-col">
                           <span className="font-semibold text-gray-900">{item.garmentName}</span>
                           <span className="text-gray-500 text-xs">{item.serviceName}</span>
                           <span className="text-gray-500 mt-1">Qty: {item.quantity}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="font-bold text-gray-900">₹{(item.unitPrice * item.quantity).toFixed(2)}</span>
-                          <button 
+                          <span className="font-bold text-gray-900">
+                            ₹{(item.unitPrice * item.quantity).toFixed(2)}
+                          </span>
+                          <button
                             className="text-red-500 text-xs mt-2 hover:underline"
                             onClick={() => {
                               setItems(items.filter((_, i) => i !== idx));
@@ -273,7 +280,10 @@ export function OrderWizardPage() {
                   <div className="flex justify-between font-bold text-lg mb-4">
                     <span>Subtotal:</span>
                     <span>
-                      ₹{items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0).toFixed(2)}
+                      ₹
+                      {items
+                        .reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+                        .toFixed(2)}
                     </span>
                   </div>
 
@@ -288,7 +298,9 @@ export function OrderWizardPage() {
                         />
                         <div className="flex flex-col">
                           <span className="font-semibold text-orange-900 text-sm">⚡ Express</span>
-                          <span className="text-xs text-orange-700">+{storeConfig.expressSurchargePercent}% Surcharge</span>
+                          <span className="text-xs text-orange-700">
+                            +{storeConfig.expressSurchargePercent}% Surcharge
+                          </span>
                         </div>
                       </label>
                     </div>
