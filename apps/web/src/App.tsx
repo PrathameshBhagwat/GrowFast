@@ -12,6 +12,7 @@ import { MasterDataPage } from './pages/MasterDataPage';
 import { OrderWizardPage } from './pages/OrderWizardPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
 import { DeliveryPage } from './pages/DeliveryPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -101,6 +102,15 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'COUNTER', 'DELIVERY']}>
             <DeliveryPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Developer C — Dashboard (C7) */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'COUNTER']}>
+            <DashboardPage />
           </ProtectedRoute>
         }
       />
