@@ -143,41 +143,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let data: { accessToken: string; employee: EmployeeSummary };
 
       try {
-        const res = await fetch(`${API_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ employeeId, pin }),
-        });
+        let res: Response | null = null;
+        try {
+          res = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employeeId, pin }),
+          });
+        } catch {
+          res = null;
+        }
 
-        if (!res.ok) {
+        if (res && res.ok) {
+          data = await res.json();
+        } else if (res && res.status >= 400 && res.status < 500) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.message || 'Invalid credentials');
-        }
-
-        data = await res.json();
-      } catch (fetchErr: any) {
-        // If backend is offline or network error, fallback to dev credentials in development mode
-        const isNetworkError =
-          fetchErr instanceof TypeError ||
-          fetchErr.message?.includes('fetch') ||
-          fetchErr.message?.includes('Failed to fetch') ||
-          fetchErr.message?.includes('NetworkError');
-
-        const devCred = DEV_CREDENTIALS[employeeId];
-        if (isNetworkError && devCred) {
-          if (devCred.pin !== pin) {
-            throw new Error('Invalid PIN. Check dev credentials below.');
-          }
-          data = {
-            accessToken: `dev-mock-jwt-${employeeId}`,
-            employee: devCred.employee,
-          };
-          console.info(
-            `[Auth] Backend offline. Authenticated locally for ${devCred.employee.name} (${devCred.employee.role})`,
-          );
         } else {
-          throw fetchErr;
+          // Server offline, HTTP 500 (DB offline), or network unreachable
+          const devCred = DEV_CREDENTIALS[employeeId];
+          if (devCred) {
+            if (devCred.pin !== pin) {
+              throw new Error('Invalid PIN. Check dev credentials below.');
+            }
+            data = {
+              accessToken: `dev-mock-jwt-${employeeId}`,
+              employee: devCred.employee,
+            };
+            console.info(
+              `[Auth] Local dev session for ${devCred.employee.name} (${devCred.employee.role})`,
+            );
+          } else {
+            throw new Error('Server unreachable. Please check backend connection.');
+          }
         }
+      } catch (fetchErr: any) {
+        throw fetchErr;
       }
 
       localStorage.setItem(TOKEN_KEY, data.accessToken);

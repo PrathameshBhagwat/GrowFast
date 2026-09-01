@@ -175,37 +175,69 @@ export const HomePage: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
+      // In development offline / mock mode:
+      if (token.startsWith('dev-mock-jwt-')) {
+        const q = query.toLowerCase();
+        const filtered = MOCK_CUSTOMERS.filter(
+          (c) =>
+            !q ||
+            c.name.toLowerCase().includes(q) ||
+            c.phone.toLowerCase().includes(q) ||
+            c.id.toLowerCase().includes(q),
+        );
+        const start = (currentPage - 1) * pageSize;
+        const pageItems = filtered.slice(start, start + pageSize);
+
+        setCustomers(pageItems);
+        setTotalCount(filtered.length);
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const queryParams = new URLSearchParams();
         if (query) queryParams.set('query', query);
         queryParams.set('page', String(currentPage));
         queryParams.set('pageSize', String(pageSize));
 
-        const res = await fetch(`${API_URL}/customers/search?${queryParams.toString()}`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!res.ok) {
-          if (res.status === 401 && !token.startsWith('dev-mock-jwt-')) {
-            logout();
-            return;
-          }
-          if (res.status >= 500) {
-            throw new Error('Server 500: Database offline, falling back to mock data');
-          }
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody.message || `HTTP ${res.status}: Failed to search customers`);
+        let res: Response | null = null;
+        try {
+          res = await fetch(`${API_URL}/customers/search?${queryParams.toString()}`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+        } catch {
+          res = null;
         }
 
-        const responseData: PaginatedResponse<CustomerDTO> = await res.json();
-        setCustomers(responseData.data || []);
-        setTotalCount(responseData.total || 0);
+        if (res && res.ok) {
+          const responseData: PaginatedResponse<CustomerDTO> = await res.json();
+          setCustomers(responseData.data || []);
+          setTotalCount(responseData.total || 0);
+        } else if (res && res.status === 401) {
+          logout();
+          return;
+        } else {
+          // Fallback to mock customers on server/DB error or offline
+          const q = query.toLowerCase();
+          const filtered = MOCK_CUSTOMERS.filter(
+            (c) =>
+              !q ||
+              c.name.toLowerCase().includes(q) ||
+              c.phone.toLowerCase().includes(q) ||
+              c.id.toLowerCase().includes(q),
+          );
+          const start = (currentPage - 1) * pageSize;
+          const pageItems = filtered.slice(start, start + pageSize);
+
+          setCustomers(pageItems);
+          setTotalCount(filtered.length);
+        }
       } catch (err: any) {
-        // In development offline mode, fallback to local mock customers
+        // Fallback to local mock customers
         const q = query.toLowerCase();
         const filtered = MOCK_CUSTOMERS.filter(
           (c) =>
@@ -244,7 +276,8 @@ export const HomePage: React.FC = () => {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100vh',
+        overflowY: 'auto',
         background: '#F8FAFC',
         fontFamily: "'Inter', sans-serif",
         color: '#0F172A',

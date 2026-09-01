@@ -268,7 +268,14 @@ export const CustomerProfilePage: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingBottom: '40px' }}>
+    <div
+      style={{
+        height: '100vh',
+        overflowY: 'auto',
+        background: '#F8FAFC',
+        paddingBottom: '40px',
+      }}
+    >
       {/* Toast Notice Banner */}
       {notice && (
         <div
