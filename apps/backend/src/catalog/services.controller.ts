@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, Body, UseGuards, Req } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { GetServicesQueryDto } from './dto/get-services-query.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -23,8 +23,9 @@ export class ServicesController {
    */
   @Get()
   @UseGuards(JwtAuthGuard)
-  async findAll(@Query() query: GetServicesQueryDto) {
-    const services = await this.catalogService.findAllServices(query.category);
+  async findAll(@Req() req: any, @Query() query: GetServicesQueryDto) {
+    const storeId = req.user.storeId;
+    const services = await this.catalogService.findAllServices(storeId, query.category);
     return {
       success: true,
       data: services,

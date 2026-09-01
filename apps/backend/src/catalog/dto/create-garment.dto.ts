@@ -1,20 +1,17 @@
-import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsBoolean, IsNumber, Min } from 'class-validator';
 import { GarmentCategory } from '@growfast/shared-types';
 
 /**
- * DTO for PATCH /api/garments/:id.
- * All fields are optional — only provided fields are updated.
+ * DTO for POST /api/garments.
  */
-export class UpdateGarmentDto {
-  @IsOptional()
+export class CreateGarmentDto {
   @IsString()
-  name?: string;
+  name!: string;
 
-  @IsOptional()
   @IsEnum(GarmentCategory, {
     message: `category must be one of: ${Object.values(GarmentCategory).join(', ')}`,
   })
-  category?: GarmentCategory;
+  category!: GarmentCategory;
 
   @IsOptional()
   @IsString()

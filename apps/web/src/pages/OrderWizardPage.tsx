@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, Button, LoadingState, ErrorState } from '@growfast/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { CustomerDTO, calculateOrderTotals, PricingItemInput } from '@growfast/shared-types';
+import { CustomerSelector } from '../components/CustomerSelector';
+import { ItemSelector } from '../components/ItemSelector';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -20,6 +22,8 @@ export function OrderWizardPage() {
   const [customerError, setCustomerError] = useState<string | null>(null);
 
   const [items, setItems] = useState<any[]>([]);
+  const [garments, setGarments] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
   const [isExpress, setIsExpress] = useState(false);
   const [storeConfig, setStoreConfig] = useState<any>(null);
@@ -39,14 +43,21 @@ export function OrderWizardPage() {
 
   useEffect(() => {
     if (token) {
-      fetch(`${API_URL}/pricing`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((body) => {
-          if (body.success) setPrices(body.data);
+      Promise.all([
+        fetch(`${API_URL}/pricing`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/garments`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/services`, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+        .then(async ([resPricing, resGarments, resServices]) => {
+          const bodyPricing = await resPricing.json();
+          const bodyGarments = await resGarments.json();
+          const bodyServices = await resServices.json();
+
+          if (bodyPricing.success) setPrices(bodyPricing.data);
+          if (bodyGarments.success) setGarments(bodyGarments.data);
+          if (bodyServices.success) setServices(bodyServices.data);
         })
-        .catch((err) => console.error('Failed to load pricing:', err));
+        .catch((err) => console.error('Failed to load catalog data:', err));
     }
   }, [token]);
 
@@ -183,21 +194,13 @@ export function OrderWizardPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
-                <p className="text-gray-500 mb-4">Customer search component will go here.</p>
-                <Button
-                  onClick={() => {
-                    setSelectedCustomerId('cust-003');
-                    setCustomer({
-                      id: 'cust-003',
-                      name: 'Amit Shah',
-                      phone: '+919811122334',
-                      email: 'amit.shah@techcorp.in',
-                    } as any);
-                  }}
-                >
-                  Select Mock Customer
-                </Button>
+              <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
+                <CustomerSelector 
+                  onSelect={(c) => {
+                    setCustomer(c);
+                    setSelectedCustomerId(c.id);
+                  }} 
+                />
               </div>
             )}
           </div>
@@ -206,31 +209,22 @@ export function OrderWizardPage() {
         {step === 2 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Add Items</h2>
-            <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
-              <p className="text-gray-500 mb-4">Item catalog and selection will go here.</p>
-              <Button
-                onClick={() =>
-                  setItems([
-                    {
-                      garmentCatalogId: 'garment-shirt',
-                      serviceTypeId: 'svc-wash',
-                      quantity: 2,
-                      garmentName: 'Shirt',
-                      serviceName: 'Wash',
-                    },
-                  ])
-                }
-              >
-                Add Mock Item
-              </Button>
-            </div>
+            
+            <ItemSelector 
+              garments={garments}
+              services={services}
+              prices={prices}
+              onAddItem={(item) => setItems((prev) => [...prev, item])}
+            />
+
             {items.length > 0 && (
               <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
                 <h3 className="font-semibold mb-2">Selected Items:</h3>
                 <ul className="list-disc pl-5">
                   {items.map((item, idx) => (
-                    <li key={idx}>
-                      {item.quantity}x {item.garmentName} ({item.serviceName})
+                    <li key={idx} className="flex justify-between max-w-sm mb-1">
+                      <span>{item.quantity}x {item.garmentName} ({item.serviceName})</span>
+                      <span className="font-semibold">₹{(item.unitPrice * item.quantity).toFixed(2)}</span>
                     </li>
                   ))}
                 </ul>

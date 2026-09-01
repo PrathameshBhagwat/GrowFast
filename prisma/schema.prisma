@@ -24,6 +24,9 @@ model Store {
 
   employees Employee[]
   orders    Order[]
+  garmentCatalogs GarmentCatalog[]
+  serviceTypes ServiceType[]
+  serviceGarmentPrices ServiceGarmentPrice[]
 
   @@map("stores")
 }
@@ -96,14 +99,18 @@ model GarmentCatalog {
   id        String          @id @default(cuid())
   name      String
   category  GarmentCategory
+  section   String?
   isActive  Boolean         @default(true)
+  storeId   String?         @map("store_id")
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
+  store         Store?          @relation(fields: [storeId], references: [id])
   orderItems    OrderItem[]
   servicePrices ServiceGarmentPrice[]
 
   @@index([category])
+  @@index([storeId])
   @@map("garment_catalog")
 }
 
@@ -124,13 +131,16 @@ model ServiceType {
   category      ServiceCategory
   estimatedDays Int             @default(2)
   isActive      Boolean         @default(true)
+  storeId       String?         @map("store_id")
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  store         Store?          @relation(fields: [storeId], references: [id])
   orderItems    OrderItem[]
   servicePrices ServiceGarmentPrice[]
 
   @@index([category])
+  @@index([storeId])
   @@map("service_types")
 }
 
@@ -152,15 +162,18 @@ model ServiceGarmentPrice {
   garmentCatalogId String         @map("garment_catalog_id")
   serviceTypeId    String         @map("service_type_id")
   price            Float
+  storeId          String?        @map("store_id")
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   garmentCatalog   GarmentCatalog @relation(fields: [garmentCatalogId], references: [id], onDelete: Cascade)
   serviceType      ServiceType    @relation(fields: [serviceTypeId], references: [id], onDelete: Cascade)
+  store            Store?         @relation(fields: [storeId], references: [id])
 
-  @@unique([garmentCatalogId, serviceTypeId])
+  @@unique([garmentCatalogId, serviceTypeId, storeId])
   @@index([garmentCatalogId])
   @@index([serviceTypeId])
+  @@index([storeId])
   @@map("service_garment_prices")
 }
 
