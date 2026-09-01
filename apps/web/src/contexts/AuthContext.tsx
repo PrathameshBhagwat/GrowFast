@@ -82,8 +82,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const employee = JSON.parse(employeeStr) as EmployeeSummary;
 
-        // If it's a dev mock token, preserve offline session
+        // If it's a dev mock token, attempt live login if backend is online
         if (token.startsWith('dev-mock-jwt-')) {
+          const devCred = DEV_CREDENTIALS[employee.id];
+          if (devCred) {
+            fetch(`${API_URL}/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ employeeId: employee.id, pin: devCred.pin }),
+            })
+              .then((res) => (res.ok ? res.json() : null))
+              .then((data) => {
+                if (data && data.accessToken) {
+                  localStorage.setItem(TOKEN_KEY, data.accessToken);
+                  localStorage.setItem(EMPLOYEE_KEY, JSON.stringify(data.employee));
+                  setState({
+                    isAuthenticated: true,
+                    token: data.accessToken,
+                    employee: data.employee,
+                    isLoading: false,
+                  });
+                }
+              })
+              .catch(() => {});
+          }
+
           setState({
             isAuthenticated: true,
             token,
