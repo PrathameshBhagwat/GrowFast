@@ -13,7 +13,10 @@ import {
   PaymentSummaryDTO,
   PaymentStatus as SharedPaymentStatus,
   PaymentMode as SharedPaymentMode,
+  NotificationEventType,
+  NotificationChannel,
 } from '@growfast/shared-types';
+import { NotificationService } from '../notification/notification.service';
 import { PaymentStatus, OrderStatus, Prisma } from '@prisma/client';
 
 /** Canonical set of valid payment modes for fast lookup */
@@ -60,7 +63,10 @@ export function derivePaymentStatus(
 
 @Injectable()
 export class PaymentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   private async executeWithRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
     let attempts = 0;
@@ -98,7 +104,7 @@ export class PaymentService {
       );
     }
 
-    return this.executeWithRetry(() =>
+    const paymentDto = await this.executeWithRetry(() =>
       this.prisma.$transaction(
         async (tx) => {
           // 1. Fetch order — Serializable isolation prevents concurrent races
@@ -184,6 +190,32 @@ export class PaymentService {
         },
       ),
     );
+
+    // C6: Trigger PAYMENT_RECEIVED notification outside transaction
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.orderId },
+      include: { customer: true },
+    });
+
+    if (order && order.customer?.phone) {
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.PAYMENT_RECEIVED,
+          NotificationChannel.SMS,
+          order.customer.phone,
+          order.id,
+          order.customer.id,
+          {
+            amountPaid: dto.amount,
+            totalAmount: order.totalAmount,
+            amountDue: order.amountDue,
+          },
+        )
+        .catch(() => {});
+    }
+
+    return paymentDto;
   }
 
   /**

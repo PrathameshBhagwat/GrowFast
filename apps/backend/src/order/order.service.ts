@@ -12,17 +12,21 @@ import {
   deriveOrderStatus,
   ItemStatus,
   OrderStatus,
+  NotificationEventType,
+  NotificationChannel,
 } from '@growfast/shared-types';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalogService: CatalogService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async createOrder(dto: CreateOrderDto, employeeId: string, storeId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Validate customer
       const customer = await tx.customer.findUnique({
         where: { id: dto.customerId },
@@ -195,6 +199,25 @@ export class OrderService {
 
       return this.mapToDetailDto(order);
     });
+
+    // C6: Trigger ORDER_CREATED notification outside transaction
+    if (result && result.customerPhone) {
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_CREATED,
+          NotificationChannel.SMS,
+          result.customerPhone,
+          result.id,
+          result.customerId,
+          { orderNumber: result.orderNumber, totalAmount: result.totalAmount },
+        )
+        .catch((err) => {
+          // Swallow any unhandled promises just in case
+        });
+    }
+
+    return result;
   }
 
   async findOrderById(id: string, storeId?: string) {
@@ -256,7 +279,7 @@ export class OrderService {
   }
 
   async updateOrderItem(orderId: string, itemId: string, dto: UpdateOrderItemDto, storeId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const { oldStatus, updatedOrder } = await this.prisma.$transaction(async (tx) => {
       // 1. Validate order exists and belongs to store
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -382,8 +405,32 @@ export class OrderService {
       });
 
       // 8. Return updated order detail
-      return await this.findOrderById(orderId);
+      return {
+        oldStatus: order.status,
+        updatedOrder: await this.findOrderById(orderId),
+      };
     });
+
+    // C6: Trigger ORDER_READY notification outside transaction
+    if (
+      oldStatus !== OrderStatus.READY &&
+      updatedOrder.status === OrderStatus.READY &&
+      updatedOrder.customerPhone
+    ) {
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_READY,
+          NotificationChannel.SMS,
+          updatedOrder.customerPhone,
+          updatedOrder.id,
+          updatedOrder.customerId,
+          { orderNumber: updatedOrder.orderNumber },
+        )
+        .catch(() => {});
+    }
+
+    return updatedOrder;
   }
 
   // --- B6 Due Date Override ---
