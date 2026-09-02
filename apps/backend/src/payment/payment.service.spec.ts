@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService, derivePaymentStatus } from './payment.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -91,7 +92,11 @@ describe('PaymentService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PaymentService, { provide: PrismaService, useValue: mockPrisma }],
+      providers: [
+        PaymentService,
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: NotificationService, useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) } },
+      ],
     }).compile();
 
     service = module.get<PaymentService>(PaymentService);

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeliveryService } from './delivery.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DeliveryStatus, ItemStatus, Role } from '@growfast/shared-types';
 
@@ -93,10 +94,17 @@ describe('DeliveryService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
       },
+      order: {
+        findUnique: jest.fn().mockResolvedValue(mockOrder),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DeliveryService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        DeliveryService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationService, useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) } },
+      ],
     }).compile();
 
     service = module.get<DeliveryService>(DeliveryService);

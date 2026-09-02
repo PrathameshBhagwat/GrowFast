@@ -11,7 +11,10 @@ import {
   OrderStatus,
   deriveOrderStatus,
   Role,
+  NotificationEventType,
+  NotificationChannel,
 } from '@growfast/shared-types';
+import { NotificationService } from '../notification/notification.service';
 
 /**
  * Delivery State Machine — valid transitions.
@@ -33,7 +36,10 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   /**
    * Create a new delivery record for an order.
@@ -215,7 +221,7 @@ export class DeliveryService {
     employeeId: string,
     employeeRole: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const delivery = await tx.deliveryRecord.findUnique({
         where: { id: deliveryId },
         include: { order: { include: { items: true } } },
@@ -287,6 +293,29 @@ export class DeliveryService {
 
       return this.mapToDto(updated);
     });
+
+    // C6: Trigger ORDER_OUT_FOR_DELIVERY notification outside transaction
+    if (newStatus === DeliveryStatus.IN_TRANSIT) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: updated.orderId },
+        include: { customer: true },
+      });
+      if (order && order.customer?.phone) {
+        this.notificationService
+          .createNotificationEvent(
+            storeId,
+            NotificationEventType.ORDER_OUT_FOR_DELIVERY,
+            NotificationChannel.SMS,
+            order.customer.phone,
+            order.id,
+            order.customer.id,
+            { orderNumber: order.orderNumber, riderName: updated.riderName },
+          )
+          .catch(() => {});
+      }
+    }
+
+    return updated;
   }
 
   /**
@@ -301,7 +330,7 @@ export class DeliveryService {
     employeeId: string,
     employeeRole: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const finalDelivery = await this.prisma.$transaction(async (tx) => {
       const delivery = await tx.deliveryRecord.findUnique({
         where: { id: deliveryId },
         include: {
@@ -456,6 +485,27 @@ export class DeliveryService {
 
       return this.mapToDto(finalDelivery!);
     });
+
+    // C6: Trigger ORDER_DELIVERED notification outside transaction
+    const order = await this.prisma.order.findUnique({
+      where: { id: finalDelivery.orderId },
+      include: { customer: true },
+    });
+    if (order && order.customer?.phone) {
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_DELIVERED,
+          NotificationChannel.SMS,
+          order.customer.phone,
+          order.id,
+          order.customer.id,
+          { orderNumber: order.orderNumber },
+        )
+        .catch(() => {});
+    }
+
+    return finalDelivery;
   }
 
   /** Map Prisma DeliveryRecord to shared DTO */
