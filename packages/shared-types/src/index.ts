@@ -25,6 +25,9 @@ export {
   QCStatus,
   MembershipTier,
   RegistrationSource,
+  NotificationEventType,
+  NotificationChannel,
+  NotificationStatus,
 } from './enums';
 
 // DTOs
@@ -67,6 +70,8 @@ export type {
   ApiResponse,
   PaginatedResponse,
   ApiError,
+  NotificationDTO,
+  CreateNotificationRequest,
 } from './dto';
 
 // Order Status Contract

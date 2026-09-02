@@ -16,6 +16,9 @@ import {
   PhotoType,
   MembershipTier,
   DeliveryStatus,
+  NotificationEventType,
+  NotificationChannel,
+  NotificationStatus,
 } from './enums';
 
 // ─── Auth DTOs ──────────────────────────────────────────────────────
@@ -382,4 +385,32 @@ export interface ApiError {
   message: string;
   statusCode: number;
   errors?: Record<string, string[]>;
+}
+
+// ─── Notification DTOs ──────────────────────────────────────────────
+
+export interface NotificationDTO {
+  id: string;
+  storeId: string;
+  orderId: string | null;
+  customerId: string | null;
+  eventType: NotificationEventType;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  recipient: string;
+  payload: Record<string, unknown> | null;
+  sentAt: string | null;
+  failedAt: string | null;
+  failureReason: string | null;
+  retryCount: number;
+  createdAt: string;
+}
+
+export interface CreateNotificationRequest {
+  orderId?: string;
+  customerId?: string;
+  eventType: NotificationEventType;
+  channel: NotificationChannel;
+  recipient: string;
+  payload?: Record<string, unknown>;
 }
