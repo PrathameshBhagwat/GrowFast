@@ -33,5 +33,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     exclude: ['node_modules', 'dist', 'e2e/**'],
+    pool: 'threads',
   },
 });

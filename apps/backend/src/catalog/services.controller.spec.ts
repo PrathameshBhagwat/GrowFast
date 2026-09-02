@@ -85,24 +85,24 @@ describe('ServicesController', () => {
 
       mockCatalogService.updateService.mockResolvedValue(updatedService);
 
-      const result = await controller.update('s1', updateDto);
+      const result = await controller.update({ user: { storeId: 'store-1' } }, 's1', updateDto);
 
       expect(result).toEqual({ success: true, data: updatedService });
-      expect(mockCatalogService.updateService).toHaveBeenCalledWith('s1', updateDto);
+      expect(mockCatalogService.updateService).toHaveBeenCalledWith('s1', 'store-1', updateDto);
     });
 
     it('should pass the update DTO to the service', async () => {
       const updateDto = { isActive: false };
       mockCatalogService.updateService.mockResolvedValue({ ...existingService, ...updateDto });
 
-      await controller.update('s1', updateDto);
+      await controller.update({ user: { storeId: 'store-1' } }, 's1', updateDto);
 
-      expect(mockCatalogService.updateService).toHaveBeenCalledWith('s1', updateDto);
+      expect(mockCatalogService.updateService).toHaveBeenCalledWith('s1', 'store-1', updateDto);
     });
 
-    it('should have OWNER role metadata on the update method', () => {
+    it('should have OWNER and MANAGER role metadata on the update method', () => {
       const rolesMetadata = Reflect.getMetadata('roles', controller.update);
-      expect(rolesMetadata).toEqual(['OWNER']);
+      expect(rolesMetadata).toEqual(['OWNER', 'MANAGER']);
     });
   });
 });

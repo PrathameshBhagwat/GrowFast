@@ -88,13 +88,17 @@ describe('CatalogController', () => {
     it('should update and return the garment', async () => {
       mockCatalogService.updateGarment.mockResolvedValue(updatedGarment);
 
-      const result = await controller.update('g1', { name: 'Formal Shirt' });
+      const result = await controller.update(
+        { user: { storeId: 'store-1' } },
+        'g1',
+        { name: 'Formal Shirt' },
+      );
 
       expect(result).toEqual({
         success: true,
         data: updatedGarment,
       });
-      expect(mockCatalogService.updateGarment).toHaveBeenCalledWith('g1', {
+      expect(mockCatalogService.updateGarment).toHaveBeenCalledWith('g1', 'store-1', {
         name: 'Formal Shirt',
       });
     });
@@ -103,18 +107,25 @@ describe('CatalogController', () => {
       const dto = { name: 'Kids Dress', category: GarmentCategory.KIDS, isActive: false };
       mockCatalogService.updateGarment.mockResolvedValue({ id: 'g2', ...dto });
 
-      await controller.update('g2', dto);
+      await controller.update({ user: { storeId: 'store-1' } }, 'g2', dto);
 
-      expect(mockCatalogService.updateGarment).toHaveBeenCalledWith('g2', dto);
+      expect(mockCatalogService.updateGarment).toHaveBeenCalledWith('g2', 'store-1', dto);
     });
   });
 
   describe('Authorization metadata', () => {
-    it('should have OWNER role metadata on the update method', () => {
+    it('should have OWNER and MANAGER role metadata on the create method', () => {
+      const reflector = new Reflector();
+      const roles = reflector.get<string[]>(ROLES_KEY, CatalogController.prototype.create);
+
+      expect(roles).toEqual(['OWNER', 'MANAGER']);
+    });
+
+    it('should have OWNER and MANAGER role metadata on the update method', () => {
       const reflector = new Reflector();
       const roles = reflector.get<string[]>(ROLES_KEY, CatalogController.prototype.update);
 
-      expect(roles).toEqual(['OWNER']);
+      expect(roles).toEqual(['OWNER', 'MANAGER']);
     });
 
     it('should NOT have roles metadata on the findAll method (accessible to all authenticated)', () => {
@@ -125,11 +136,12 @@ describe('CatalogController', () => {
       expect(roles).toBeUndefined();
     });
 
-    it('should restrict PATCH to OWNER role only — not MANAGER', () => {
+    it('should restrict PATCH to OWNER and MANAGER — not COUNTER or DELIVERY', () => {
       const reflector = new Reflector();
       const roles = reflector.get<string[]>(ROLES_KEY, CatalogController.prototype.update);
 
-      expect(roles).not.toContain('MANAGER');
+      expect(roles).toContain('OWNER');
+      expect(roles).toContain('MANAGER');
       expect(roles).not.toContain('COUNTER');
       expect(roles).not.toContain('DELIVERY');
     });

@@ -122,6 +122,9 @@ enum GarmentCategory {
   HOUSEHOLD
   SHOES
   SPECIAL
+  WEIGHT_BASED
+  OTHERS
+  HOME_CLEANING
 }
 
 // ─── SERVICE TYPE ───────────────────────────────────────────────────
