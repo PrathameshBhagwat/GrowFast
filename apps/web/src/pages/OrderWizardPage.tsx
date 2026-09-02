@@ -221,6 +221,7 @@ export function OrderWizardPage() {
                     garments={garments}
                     services={services}
                     prices={prices}
+                    selectedGarmentId={selectedItemConfig?.garmentCatalogId}
                     onGarmentSelect={(garment, serviceId, unitPrice) => {
                       setSelectedItemConfig({
                         garmentCatalogId: garment.id,

@@ -129,14 +129,14 @@ describe('CatalogService', () => {
       updatedAt: new Date(),
     };
 
-    it('should update and return the garment when it exists', async () => {
+    it('should update and return the garment when it exists and store matches', async () => {
       const updateDto = { name: 'Formal Shirt' };
       const updatedGarment = { ...existingGarment, ...updateDto };
 
       mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(existingGarment);
       mockPrismaService.garmentCatalog.update.mockResolvedValue(updatedGarment);
 
-      const result = await service.updateGarment('g1', updateDto);
+      const result = await service.updateGarment('g1', 'store-1', updateDto);
 
       expect(result.name).toBe('Formal Shirt');
       expect(mockPrismaService.garmentCatalog.findUnique).toHaveBeenCalledWith({
@@ -148,6 +148,15 @@ describe('CatalogService', () => {
       });
     });
 
+    it('should throw ForbiddenException when garment belongs to another store', async () => {
+      const storeGarment = { ...existingGarment, storeId: 'store-2' };
+      mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(storeGarment);
+
+      await expect(service.updateGarment('g1', 'store-1', { name: 'Test' })).rejects.toThrow(
+        'Cannot modify garment belonging to another store',
+      );
+    });
+
     it('should update the category field', async () => {
       const updateDto = { category: GarmentCategory.WOMEN };
       const updatedGarment = { ...existingGarment, category: GarmentCategory.WOMEN };
@@ -155,7 +164,7 @@ describe('CatalogService', () => {
       mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(existingGarment);
       mockPrismaService.garmentCatalog.update.mockResolvedValue(updatedGarment);
 
-      const result = await service.updateGarment('g1', updateDto);
+      const result = await service.updateGarment('g1', 'store-1', updateDto);
 
       expect(result.category).toBe(GarmentCategory.WOMEN);
     });
@@ -167,7 +176,7 @@ describe('CatalogService', () => {
       mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(existingGarment);
       mockPrismaService.garmentCatalog.update.mockResolvedValue(updatedGarment);
 
-      const result = await service.updateGarment('g1', updateDto);
+      const result = await service.updateGarment('g1', 'store-1', updateDto);
 
       expect(result.isActive).toBe(false);
     });
@@ -175,7 +184,7 @@ describe('CatalogService', () => {
     it('should throw NotFoundException when garment does not exist', async () => {
       mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateGarment('nonexistent', { name: 'Test' })).rejects.toThrow(
+      await expect(service.updateGarment('nonexistent', 'store-1', { name: 'Test' })).rejects.toThrow(
         NotFoundException,
       );
       expect(mockPrismaService.garmentCatalog.update).not.toHaveBeenCalled();
@@ -185,7 +194,7 @@ describe('CatalogService', () => {
       mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(null);
 
       try {
-        await service.updateGarment('bad-id', { name: 'Test' });
+        await service.updateGarment('bad-id', 'store-1', { name: 'Test' });
         fail('Expected NotFoundException');
       } catch (err: any) {
         expect(err.message).toContain('bad-id');
@@ -293,7 +302,7 @@ describe('CatalogService', () => {
       mockPrismaService.serviceType.findUnique.mockResolvedValue(existingService);
       mockPrismaService.serviceType.update.mockResolvedValue(updatedService);
 
-      const result = await service.updateService('s1', updateDto);
+      const result = await service.updateService('s1', 'store-1', updateDto);
 
       expect(result.name).toBe('Premium Dry Clean');
       expect(mockPrismaService.serviceType.findUnique).toHaveBeenCalledWith({
@@ -305,6 +314,15 @@ describe('CatalogService', () => {
       });
     });
 
+    it('should throw ForbiddenException when service belongs to another store', async () => {
+      const storeService = { ...existingService, storeId: 'store-2' };
+      mockPrismaService.serviceType.findUnique.mockResolvedValue(storeService);
+
+      await expect(service.updateService('s1', 'store-1', { name: 'Test' })).rejects.toThrow(
+        'Cannot modify service belonging to another store',
+      );
+    });
+
     it('should update the category field', async () => {
       const updateDto = { category: ServiceCategory.WASH };
       const updatedService = { ...existingService, category: ServiceCategory.WASH };
@@ -312,7 +330,7 @@ describe('CatalogService', () => {
       mockPrismaService.serviceType.findUnique.mockResolvedValue(existingService);
       mockPrismaService.serviceType.update.mockResolvedValue(updatedService);
 
-      const result = await service.updateService('s1', updateDto);
+      const result = await service.updateService('s1', 'store-1', updateDto);
 
       expect(result.category).toBe(ServiceCategory.WASH);
     });
@@ -324,7 +342,7 @@ describe('CatalogService', () => {
       mockPrismaService.serviceType.findUnique.mockResolvedValue(existingService);
       mockPrismaService.serviceType.update.mockResolvedValue(updatedService);
 
-      const result = await service.updateService('s1', updateDto);
+      const result = await service.updateService('s1', 'store-1', updateDto);
 
       expect(result.isActive).toBe(false);
     });
@@ -332,7 +350,7 @@ describe('CatalogService', () => {
     it('should throw NotFoundException when service does not exist', async () => {
       mockPrismaService.serviceType.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateService('nonexistent', { name: 'Test' })).rejects.toThrow(
+      await expect(service.updateService('nonexistent', 'store-1', { name: 'Test' })).rejects.toThrow(
         NotFoundException,
       );
       expect(mockPrismaService.serviceType.update).not.toHaveBeenCalled();
@@ -342,7 +360,7 @@ describe('CatalogService', () => {
       mockPrismaService.serviceType.findUnique.mockResolvedValue(null);
 
       try {
-        await service.updateService('bad-id', { name: 'Test' });
+        await service.updateService('bad-id', 'store-1', { name: 'Test' });
         fail('Expected NotFoundException');
       } catch (err: any) {
         expect(err.message).toContain('bad-id');

@@ -26,11 +26,11 @@ export class PricingController {
 
   /**
    * POST /api/pricing/:garmentId/:serviceId
-   * Set price for a garment and service combo. OWNER role required.
+   * Set price for a garment and service combo. OWNER or MANAGER role required.
    */
   @Post(':garmentId/:serviceId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER')
+  @Roles('OWNER', 'MANAGER')
   async setPrice(
     @Req() req: any,
     @Param('garmentId') garmentId: string,
