@@ -13,7 +13,7 @@ import {
 } from '@growfast/ui';
 import { GarmentCategory, Role } from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
-import { ArrowLeft, Edit2, Shirt, Plus } from 'lucide-react';
+import { ArrowLeft, Edit2, Shirt, Plus, Search } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -60,7 +60,8 @@ export const CatalogSettingsPage: React.FC = () => {
   const [garments, setGarments] = useState<GarmentCatalogDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(CATEGORIES[0]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Create modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -248,260 +249,150 @@ export const CatalogSettingsPage: React.FC = () => {
   };
 
   // ─── Render ────────────────────────────────────────
+  const filteredGarments = garments.filter(
+    (g) => !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#F8FAFC',
-        fontFamily: "'Inter', sans-serif",
-      }}
-    >
+    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden font-sans">
       {/* ── Header ──────────────────────────────────── */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-          padding: '20px 20px 24px',
-          color: '#FFFFFF',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '16px',
-          }}
-        >
-          <button
-            id="catalog-back-btn"
-            onClick={() => navigate('/')}
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFFFFF',
-              minWidth: '44px',
-              minHeight: '44px',
-            }}
-            aria-label="Back to home"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: '1.35rem',
-                fontWeight: 800,
-                letterSpacing: '-0.01em',
-              }}
+      <div className="bg-gradient-to-br from-primary-600 to-primary-800 p-4 md:p-6 text-white shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button
+              id="catalog-back-btn"
+              onClick={() => navigate('/')}
+              className="bg-white/15 border-none rounded-lg p-2 cursor-pointer flex items-center justify-center text-white min-w-[44px] min-h-[44px] hover:bg-white/25 transition-colors"
+              aria-label="Back to home"
             >
-              Garment Catalog
-            </h1>
-            <p style={{ margin: '2px 0 0', fontSize: '0.8rem', opacity: 0.8 }}>
-              {isOwner ? 'Manage garment names & categories' : 'View garment catalog'}
-            </p>
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="m-0 text-xl font-bold tracking-tight">Garment Catalog</h1>
+              <p className="m-0 mt-0.5 text-xs opacity-80">
+                {isOwner ? 'Manage garment names & categories' : 'View garment catalog'}
+              </p>
+            </div>
           </div>
           {isOwner && (
             <Button
               id="catalog-create-btn"
               onClick={openCreateModal}
               icon={<Plus size={18} />}
-              style={{ background: '#FFFFFF', color: '#7C3AED' }}
+              className="bg-white text-primary-700 hover:bg-gray-100 border-0"
             >
               Add Garment
             </Button>
           )}
         </div>
+      </div>
 
-        {/* ── Category Filter Pills ─────────────────── */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            overflowX: 'auto',
-            paddingBottom: '4px',
-          }}
-        >
+      {/* ── Tabs & Search ─────────────────────────── */}
+      <div className="flex flex-col bg-white border-b shrink-0 shadow-sm">
+        <div className="flex overflow-x-auto hide-scrollbar border-b">
           <button
-            id="catalog-filter-all"
             onClick={() => setActiveCategory(null)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '9999px',
-              border: 'none',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              minHeight: '44px',
-              background: activeCategory === null ? '#FFFFFF' : 'rgba(255,255,255,0.15)',
-              color: activeCategory === null ? '#7C3AED' : '#FFFFFF',
-              transition: 'all 150ms ease',
-            }}
+            className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] ${
+              activeCategory === null
+                ? 'text-gray-900 border-b-2 border-gray-900'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
           >
             All
           </button>
           {CATEGORIES.map((cat) => (
             <button
-              id={`catalog-filter-${cat.toLowerCase()}`}
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '9999px',
-                border: 'none',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                minHeight: '44px',
-                background: activeCategory === cat ? '#FFFFFF' : 'rgba(255,255,255,0.15)',
-                color: activeCategory === cat ? '#7C3AED' : '#FFFFFF',
-                transition: 'all 150ms ease',
-              }}
+              className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] ${
+                activeCategory === cat
+                  ? 'text-gray-900 border-b-2 border-gray-900'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
             >
               {CATEGORY_LABELS[cat] || cat}
             </button>
           ))}
         </div>
+        <div className="p-3 border-t">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+              <Search size={18} />
+            </div>
+            <input
+              type="text"
+              className="w-full pl-10 pr-4 py-2 border rounded-md min-h-[44px] text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="Search garments..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* ── Content ─────────────────────────────────── */}
-      <div style={{ padding: '20px', maxWidth: '720px', margin: '0 auto' }}>
+      {/* ── Content Grid ────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
         {loading && <LoadingState message="Loading garments…" />}
-
         {error && <ErrorState message={error} onRetry={fetchGarments} />}
 
-        {!loading && !error && garments.length === 0 && (
+        {!loading && !error && filteredGarments.length === 0 && (
           <EmptyState
             message={
-              activeCategory
-                ? `No garments found in "${CATEGORY_LABELS[activeCategory] || activeCategory}" category`
-                : 'No garments in the catalog yet'
+              searchQuery
+                ? `No garments matching "${searchQuery}"`
+                : activeCategory
+                  ? `No garments found in "${CATEGORY_LABELS[activeCategory] || activeCategory}" category`
+                  : 'No garments in the catalog yet'
             }
           />
         )}
 
-        {!loading && !error && garments.length > 0 && (
-          <>
-            <p
-              style={{
-                fontSize: '0.78rem',
-                color: '#64748B',
-                marginBottom: '12px',
-                fontWeight: 500,
-              }}
-            >
-              {garments.length} garment{garments.length !== 1 ? 's' : ''}{' '}
-              {activeCategory ? `in ${CATEGORY_LABELS[activeCategory] || activeCategory}` : 'total'}
+        {!loading && !error && filteredGarments.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-500 font-medium mb-4">
+              Showing {filteredGarments.length} garment{filteredGarments.length !== 1 ? 's' : ''}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {garments.map((g) => {
-                const catColor = CATEGORY_COLORS[g.category] || '#475569';
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {filteredGarments.map((g) => {
                 return (
-                  <Card key={g.id} padding="md">
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '14px',
-                      }}
-                    >
-                      {/* Icon */}
-                      <div
-                        style={{
-                          width: '44px',
-                          height: '44px',
-                          borderRadius: '12px',
-                          background: `${catColor}10`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: catColor,
-                          flexShrink: 0,
-                        }}
+                  <div
+                    key={g.id}
+                    className={`relative flex flex-col items-center justify-center p-3 bg-white rounded-lg border shadow-sm transition-all group ${
+                      !g.isActive
+                        ? 'opacity-60 grayscale'
+                        : 'hover:shadow-md hover:border-primary-300'
+                    }`}
+                    title={g.name}
+                  >
+                    {!g.isActive && (
+                      <div className="absolute top-0 right-0 bg-gray-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg">
+                        Inactive
+                      </div>
+                    )}
+
+                    {isOwner && (
+                      <button
+                        onClick={() => openEditModal(g)}
+                        className="absolute top-1 right-1 p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+                        title="Edit garment"
                       >
-                        <Shirt size={20} />
-                      </div>
+                        <Edit2 size={16} />
+                      </button>
+                    )}
 
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: '0.95rem',
-                            fontWeight: 600,
-                            color: '#0F172A',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {g.name}
-                        </div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginTop: '4px',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 600,
-                              color: catColor,
-                              background: `${catColor}10`,
-                              padding: '2px 8px',
-                              borderRadius: '9999px',
-                              border: `1px solid ${catColor}20`,
-                            }}
-                          >
-                            {CATEGORY_LABELS[g.category] || g.category}
-                          </span>
-                          {!g.isActive && (
-                            <span
-                              style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                color: '#94A3B8',
-                                background: '#F1F5F9',
-                                padding: '2px 8px',
-                                borderRadius: '9999px',
-                              }}
-                            >
-                              Inactive
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Edit button (OWNER only) */}
-                      {isOwner && (
-                        <Button
-                          id={`edit-garment-${g.id}`}
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditModal(g)}
-                          icon={<Edit2 size={16} />}
-                          aria-label={`Edit ${g.name}`}
-                        >
-                          Edit
-                        </Button>
-                      )}
+                    <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-primary-500 transition-colors mb-2 mt-2">
+                      <Shirt size={28} strokeWidth={1.5} />
                     </div>
-                  </Card>
+
+                    <span className="text-sm text-center font-medium text-gray-800 line-clamp-2 leading-tight px-1 pb-1">
+                      {g.name}
+                    </span>
+                  </div>
                 );
               })}
             </div>
-          </>
+          </div>
         )}
       </div>
 
