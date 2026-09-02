@@ -52,7 +52,7 @@ export class LogNotificationProvider implements NotificationProvider {
       const p = payload.payload as any;
       console.log(`\n================= CUSTOMER SMS =================`);
       console.log(`Your GrowFast order ${p.orderNumber} has items ready for collection.`);
-      
+
       if (p.readyItems && p.readyItems.length > 0) {
         console.log(`\nReady:`);
         p.readyItems.forEach((i: any) => console.log(`• ${i.garmentName} ×${i.quantity}`));
@@ -61,7 +61,7 @@ export class LogNotificationProvider implements NotificationProvider {
         console.log(`\nStill processing:`);
         p.remainingItems.forEach((i: any) => console.log(`• ${i.garmentName} ×${i.quantity}`));
       }
-      
+
       console.log(`\nOrder total: ₹${p.totalAmount}`);
       console.log(`Paid: ₹${p.amountPaid}`);
       console.log(`Balance due: ₹${p.amountDue}`);
