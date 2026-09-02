@@ -13,7 +13,7 @@ export async function fetchDashboardSummary(
   const queryString = params.toString();
   const url = `${API_BASE}/summary${queryString ? `?${queryString}` : ''}`;
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('growfast_token');
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,

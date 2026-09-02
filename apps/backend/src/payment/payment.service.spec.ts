@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService, derivePaymentStatus } from './payment.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -91,7 +92,14 @@ describe('PaymentService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PaymentService, { provide: PrismaService, useValue: mockPrisma }],
+      providers: [
+        PaymentService,
+        { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: NotificationService,
+          useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) },
+        },
+      ],
     }).compile();
 
     service = module.get<PaymentService>(PaymentService);
@@ -205,6 +213,53 @@ describe('PaymentService', () => {
       const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 200 }));
 
       expect(result.reference).toBeNull();
+    });
+
+    it('should emit PAYMENT_RECEIVED notification after successful payment', async () => {
+      setupTransaction({
+        order: makeOrder(),
+        paymentResult: makePaymentResult(400),
+      });
+
+      // Need to spy/mock the regular findUnique for the order fetch in notification logic
+      mockPrisma.order.findUnique.mockResolvedValueOnce({
+        ...makeOrder(),
+        customer: { id: 'cust1', phone: '1234567890' },
+      });
+
+      await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 400 }));
+
+      expect((service as any).notificationService.createNotificationEvent).toHaveBeenCalledWith(
+        STORE_ID,
+        'PAYMENT_RECEIVED',
+        'SMS',
+        '1234567890',
+        ORDER_ID,
+        'cust1',
+        expect.objectContaining({
+          amountPaid: 400,
+        }),
+      );
+    });
+
+    it('should not rollback transaction if PAYMENT_RECEIVED notification fails', async () => {
+      setupTransaction({
+        order: makeOrder(),
+        paymentResult: makePaymentResult(400),
+      });
+
+      mockPrisma.order.findUnique.mockResolvedValueOnce({
+        ...makeOrder(),
+        customer: { id: 'cust1', phone: '1234567890' },
+      });
+
+      (service as any).notificationService.createNotificationEvent.mockRejectedValueOnce(
+        new Error('Provider fail'),
+      );
+
+      const result = await service.recordPayment(EMPLOYEE_ID, STORE_ID, makeDto({ amount: 400 }));
+      expect(result).toBeDefined(); // Still succeeds
+      expect((service as any).notificationService.createNotificationEvent).toHaveBeenCalled();
     });
   });
 
