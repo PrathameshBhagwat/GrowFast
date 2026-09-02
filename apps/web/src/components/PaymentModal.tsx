@@ -67,11 +67,7 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
   return (
     <Modal open={open} onClose={onClose} title="Record Payment">
       <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">{error}</div>}
 
         <div className="bg-gray-50 p-4 rounded-md space-y-2 mb-4">
           <div className="flex justify-between text-sm">
@@ -89,9 +85,7 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Payment Amount (₹)
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount (₹)</label>
           <input
             type="number"
             min="1"
@@ -115,7 +109,9 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-blue-700">New Balance</span>
-                <span className="font-medium text-blue-900">₹{remainingAfterPayment.toFixed(2)}</span>
+                <span className="font-medium text-blue-900">
+                  ₹{remainingAfterPayment.toFixed(2)}
+                </span>
               </div>
               <div className="flex justify-between text-xs pt-1 border-t border-blue-100 mt-1">
                 <span className="text-blue-700">Status</span>

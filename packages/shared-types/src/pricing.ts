@@ -86,7 +86,7 @@ export function calculateFulfillmentBreakdown(
   items: { lineTotal: number; itemStatus: ItemStatus }[],
 ): FulfillmentBreakdown {
   const totalLine = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  
+
   if (totalLine === 0) {
     return {
       readyAmount: 0,
@@ -119,7 +119,7 @@ export function calculateFulfillmentBreakdown(
   if (payableAmount < 0) {
     payableAmount = 0;
   }
-  
+
   // Clean up floating point just in case
   payableAmount = Math.round(payableAmount * 100) / 100;
 

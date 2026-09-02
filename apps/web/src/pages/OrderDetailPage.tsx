@@ -166,11 +166,11 @@ export function OrderDetailPage() {
                 <span className="font-medium text-gray-400">₹0</span>
               </div>
             )}
-            
+
             {order.amountDue > 0 && (
               <div className="pt-4">
-                <Button 
-                  variant="primary" 
+                <Button
+                  variant="primary"
                   className="w-full"
                   onClick={() => setShowPaymentModal(true)}
                 >
@@ -218,7 +218,7 @@ export function OrderDetailPage() {
               {order.items.map((item) => {
                 const isReady = item.itemStatus === 'READY';
                 const isDelivered = item.itemStatus === 'DELIVERED';
-                
+
                 return (
                   <tr
                     key={item.id}
@@ -228,45 +228,45 @@ export function OrderDetailPage() {
                   >
                     <td className="py-3 px-4">
                       <div className="font-medium text-gray-900">{item.garmentName}</div>
-                    {item.colorTags && item.colorTags.length > 0 && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Tags: {item.colorTags.join(', ')}
-                      </div>
-                    )}
-                    {item.defectNotes && (
-                      <div className="text-xs text-red-500 mt-1">Notes: {item.defectNotes}</div>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-gray-600">{item.serviceType}</td>
-                  <td className="py-3 px-4 text-center">
-                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
-                      {item.itemStatus}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div>{item.quantity}</div>
-                    {item.deliveredQuantity > 0 && (
-                      <div className="text-xs text-green-600">
-                        {item.deliveredQuantity} delivered
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-right font-medium">₹{item.lineTotal}</td>
-                  <td className="py-3 px-4 text-right">
-                    <Button
-                      id={`edit-item-${item.id}`}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditItem(item)}
-                      icon={<Edit2 size={16} />}
-                      aria-label={`Edit ${item.garmentName}`}
-                    >
-                      Edit
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
+                      {item.colorTags && item.colorTags.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Tags: {item.colorTags.join(', ')}
+                        </div>
+                      )}
+                      {item.defectNotes && (
+                        <div className="text-xs text-red-500 mt-1">Notes: {item.defectNotes}</div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-gray-600">{item.serviceType}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
+                        {item.itemStatus}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div>{item.quantity}</div>
+                      {item.deliveredQuantity > 0 && (
+                        <div className="text-xs text-green-600">
+                          {item.deliveredQuantity} delivered
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right font-medium">₹{item.lineTotal}</td>
+                    <td className="py-3 px-4 text-right">
+                      <Button
+                        id={`edit-item-${item.id}`}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditItem(item)}
+                        icon={<Edit2 size={16} />}
+                        aria-label={`Edit ${item.garmentName}`}
+                      >
+                        Edit
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

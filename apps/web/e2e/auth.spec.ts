@@ -6,18 +6,17 @@ test.describe('Authentication', () => {
 
     await expect(page.getByText('GrowFast Laundry')).toBeVisible();
 
-    
     for (let i = 0; i < 5; i++) {
-      const responsePromise = page.waitForResponse(response => 
-        response.url().includes('/auth/login')
+      const responsePromise = page.waitForResponse((response) =>
+        response.url().includes('/auth/login'),
       );
 
       for (let j = 0; j < 6; j++) {
         await page.getByRole('button', { name: '9', exact: true }).click();
       }
-      
+
       await page.getByRole('button', { name: 'Unlock' }).click();
-      
+
       await responsePromise;
 
       if (i < 4) {
