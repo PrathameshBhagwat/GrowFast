@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  LoadingState,
-  EmptyState,
-  ErrorState,
-} from '@growfast/ui';
+import { LoadingState, EmptyState, ErrorState } from '@growfast/ui';
 import { GarmentCategory, Role } from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
 import {
@@ -161,7 +157,8 @@ export const CatalogSettingsPage: React.FC = () => {
   const filteredGarments = useMemo(() => {
     return garments.filter((g) => {
       const matchesCategory = g.category === activeCategory;
-      const matchesSearch = !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [garments, activeCategory, searchQuery]);
@@ -785,7 +782,9 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* Pricing Table (Scrollable) */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 min-h-0">
                   {pricingFilteredGarments.length === 0 ? (
-                    <EmptyState message={`No garments found in ${CATEGORY_LABELS[pricingCategory]}`} />
+                    <EmptyState
+                      message={`No garments found in ${CATEGORY_LABELS[pricingCategory]}`}
+                    />
                   ) : (
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
                       <table className="w-full text-left text-sm">
@@ -810,7 +809,10 @@ export const CatalogSettingsPage: React.FC = () => {
                                 : '';
 
                             return (
-                              <tr key={garment.id} className="hover:bg-slate-50/70 transition-colors">
+                              <tr
+                                key={garment.id}
+                                className="hover:bg-slate-50/70 transition-colors"
+                              >
                                 <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2.5">
                                   <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
                                     <Shirt size={16} />
@@ -824,7 +826,9 @@ export const CatalogSettingsPage: React.FC = () => {
                                 </td>
                                 <td className="py-3 px-4 font-semibold">
                                   {hasPrice ? (
-                                    <span className="text-slate-900">₹{currentPrice.toFixed(0)}</span>
+                                    <span className="text-slate-900">
+                                      ₹{currentPrice.toFixed(0)}
+                                    </span>
                                   ) : (
                                     <span className="text-amber-700 text-xs italic bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                                       Not Configured

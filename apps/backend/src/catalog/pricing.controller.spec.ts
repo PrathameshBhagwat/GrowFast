@@ -69,15 +69,14 @@ describe('PricingController', () => {
     it('should set price and return the record', async () => {
       mockCatalogService.setPrice.mockResolvedValue(mockPriceRecord);
 
-      const result = await controller.setPrice(
-        { user: { storeId: 'store-1' } },
-        'g1',
-        's1',
-        { price: 120 },
-      );
+      const result = await controller.setPrice({ user: { storeId: 'store-1' } }, 'g1', 's1', {
+        price: 120,
+      });
 
       expect(result).toEqual({ success: true, data: mockPriceRecord });
-      expect(mockCatalogService.setPrice).toHaveBeenCalledWith('g1', 's1', 'store-1', { price: 120 });
+      expect(mockCatalogService.setPrice).toHaveBeenCalledWith('g1', 's1', 'store-1', {
+        price: 120,
+      });
     });
 
     it('should have OWNER and MANAGER role metadata on setPrice', () => {

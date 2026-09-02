@@ -184,9 +184,9 @@ describe('CatalogService', () => {
     it('should throw NotFoundException when garment does not exist', async () => {
       mockPrismaService.garmentCatalog.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateGarment('nonexistent', 'store-1', { name: 'Test' })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateGarment('nonexistent', 'store-1', { name: 'Test' }),
+      ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.garmentCatalog.update).not.toHaveBeenCalled();
     });
 
@@ -350,9 +350,9 @@ describe('CatalogService', () => {
     it('should throw NotFoundException when service does not exist', async () => {
       mockPrismaService.serviceType.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateService('nonexistent', 'store-1', { name: 'Test' })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateService('nonexistent', 'store-1', { name: 'Test' }),
+      ).rejects.toThrow(NotFoundException);
       expect(mockPrismaService.serviceType.update).not.toHaveBeenCalled();
     });
 

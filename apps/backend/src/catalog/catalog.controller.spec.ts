@@ -88,11 +88,9 @@ describe('CatalogController', () => {
     it('should update and return the garment', async () => {
       mockCatalogService.updateGarment.mockResolvedValue(updatedGarment);
 
-      const result = await controller.update(
-        { user: { storeId: 'store-1' } },
-        'g1',
-        { name: 'Formal Shirt' },
-      );
+      const result = await controller.update({ user: { storeId: 'store-1' } }, 'g1', {
+        name: 'Formal Shirt',
+      });
 
       expect(result).toEqual({
         success: true,

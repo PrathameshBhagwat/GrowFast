@@ -47,7 +47,8 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   const filteredGarments = useMemo(() => {
     return activeGarments.filter((g) => {
       const matchesCategory = g.category === selectedCategory;
-      const matchesSearch = !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [activeGarments, selectedCategory, searchQuery]);
@@ -167,7 +168,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
           <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-sm">
             <Shirt size={40} strokeWidth={1} className="mb-2 opacity-50" />
             <p className="font-medium text-slate-600">
-              {searchQuery ? `No garments matching "${searchQuery}"` : 'No garments found in this category.'}
+              {searchQuery
+                ? `No garments matching "${searchQuery}"`
+                : 'No garments found in this category.'}
             </p>
           </div>
         )}
