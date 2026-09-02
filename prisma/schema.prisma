@@ -27,6 +27,7 @@ model Store {
   garmentCatalogs GarmentCatalog[]
   serviceTypes ServiceType[]
   serviceGarmentPrices ServiceGarmentPrice[]
+  notifications        Notification[]
 
   @@map("stores")
 }
@@ -382,5 +383,54 @@ enum DeliveryStatus {
   ASSIGNED
   IN_TRANSIT
   COMPLETED
+  FAILED
+}
+
+// ─── NOTIFICATION ───────────────────────────────────────────────────
+
+model Notification {
+  id             String                @id @default(cuid())
+  storeId        String                @map("store_id")
+  orderId        String?               @map("order_id")
+  customerId     String?               @map("customer_id")
+  eventType      NotificationEventType @map("event_type")
+  channel        NotificationChannel
+  status         NotificationStatus    @default(CREATED)
+  recipient      String
+  payload        Json?
+  sentAt         DateTime?             @map("sent_at")
+  failedAt       DateTime?             @map("failed_at")
+  failureReason  String?               @map("failure_reason")
+  retryCount     Int                   @default(0) @map("retry_count")
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([orderId])
+  @@index([eventType])
+  @@index([status])
+  @@map("notifications")
+}
+
+enum NotificationEventType {
+  ORDER_CREATED
+  ORDER_READY
+  ORDER_OUT_FOR_DELIVERY
+  ORDER_DELIVERED
+  PAYMENT_RECEIVED
+}
+
+enum NotificationChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  CREATED
+  QUEUED
+  SENT
   FAILED
 }

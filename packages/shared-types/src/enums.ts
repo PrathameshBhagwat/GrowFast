@@ -145,3 +145,27 @@ export enum RegistrationSource {
   REFERRAL = 'REFERRAL',
   APP = 'APP',
 }
+
+// ─── Notification ───────────────────────────────────────────────────
+
+export enum NotificationEventType {
+  ORDER_CREATED = 'ORDER_CREATED',
+  ORDER_READY = 'ORDER_READY',
+  ORDER_OUT_FOR_DELIVERY = 'ORDER_OUT_FOR_DELIVERY',
+  ORDER_DELIVERED = 'ORDER_DELIVERED',
+  PAYMENT_RECEIVED = 'PAYMENT_RECEIVED',
+}
+
+export enum NotificationChannel {
+  SMS = 'SMS',
+  WHATSAPP = 'WHATSAPP',
+  EMAIL = 'EMAIL',
+  IN_APP = 'IN_APP',
+}
+
+export enum NotificationStatus {
+  CREATED = 'CREATED',
+  QUEUED = 'QUEUED',
+  SENT = 'SENT',
+  FAILED = 'FAILED',
+}

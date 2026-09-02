@@ -11,6 +11,7 @@ import { OrderModule } from './order/order.module';
 import { StoreModule } from './store/store.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     StoreModule,
     DeliveryModule,
     DashboardModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}
