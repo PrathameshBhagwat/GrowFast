@@ -216,6 +216,36 @@ describe('OrderService', () => {
       await expect(service.createOrder(validDto, 'emp1', 'store1')).rejects.toThrow(
         NotFoundException,
       );
+      expect(mockNotificationService.createNotificationEvent).not.toHaveBeenCalled();
+    });
+
+    it('should emit ORDER_CREATED notification after successful order creation', async () => {
+      mockPrismaService.order.create.mockResolvedValue(mockCreatedOrder);
+      await service.createOrder(validDto, 'emp1', 'store1');
+
+      expect(mockNotificationService.createNotificationEvent).toHaveBeenCalledWith(
+        'store1',
+        'ORDER_CREATED',
+        'SMS',
+        mockCreatedOrder.customer.phone,
+        mockCreatedOrder.id,
+        mockCreatedOrder.customerId,
+        {
+          orderNumber: mockCreatedOrder.orderNumber,
+          totalAmount: mockCreatedOrder.totalAmount,
+        },
+      );
+    });
+
+    it('should not rollback transaction if ORDER_CREATED notification fails', async () => {
+      mockPrismaService.order.create.mockResolvedValue(mockCreatedOrder);
+      mockNotificationService.createNotificationEvent.mockRejectedValueOnce(
+        new Error('Provider fail'),
+      );
+
+      const result = await service.createOrder(validDto, 'emp1', 'store1');
+      expect(result).toBeDefined(); // Still succeeds
+      expect(mockNotificationService.createNotificationEvent).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if garment not found', async () => {
@@ -255,6 +285,8 @@ describe('OrderService', () => {
     const mockOrder = {
       id: 'o1',
       storeId: 'store1',
+      customerId: 'cust1',
+      orderNumber: 'ORD-001',
       items: [
         {
           id: 'item1',
@@ -299,7 +331,9 @@ describe('OrderService', () => {
 
     it('should update an order item successfully', async () => {
       // FindOrderById is called at the end, so we mock it by reusing mockOrder
-      jest.spyOn(service, 'findOrderById').mockResolvedValue({ ...mockOrder, customerPhone: '123' } as any);
+      jest
+        .spyOn(service, 'findOrderById')
+        .mockResolvedValue({ ...mockOrder, customerPhone: '123' } as any);
 
       const result = await service.updateOrderItem(
         'o1',
@@ -318,6 +352,60 @@ describe('OrderService', () => {
           data: expect.objectContaining({ status: expect.any(String) }),
         }),
       );
+    });
+
+    it('should emit ORDER_READY notification exactly once when transitioning to READY', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        status: OrderStatus.PROCESSING,
+      });
+
+      jest.spyOn(service, 'findOrderById').mockResolvedValue({
+        ...mockOrder,
+        id: 'o1',
+        status: OrderStatus.READY,
+        customerPhone: '1234567890',
+      } as any);
+
+      await service.updateOrderItem(
+        'o1',
+        'item1',
+        { quantity: 2, itemStatus: ItemStatus.READY },
+        'store1',
+      );
+
+      expect(mockNotificationService.createNotificationEvent).toHaveBeenCalledWith(
+        'store1',
+        'ORDER_READY',
+        'SMS',
+        '1234567890',
+        'o1',
+        mockOrder.customerId,
+        expect.any(Object),
+      );
+    });
+
+    it('should NOT emit ORDER_READY if order was already READY', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        status: OrderStatus.READY,
+      });
+
+      jest.spyOn(service, 'findOrderById').mockResolvedValue({
+        ...mockOrder,
+        id: 'o1',
+        status: OrderStatus.READY,
+        customerPhone: '1234567890',
+      } as any);
+
+      await service.updateOrderItem(
+        'o1',
+        'item1',
+        { quantity: 2, itemStatus: ItemStatus.READY },
+        'store1',
+      );
+
+      expect(mockNotificationService.createNotificationEvent).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if order not found', async () => {
@@ -362,7 +450,9 @@ describe('OrderService', () => {
         ],
       };
       mockPrismaService.order.findUnique.mockResolvedValue(expressOrder);
-      jest.spyOn(service, 'findOrderById').mockResolvedValue({ ...expressOrder, customerPhone: '123' } as any);
+      jest
+        .spyOn(service, 'findOrderById')
+        .mockResolvedValue({ ...expressOrder, customerPhone: '123' } as any);
 
       await service.updateOrderItem('o1', 'item1', { quantity: 3 }, 'store1');
 
@@ -408,7 +498,9 @@ describe('OrderService', () => {
         ],
       };
       mockPrismaService.order.findUnique.mockResolvedValue(packedOrder);
-      jest.spyOn(service, 'findOrderById').mockResolvedValue({ ...packedOrder, customerPhone: '123' } as any);
+      jest
+        .spyOn(service, 'findOrderById')
+        .mockResolvedValue({ ...packedOrder, customerPhone: '123' } as any);
 
       await service.updateOrderItem('o1', 'item1', { quantity: 3 }, 'store1');
 
@@ -437,7 +529,9 @@ describe('OrderService', () => {
         ],
       };
       mockPrismaService.order.findUnique.mockResolvedValue(deliveredOrder);
-      jest.spyOn(service, 'findOrderById').mockResolvedValue({ ...deliveredOrder, customerPhone: '123' } as any);
+      jest
+        .spyOn(service, 'findOrderById')
+        .mockResolvedValue({ ...deliveredOrder, customerPhone: '123' } as any);
 
       await service.updateOrderItem('o1', 'item1', { quantity: 2 }, 'store1');
 

@@ -103,7 +103,10 @@ describe('DeliveryService', () => {
       providers: [
         DeliveryService,
         { provide: PrismaService, useValue: prisma },
-        { provide: NotificationService, useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) } },
+        {
+          provide: NotificationService,
+          useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) },
+        },
       ],
     }).compile();
 
@@ -291,6 +294,84 @@ describe('DeliveryService', () => {
       expect(result).toBeDefined();
     });
 
+    it('should emit ORDER_OUT_FOR_DELIVERY notification on transition to IN_TRANSIT', async () => {
+      mockTx.deliveryRecord.findUnique.mockResolvedValue({
+        ...mockDelivery,
+        status: DeliveryStatus.ASSIGNED,
+      });
+      mockTx.deliveryRecord.update.mockResolvedValue({
+        ...mockDelivery,
+        status: DeliveryStatus.IN_TRANSIT,
+        riderId: DRIVER_ID,
+      });
+      mockTx.order.update.mockResolvedValue({});
+
+      const mockOrderWithCustomer = {
+        ...mockOrder,
+        customer: { id: 'cust1', phone: '1234567890' },
+      };
+
+      prisma.order.findUnique.mockResolvedValue(mockOrderWithCustomer as any);
+      prisma.employee = { findUnique: jest.fn().mockResolvedValue(mockDriver as any) };
+
+      await service.updateDeliveryStatus(
+        DELIVERY_ID,
+        DeliveryStatus.IN_TRANSIT,
+        undefined,
+        STORE_ID,
+        DRIVER_ID,
+        Role.DELIVERY,
+      );
+
+      expect((service as any).notificationService.createNotificationEvent).toHaveBeenCalledWith(
+        STORE_ID,
+        'ORDER_OUT_FOR_DELIVERY',
+        'SMS',
+        '1234567890',
+        ORDER_ID,
+        'cust1',
+        expect.objectContaining({
+          orderNumber: mockOrder.orderNumber,
+          riderName: mockDriver.name,
+        }),
+      );
+    });
+
+    it('should not rollback if ORDER_OUT_FOR_DELIVERY notification fails', async () => {
+      mockTx.deliveryRecord.findUnique.mockResolvedValue({
+        ...mockDelivery,
+        status: DeliveryStatus.ASSIGNED,
+      });
+      mockTx.deliveryRecord.update.mockResolvedValue({
+        ...mockDelivery,
+        status: DeliveryStatus.IN_TRANSIT,
+        riderId: DRIVER_ID,
+      });
+      mockTx.order.update.mockResolvedValue({});
+
+      const mockOrderWithCustomer = {
+        ...mockOrder,
+        customer: { id: 'cust1', phone: '1234567890' },
+      };
+
+      prisma.order.findUnique.mockResolvedValue(mockOrderWithCustomer as any);
+      prisma.employee = { findUnique: jest.fn().mockResolvedValue(mockDriver as any) };
+
+      (service as any).notificationService.createNotificationEvent.mockRejectedValueOnce(
+        new Error('Provider fail'),
+      );
+
+      const result = await service.updateDeliveryStatus(
+        DELIVERY_ID,
+        DeliveryStatus.IN_TRANSIT,
+        undefined,
+        STORE_ID,
+        DRIVER_ID,
+        Role.DELIVERY,
+      );
+      expect(result).toBeDefined();
+    });
+
     it('should reject invalid transition SCHEDULED → IN_TRANSIT', async () => {
       mockTx.deliveryRecord.findUnique.mockResolvedValue({
         ...mockDelivery,
@@ -437,6 +518,104 @@ describe('DeliveryService', () => {
       expect(deriveOrderStatus).toHaveBeenCalled();
     });
 
+    it('should emit ORDER_DELIVERED notification after successful delivery completion', async () => {
+      mockTx.deliveryRecord.findUnique
+        .mockResolvedValueOnce({
+          ...mockDelivery,
+          status: DeliveryStatus.IN_TRANSIT,
+        })
+        .mockResolvedValueOnce({
+          ...mockDelivery,
+          status: DeliveryStatus.COMPLETED,
+        });
+      mockTx.deliveryRecord.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.orderItem.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        items: mockOrder.items.map((i) => ({
+          ...i,
+          itemStatus: ItemStatus.DELIVERED,
+          deliveredQuantity: i.quantity,
+        })),
+        customer: { id: 'cust1', phone: '1234567890' },
+      });
+      mockTx.deliveryRecord.count.mockResolvedValue(0);
+      mockTx.order.update.mockResolvedValue({});
+
+      prisma.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        customer: { id: 'cust1', phone: '1234567890' },
+      } as any);
+
+      await service.completeDelivery(
+        DELIVERY_ID,
+        'proof-url',
+        'Delivered OK',
+        undefined,
+        STORE_ID,
+        DRIVER_ID,
+        Role.DELIVERY,
+      );
+
+      expect((service as any).notificationService.createNotificationEvent).toHaveBeenCalledWith(
+        STORE_ID,
+        'ORDER_DELIVERED',
+        'SMS',
+        '1234567890',
+        ORDER_ID,
+        'cust1',
+        expect.objectContaining({
+          orderNumber: mockOrder.orderNumber,
+        }),
+      );
+    });
+
+    it('should not rollback if ORDER_DELIVERED notification fails', async () => {
+      mockTx.deliveryRecord.findUnique
+        .mockResolvedValueOnce({
+          ...mockDelivery,
+          status: DeliveryStatus.IN_TRANSIT,
+        })
+        .mockResolvedValueOnce({
+          ...mockDelivery,
+          status: DeliveryStatus.COMPLETED,
+        });
+      mockTx.deliveryRecord.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.orderItem.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        items: mockOrder.items.map((i) => ({
+          ...i,
+          itemStatus: ItemStatus.DELIVERED,
+          deliveredQuantity: i.quantity,
+        })),
+        customer: { id: 'cust1', phone: '1234567890' },
+      });
+      mockTx.deliveryRecord.count.mockResolvedValue(0);
+      mockTx.order.update.mockResolvedValue({});
+
+      prisma.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        customer: { id: 'cust1', phone: '1234567890' },
+      } as any);
+
+      (service as any).notificationService.createNotificationEvent.mockRejectedValueOnce(
+        new Error('Provider fail'),
+      );
+
+      const result = await service.completeDelivery(
+        DELIVERY_ID,
+        'proof-url',
+        'Delivered OK',
+        undefined,
+        STORE_ID,
+        DRIVER_ID,
+        Role.DELIVERY,
+      );
+
+      expect(result).toBeDefined();
+    });
+
     it('should process partial delivery quantities correctly', async () => {
       mockTx.deliveryRecord.findUnique
         .mockResolvedValueOnce({
@@ -491,6 +670,8 @@ describe('DeliveryService', () => {
           Role.DELIVERY,
         ),
       ).rejects.toThrow(BadRequestException);
+
+      expect((service as any).notificationService.createNotificationEvent).not.toHaveBeenCalled();
     });
 
     it('should reject completing a non-IN_TRANSIT delivery', async () => {
