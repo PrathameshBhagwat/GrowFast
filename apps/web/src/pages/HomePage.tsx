@@ -356,7 +356,9 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {(employee.role === 'OWNER' || employee.role === 'MANAGER' || employee.role === 'COUNTER') && (
+            {(employee.role === 'OWNER' ||
+              employee.role === 'MANAGER' ||
+              employee.role === 'COUNTER') && (
               <Button
                 id="home-dashboard"
                 variant="outline"
