@@ -48,15 +48,35 @@ export class LogNotificationProvider implements NotificationProvider {
   readonly name = 'LogNotificationProvider';
 
   async dispatch(payload: NotificationDispatchPayload): Promise<NotificationDispatchResult> {
-    console.log(
-      `[${this.name}] Notification event recorded (not dispatched):`,
-      JSON.stringify({
-        id: payload.id,
-        channel: payload.channel,
-        eventType: payload.eventType,
-        recipient: payload.recipient,
-      }),
-    );
+    if (payload.eventType === 'ORDER_READY' && payload.payload) {
+      const p = payload.payload as any;
+      console.log(`\n================= CUSTOMER SMS =================`);
+      console.log(`Your GrowFast order ${p.orderNumber} has items ready for collection.`);
+      
+      if (p.readyItems && p.readyItems.length > 0) {
+        console.log(`\nReady:`);
+        p.readyItems.forEach((i: any) => console.log(`• ${i.garmentName} ×${i.quantity}`));
+      }
+      if (p.remainingItems && p.remainingItems.length > 0) {
+        console.log(`\nStill processing:`);
+        p.remainingItems.forEach((i: any) => console.log(`• ${i.garmentName} ×${i.quantity}`));
+      }
+      
+      console.log(`\nOrder total: ₹${p.totalAmount}`);
+      console.log(`Paid: ₹${p.amountPaid}`);
+      console.log(`Balance due: ₹${p.amountDue}`);
+      console.log(`================================================\n`);
+    } else {
+      console.log(
+        `[${this.name}] Notification event recorded (not dispatched):`,
+        JSON.stringify({
+          id: payload.id,
+          channel: payload.channel,
+          eventType: payload.eventType,
+          recipient: payload.recipient,
+        }),
+      );
+    }
 
     return {
       success: false,

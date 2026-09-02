@@ -8,6 +8,7 @@ import {
   OrderPriority,
   PaymentStatus,
   calculateOrderTotals,
+  calculateFulfillmentBreakdown,
   PricingItemInput,
   deriveOrderStatus,
   ItemStatus,
@@ -279,7 +280,7 @@ export class OrderService {
   }
 
   async updateOrderItem(orderId: string, itemId: string, dto: UpdateOrderItemDto, storeId: string) {
-    const { oldStatus, updatedOrder } = await this.prisma.$transaction(async (tx) => {
+    const { oldOrderStatus, oldItemStatus, updatedOrder } = await this.prisma.$transaction(async (tx) => {
       // 1. Validate order exists and belongs to store
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -370,7 +371,14 @@ export class OrderService {
       // 7. Recalculate Order Totals
       const updatedOrder = await tx.order.findUnique({
         where: { id: orderId },
-        include: { items: true },
+        include: { 
+          items: {
+            include: {
+              garmentCatalog: true,
+              serviceType: true
+            }
+          } 
+        },
       });
 
       const pricingInputs = updatedOrder!.items.map((i) => ({
@@ -406,17 +414,31 @@ export class OrderService {
 
       // 8. Return updated order detail
       return {
-        oldStatus: order.status,
+        oldOrderStatus: order.status,
+        oldItemStatus: orderItem.itemStatus,
         updatedOrder: await this.findOrderById(orderId),
       };
     });
 
     // C6: Trigger ORDER_READY notification outside transaction
     if (
-      oldStatus !== OrderStatus.READY &&
-      updatedOrder.status === OrderStatus.READY &&
+      dto.itemStatus === ItemStatus.READY &&
+      oldItemStatus !== ItemStatus.READY &&
       updatedOrder.customerPhone
     ) {
+      // Find all ready items to include in the payload
+      const readyItems = updatedOrder.items.filter((i: any) => i.itemStatus === ItemStatus.READY);
+      const remainingItems = updatedOrder.items.filter(
+        (i: any) => i.itemStatus !== ItemStatus.READY && i.itemStatus !== ItemStatus.DELIVERED && i.itemStatus !== ItemStatus.CANCELLED,
+      );
+
+      // We can also calculate current value of ready items
+      const breakdown = calculateFulfillmentBreakdown(
+        updatedOrder.totalAmount,
+        updatedOrder.amountPaid,
+        updatedOrder.items as any,
+      );
+
       this.notificationService
         .createNotificationEvent(
           storeId,
@@ -425,7 +447,26 @@ export class OrderService {
           updatedOrder.customerPhone,
           updatedOrder.id,
           updatedOrder.customerId,
-          { orderNumber: updatedOrder.orderNumber },
+          { 
+            orderNumber: updatedOrder.orderNumber,
+            totalAmount: updatedOrder.totalAmount,
+            amountPaid: updatedOrder.amountPaid,
+            amountDue: updatedOrder.amountDue,
+            readyAmount: breakdown.readyAmount,
+            remainingAmount: breakdown.remainingAmount,
+            readyItems: readyItems.map((i: any) => ({
+              id: i.id,
+              garmentName: i.garmentName,
+              serviceType: i.serviceType,
+              quantity: i.quantity
+            })),
+            remainingItems: remainingItems.map((i: any) => ({
+              id: i.id,
+              garmentName: i.garmentName,
+              serviceType: i.serviceType,
+              quantity: i.quantity
+            }))
+          },
         )
         .catch(() => {});
     }
@@ -486,6 +527,7 @@ export class OrderService {
       paymentStatus: order.paymentStatus,
       pickupType: order.pickupType,
       itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
+      ...calculateFulfillmentBreakdown(order.totalAmount, order.amountPaid, order.items),
     };
   }
 

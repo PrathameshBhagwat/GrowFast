@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NumericKeypadInput, Card } from '@growfast/ui';
@@ -18,18 +18,52 @@ export const LoginPage: React.FC = () => {
   const [pin, setPin] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [shake, setShake] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // Lockout timer effect
+  useEffect(() => {
+    if (!lockoutUntil) return;
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockoutUntil(null);
+        setFailedAttempts(0);
+        setTimeLeft(0);
+        clearInterval(interval);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutUntil]);
+
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 400);
+  };
 
   const handleLogin = async (overrideEmpId?: string, overridePin?: string) => {
     const empId = overrideEmpId || selectedEmployee.id;
     const pinToUse = overridePin || pin;
-    if (pinToUse.length !== 6) return;
+    if (pinToUse.length !== 6 || lockoutUntil) return;
 
     setIsLoggingIn(true);
     try {
       await login(empId, pinToUse);
+      // Reset attempts on success
+      setFailedAttempts(0);
       navigate('/', { replace: true });
     } catch {
       setPin('');
+      triggerShake();
+      const attempts = failedAttempts + 1;
+      setFailedAttempts(attempts);
+      if (attempts >= 5) {
+        setLockoutUntil(Date.now() + 60000); // 60 seconds lockout
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -53,8 +87,9 @@ export const LoginPage: React.FC = () => {
         fontFamily: "'Inter', sans-serif",
       }}
     >
-      <Card padding="lg" elevated style={{ maxWidth: '420px', width: '100%' }}>
-        {/* Logo & Title */}
+      <div style={{ animation: shake ? 'shake 0.4s ease-in-out' : 'none' }}>
+        <Card padding="lg" elevated style={{ maxWidth: '420px', width: '100%' }}>
+          {/* Logo & Title */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div
             style={{
@@ -192,7 +227,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Error message */}
-        {error && (
+        {error && !lockoutUntil && (
           <div
             style={{
               padding: '10px 14px',
@@ -206,12 +241,30 @@ export const LoginPage: React.FC = () => {
               textAlign: 'center',
             }}
           >
-            {error}
+            {error} (Attempt {failedAttempts}/5)
+          </div>
+        )}
+
+        {lockoutUntil && (
+          <div
+            style={{
+              padding: '10px 14px',
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '8px',
+              color: '#991B1B',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              marginBottom: '16px',
+              textAlign: 'center',
+            }}
+          >
+            Too many failed attempts. Try again in {timeLeft}s.
           </div>
         )}
 
         {/* PIN Keypad */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', opacity: lockoutUntil ? 0.5 : 1, pointerEvents: lockoutUntil ? 'none' : 'auto' }}>
           <NumericKeypadInput
             value={pin}
             onChange={setPin}
@@ -293,6 +346,7 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
       </Card>
+      </div>
     </div>
   );
 };

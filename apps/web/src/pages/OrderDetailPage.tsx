@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { OrderDetailDTO, OrderItemDTO, Role } from '@growfast/shared-types';
 import { OrderItemEditModal } from '../components/OrderItemEditModal';
 import { DueDateEditModal } from '../components/DueDateEditModal';
+import { PaymentModal } from '../components/PaymentModal';
 import { ArrowLeft, Edit2, Calendar } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -20,6 +21,7 @@ export function OrderDetailPage() {
 
   const [editItem, setEditItem] = useState<OrderItemDTO | null>(null);
   const [editDueDate, setEditDueDate] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const fetchOrder = async () => {
     setLoading(true);
@@ -152,6 +154,48 @@ export function OrderDetailPage() {
               <span className="font-semibold text-gray-900">Amount Due</span>
               <span className="font-bold text-red-600">₹{order.amountDue}</span>
             </div>
+            {order.payableAmount > 0 && (
+              <div className="flex justify-between pt-2 border-t mt-2">
+                <span className="font-bold text-gray-900">Amount Payable Now</span>
+                <span className="font-bold text-blue-600 text-lg">₹{order.payableAmount}</span>
+              </div>
+            )}
+            {order.payableAmount === 0 && order.amountDue > 0 && (
+              <div className="flex justify-between pt-2 border-t mt-2">
+                <span className="font-medium text-gray-500">Amount Payable Now</span>
+                <span className="font-medium text-gray-400">₹0</span>
+              </div>
+            )}
+            
+            {order.amountDue > 0 && (
+              <div className="pt-4">
+                <Button 
+                  variant="primary" 
+                  className="w-full"
+                  onClick={() => setShowPaymentModal(true)}
+                >
+                  Record Payment
+                </Button>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-semibold mb-4">Fulfillment Summary</h2>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Ready Items Value</span>
+              <span className="font-medium text-green-600">₹{order.readyAmount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Processing Items Value</span>
+              <span className="font-medium text-orange-500">₹{order.remainingAmount}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span className="text-gray-500">Collected Items Value</span>
+              <span className="font-medium text-gray-900">₹{order.collectedAmount}</span>
+            </div>
           </div>
         </Card>
       </div>
@@ -171,13 +215,19 @@ export function OrderDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {order.items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-gray-900">{item.garmentName}</div>
+              {order.items.map((item) => {
+                const isReady = item.itemStatus === 'READY';
+                const isDelivered = item.itemStatus === 'DELIVERED';
+                
+                return (
+                  <tr
+                    key={item.id}
+                    className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors ${
+                      isReady ? 'bg-green-50/30' : isDelivered ? 'opacity-50 grayscale' : ''
+                    }`}
+                  >
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-gray-900">{item.garmentName}</div>
                     {item.colorTags && item.colorTags.length > 0 && (
                       <div className="text-xs text-gray-500 mt-1">
                         Tags: {item.colorTags.join(', ')}
@@ -215,7 +265,8 @@ export function OrderDetailPage() {
                     </Button>
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         </div>
@@ -237,6 +288,15 @@ export function OrderDetailPage() {
           onClose={() => setEditDueDate(false)}
           orderId={order.id}
           currentDueDate={order.effectiveDueDate}
+          onSuccess={fetchOrder}
+        />
+      )}
+
+      {showPaymentModal && (
+        <PaymentModal
+          open={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          order={order}
           onSuccess={fetchOrder}
         />
       )}

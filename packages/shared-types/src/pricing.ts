@@ -4,6 +4,8 @@
  * Centralizes the calculation logic for order financial fields.
  */
 
+import { ItemStatus } from './enums';
+
 export interface PricingItemInput {
   quantity: number;
   unitPrice: number;
@@ -68,4 +70,58 @@ export function calculateOrderTotals(
     taxAmount: Math.round(taxAmount * 100) / 100,
     totalAmount: Math.round(totalAmount * 100) / 100,
   };
+}
+
+export interface FulfillmentBreakdown {
+  readyAmount: number;
+  remainingAmount: number;
+  collectedAmount: number;
+  cancelledAmount: number;
+  payableAmount: number;
+}
+
+export function calculateFulfillmentBreakdown(
+  totalAmount: number,
+  amountPaid: number,
+  items: { lineTotal: number; itemStatus: ItemStatus }[],
+): FulfillmentBreakdown {
+  const totalLine = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  
+  if (totalLine === 0) {
+    return {
+      readyAmount: 0,
+      remainingAmount: 0,
+      collectedAmount: 0,
+      cancelledAmount: 0,
+      payableAmount: 0,
+    };
+  }
+
+  let readyLine = 0;
+  let remainingLine = 0;
+  let collectedLine = 0;
+  let cancelledLine = 0;
+
+  for (const item of items) {
+    if (item.itemStatus === ItemStatus.READY) readyLine += item.lineTotal;
+    else if (item.itemStatus === ItemStatus.DELIVERED) collectedLine += item.lineTotal;
+    else if (item.itemStatus === ItemStatus.CANCELLED) cancelledLine += item.lineTotal;
+    else remainingLine += item.lineTotal;
+  }
+
+  const readyAmount = Math.round((readyLine / totalLine) * totalAmount * 100) / 100;
+  const collectedAmount = Math.round((collectedLine / totalLine) * totalAmount * 100) / 100;
+  const cancelledAmount = Math.round((cancelledLine / totalLine) * totalAmount * 100) / 100;
+  const remainingAmount = Math.round((remainingLine / totalLine) * totalAmount * 100) / 100;
+
+  // Payable right now = what they are picking up + what they already picked up - what they paid
+  let payableAmount = readyAmount + collectedAmount - amountPaid;
+  if (payableAmount < 0) {
+    payableAmount = 0;
+  }
+  
+  // Clean up floating point just in case
+  payableAmount = Math.round(payableAmount * 100) / 100;
+
+  return { readyAmount, remainingAmount, collectedAmount, cancelledAmount, payableAmount };
 }
