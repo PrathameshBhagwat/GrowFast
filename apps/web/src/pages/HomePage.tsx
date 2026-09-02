@@ -356,6 +356,30 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {(employee.role === 'OWNER' ||
+              employee.role === 'MANAGER' ||
+              employee.role === 'COUNTER') && (
+              <Button
+                id="home-dashboard"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/dashboard')}
+                icon={<Package size={16} />}
+                aria-label="Dashboard"
+              >
+                Dashboard
+              </Button>
+            )}
+            <Button
+              id="home-deliveries"
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/deliveries')}
+              icon={<Truck size={16} />}
+              aria-label="Deliveries"
+            >
+              Deliveries
+            </Button>
             {(employee.role === 'OWNER' || employee.role === 'MANAGER') && (
               <Button
                 id="home-staff-management"

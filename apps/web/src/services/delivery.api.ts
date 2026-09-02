@@ -9,7 +9,7 @@ import type {
 const API_BASE = '/api/deliveries';
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('growfast_token');
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
