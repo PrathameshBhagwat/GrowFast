@@ -637,12 +637,14 @@ export const CatalogSettingsPage: React.FC = () => {
                           className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                             activeCategory === cat
                               ? 'bg-primary-600 text-white border-primary-600'
+                              : isVisuallyDisabled
+                              ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                           }`}
                         >
                           {CATEGORY_LABELS[cat] || cat}
                         </button>
-                      ))}
+                      );})}
                     </div>
                   </div>
                 </div>
@@ -797,12 +799,14 @@ export const CatalogSettingsPage: React.FC = () => {
                           className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                             pricingCategory === cat
                               ? 'bg-primary-600 text-white border-primary-600'
+                              : isVisuallyDisabled
+                              ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                           }`}
                         >
                           {CATEGORY_LABELS[cat] || cat}
                         </button>
-                      ))}
+                      );})}
                       
                     </div>
                   </div>
