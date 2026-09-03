@@ -53,6 +53,26 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
     }
   }, [activeServices, selectedServiceId]);
 
+  // Determine if a shoe service is currently selected
+  const isShoeServiceSelected = activeServices
+    .find((s) => s.id === selectedServiceId)
+    ?.name.toLowerCase()
+    .includes('shoe');
+
+  // Determine if the shoe category is currently selected
+  const isShoeCategorySelected = selectedCategory === GarmentCategory.SHOES;
+
+  // Enforce valid combinations if state becomes mismatched
+  React.useEffect(() => {
+    if (isShoeCategorySelected && !isShoeServiceSelected) {
+      const shoeService = activeServices.find((s) => s.name.toLowerCase().includes('shoe'));
+      if (shoeService) setSelectedServiceId(shoeService.id);
+    } else if (!isShoeCategorySelected && isShoeServiceSelected) {
+      const nonShoeService = activeServices.find((s) => !s.name.toLowerCase().includes('shoe'));
+      if (nonShoeService) setSelectedServiceId(nonShoeService.id);
+    }
+  }, [isShoeCategorySelected, isShoeServiceSelected, activeServices]);
+
   const filteredGarments = useMemo(() => {
     return activeGarments.filter((g) => {
       const matchesCategory = g.category === selectedCategory;
@@ -75,24 +95,31 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   return (
     <div className="flex flex-col h-full bg-white min-h-0 select-none">
       {/* BAR 1: Service Selector Bar */}
-      <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-3 shadow-xs">
+      <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
         <div className="flex flex-col xl:flex-row xl:items-center gap-4">
           <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
           <div className="flex-1 flex flex-wrap gap-4 w-full">
-            {activeServices.map((service) => (
-              <button
-                key={service.id}
-                type="button"
-                onClick={() => setSelectedServiceId(service.id)}
-                className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
-                  selectedServiceId === service.id
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                }`}
-              >
-                {service.name}
-              </button>
-            ))}
+            {activeServices.map((service) => {
+              const isShoeService = service.name.toLowerCase().includes('shoe');
+              const isVisuallyDisabled = isShoeCategorySelected ? !isShoeService : isShoeService;
+
+              return (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => setSelectedServiceId(service.id)}
+                  className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                    selectedServiceId === service.id
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : isVisuallyDisabled
+                      ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {service.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -102,20 +129,27 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
         <div className="flex flex-col xl:flex-row xl:items-center gap-4">
           <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
           <div className="flex-1 flex flex-wrap gap-4 w-full">
-            {CATEGORIES.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setSelectedCategory(category)}
-                className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
-                  selectedCategory === category
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                }`}
-              >
-                {CATEGORY_LABELS[category] || category}
-              </button>
-            ))}
+            {CATEGORIES.map((category) => {
+              const isShoeCat = category === GarmentCategory.SHOES;
+              const isVisuallyDisabled = isShoeServiceSelected ? !isShoeCat : isShoeCat;
+
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setSelectedCategory(category)}
+                  className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                    selectedCategory === category
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : isVisuallyDisabled
+                      ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {CATEGORY_LABELS[category] || category}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

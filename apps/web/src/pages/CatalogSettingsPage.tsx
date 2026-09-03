@@ -174,6 +174,39 @@ export const CatalogSettingsPage: React.FC = () => {
     });
   }, [garments, activeCategory, searchQuery]);
 
+  // --- Shoe Category & Service Enforcements ---
+  const isActiveShoeService = services.find(s => s.id === activeServiceId)?.name.toLowerCase().includes('shoe');
+  const isActiveShoeCategory = activeCategory === GarmentCategory.SHOES;
+  
+  useEffect(() => {
+    if (isActiveShoeCategory && !isActiveShoeService) {
+      const shoeSvc = services.find(s => s.name.toLowerCase().includes('shoe'));
+      if (shoeSvc) setActiveServiceId(shoeSvc.id);
+    } else if (!isActiveShoeCategory && isActiveShoeService) {
+      const nonShoeSvc = services.find(s => !s.name.toLowerCase().includes('shoe'));
+      if (nonShoeSvc) setActiveServiceId(nonShoeSvc.id);
+    }
+  }, [isActiveShoeCategory, isActiveShoeService, services]);
+
+  const isPricingShoeService = services.find(s => s.id === pricingServiceId)?.name.toLowerCase().includes('shoe');
+  const isPricingShoeCategory = pricingCategory === GarmentCategory.SHOES;
+
+  useEffect(() => {
+    if (isPricingShoeCategory && !isPricingShoeService) {
+      const shoeSvc = services.find(s => s.name.toLowerCase().includes('shoe'));
+      if (shoeSvc) {
+        setPricingServiceId(shoeSvc.id);
+        setEditedPrices({});
+      }
+    } else if (!isPricingShoeCategory && isPricingShoeService) {
+      const nonShoeSvc = services.find(s => !s.name.toLowerCase().includes('shoe'));
+      if (nonShoeSvc) {
+        setPricingServiceId(nonShoeSvc.id);
+        setEditedPrices({});
+      }
+    }
+  }, [isPricingShoeCategory, isPricingShoeService, services]);
+
   // Filtered garments for Pricing Tab
   const pricingFilteredGarments = useMemo(() => {
     return garments.filter((g) => {
@@ -448,6 +481,44 @@ export const CatalogSettingsPage: React.FC = () => {
     }
   };
 
+  const handleAutoFillAllMissingPrices = async () => {
+    setSavingPrices(true);
+    setPriceSaveError(null);
+    setPriceSaveSuccess(null);
+    try {
+      let count = 0;
+      for (const service of services) {
+        for (const garment of garments) {
+          const hasPrice = pricingData.some(p => p.garmentCatalogId === garment.id && p.serviceTypeId === service.id);
+          if (!hasPrice) {
+            const randomPrice = Math.floor(Math.random() * 10 + 1) * 100; // 100 to 1000
+            const res = await fetch(`${API_URL}/pricing/${garment.id}/${service.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ price: randomPrice }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(body.message || `Failed on garment ${garment.id} and service ${service.id}`);
+            }
+            count++;
+          }
+        }
+      }
+      setPriceSaveSuccess(`Auto-filled ${count} missing prices across all combinations!`);
+      await fetchAllData();
+      setTimeout(() => setPriceSaveSuccess(null), 3000);
+    } catch (err) {
+      setPriceSaveError(err instanceof Error ? err.message : 'Auto-fill failed');
+    } finally {
+      setSavingPrices(false);
+    }
+  };
+
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-100 font-sans">
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
@@ -523,11 +594,14 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'garments' && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* BAR 1: Service Selector Bar */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-3 shadow-xs">
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {services.map((service) => (
+                      {services.map((service) => {
+                        const isShoeSvc = service.name.toLowerCase().includes('shoe');
+                        const isVisuallyDisabled = isActiveShoeCategory ? !isShoeSvc : isShoeSvc;
+                        return (
                         <button
                           key={service.id}
                           type="button"
@@ -535,12 +609,14 @@ export const CatalogSettingsPage: React.FC = () => {
                           className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                             activeServiceId === service.id
                               ? 'bg-primary-600 text-white border-primary-600'
+                              : isVisuallyDisabled
+                              ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                           }`}
                         >
                           {service.name}
                         </button>
-                      ))}
+                      );})}
                     </div>
                   </div>
                 </div>
@@ -550,7 +626,10 @@ export const CatalogSettingsPage: React.FC = () => {
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {CATEGORIES.map((cat) => (
+                      {CATEGORIES.map((cat) => {
+                        const isShoeCat = cat === GarmentCategory.SHOES;
+                        const isVisuallyDisabled = isActiveShoeService ? !isShoeCat : isShoeCat;
+                        return (
                         <button
                           key={cat}
                           type="button"
@@ -672,11 +751,14 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'pricing' && canManage && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* Selector Bar 1: Service */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-3 shadow-xs">
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {services.map((service) => (
+                      {services.map((service) => {
+                        const isShoeSvc = service.name.toLowerCase().includes('shoe');
+                        const isVisuallyDisabled = isPricingShoeCategory ? !isShoeSvc : isShoeSvc;
+                        return (
                         <button
                           key={service.id}
                           type="button"
@@ -687,12 +769,14 @@ export const CatalogSettingsPage: React.FC = () => {
                           className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                             pricingServiceId === service.id
                               ? 'bg-primary-600 text-white border-primary-600'
+                              : isVisuallyDisabled
+                              ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                           }`}
                         >
                           {service.name}
                         </button>
-                      ))}
+                      );})}
                     </div>
                   </div>
                 </div>
@@ -702,7 +786,10 @@ export const CatalogSettingsPage: React.FC = () => {
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {CATEGORIES.map((cat) => (
+                      {CATEGORIES.map((cat) => {
+                        const isShoeCat = cat === GarmentCategory.SHOES;
+                        const isVisuallyDisabled = isPricingShoeService ? !isShoeCat : isShoeCat;
+                        return (
                         <button
                           key={cat}
                           type="button"
@@ -716,6 +803,7 @@ export const CatalogSettingsPage: React.FC = () => {
                           {CATEGORY_LABELS[cat] || cat}
                         </button>
                       ))}
+                      
                     </div>
                   </div>
                 </div>
@@ -736,6 +824,14 @@ export const CatalogSettingsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleAutoFillAllMissingPrices}
+                      disabled={savingPrices}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Sparkles size={15} /> Auto-fill All Missing
+                    </button>
                     {Object.keys(editedPrices).length > 0 && (
                       <button
                         type="button"
