@@ -460,7 +460,9 @@ export function OrderWizardPage() {
                 </div>
               </div>
             </div>
-          
+          </div>
+        </div>
+
         <div className="flex justify-between p-4 border-t bg-white shrink-0">
           <Button variant="outline" onClick={() => navigate(-1)}>
             Cancel
