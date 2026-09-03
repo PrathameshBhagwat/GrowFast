@@ -451,7 +451,7 @@ export const CatalogSettingsPage: React.FC = () => {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-100 font-sans">
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-4 py-3 shrink-0 shadow-xs z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <header className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-xs z-10 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -461,10 +461,11 @@ export const CatalogSettingsPage: React.FC = () => {
           >
             <ArrowLeft size={20} />
           </button>
+          <h1 className="text-lg font-bold text-slate-900">Garment Catalog</h1>
         </div>
 
         {/* Header Action Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {isCounter && (
             <span className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-sm border border-slate-200 font-medium">
                 <Lock size={13} /> View Only (Counter)
@@ -509,7 +510,6 @@ export const CatalogSettingsPage: React.FC = () => {
               </>
             )}
           </div>
-        </div>
       </header>
 
       {/* ─── MAIN CONTENT VIEWPORT ────────────────────────── */}
@@ -525,14 +525,14 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'garments' && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* BAR 1: Service Selector Bar */}
-                <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0">
-                  <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-3">
                     {services.map((service) => (
                       <button
                         key={service.id}
                         type="button"
                         onClick={() => setActiveServiceId(service.id)}
-                        className={`px-4 py-2 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
+                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
                           activeServiceId === service.id
                             ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
                             : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
@@ -545,14 +545,14 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* BAR 2: Category Selector Bar */}
-                <div className="border-b border-slate-200 bg-white px-2 shrink-0">
-                  <div className="flex items-center overflow-x-auto hide-scrollbar">
+                <div className="w-full border-b border-slate-200 bg-white px-5 shrink-0">
+                  <div className="flex flex-wrap items-center gap-1">
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => setActiveCategory(cat)}
-                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer ${
+                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm ${
                           activeCategory === cat
                             ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50 font-bold'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -564,15 +564,15 @@ export const CatalogSettingsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Context & Search Bar */}
-                <div className="p-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                {/* Search Bar */}
+                <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0">
                   <div className="relative w-full">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search size={16} />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-sm text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                       placeholder={`Search in ${CATEGORY_LABELS[activeCategory]}...`}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -581,7 +581,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* 4-Column Garment Catalog Grid (Independently Scrollable) */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 min-h-0">
+                <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6 md:py-6 bg-slate-50 min-h-0">
                   {filteredGarments.length === 0 ? (
                     <EmptyState
                       message={
@@ -591,7 +591,7 @@ export const CatalogSettingsPage: React.FC = () => {
                       }
                     />
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                       {filteredGarments.map((garment) => {
                         const price = getPriceFor(garment.id, activeServiceId);
                         const hasPrice = price !== null;
@@ -599,7 +599,7 @@ export const CatalogSettingsPage: React.FC = () => {
                         return (
                           <div
                             key={garment.id}
-                            className={`relative flex flex-col items-center justify-between p-5 bg-white rounded-sm border transition-all group min-h-[160px] ${
+                            className={`relative flex flex-col items-center justify-between p-6 bg-white rounded-sm border transition-all group min-h-[180px] ${
                               !garment.isActive
                                 ? 'opacity-60 grayscale border-slate-300'
                                 : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400'
@@ -607,18 +607,18 @@ export const CatalogSettingsPage: React.FC = () => {
                           >
                             {/* Price Badge (Top-Right) */}
                             {hasPrice ? (
-                              <div className="absolute top-2 right-2 bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-sm shadow-xs">
+                              <div className="absolute top-3 right-3 bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-sm shadow-xs">
                                 ₹{price.toFixed(0)}
                               </div>
                             ) : (
-                              <div className="absolute top-2 right-2 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-sm">
+                              <div className="absolute top-3 right-3 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2.5 py-1 rounded-sm">
                                 Not Configured
                               </div>
                             )}
 
                             {/* Inactive State Badge (Top-Left) */}
                             {!garment.isActive && (
-                              <span className="absolute top-2 left-2 bg-slate-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm">
+                              <span className="absolute top-3 left-3 bg-slate-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-sm">
                                 Inactive
                               </span>
                             )}
@@ -635,11 +635,11 @@ export const CatalogSettingsPage: React.FC = () => {
 
                             {/* Admin Controls on Tile for OWNER / MANAGER */}
                             {canManage && (
-                              <div className="w-full pt-3 border-t border-slate-100 flex items-center justify-between gap-3 opacity-90 group-hover:opacity-100 transition-opacity">
+                              <div className="w-full pt-3 mt-auto border-t border-slate-100 flex items-center justify-center gap-4 opacity-90 group-hover:opacity-100 transition-opacity px-2">
                                 <button
                                   type="button"
                                   onClick={() => openEditModal(garment)}
-                                  className="flex-1 py-1.5 px-2 rounded-sm text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-1 border border-slate-200 cursor-pointer"
+                                  className="flex-1 py-2 px-3 rounded-sm text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer min-h-[36px]"
                                   title="Edit garment details"
                                 >
                                   <Edit2 size={12} /> Edit
@@ -647,7 +647,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => openQuickPriceModal(garment)}
-                                  className="flex-1 py-1.5 px-2 rounded-sm text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 flex items-center justify-center gap-1 border border-primary-200 cursor-pointer"
+                                  className="flex-1 py-2 px-3 rounded-sm text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 flex items-center justify-center gap-1.5 border border-primary-200 cursor-pointer min-h-[36px]"
                                   title="Set price for this service"
                                 >
                                   <Tag size={12} /> Price
@@ -669,8 +669,8 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'pricing' && canManage && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* Selector Bar 1: Service */}
-                <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0">
-                  <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-3">
                     {services.map((service) => (
                       <button
                         key={service.id}
@@ -679,7 +679,7 @@ export const CatalogSettingsPage: React.FC = () => {
                           setPricingServiceId(service.id);
                           setEditedPrices({});
                         }}
-                        className={`px-4 py-2 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
+                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
                           pricingServiceId === service.id
                             ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
                             : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
@@ -692,14 +692,14 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* Selector Bar 2: Category */}
-                <div className="border-b border-slate-200 bg-white px-2 shrink-0">
-                  <div className="flex items-center overflow-x-auto hide-scrollbar">
+                <div className="w-full border-b border-slate-200 bg-white px-5 shrink-0">
+                  <div className="flex flex-wrap items-center gap-1">
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => setPricingCategory(cat)}
-                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer ${
+                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm ${
                           pricingCategory === cat
                             ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50 font-bold'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -712,14 +712,14 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* Controls Bar & Feedback */}
-                <div className="p-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                  <div className="relative w-full sm:w-80">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search size={16} />
+                <div className="px-5 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                  <div className="relative w-full sm:w-96">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-sm text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                       placeholder={`Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
                       value={pricingSearch}
                       onChange={(e) => setPricingSearch(e.target.value)}
@@ -768,11 +768,11 @@ export const CatalogSettingsPage: React.FC = () => {
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
                           <tr>
-                            <th className="py-3 px-4">Garment</th>
-                            <th className="py-3 px-4">Category</th>
-                            <th className="py-3 px-4">Current Price</th>
-                            <th className="py-3 px-4 w-48">Configure Price (₹)</th>
-                            <th className="py-3 px-4 text-right">Action</th>
+                            <th className="py-3.5 px-5">Garment</th>
+                            <th className="py-3.5 px-5">Category</th>
+                            <th className="py-3.5 px-5">Current Price</th>
+                            <th className="py-3.5 px-5 w-56">Configure Price (₹)</th>
+                            <th className="py-3.5 px-5 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -788,29 +788,29 @@ export const CatalogSettingsPage: React.FC = () => {
 
                             return (
                               <tr key={garment.id} className="hover:bg-slate-50/70 transition-colors">
-                                <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-sm bg-slate-100 flex items-center justify-center text-slate-500">
+                                <td className="py-3.5 px-5 font-semibold text-slate-900 flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-sm bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
                                     <Shirt size={16} />
                                   </div>
                                   <span>{garment.name}</span>
                                 </td>
-                                <td className="py-3 px-4 text-xs text-slate-500">
-                                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-sm font-medium">
+                                <td className="py-3.5 px-5 text-xs text-slate-500">
+                                  <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-sm font-medium">
                                     {CATEGORY_LABELS[garment.category] || garment.category}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 font-semibold">
+                                <td className="py-3.5 px-5 font-semibold">
                                   {hasPrice ? (
                                     <span className="text-slate-900">₹{currentPrice.toFixed(0)}</span>
                                   ) : (
-                                    <span className="text-amber-700 text-xs italic bg-amber-50 px-2 py-0.5 rounded-sm border border-amber-200">
+                                    <span className="text-amber-700 text-xs italic bg-amber-50 px-2.5 py-1 rounded-sm border border-amber-200">
                                       Not Configured
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-3 px-4">
-                                  <div className="relative w-36">
-                                    <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">
+                                <td className="py-3.5 px-5">
+                                  <div className="relative w-44">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-bold text-sm">
                                       ₹
                                     </span>
                                     <input
@@ -822,7 +822,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                       onChange={(e) =>
                                         handlePriceInputChange(garment.id, e.target.value)
                                       }
-                                      className={`w-full pl-7 pr-3 py-1.5 text-xs font-bold rounded-sm border focus:outline-none focus:ring-2 ${
+                                      className={`w-full pl-8 pr-4 py-2 text-sm font-bold rounded-sm border min-h-[40px] focus:outline-none focus:ring-2 ${
                                         isEdited
                                           ? 'border-primary-500 bg-primary-50/40 text-primary-900 ring-2 ring-primary-400'
                                           : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-primary-500'
@@ -830,13 +830,13 @@ export const CatalogSettingsPage: React.FC = () => {
                                     />
                                   </div>
                                 </td>
-                                <td className="py-3 px-4 text-right min-w-[80px]">
+                                <td className="py-3.5 px-5 text-right min-w-[100px]">
                                   {isEdited && (
                                     <button
                                       type="button"
                                       onClick={() => handleSaveSinglePrice(garment.id)}
                                       disabled={savingPrices}
-                                      className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white rounded-sm text-xs font-bold cursor-pointer transition-all shadow-2xs"
+                                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-sm text-xs font-bold cursor-pointer transition-all shadow-xs min-h-[36px]"
                                     >
                                       Save
                                     </button>
