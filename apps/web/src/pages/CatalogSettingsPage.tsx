@@ -14,7 +14,7 @@ import {
   Save,
   Tag,
   X,
-  Lock,
+
   Layers,
   Sparkles,
 } from 'lucide-react';
@@ -43,9 +43,12 @@ export const CatalogSettingsPage: React.FC = () => {
   const { token, employee } = useAuth();
   const navigate = useNavigate();
 
-  // Role checks
-  const canManage = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
-  const isCounter = employee?.role === Role.COUNTER;
+  // Role checks — COUNTER (Employee) can add/edit garments but not configure pricing
+  const canManage =
+    employee?.role === Role.OWNER ||
+    employee?.role === Role.MANAGER ||
+    employee?.role === Role.COUNTER;
+  const canConfigurePricing = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
 
   const [activeTab, setActiveTab] = useState<PageTab>('garments');
 
@@ -100,11 +103,7 @@ export const CatalogSettingsPage: React.FC = () => {
   const fetchAllData = useCallback(async () => {
     if (!token) return;
 
-    if (token.startsWith('dev-mock-jwt-')) {
-      setError('Please log in with the real backend to manage the catalog.');
-      setLoading(false);
-      return;
-    }
+
 
     setLoading(true);
     setError(null);
@@ -456,9 +455,6 @@ export const CatalogSettingsPage: React.FC = () => {
                 <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                   Garment Catalog & Pricing
                 </h1>
-                <span className="bg-primary-50 text-primary-700 text-xs font-semibold px-2 py-0.5 rounded-md border border-primary-200">
-                  {services.length} Services • {garments.length} Items
-                </span>
               </div>
               <p className="text-xs text-slate-500">
                 Manage garment definitions, categories, and service-specific pricing for your store
@@ -468,48 +464,41 @@ export const CatalogSettingsPage: React.FC = () => {
 
           {/* Header Action Controls */}
           <div className="flex items-center gap-2.5">
-            {isCounter && (
-              <span className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg border border-slate-200 font-medium">
-                <Lock size={13} /> View Only (Counter)
-              </span>
+            {canConfigurePricing && (
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('garments')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'garments'
+                      ? 'bg-white text-primary-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Layers size={14} /> Catalog View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('pricing')}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'pricing'
+                      ? 'bg-white text-primary-700 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Tag size={14} /> Pricing Matrix
+                </button>
+              </div>
             )}
 
             {canManage && (
-              <>
-                {/* Mode Selector Tabs */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('garments')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'garments'
-                        ? 'bg-white text-primary-700 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Layers size={14} /> Catalog View
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('pricing')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'pricing'
-                        ? 'bg-white text-primary-700 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Tag size={14} /> Service Pricing
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Plus size={16} /> Add Garment
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus size={16} /> Add Garment
+              </button>
             )}
           </div>
         </div>
@@ -683,7 +672,7 @@ export const CatalogSettingsPage: React.FC = () => {
             {/* ════════════════════════════════════════════════════ */}
             {/* ══ TAB 2: SERVICE PRICING MATRIX (ADMIN) ═════════ */}
             {/* ════════════════════════════════════════════════════ */}
-            {activeTab === 'pricing' && canManage && (
+            {activeTab === 'pricing' && canConfigurePricing && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* Selector Bar 1: Service */}
                 <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0">

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -83,6 +84,21 @@ export class EmployeeController {
     return {
       success: true,
       data: employee,
+    };
+  }
+
+  /**
+   * DELETE /api/employees/:id
+   * Delete an employee account.
+   * Allowed roles: OWNER, MANAGER
+   */
+  @Delete(':id')
+  @Roles('OWNER', 'MANAGER')
+  async remove(@Param('id') id: string, @Request() req: any) {
+    await this.employeeService.remove(id, req.user);
+    return {
+      success: true,
+      message: 'Employee deleted successfully',
     };
   }
 }

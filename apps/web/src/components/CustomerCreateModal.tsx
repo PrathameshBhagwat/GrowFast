@@ -171,7 +171,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
       let createdCustomer: CustomerDTO;
 
-      if (token && !token.startsWith('dev-mock-jwt-')) {
+      if (token) {
         let res: Response | null = null;
         try {
           res = await fetch(`${API_URL}/customers`, {

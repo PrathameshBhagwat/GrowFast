@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Info,
   X,
+  Trash2,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -67,62 +68,6 @@ export const StaffManagementPage: React.FC = () => {
     setError(null);
 
     try {
-      if (token.startsWith('dev-mock-jwt-')) {
-        // Fallback for mock dev environment
-        setEmployees([
-          {
-            id: 'emp-owner-001',
-            name: 'Prathamesh Bhagwat',
-            phone: '+919876543210',
-            email: 'prathamesh@growfast.in',
-            role: Role.OWNER,
-            storeId: 'store-kp-001',
-            storeName: 'Koregaon Park Branch',
-            isActive: true,
-            createdAt: new Date('2026-01-01').toISOString(),
-            updatedAt: new Date('2026-01-01').toISOString(),
-          },
-          {
-            id: 'emp-mgr-001',
-            name: 'Rajesh Nair',
-            phone: '+919823456789',
-            email: 'rajesh@growfast.in',
-            role: Role.MANAGER,
-            storeId: 'store-kp-001',
-            storeName: 'Koregaon Park Branch',
-            isActive: true,
-            createdAt: new Date('2026-01-05').toISOString(),
-            updatedAt: new Date('2026-01-05').toISOString(),
-          },
-          {
-            id: 'emp-counter-001',
-            name: 'Swapnil Shinde',
-            phone: '+919811122334',
-            email: 'swapnil@growfast.in',
-            role: Role.COUNTER,
-            storeId: 'store-kp-001',
-            storeName: 'Koregaon Park Branch',
-            isActive: true,
-            createdAt: new Date('2026-01-10').toISOString(),
-            updatedAt: new Date('2026-01-10').toISOString(),
-          },
-          {
-            id: 'emp-delivery-001',
-            name: 'Kiran More',
-            phone: '+919855566778',
-            email: 'kiran@growfast.in',
-            role: Role.DELIVERY,
-            storeId: 'store-kp-001',
-            storeName: 'Koregaon Park Branch',
-            isActive: true,
-            createdAt: new Date('2026-01-15').toISOString(),
-            updatedAt: new Date('2026-01-15').toISOString(),
-          },
-        ]);
-        setIsLoading(false);
-        return;
-      }
-
       const res = await fetch(`${API_URL}/employees`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -201,38 +146,16 @@ export const StaffManagementPage: React.FC = () => {
     setFormLoading(true);
 
     try {
-      const isMock = token?.startsWith('dev-mock-jwt-');
+        if (editingEmployee) {
+          const updatePayload: any = {
+            name: name.trim(),
+            phone: phone.trim() || null,
+            email: email.trim() || null,
+            role,
+            isActive,
+          };
+          if (pin) updatePayload.pin = pin;
 
-      if (editingEmployee) {
-        // Update Employee
-        const updatePayload: any = {
-          name: name.trim(),
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          role,
-          isActive,
-        };
-        if (pin) updatePayload.pin = pin;
-
-        if (isMock) {
-          setEmployees((prev) =>
-            prev.map((emp) =>
-              emp.id === editingEmployee.id
-                ? {
-                    ...emp,
-                    name: name.trim(),
-                    phone: phone.trim() || null,
-                    email: email.trim() || null,
-                    role,
-                    isActive,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : emp,
-            ),
-          );
-          showNotice(`Staff member "${name}" updated successfully!`);
-          setIsModalOpen(false);
-        } else {
           const res = await fetch(`${API_URL}/employees/${editingEmployee.id}`, {
             method: 'PATCH',
             headers: {
@@ -251,35 +174,17 @@ export const StaffManagementPage: React.FC = () => {
           setEmployees((prev) => prev.map((emp) => (emp.id === body.data.id ? body.data : emp)));
           showNotice(`Staff member "${body.data.name}" updated successfully!`);
           setIsModalOpen(false);
-        }
-      } else {
-        // Create Employee
-        const createPayload = {
-          name: name.trim(),
-          phone: phone.trim() || undefined,
-          email: email.trim() || undefined,
-          pin,
-          role,
-          storeId: currentEmployee?.storeId,
-        };
-
-        if (isMock) {
-          const newMockEmp: EmployeeDTO = {
-            id: `emp-mock-${Date.now()}`,
-            name: name.trim(),
-            phone: phone.trim() || null,
-            email: email.trim() || null,
-            role,
-            storeId: currentEmployee?.storeId || 'store-kp-001',
-            storeName: currentEmployee?.storeName || 'Koregaon Park Branch',
-            isActive: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          setEmployees((prev) => [newMockEmp, ...prev]);
-          showNotice(`New staff member "${name}" created successfully!`);
-          setIsModalOpen(false);
         } else {
+          // Create Employee
+          const createPayload = {
+            name: name.trim(),
+            phone: phone.trim() || undefined,
+            email: email.trim() || undefined,
+            pin,
+            role,
+            storeId: currentEmployee?.storeId,
+          };
+
           const res = await fetch(`${API_URL}/employees`, {
             method: 'POST',
             headers: {
@@ -299,7 +204,6 @@ export const StaffManagementPage: React.FC = () => {
           showNotice(`Employee account created for "${body.data.name}"!`);
           setIsModalOpen(false);
         }
-      }
     } catch (err: any) {
       setFormError(err.message || 'Failed to save staff information.');
     } finally {
@@ -323,34 +227,64 @@ export const StaffManagementPage: React.FC = () => {
     const newActiveState = !emp.isActive;
 
     try {
-      if (token?.startsWith('dev-mock-jwt-')) {
-        setEmployees((prev) =>
-          prev.map((e) => (e.id === emp.id ? { ...e, isActive: newActiveState } : e)),
-        );
-        showNotice(`Employee "${emp.name}" is now ${newActiveState ? 'ACTIVE' : 'INACTIVE'}.`);
-      } else {
-        const res = await fetch(`${API_URL}/employees/${emp.id}`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ isActive: newActiveState }),
-        });
+      const res = await fetch(`${API_URL}/employees/${emp.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive: newActiveState }),
+      });
 
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody.message || 'Failed to update employee status.');
-        }
-
-        const body: ApiResponse<EmployeeDTO> = await res.json();
-        setEmployees((prev) => prev.map((e) => (e.id === body.data.id ? body.data : e)));
-        showNotice(
-          `Employee "${body.data.name}" is now ${body.data.isActive ? 'ACTIVE' : 'INACTIVE'}.`,
-        );
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || 'Failed to update employee status.');
       }
+
+      const body: ApiResponse<EmployeeDTO> = await res.json();
+      setEmployees((prev) => prev.map((e) => (e.id === body.data.id ? body.data : e)));
+      showNotice(
+        `Employee "${body.data.name}" is now ${body.data.isActive ? 'ACTIVE' : 'INACTIVE'}.`,
+      );
     } catch (err: any) {
       showNotice(err.message || 'Failed to update status.');
+    }
+  };
+
+  const handleDeleteEmployee = async (emp: EmployeeDTO) => {
+    // Protection: Self-deletion
+    if (emp.id === currentEmployee?.id) {
+      showNotice('You cannot delete your own account.');
+      return;
+    }
+
+    // Protection: Manager deleting Owner
+    if (currentEmployee?.role === Role.MANAGER && emp.role === Role.OWNER) {
+      showNotice('Managers are not authorized to delete Owner accounts.');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to completely delete "${emp.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/employees/${emp.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || 'Failed to delete employee account.');
+      }
+
+      setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
+      showNotice(`Employee "${emp.name}" deleted successfully.`);
+    } catch (err: any) {
+      showNotice(err.message || 'Failed to delete employee.');
     }
   };
 
@@ -529,9 +463,7 @@ export const StaffManagementPage: React.FC = () => {
               >
                 <option value="ALL">All Roles</option>
                 <option value="OWNER">Owner</option>
-                <option value="MANAGER">Manager</option>
-                <option value="COUNTER">Counter</option>
-                <option value="DELIVERY">Delivery Rider</option>
+                <option value="COUNTER">Employee</option>
               </select>
 
               <Button
@@ -768,6 +700,29 @@ export const StaffManagementPage: React.FC = () => {
                     >
                       {emp.isActive ? 'Deactivate' : 'Activate'}
                     </Button>
+                    
+                    {/* Delete only allowed if not self, and not manager deleting owner */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteEmployee(emp)}
+                      disabled={isSelf || isManagerEditingOwner}
+                      title="Delete Employee"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '44px',
+                        minWidth: '44px',
+                        borderRadius: '8px',
+                        border: '1px solid #FECACA',
+                        background: '#FEF2F2',
+                        color: '#DC2626',
+                        cursor: (isSelf || isManagerEditingOwner) ? 'not-allowed' : 'pointer',
+                        opacity: (isSelf || isManagerEditingOwner) ? 0.5 : 1,
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </Card>
               );
@@ -966,9 +921,7 @@ export const StaffManagementPage: React.FC = () => {
                     }}
                   >
                     {currentEmployee?.role === Role.OWNER && <option value="OWNER">Owner</option>}
-                    <option value="MANAGER">Manager</option>
-                    <option value="COUNTER">Counter Staff</option>
-                    <option value="DELIVERY">Delivery Rider</option>
+                    <option value="COUNTER">Employee</option>
                   </select>
                 </div>
 

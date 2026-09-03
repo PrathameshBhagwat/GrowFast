@@ -2,26 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NumericKeypadInput, Card } from '@growfast/ui';
-import { Shirt, ChevronDown, Zap } from 'lucide-react';
-
-const EMPLOYEES = [
-  { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER', initials: 'PB', pin: '111111' },
-  { id: 'emp-mgr-001', name: 'Rajesh Nair', role: 'MANAGER', initials: 'RN', pin: '222222' },
-  { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER', initials: 'SS', pin: '333333' },
-  { id: 'emp-delivery-001', name: 'Kiran More', role: 'DELIVERY', initials: 'KM', pin: '444444' },
-];
+import { Shirt } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login, error } = useAuth();
   const navigate = useNavigate();
-  const [selectedEmployee, setSelectedEmployee] = useState(EMPLOYEES[0]!);
+  const [employeeId, setEmployeeId] = useState('');
   const [pin, setPin] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [shake, setShake] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+
+  const [directory, setDirectory] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [isFetchingDirectory, setIsFetchingDirectory] = useState(true);
+
+  // Fetch directory on mount
+  useEffect(() => {
+    const fetchDirectory = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '/api';
+        const res = await fetch(`${API_URL}/auth/directory`);
+        if (res.ok) {
+          const body = await res.json();
+          setDirectory(body.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch employee directory', err);
+      } finally {
+        setIsFetchingDirectory(false);
+      }
+    };
+    fetchDirectory();
+  }, []);
 
   // Lockout timer effect
   useEffect(() => {
@@ -45,15 +59,12 @@ export const LoginPage: React.FC = () => {
     setTimeout(() => setShake(false), 400);
   };
 
-  const handleLogin = async (overrideEmpId?: string, overridePin?: string) => {
-    const empId = overrideEmpId || selectedEmployee.id;
-    const pinToUse = overridePin || pin;
-    if (pinToUse.length !== 6 || lockoutUntil) return;
+  const handleLogin = async () => {
+    if (!employeeId.trim() || pin.length !== 6 || lockoutUntil) return;
 
     setIsLoggingIn(true);
     try {
-      await login(empId, pinToUse);
-      // Reset attempts on success
+      await login(employeeId.trim(), pin);
       setFailedAttempts(0);
       navigate('/', { replace: true });
     } catch {
@@ -62,17 +73,11 @@ export const LoginPage: React.FC = () => {
       const attempts = failedAttempts + 1;
       setFailedAttempts(attempts);
       if (attempts >= 5) {
-        setLockoutUntil(Date.now() + 60000); // 60 seconds lockout
+        setLockoutUntil(Date.now() + 60000);
       }
     } finally {
       setIsLoggingIn(false);
     }
-  };
-
-  const handleQuickLogin = async (emp: (typeof EMPLOYEES)[0]) => {
-    setSelectedEmployee(emp);
-    setPin(emp.pin);
-    await handleLogin(emp.id, emp.pin);
   };
 
   return (
@@ -110,119 +115,74 @@ export const LoginPage: React.FC = () => {
               GrowFast Laundry
             </h1>
             <p style={{ fontSize: '0.84rem', color: '#64748B', marginTop: '4px' }}>
-              Select your profile and enter PIN
+              Select your name and enter your PIN to sign in
             </p>
           </div>
 
-          {/* Employee Selector */}
-          <div style={{ marginBottom: '20px', position: 'relative' }}>
-            <button
-              onClick={() => setShowPicker(!showPicker)}
-              aria-label="Select Employee"
+          {/* Employee Dropdown */}
+          <div style={{ marginBottom: '20px' }}>
+            <label
+              htmlFor="employee-select"
               style={{
-                width: '100%',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                background: '#F8FAFC',
-                cursor: 'pointer',
-                fontFamily: "'Inter', sans-serif",
+                display: 'block',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: '#334155',
+                marginBottom: '6px',
               }}
             >
+              Employee Name
+            </label>
+            {isFetchingDirectory ? (
               <div
                 style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+                  width: '100%',
+                  minHeight: '48px',
+                  padding: '0 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #CBD5E1',
+                  background: '#F1F5F9',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFFFFF',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  flexShrink: 0,
+                  fontSize: '0.9rem',
+                  color: '#64748B',
                 }}
               >
-                {selectedEmployee.initials}
+                Loading staff directory...
               </div>
-              <div style={{ flex: 1, textAlign: 'left' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0F172A' }}>
-                  {selectedEmployee.name}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{selectedEmployee.role}</div>
-              </div>
-              <ChevronDown size={18} color="#94A3B8" />
-            </button>
-
-            {showPicker && (
-              <div
+            ) : (
+              <select
+                id="employee-select"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                disabled={!!lockoutUntil}
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '4px',
-                  background: '#FFFFFF',
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.08)',
-                  zIndex: 10,
-                  overflow: 'hidden',
+                  width: '100%',
+                  minHeight: '48px',
+                  padding: '0 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '0.9rem',
+                  fontFamily: "'Inter', sans-serif",
+                  outline: 'none',
+                  background: lockoutUntil ? '#F1F5F9' : '#FFFFFF',
+                  color: employeeId ? '#0F172A' : '#64748B',
+                  cursor: lockoutUntil ? 'not-allowed' : 'pointer',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 14px center',
                 }}
               >
-                {EMPLOYEES.map((emp) => (
-                  <button
-                    key={emp.id}
-                    onClick={() => {
-                      setSelectedEmployee(emp);
-                      setShowPicker(false);
-                      setPin('');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      border: 'none',
-                      background: emp.id === selectedEmployee.id ? '#EFF6FF' : 'transparent',
-                      cursor: 'pointer',
-                      fontFamily: "'Inter', sans-serif",
-                      borderBottom: '1px solid #F1F5F9',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background:
-                          emp.id === selectedEmployee.id
-                            ? 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)'
-                            : '#E2E8F0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: emp.id === selectedEmployee.id ? '#FFFFFF' : '#64748B',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {emp.initials}
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0F172A' }}>
-                        {emp.name}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{emp.role}</div>
-                    </div>
-                  </button>
+                <option value="" disabled>
+                  -- Select your name --
+                </option>
+                {directory.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name} ({emp.role})
+                  </option>
                 ))}
-              </div>
+              </select>
             )}
           </div>
 
@@ -263,6 +223,20 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
+          {/* PIN Label */}
+          <div style={{ marginBottom: '8px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: '#334155',
+              }}
+            >
+              Security PIN
+            </label>
+          </div>
+
           {/* PIN Keypad */}
           <div
             style={{
@@ -294,64 +268,6 @@ export const LoginPage: React.FC = () => {
               Authenticating...
             </p>
           )}
-
-          {/* Dev Mode 1-Click Quick Login */}
-          <div
-            style={{
-              marginTop: '20px',
-              padding: '12px',
-              background: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                color: '#475569',
-                marginBottom: '8px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              <Zap size={14} color="#D97706" />
-              <span>Dev Quick Login</span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-              {EMPLOYEES.map((emp) => (
-                <button
-                  key={emp.id}
-                  type="button"
-                  onClick={() => handleQuickLogin(emp)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    background: '#FFFFFF',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: '#0F172A',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    transition: 'all 120ms ease',
-                  }}
-                >
-                  <span>{emp.role}</span>
-                  <span style={{ color: '#64748B', fontFamily: 'monospace', fontSize: '0.7rem' }}>
-                    {emp.pin}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </Card>
       </div>
     </div>

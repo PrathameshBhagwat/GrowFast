@@ -87,7 +87,7 @@ describe('CatalogSettingsPage', () => {
     // Verify Owner has Add Garment button and tabs
     expect(screen.getByText('Add Garment')).toBeInTheDocument();
     expect(screen.getByText('Catalog View')).toBeInTheDocument();
-    expect(screen.getByText('Service Pricing')).toBeInTheDocument();
+    expect(screen.getByText('Pricing Matrix')).toBeInTheDocument();
   });
 
   it('updates price badge when switching active service', async () => {
@@ -142,7 +142,7 @@ describe('CatalogSettingsPage', () => {
     });
   });
 
-  it('restricts COUNTER role to view-only (no Add/Edit/Pricing tabs)', async () => {
+  it('allows COUNTER role to add garments but NOT configure pricing matrix', async () => {
     mockEmployee = {
       id: 'emp-counter-001',
       name: 'Swapnil',
@@ -157,10 +157,9 @@ describe('CatalogSettingsPage', () => {
       expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
     });
 
-    // Counter sees view only badge and NO Add Garment button or Service Pricing tab
-    expect(screen.getByText(/View Only \(Counter\)/i)).toBeInTheDocument();
-    expect(screen.queryByText('Add Garment')).not.toBeInTheDocument();
-    expect(screen.queryByText('Service Pricing')).not.toBeInTheDocument();
-    expect(screen.queryByTitle('Edit garment details')).not.toBeInTheDocument();
+    // Counter sees Add Garment button but NO Pricing Matrix tab
+    expect(screen.getByText('Add Garment')).toBeInTheDocument();
+    expect(screen.queryByText('Pricing Matrix')).not.toBeInTheDocument();
+    expect(screen.queryByText(/View Only \(Counter\)/i)).not.toBeInTheDocument();
   });
 });
