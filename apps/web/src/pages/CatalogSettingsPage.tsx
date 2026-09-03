@@ -43,10 +43,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   WOMEN: 'Women',
   KIDS: 'Kids',
   HOUSEHOLD: 'Household',
-  WEIGHT_BASED: 'Weight Based',
   HOME_CLEANING: 'Home Cleaning',
   SHOES: 'Shoe',
   OTHERS: 'Other',
+  WEIGHT_BASED: 'Weight Based',
 };
 
 type PageTab = 'garments' | 'pricing';
@@ -468,48 +468,46 @@ export const CatalogSettingsPage: React.FC = () => {
         <div className="flex items-center gap-4">
           {isCounter && (
             <span className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-sm border border-slate-200 font-medium">
-                <Lock size={13} /> View Only (Counter)
-              </span>
-            )}
+              <Lock size={13} /> View Only (Counter)
+            </span>
+          )}
 
-            {canManage && (
-              <>
-                {/* Mode Selector Tabs */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-sm border border-slate-200 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('garments')}
-                    className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'garments'
-                        ? 'bg-white text-primary-700 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Layers size={14} /> Catalog View
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('pricing')}
-                    className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'pricing'
-                        ? 'bg-white text-primary-700 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Tag size={14} /> Service Pricing
-                  </button>
-                </div>
-
+          {canManage && (
+            <>
+              {/* Mode Selector Tabs */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-sm border border-slate-200 text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={openCreateModal}
-                  className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-sm text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  onClick={() => setActiveTab('garments')}
+                  className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${activeTab === 'garments'
+                    ? 'bg-white text-primary-700 shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
-                  <Plus size={16} /> Add Garment
+                  <Layers size={14} /> Catalog View
                 </button>
-              </>
-            )}
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('pricing')}
+                  className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${activeTab === 'pricing'
+                    ? 'bg-white text-primary-700 shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                  <Tag size={14} /> Service Pricing
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-sm text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus size={16} /> Add Garment
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {/* ─── MAIN CONTENT VIEWPORT ────────────────────────── */}
@@ -525,7 +523,7 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'garments' && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* BAR 1: Service Selector Bar */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0">
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-3 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
@@ -548,7 +546,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* BAR 2: Category Selector Bar */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0">
+                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0 mb-3 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
@@ -605,11 +603,10 @@ export const CatalogSettingsPage: React.FC = () => {
                         return (
                           <div
                             key={garment.id}
-                            className={`relative flex flex-col items-center justify-between p-6 bg-white rounded-sm border transition-all group min-h-[180px] ${
-                              !garment.isActive
-                                ? 'opacity-60 grayscale border-slate-300'
-                                : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400'
-                            }`}
+                            className={`relative flex flex-col items-center justify-between p-6 bg-white rounded-sm border transition-all group min-h-[180px] ${!garment.isActive
+                              ? 'opacity-60 grayscale border-slate-300'
+                              : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400'
+                              }`}
                           >
                             {/* Price Badge (Top-Right) */}
                             {hasPrice ? (
@@ -675,7 +672,7 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'pricing' && canManage && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* Selector Bar 1: Service */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0">
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-3 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
@@ -701,7 +698,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* Selector Bar 2: Category */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0">
+                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0 mb-3 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
@@ -834,11 +831,10 @@ export const CatalogSettingsPage: React.FC = () => {
                                       onChange={(e) =>
                                         handlePriceInputChange(garment.id, e.target.value)
                                       }
-                                      className={`w-full pl-8 pr-4 py-2 text-sm font-bold rounded-sm border min-h-[40px] focus:outline-none focus:ring-2 ${
-                                        isEdited
-                                          ? 'border-primary-500 bg-primary-50/40 text-primary-900 ring-2 ring-primary-400'
-                                          : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-primary-500'
-                                      }`}
+                                      className={`w-full pl-8 pr-4 py-2 text-sm font-bold rounded-sm border min-h-[40px] focus:outline-none focus:ring-2 ${isEdited
+                                        ? 'border-primary-500 bg-primary-50/40 text-primary-900 ring-2 ring-primary-400'
+                                        : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-primary-500'
+                                        }`}
                                     />
                                   </div>
                                 </td>
