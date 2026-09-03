@@ -79,5 +79,5 @@ export { deriveOrderStatus, ORDER_STATUS_COLORS } from './order-status';
 export type { OrderItemStatusInput, OrderStatusDerivationContext } from './order-status';
 
 // Pricing Contract
-export { calculateOrderTotals } from './pricing';
-export type { PricingItemInput, PricingTotals } from './pricing';
+export { calculateOrderTotals, calculateFulfillmentBreakdown } from './pricing';
+export type { PricingItemInput, PricingTotals, FulfillmentBreakdown } from './pricing';

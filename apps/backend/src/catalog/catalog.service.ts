@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GarmentCategory, ServiceCategory } from '@growfast/shared-types';
 import { UpdateGarmentDto } from './dto/update-garment.dto';
@@ -49,15 +49,19 @@ export class CatalogService {
 
   /**
    * Update a garment catalog item by ID.
-   * Validates existence before updating.
+   * Validates existence and store isolation before updating.
    */
-  async updateGarment(id: string, dto: UpdateGarmentDto) {
+  async updateGarment(id: string, storeId: string, dto: UpdateGarmentDto) {
     const existing = await this.prisma.garmentCatalog.findUnique({
       where: { id },
     });
 
     if (!existing) {
       throw new NotFoundException(`Garment with ID "${id}" not found`);
+    }
+
+    if (existing.storeId && existing.storeId !== storeId) {
+      throw new ForbiddenException(`Cannot modify garment belonging to another store`);
     }
 
     return this.prisma.garmentCatalog.update({
@@ -83,15 +87,19 @@ export class CatalogService {
 
   /**
    * Update a service type by ID.
-   * Validates existence before updating.
+   * Validates existence and store isolation before updating.
    */
-  async updateService(id: string, dto: UpdateServiceDto) {
+  async updateService(id: string, storeId: string, dto: UpdateServiceDto) {
     const existing = await this.prisma.serviceType.findUnique({
       where: { id },
     });
 
     if (!existing) {
       throw new NotFoundException(`Service type with ID "${id}" not found`);
+    }
+
+    if (existing.storeId && existing.storeId !== storeId) {
+      throw new ForbiddenException(`Cannot modify service belonging to another store`);
     }
 
     return this.prisma.serviceType.update({

@@ -389,6 +389,14 @@ describe('OrderService', () => {
       mockPrismaService.order.findUnique.mockResolvedValue({
         ...mockOrder,
         status: OrderStatus.READY,
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.READY,
+          },
+        ],
       });
 
       jest.spyOn(service, 'findOrderById').mockResolvedValue({

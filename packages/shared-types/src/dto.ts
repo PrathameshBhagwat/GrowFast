@@ -136,6 +136,11 @@ export interface OrderSummaryDTO {
   paymentStatus: PaymentStatus;
   pickupType: PickupType;
   itemCount: number;
+  readyAmount: number;
+  remainingAmount: number;
+  collectedAmount: number;
+  cancelledAmount: number;
+  payableAmount: number;
 }
 
 export interface OrderDetailDTO extends OrderSummaryDTO {

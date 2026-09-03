@@ -97,6 +97,9 @@ export enum GarmentCategory {
   HOUSEHOLD = 'HOUSEHOLD',
   SHOES = 'SHOES',
   SPECIAL = 'SPECIAL',
+  WEIGHT_BASED = 'WEIGHT_BASED',
+  OTHERS = 'OTHERS',
+  HOME_CLEANING = 'HOME_CLEANING',
 }
 
 export enum ServiceCategory {
