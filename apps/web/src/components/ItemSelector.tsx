@@ -84,7 +84,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 key={service.id}
                 type="button"
                 onClick={() => setSelectedServiceId(service.id)}
-                className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-nowrap min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                   selectedServiceId === service.id
                     ? 'bg-primary-600 text-white border-primary-600'
                     : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
@@ -107,7 +107,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 key={category}
                 type="button"
                 onClick={() => setSelectedCategory(category)}
-                className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-nowrap text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                   selectedCategory === category
                     ? 'bg-primary-600 text-white border-primary-600'
                     : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
@@ -128,7 +128,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
           </div>
           <input
             type="text"
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
             placeholder="🔍 Search garment to add..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -152,7 +152,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 key={garment.id}
                 type="button"
                 onClick={() => handleGarmentClick(garment)}
-                className={`relative flex flex-col items-center justify-between p-4 bg-white rounded-2xl border transition-all text-left group min-h-[140px] cursor-pointer ${
+                className={`relative flex flex-col items-center justify-between p-4 bg-white rounded-[2px] border transition-all text-left group min-h-[140px] cursor-pointer ${
                   isSelected
                     ? 'border-primary-600 ring-2 ring-primary-500 bg-primary-50/30 shadow-md'
                     : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400 hover:bg-slate-50/50'
@@ -161,16 +161,16 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
               >
                 {/* Price Badge */}
                 {hasPrice ? (
-                  <div className="absolute top-0 right-0 bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-bl-xl rounded-tr-2xl shadow-xs">
+                  <div className="absolute top-0 right-0 bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-bl-[2px] rounded-tr-[2px] shadow-xs">
                     ₹{price}
                   </div>
                 ) : (
-                  <div className="absolute top-0 right-0 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-bl-xl rounded-tr-2xl">
+                  <div className="absolute top-0 right-0 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-bl-[2px] rounded-tr-[2px]">
                     Not Configured
                   </div>
                 )}
 
-                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-2 mb-2">
+                <div className="w-14 h-14 rounded-[2px] bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-2 mb-2">
                   <Shirt size={28} strokeWidth={1.5} />
                 </div>
 

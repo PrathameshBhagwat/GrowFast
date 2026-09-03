@@ -532,7 +532,7 @@ export const CatalogSettingsPage: React.FC = () => {
                           key={service.id}
                           type="button"
                           onClick={() => setActiveServiceId(service.id)}
-                          className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-nowrap min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                             activeServiceId === service.id
                               ? 'bg-primary-600 text-white border-primary-600'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
@@ -555,7 +555,7 @@ export const CatalogSettingsPage: React.FC = () => {
                           key={cat}
                           type="button"
                           onClick={() => setActiveCategory(cat)}
-                          className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-nowrap text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                             activeCategory === cat
                               ? 'bg-primary-600 text-white border-primary-600'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
@@ -684,7 +684,7 @@ export const CatalogSettingsPage: React.FC = () => {
                             setPricingServiceId(service.id);
                             setEditedPrices({});
                           }}
-                          className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-nowrap min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                             pricingServiceId === service.id
                               ? 'bg-primary-600 text-white border-primary-600'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
@@ -707,7 +707,7 @@ export const CatalogSettingsPage: React.FC = () => {
                           key={cat}
                           type="button"
                           onClick={() => setPricingCategory(cat)}
-                          className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-nowrap text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                             pricingCategory === cat
                               ? 'bg-primary-600 text-white border-primary-600'
                               : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
