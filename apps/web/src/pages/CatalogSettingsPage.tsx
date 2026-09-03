@@ -600,7 +600,7 @@ export const CatalogSettingsPage: React.FC = () => {
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
                       {services.map((service) => {
                         const isShoeSvc = service.name.toLowerCase().includes('shoe');
-                        const isVisuallyDisabled = isActiveShoeCategory ? !isShoeSvc : isShoeSvc;
+                        const isVisuallyDisabled = isActiveShoeCategory ? !isShoeSvc : false;
                         return (
                         <button
                           key={service.id}
@@ -622,13 +622,13 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* BAR 2: Category Selector Bar */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0 mb-3 shadow-xs">
+                <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
                       {CATEGORIES.map((cat) => {
                         const isShoeCat = cat === GarmentCategory.SHOES;
-                        const isVisuallyDisabled = isActiveShoeService ? !isShoeCat : isShoeCat;
+                        const isVisuallyDisabled = isActiveShoeService ? !isShoeCat : false;
                         return (
                         <button
                           key={cat}
@@ -759,7 +759,7 @@ export const CatalogSettingsPage: React.FC = () => {
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
                       {services.map((service) => {
                         const isShoeSvc = service.name.toLowerCase().includes('shoe');
-                        const isVisuallyDisabled = isPricingShoeCategory ? !isShoeSvc : isShoeSvc;
+                        const isVisuallyDisabled = isPricingShoeCategory ? !isShoeSvc : false;
                         return (
                         <button
                           key={service.id}
@@ -784,13 +784,13 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* Selector Bar 2: Category */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0 mb-3 shadow-xs">
+                <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
                     <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
                       {CATEGORIES.map((cat) => {
                         const isShoeCat = cat === GarmentCategory.SHOES;
-                        const isVisuallyDisabled = isPricingShoeService ? !isShoeCat : isShoeCat;
+                        const isVisuallyDisabled = isPricingShoeService ? !isShoeCat : false;
                         return (
                         <button
                           key={cat}

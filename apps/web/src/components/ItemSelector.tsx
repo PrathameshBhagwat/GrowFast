@@ -101,7 +101,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
           <div className="flex-1 flex flex-wrap gap-4 w-full">
             {activeServices.map((service) => {
               const isShoeService = service.name.toLowerCase().includes('shoe');
-              const isVisuallyDisabled = isShoeCategorySelected ? !isShoeService : isShoeService;
+              const isVisuallyDisabled = isShoeCategorySelected ? !isShoeService : false;
 
               return (
                 <button
@@ -125,13 +125,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
       </div>
 
       {/* BAR 2: Category Selector Bar */}
-      <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0 mb-3 shadow-xs">
+      <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
         <div className="flex flex-col xl:flex-row xl:items-center gap-4">
           <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
           <div className="flex-1 flex flex-wrap gap-4 w-full">
             {CATEGORIES.map((category) => {
               const isShoeCat = category === GarmentCategory.SHOES;
-              const isVisuallyDisabled = isShoeServiceSelected ? !isShoeCat : isShoeCat;
+              const isVisuallyDisabled = isShoeServiceSelected ? !isShoeCat : false;
 
               return (
                 <button
