@@ -223,14 +223,14 @@ async function main() {
 
   // ─── Service Types ────────────────────────────────────────────
   const services = [
-    { id: 'svc-dry-clean', name: 'Dry Cleaning', category: 'DRY_CLEAN' as const, estimatedDays: 2 },
+    { id: 'svc-wash', name: 'Standard Wash', category: 'WASH' as const, estimatedDays: 2 },
+    { id: 'svc-dry-clean', name: 'Dry Clean', category: 'DRY_CLEAN' as const, estimatedDays: 2 },
     {
       id: 'svc-steam-press',
-      name: 'Steam Pressing',
+      name: 'Steam Iron',
       category: 'STEAM_PRESS' as const,
       estimatedDays: 1,
     },
-    { id: 'svc-wash', name: 'Standard Wash', category: 'WASH' as const, estimatedDays: 2 },
     {
       id: 'svc-wash-iron',
       name: 'Wash + Steam Iron',
@@ -239,25 +239,25 @@ async function main() {
     },
     {
       id: 'svc-shoe-clean',
-      name: 'Premium Shoe Spa',
+      name: 'Shoe Cleaning',
       category: 'SHOE_CLEAN' as const,
       estimatedDays: 3,
     },
     {
       id: 'svc-leather',
-      name: 'Leather & Suede Spa',
+      name: 'Reprocess Cleaning',
       category: 'LEATHER_CLEAN' as const,
       estimatedDays: 4,
     },
     {
       id: 'svc-stain',
-      name: 'Targeted Spotting',
+      name: 'Free Shoe',
       category: 'STAIN_REMOVAL' as const,
       estimatedDays: 2,
     },
     {
       id: 'svc-weight',
-      name: 'Laundry by Weight',
+      name: 'Starching Dc',
       category: 'WEIGHT_BASED' as const,
       estimatedDays: 2,
     },
@@ -266,7 +266,7 @@ async function main() {
   for (const s of services) {
     await prisma.serviceType.upsert({
       where: { id: s.id },
-      update: {},
+      update: { name: s.name, category: s.category, estimatedDays: s.estimatedDays },
       create: s,
     });
   }

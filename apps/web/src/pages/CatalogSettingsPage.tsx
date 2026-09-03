@@ -21,7 +21,16 @@ import {
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 /** All category values for the filter UI. */
-const CATEGORIES = Object.values(GarmentCategory);
+const CATEGORIES = [
+  GarmentCategory.MEN,
+  GarmentCategory.WOMEN,
+  GarmentCategory.KIDS,
+  GarmentCategory.HOUSEHOLD,
+  GarmentCategory.HOME_CLEANING,
+  GarmentCategory.SHOES,
+  GarmentCategory.OTHERS,
+  GarmentCategory.WEIGHT_BASED,
+];
 
 /** Human-readable labels for category values. */
 const CATEGORY_LABELS: Record<string, string> = {
@@ -29,11 +38,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   WOMEN: 'Women',
   KIDS: 'Kids',
   HOUSEHOLD: 'Household',
-  SHOES: 'Shoes',
-  SPECIAL: 'Special',
-  WEIGHT_BASED: 'Weight Based',
-  OTHERS: 'Others',
   HOME_CLEANING: 'Home Cleaning',
+  SHOES: 'Shoe',
+  OTHERS: 'Other',
+  WEIGHT_BASED: 'Weight Based',
 };
 
 type PageTab = 'garments' | 'pricing';
@@ -158,6 +166,45 @@ export const CatalogSettingsPage: React.FC = () => {
       return matchesCategory && matchesSearch;
     });
   }, [garments, activeCategory, searchQuery]);
+
+  // --- Shoe Category & Service Enforcements ---
+  const isActiveShoeService = services
+    .find((s) => s.id === activeServiceId)
+    ?.name.toLowerCase()
+    .includes('shoe');
+  const isActiveShoeCategory = activeCategory === GarmentCategory.SHOES;
+
+  useEffect(() => {
+    if (isActiveShoeCategory && !isActiveShoeService) {
+      const shoeSvc = services.find((s) => s.name.toLowerCase().includes('shoe'));
+      if (shoeSvc) setActiveServiceId(shoeSvc.id);
+    } else if (!isActiveShoeCategory && isActiveShoeService) {
+      const nonShoeSvc = services.find((s) => !s.name.toLowerCase().includes('shoe'));
+      if (nonShoeSvc) setActiveServiceId(nonShoeSvc.id);
+    }
+  }, [isActiveShoeCategory, isActiveShoeService, services]);
+
+  const isPricingShoeService = services
+    .find((s) => s.id === pricingServiceId)
+    ?.name.toLowerCase()
+    .includes('shoe');
+  const isPricingShoeCategory = pricingCategory === GarmentCategory.SHOES;
+
+  useEffect(() => {
+    if (isPricingShoeCategory && !isPricingShoeService) {
+      const shoeSvc = services.find((s) => s.name.toLowerCase().includes('shoe'));
+      if (shoeSvc) {
+        setPricingServiceId(shoeSvc.id);
+        setEditedPrices({});
+      }
+    } else if (!isPricingShoeCategory && isPricingShoeService) {
+      const nonShoeSvc = services.find((s) => !s.name.toLowerCase().includes('shoe'));
+      if (nonShoeSvc) {
+        setPricingServiceId(nonShoeSvc.id);
+        setEditedPrices({});
+      }
+    }
+  }, [isPricingShoeCategory, isPricingShoeService, services]);
 
   // Filtered garments for Pricing Tab
   const pricingFilteredGarments = useMemo(() => {
@@ -433,71 +480,101 @@ export const CatalogSettingsPage: React.FC = () => {
     }
   };
 
+  const handleAutoFillAllMissingPrices = async () => {
+    setSavingPrices(true);
+    setPriceSaveError(null);
+    setPriceSaveSuccess(null);
+    try {
+      let count = 0;
+      for (const service of services) {
+        for (const garment of garments) {
+          const hasPrice = pricingData.some(
+            (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === service.id,
+          );
+          if (!hasPrice) {
+            const randomPrice = Math.floor(Math.random() * 10 + 1) * 100; // 100 to 1000
+            const res = await fetch(`${API_URL}/pricing/${garment.id}/${service.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ price: randomPrice }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(
+                body.message || `Failed on garment ${garment.id} and service ${service.id}`,
+              );
+            }
+            count++;
+          }
+        }
+      }
+      setPriceSaveSuccess(`Auto-filled ${count} missing prices across all combinations!`);
+      await fetchAllData();
+      setTimeout(() => setPriceSaveSuccess(null), 3000);
+    } catch (err) {
+      setPriceSaveError(err instanceof Error ? err.message : 'Auto-fill failed');
+    } finally {
+      setSavingPrices(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-100 font-sans">
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-4 py-3 shrink-0 shadow-xs z-10">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-              title="Back to home"
-            >
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                  Garment Catalog & Pricing
-                </h1>
-              </div>
-              <p className="text-xs text-slate-500">
-                Manage garment definitions, categories, and service-specific pricing for your store
-              </p>
-            </div>
-          </div>
+      <header className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-xs z-10 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="p-2 rounded-sm text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Back to home"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-lg font-bold text-slate-900">Garment Catalog</h1>
+        </div>
 
-          {/* Header Action Controls */}
-          <div className="flex items-center gap-2.5">
-            {canConfigurePricing && (
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('garments')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'garments'
-                      ? 'bg-white text-primary-700 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Layers size={14} /> Catalog View
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('pricing')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'pricing'
-                      ? 'bg-white text-primary-700 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Tag size={14} /> Pricing Matrix
-                </button>
-              </div>
-            )}
-
-            {canManage && (
+        {/* Header Action Controls */}
+        <div className="flex items-center gap-4">
+          {canConfigurePricing && (
+            <div className="flex items-center bg-slate-100 p-1 rounded-sm border border-slate-200 text-xs font-semibold">
               <button
                 type="button"
-                onClick={openCreateModal}
-                className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => setActiveTab('garments')}
+                className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'garments'
+                    ? 'bg-white text-primary-700 shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <Plus size={16} /> Add Garment
+                <Layers size={14} /> Catalog View
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('pricing')}
+                className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'pricing'
+                    ? 'bg-white text-primary-700 shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Tag size={14} /> Service Pricing
+              </button>
+            </div>
+          )}
+
+          {canManage && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-sm text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Plus size={16} /> Add Garment
+            </button>
+          )}
         </div>
       </header>
 
@@ -514,68 +591,76 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'garments' && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* BAR 1: Service Selector Bar */}
-                <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0">
-                  <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0">
-                      Service:
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
+                      Service
                     </span>
-                    {services.map((service) => (
-                      <button
-                        key={service.id}
-                        type="button"
-                        onClick={() => setActiveServiceId(service.id)}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
-                          activeServiceId === service.id
-                            ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
-                        }`}
-                      >
-                        {service.name}
-                      </button>
-                    ))}
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {services.map((service) => {
+                        const isShoeSvc = service.name.toLowerCase().includes('shoe');
+                        const isVisuallyDisabled = isActiveShoeCategory ? !isShoeSvc : false;
+                        return (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => setActiveServiceId(service.id)}
+                            className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                              activeServiceId === service.id
+                                ? 'bg-primary-600 text-white border-primary-600'
+                                : isVisuallyDisabled
+                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            {service.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
                 {/* BAR 2: Category Selector Bar */}
-                <div className="border-b border-slate-200 bg-white px-2 shrink-0">
-                  <div className="flex items-center overflow-x-auto hide-scrollbar">
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setActiveCategory(cat)}
-                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer ${
-                          activeCategory === cat
-                            ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50 font-bold'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat] || cat}
-                      </button>
-                    ))}
+                <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
+                      Category
+                    </span>
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {CATEGORIES.map((cat) => {
+                        const isShoeCat = cat === GarmentCategory.SHOES;
+                        const isVisuallyDisabled = isActiveShoeService ? !isShoeCat : false;
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setActiveCategory(cat)}
+                            className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                              activeCategory === cat
+                                ? 'bg-primary-600 text-white border-primary-600'
+                                : isVisuallyDisabled
+                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            {CATEGORY_LABELS[cat] || cat}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Context & Search Bar */}
-                <div className="p-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                  <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-                    <span>Showing</span>
-                    <span className="font-bold text-slate-800">
-                      {filteredGarments.length} {CATEGORY_LABELS[activeCategory]}
-                    </span>
-                    <span>garments for</span>
-                    <span className="bg-primary-50 text-primary-700 font-bold px-2 py-0.5 rounded-md border border-primary-200">
-                      {currentActiveService?.name || 'Selected Service'}
-                    </span>
-                  </div>
-
-                  <div className="relative w-full sm:w-80">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search size={16} />
+                {/* Search Bar */}
+                <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0">
+                  <div className="relative w-full">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                       placeholder={`Search in ${CATEGORY_LABELS[activeCategory]}...`}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -584,7 +669,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* 4-Column Garment Catalog Grid (Independently Scrollable) */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 min-h-0">
+                <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6 md:py-6 bg-slate-50 min-h-0">
                   {filteredGarments.length === 0 ? (
                     <EmptyState
                       message={
@@ -594,7 +679,7 @@ export const CatalogSettingsPage: React.FC = () => {
                       }
                     />
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                       {filteredGarments.map((garment) => {
                         const price = getPriceFor(garment.id, activeServiceId);
                         const hasPrice = price !== null;
@@ -602,7 +687,7 @@ export const CatalogSettingsPage: React.FC = () => {
                         return (
                           <div
                             key={garment.id}
-                            className={`relative flex flex-col items-center justify-between p-4 bg-white rounded-2xl border transition-all group min-h-[160px] ${
+                            className={`relative flex flex-col items-center justify-between p-6 bg-white rounded-sm border transition-all group min-h-[180px] ${
                               !garment.isActive
                                 ? 'opacity-60 grayscale border-slate-300'
                                 : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400'
@@ -610,39 +695,39 @@ export const CatalogSettingsPage: React.FC = () => {
                           >
                             {/* Price Badge (Top-Right) */}
                             {hasPrice ? (
-                              <div className="absolute top-0 right-0 bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl shadow-xs">
+                              <div className="absolute top-3 right-3 bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-sm shadow-xs">
                                 ₹{price.toFixed(0)}
                               </div>
                             ) : (
-                              <div className="absolute top-0 right-0 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-bl-xl rounded-tr-2xl">
+                              <div className="absolute top-3 right-3 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2.5 py-1 rounded-sm">
                                 Not Configured
                               </div>
                             )}
 
                             {/* Inactive State Badge (Top-Left) */}
                             {!garment.isActive && (
-                              <span className="absolute top-0 left-0 bg-slate-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-br-xl rounded-tl-2xl">
+                              <span className="absolute top-3 left-3 bg-slate-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-sm">
                                 Inactive
                               </span>
                             )}
 
                             {/* Garment Icon */}
-                            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-2 mb-2">
+                            <div className="w-16 h-16 rounded-sm bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-6 mb-4">
                               <Shirt size={32} strokeWidth={1.5} />
                             </div>
 
                             {/* Garment Name */}
-                            <span className="text-sm font-semibold text-slate-800 text-center line-clamp-2 leading-tight px-1 w-full mb-2">
+                            <span className="text-sm font-semibold text-slate-800 text-center line-clamp-2 leading-tight px-1 w-full mb-4">
                               {garment.name}
                             </span>
 
                             {/* Admin Controls on Tile for OWNER / MANAGER */}
                             {canManage && (
-                              <div className="w-full pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                              <div className="w-full pt-3 mt-auto border-t border-slate-100 flex items-center justify-center gap-4 opacity-90 group-hover:opacity-100 transition-opacity px-2">
                                 <button
                                   type="button"
                                   onClick={() => openEditModal(garment)}
-                                  className="flex-1 py-1 px-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-1 border border-slate-200 cursor-pointer"
+                                  className="flex-1 py-2 px-3 rounded-sm text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer min-h-[36px]"
                                   title="Edit garment details"
                                 >
                                   <Edit2 size={12} /> Edit
@@ -650,7 +735,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => openQuickPriceModal(garment)}
-                                  className="flex-1 py-1 px-2 rounded-lg text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 flex items-center justify-center gap-1 border border-primary-200 cursor-pointer"
+                                  className="flex-1 py-2 px-3 rounded-sm text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 flex items-center justify-center gap-1.5 border border-primary-200 cursor-pointer min-h-[36px]"
                                   title="Set price for this service"
                                 >
                                   <Tag size={12} /> Price
@@ -672,60 +757,79 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'pricing' && canConfigurePricing && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* Selector Bar 1: Service */}
-                <div className="bg-slate-50 border-b border-slate-200 p-3 shrink-0">
-                  <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1 shrink-0">
-                      Configure Service:
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
+                      Service
                     </span>
-                    {services.map((service) => (
-                      <button
-                        key={service.id}
-                        type="button"
-                        onClick={() => {
-                          setPricingServiceId(service.id);
-                          setEditedPrices({});
-                        }}
-                        className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
-                          pricingServiceId === service.id
-                            ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
-                        }`}
-                      >
-                        {service.name}
-                      </button>
-                    ))}
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {services.map((service) => {
+                        const isShoeSvc = service.name.toLowerCase().includes('shoe');
+                        const isVisuallyDisabled = isPricingShoeCategory ? !isShoeSvc : false;
+                        return (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => {
+                              setPricingServiceId(service.id);
+                              setEditedPrices({});
+                            }}
+                            className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                              pricingServiceId === service.id
+                                ? 'bg-primary-600 text-white border-primary-600'
+                                : isVisuallyDisabled
+                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            {service.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
                 {/* Selector Bar 2: Category */}
-                <div className="border-b border-slate-200 bg-white px-2 shrink-0">
-                  <div className="flex items-center overflow-x-auto hide-scrollbar">
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setPricingCategory(cat)}
-                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer ${
-                          pricingCategory === cat
-                            ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50 font-bold'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat] || cat}
-                      </button>
-                    ))}
+                <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
+                      Category
+                    </span>
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {CATEGORIES.map((cat) => {
+                        const isShoeCat = cat === GarmentCategory.SHOES;
+                        const isVisuallyDisabled = isPricingShoeService ? !isShoeCat : false;
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setPricingCategory(cat)}
+                            className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                              pricingCategory === cat
+                                ? 'bg-primary-600 text-white border-primary-600'
+                                : isVisuallyDisabled
+                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            {CATEGORY_LABELS[cat] || cat}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
                 {/* Controls Bar & Feedback */}
-                <div className="p-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                  <div className="relative w-full sm:w-80">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search size={16} />
+                <div className="px-5 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                  <div className="relative w-full sm:w-96">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                       placeholder={`Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
                       value={pricingSearch}
                       onChange={(e) => setPricingSearch(e.target.value)}
@@ -733,12 +837,20 @@ export const CatalogSettingsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleAutoFillAllMissingPrices}
+                      disabled={savingPrices}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Sparkles size={15} /> Auto-fill All Missing
+                    </button>
                     {Object.keys(editedPrices).length > 0 && (
                       <button
                         type="button"
                         onClick={handleSaveAllEditedPrices}
                         disabled={savingPrices}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                       >
                         <Save size={15} /> Save All Changes ({Object.keys(editedPrices).length})
                       </button>
@@ -748,12 +860,12 @@ export const CatalogSettingsPage: React.FC = () => {
 
                 {/* Notifications */}
                 {priceSaveSuccess && (
-                  <div className="mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl flex items-center gap-2">
+                  <div className="mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-sm flex items-center gap-2">
                     <Check size={16} /> {priceSaveSuccess}
                   </div>
                 )}
                 {priceSaveError && (
-                  <div className="mx-4 mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-xl flex items-center justify-between">
+                  <div className="mx-4 mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-sm flex items-center justify-between">
                     <span>{priceSaveError}</span>
                     <button
                       type="button"
@@ -772,15 +884,15 @@ export const CatalogSettingsPage: React.FC = () => {
                       message={`No garments found in ${CATEGORY_LABELS[pricingCategory]}`}
                     />
                   ) : (
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="bg-white rounded-sm border border-slate-200 shadow-xs overflow-hidden">
                       <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
                           <tr>
-                            <th className="py-3 px-4">Garment</th>
-                            <th className="py-3 px-4">Category</th>
-                            <th className="py-3 px-4">Current Price</th>
-                            <th className="py-3 px-4 w-48">Configure Price (₹)</th>
-                            <th className="py-3 px-4 text-right">Action</th>
+                            <th className="py-3.5 px-5">Garment</th>
+                            <th className="py-3.5 px-5">Category</th>
+                            <th className="py-3.5 px-5">Current Price</th>
+                            <th className="py-3.5 px-5 w-56">Configure Price (₹)</th>
+                            <th className="py-3.5 px-5 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -799,31 +911,31 @@ export const CatalogSettingsPage: React.FC = () => {
                                 key={garment.id}
                                 className="hover:bg-slate-50/70 transition-colors"
                               >
-                                <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
+                                <td className="py-3.5 px-5 font-semibold text-slate-900 flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-sm bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
                                     <Shirt size={16} />
                                   </div>
                                   <span>{garment.name}</span>
                                 </td>
-                                <td className="py-3 px-4 text-xs text-slate-500">
-                                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">
+                                <td className="py-3.5 px-5 text-xs text-slate-500">
+                                  <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-sm font-medium">
                                     {CATEGORY_LABELS[garment.category] || garment.category}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 font-semibold">
+                                <td className="py-3.5 px-5 font-semibold">
                                   {hasPrice ? (
                                     <span className="text-slate-900">
                                       ₹{currentPrice.toFixed(0)}
                                     </span>
                                   ) : (
-                                    <span className="text-amber-700 text-xs italic bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                    <span className="text-amber-700 text-xs italic bg-amber-50 px-2.5 py-1 rounded-sm border border-amber-200">
                                       Not Configured
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-3 px-4">
-                                  <div className="relative w-36">
-                                    <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 font-bold text-xs">
+                                <td className="py-3.5 px-5">
+                                  <div className="relative w-44">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-bold text-sm">
                                       ₹
                                     </span>
                                     <input
@@ -835,7 +947,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                       onChange={(e) =>
                                         handlePriceInputChange(garment.id, e.target.value)
                                       }
-                                      className={`w-full pl-7 pr-3 py-1.5 text-xs font-bold rounded-lg border focus:outline-none focus:ring-2 ${
+                                      className={`w-full pl-8 pr-4 py-2 text-sm font-bold rounded-sm border min-h-[40px] focus:outline-none focus:ring-2 ${
                                         isEdited
                                           ? 'border-primary-500 bg-primary-50/40 text-primary-900 ring-2 ring-primary-400'
                                           : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-primary-500'
@@ -843,13 +955,13 @@ export const CatalogSettingsPage: React.FC = () => {
                                     />
                                   </div>
                                 </td>
-                                <td className="py-3 px-4 text-right">
+                                <td className="py-3.5 px-5 text-right min-w-[100px]">
                                   {isEdited && (
                                     <button
                                       type="button"
                                       onClick={() => handleSaveSinglePrice(garment.id)}
                                       disabled={savingPrices}
-                                      className="px-3 py-1 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-2xs"
+                                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-sm text-xs font-bold cursor-pointer transition-all shadow-xs min-h-[36px]"
                                     >
                                       Save
                                     </button>
@@ -872,7 +984,7 @@ export const CatalogSettingsPage: React.FC = () => {
       {/* ─── CREATE GARMENT MODAL ──────────────────────────── */}
       {createModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+          <div className="bg-white rounded-sm max-w-md w-full p-6 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Sparkles size={18} className="text-primary-600" /> Add New Garment
@@ -887,7 +999,7 @@ export const CatalogSettingsPage: React.FC = () => {
             </div>
 
             {createError && (
-              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">
+              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-sm">
                 {createError}
               </div>
             )}
@@ -903,7 +1015,7 @@ export const CatalogSettingsPage: React.FC = () => {
                   placeholder="e.g. Silk Blazer"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 />
               </div>
 
@@ -914,7 +1026,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as GarmentCategory)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -933,7 +1045,7 @@ export const CatalogSettingsPage: React.FC = () => {
                   placeholder="e.g. Formal, Delicate"
                   value={newSection}
                   onChange={(e) => setNewSection(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 />
               </div>
 
@@ -941,14 +1053,14 @@ export const CatalogSettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={closeCreateModal}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-xs cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-sm shadow-xs cursor-pointer"
                 >
                   {creating ? 'Adding...' : 'Create Garment'}
                 </button>
@@ -961,7 +1073,7 @@ export const CatalogSettingsPage: React.FC = () => {
       {/* ─── EDIT GARMENT MODAL ────────────────────────────── */}
       {editModalOpen && editGarment && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+          <div className="bg-white rounded-sm max-w-md w-full p-6 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Edit2 size={18} className="text-primary-600" /> Edit Garment
@@ -976,7 +1088,7 @@ export const CatalogSettingsPage: React.FC = () => {
             </div>
 
             {saveGarmentError && (
-              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">
+              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-sm">
                 {saveGarmentError}
               </div>
             )}
@@ -991,7 +1103,7 @@ export const CatalogSettingsPage: React.FC = () => {
                   required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 />
               </div>
 
@@ -1002,7 +1114,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 <select
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value as GarmentCategory)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -1012,7 +1124,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-sm">
                 <div>
                   <span className="text-sm font-semibold text-slate-900 block">Active Status</span>
                   <span className="text-xs text-slate-500">
@@ -1031,14 +1143,14 @@ export const CatalogSettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingGarment}
-                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-xs cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-sm shadow-xs cursor-pointer"
                 >
                   {savingGarment ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -1051,7 +1163,7 @@ export const CatalogSettingsPage: React.FC = () => {
       {/* ─── QUICK PRICE EDIT MODAL ────────────────────────── */}
       {quickPriceModalOpen && quickPriceGarment && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200">
+          <div className="bg-white rounded-sm max-w-sm w-full p-6 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Tag size={18} className="text-primary-600" /> Set Price
@@ -1065,7 +1177,7 @@ export const CatalogSettingsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-4 text-xs">
+            <div className="bg-slate-50 p-3 rounded-sm border border-slate-200 mb-4 text-xs">
               <div className="font-bold text-slate-900 text-sm mb-0.5">
                 {quickPriceGarment.name}
               </div>
@@ -1078,7 +1190,7 @@ export const CatalogSettingsPage: React.FC = () => {
             </div>
 
             {quickPriceError && (
-              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl">
+              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-sm">
                 {quickPriceError}
               </div>
             )}
@@ -1100,7 +1212,7 @@ export const CatalogSettingsPage: React.FC = () => {
                     placeholder="e.g. 105"
                     value={quickPriceValue}
                     onChange={(e) => setQuickPriceValue(e.target.value)}
-                    className="w-full pl-8 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-bold focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                    className="w-full pl-8 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-base font-bold focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1109,14 +1221,14 @@ export const CatalogSettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={closeQuickPriceModal}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-sm cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingQuickPrice}
-                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-xs cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-sm shadow-xs cursor-pointer"
                 >
                   {savingQuickPrice ? 'Saving...' : 'Save Price'}
                 </button>

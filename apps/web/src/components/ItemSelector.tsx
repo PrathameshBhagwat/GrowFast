@@ -10,7 +10,16 @@ interface ItemSelectorProps {
   selectedGarmentId?: string;
 }
 
-const CATEGORIES = Object.values(GarmentCategory);
+const CATEGORIES = [
+  GarmentCategory.MEN,
+  GarmentCategory.WOMEN,
+  GarmentCategory.KIDS,
+  GarmentCategory.HOUSEHOLD,
+  GarmentCategory.HOME_CLEANING,
+  GarmentCategory.SHOES,
+  GarmentCategory.OTHERS,
+  GarmentCategory.WEIGHT_BASED,
+];
 const CATEGORY_LABELS: Record<string, string> = {
   MEN: 'Men',
   WOMEN: 'Women',
@@ -44,6 +53,26 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
     }
   }, [activeServices, selectedServiceId]);
 
+  // Determine if a shoe service is currently selected
+  const isShoeServiceSelected = activeServices
+    .find((s) => s.id === selectedServiceId)
+    ?.name.toLowerCase()
+    .includes('shoe');
+
+  // Determine if the shoe category is currently selected
+  const isShoeCategorySelected = selectedCategory === GarmentCategory.SHOES;
+
+  // Enforce valid combinations if state becomes mismatched
+  React.useEffect(() => {
+    if (isShoeCategorySelected && !isShoeServiceSelected) {
+      const shoeService = activeServices.find((s) => s.name.toLowerCase().includes('shoe'));
+      if (shoeService) setSelectedServiceId(shoeService.id);
+    } else if (!isShoeCategorySelected && isShoeServiceSelected) {
+      const nonShoeService = activeServices.find((s) => !s.name.toLowerCase().includes('shoe'));
+      if (nonShoeService) setSelectedServiceId(nonShoeService.id);
+    }
+  }, [isShoeCategorySelected, isShoeServiceSelected, activeServices]);
+
   const filteredGarments = useMemo(() => {
     return activeGarments.filter((g) => {
       const matchesCategory = g.category === selectedCategory;
@@ -66,51 +95,79 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-white min-h-0 select-none">
-      {/* BAR 1: Service Tabs — horizontally scrollable row */}
-      <div className="flex items-center overflow-x-auto gap-2 p-3 bg-slate-50 border-b border-slate-200 hide-scrollbar shrink-0">
-        {activeServices.map((service) => (
-          <button
-            key={service.id}
-            type="button"
-            onClick={() => setSelectedServiceId(service.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
-              selectedServiceId === service.id
-                ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
-                : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
-            }`}
-          >
-            {service.name}
-          </button>
-        ))}
+      {/* BAR 1: Service Selector Bar */}
+      <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+          <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
+            Service
+          </span>
+          <div className="flex-1 flex flex-wrap gap-4 w-full">
+            {activeServices.map((service) => {
+              const isShoeService = service.name.toLowerCase().includes('shoe');
+              const isVisuallyDisabled = isShoeCategorySelected ? !isShoeService : false;
+
+              return (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => setSelectedServiceId(service.id)}
+                  className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                    selectedServiceId === service.id
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : isVisuallyDisabled
+                        ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {service.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* BAR 2: Category Tabs — horizontally scrollable row */}
-      <div className="flex items-center overflow-x-auto border-b border-slate-200 bg-white hide-scrollbar shrink-0 px-2">
-        {CATEGORIES.map((category) => (
-          <button
-            key={category}
-            type="button"
-            onClick={() => setSelectedCategory(category)}
-            className={`px-4 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer ${
-              selectedCategory === category
-                ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            {CATEGORY_LABELS[category] || category}
-          </button>
-        ))}
+      {/* BAR 2: Category Selector Bar */}
+      <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+          <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
+            Category
+          </span>
+          <div className="flex-1 flex flex-wrap gap-4 w-full">
+            {CATEGORIES.map((category) => {
+              const isShoeCat = category === GarmentCategory.SHOES;
+              const isVisuallyDisabled = isShoeServiceSelected ? !isShoeCat : false;
+
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setSelectedCategory(category)}
+                  className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                    selectedCategory === category
+                      ? 'bg-primary-600 text-white border-primary-600'
+                      : isVisuallyDisabled
+                        ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
+                        : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {CATEGORY_LABELS[category] || category}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Search Bar */}
-      <div className="p-3 border-b border-slate-200 bg-white shrink-0">
+      <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0 mb-3">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Search size={18} />
           </div>
           <input
             type="text"
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
             placeholder="🔍 Search garment to add..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -134,7 +191,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 key={garment.id}
                 type="button"
                 onClick={() => handleGarmentClick(garment)}
-                className={`relative flex flex-col items-center justify-between p-4 bg-white rounded-2xl border transition-all text-left group min-h-[140px] cursor-pointer ${
+                className={`relative flex flex-col items-center justify-between p-4 bg-white rounded-[2px] border transition-all text-left group min-h-[140px] cursor-pointer ${
                   isSelected
                     ? 'border-primary-600 ring-2 ring-primary-500 bg-primary-50/30 shadow-md'
                     : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400 hover:bg-slate-50/50'
@@ -143,16 +200,16 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
               >
                 {/* Price Badge */}
                 {hasPrice ? (
-                  <div className="absolute top-0 right-0 bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-bl-xl rounded-tr-2xl shadow-xs">
+                  <div className="absolute top-0 right-0 bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-bl-[2px] rounded-tr-[2px] shadow-xs">
                     ₹{price}
                   </div>
                 ) : (
-                  <div className="absolute top-0 right-0 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-bl-xl rounded-tr-2xl">
+                  <div className="absolute top-0 right-0 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-bl-[2px] rounded-tr-[2px]">
                     Not Configured
                   </div>
                 )}
 
-                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-2 mb-2">
+                <div className="w-14 h-14 rounded-[2px] bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-2 mb-2">
                   <Shirt size={28} strokeWidth={1.5} />
                 </div>
 
