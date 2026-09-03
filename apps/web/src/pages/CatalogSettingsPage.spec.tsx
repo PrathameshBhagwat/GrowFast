@@ -87,7 +87,7 @@ describe('CatalogSettingsPage', () => {
     // Verify Owner has Add Garment button and tabs
     expect(screen.getByText('Add Garment')).toBeInTheDocument();
     expect(screen.getByText('Catalog View')).toBeInTheDocument();
-    expect(screen.getByText('Pricing Matrix')).toBeInTheDocument();
+    expect(screen.getByText('Service Pricing')).toBeInTheDocument();
   });
 
   it('updates price badge when switching active service', async () => {
@@ -157,9 +157,9 @@ describe('CatalogSettingsPage', () => {
       expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
     });
 
-    // Counter sees Add Garment button but NO Pricing Matrix tab
+    // Counter sees Add Garment button but NO Service Pricing tab
     expect(screen.getByText('Add Garment')).toBeInTheDocument();
-    expect(screen.queryByText('Pricing Matrix')).not.toBeInTheDocument();
+    expect(screen.queryByText('Service Pricing')).not.toBeInTheDocument();
     expect(screen.queryByText(/View Only \(Counter\)/i)).not.toBeInTheDocument();
   });
 });
