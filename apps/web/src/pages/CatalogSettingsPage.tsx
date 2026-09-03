@@ -31,10 +31,10 @@ const CATEGORIES = [
   GarmentCategory.WOMEN,
   GarmentCategory.KIDS,
   GarmentCategory.HOUSEHOLD,
-  GarmentCategory.WEIGHT_BASED,
   GarmentCategory.HOME_CLEANING,
   GarmentCategory.SHOES,
   GarmentCategory.OTHERS,
+  GarmentCategory.WEIGHT_BASED,
 ];
 
 /** Human-readable labels for category values. */
@@ -525,44 +525,48 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'garments' && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* BAR 1: Service Selector Bar */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-3 shrink-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Service</span>
-                    {services.map((service) => (
-                      <button
-                        key={service.id}
-                        type="button"
-                        onClick={() => setActiveServiceId(service.id)}
-                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer border ${
-                          activeServiceId === service.id
-                            ? 'bg-primary-600 text-white shadow-sm border-primary-600'
-                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
-                        }`}
-                      >
-                        {service.name}
-                      </button>
-                    ))}
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {services.map((service) => (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => setActiveServiceId(service.id)}
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-nowrap min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                            activeServiceId === service.id
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          {service.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
                 {/* BAR 2: Category Selector Bar */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 py-3 shrink-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Category</span>
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setActiveCategory(cat)}
-                        className={`px-5 py-2.5 whitespace-nowrap text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm border ${
-                          activeCategory === cat
-                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat] || cat}
-                      </button>
-                    ))}
+                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {CATEGORIES.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setActiveCategory(cat)}
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-nowrap text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                            activeCategory === cat
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          {CATEGORY_LABELS[cat] || cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -671,47 +675,51 @@ export const CatalogSettingsPage: React.FC = () => {
             {activeTab === 'pricing' && canManage && (
               <div className="flex-1 flex flex-col min-h-0 bg-white">
                 {/* Selector Bar 1: Service */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-3 shrink-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Service</span>
-                    {services.map((service) => (
-                      <button
-                        key={service.id}
-                        type="button"
-                        onClick={() => {
-                          setPricingServiceId(service.id);
-                          setEditedPrices({});
-                        }}
-                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer border ${
-                          pricingServiceId === service.id
-                            ? 'bg-primary-600 text-white shadow-sm border-primary-600'
-                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
-                        }`}
-                      >
-                        {service.name}
-                      </button>
-                    ))}
+                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {services.map((service) => (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => {
+                            setPricingServiceId(service.id);
+                            setEditedPrices({});
+                          }}
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-nowrap min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                            pricingServiceId === service.id
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          {service.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
                 {/* Selector Bar 2: Category */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 py-3 shrink-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Category</span>
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setPricingCategory(cat)}
-                        className={`px-5 py-2.5 whitespace-nowrap text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm border ${
-                          pricingCategory === cat
-                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat] || cat}
-                      </button>
-                    ))}
+                <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0">
+                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
+                    <div className="flex-1 flex flex-wrap gap-4 w-full">
+                      {CATEGORIES.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setPricingCategory(cat)}
+                          className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-nowrap text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                            pricingCategory === cat
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          {CATEGORY_LABELS[cat] || cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
