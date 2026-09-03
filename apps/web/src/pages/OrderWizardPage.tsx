@@ -14,7 +14,6 @@ export function OrderWizardPage() {
   const initialCustomerId = searchParams.get('customerId');
   const { token } = useAuth();
 
-  const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialCustomerId);
   const [customer, setCustomer] = useState<CustomerDTO | null>(null);
@@ -88,9 +87,6 @@ export function OrderWizardPage() {
     }
   }, [initialCustomerId, token]);
 
-  const handleNext = () => setStep((s) => Math.min(s + 1, 3));
-  const handlePrev = () => setStep((s) => Math.max(s - 1, 1));
-
   const handleCreateOrder = async () => {
     if (!selectedCustomerId || items.length === 0) return;
 
@@ -132,83 +128,19 @@ export function OrderWizardPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 p-4 md:p-6 overflow-hidden">
-      <div className="flex items-center justify-between shrink-0 mb-6">
+      <div className="flex items-center justify-between shrink-0 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Create New Order</h1>
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-semibold border ${step === 3 ? 'bg-green-100 text-green-800 border-green-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}
-        >
-          Step {step} of 3
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 shrink-0">
-        <div
-          className={`p-4 rounded-lg border-2 ${step >= 1 ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white'}`}
-        >
-          <div className="font-semibold text-gray-900">1. Customer Selection</div>
-          <div className="text-sm text-gray-500">Search and select a customer</div>
-        </div>
-        <div
-          className={`p-4 rounded-lg border-2 ${step >= 2 ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white'}`}
-        >
-          <div className="font-semibold text-gray-900">2. Item Entry</div>
-          <div className="text-sm text-gray-500">Add garments and services</div>
-        </div>
-        <div
-          className={`p-4 rounded-lg border-2 ${step >= 3 ? 'border-primary-500 bg-primary-50' : 'border-gray-200 bg-white'}`}
-        >
-          <div className="font-semibold text-gray-900">3. Review Order</div>
-          <div className="text-sm text-gray-500">Confirm details before creation</div>
-        </div>
+        {customer && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-md text-sm">
+            <span className="font-semibold text-green-900">{customer.name}</span>
+            <span className="text-green-700">({customer.phone})</span>
+          </div>
+        )}
       </div>
 
       <Card className="flex-1 flex flex-col min-h-0 overflow-hidden" padding="none">
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-gray-50">
-          {step === 1 && (
-            <div className="p-6 h-full overflow-y-auto bg-white">
-              <h2 className="text-xl font-semibold mb-4">Select Customer</h2>
-
-              {customerLoading ? (
-                <LoadingState message="Loading customer details..." />
-              ) : customerError ? (
-                <ErrorState
-                  message={customerError}
-                  onRetry={() => {
-                    setCustomerError(null);
-                    setSelectedCustomerId(null);
-                  }}
-                />
-              ) : customer ? (
-                <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                  <h3 className="font-semibold text-green-900 text-lg">{customer.name}</h3>
-                  <p className="text-green-700">{customer.phone}</p>
-                  <p className="text-green-700">{customer.email}</p>
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setCustomer(null);
-                        setSelectedCustomerId(null);
-                      }}
-                    >
-                      Change Customer
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg">
-                  <CustomerSelector
-                    onSelect={(c) => {
-                      setCustomer(c);
-                      setSelectedCustomerId(c.id);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {step === 2 && (
+          
             <div className="flex flex-col h-full bg-gray-50">
               <div className="p-4 border-b shrink-0 bg-white">
                 <h2 className="text-xl font-semibold">Add Items</h2>
@@ -528,93 +460,18 @@ export function OrderWizardPage() {
                 </div>
               </div>
             </div>
-          )}
-
-          {step === 3 &&
-            (() => {
-              const pricingInputs: PricingItemInput[] = items.map((item) => {
-                const p = prices.find(
-                  (priceItem) =>
-                    priceItem.garmentCatalogId === item.garmentCatalogId &&
-                    priceItem.serviceTypeId === item.serviceTypeId,
-                );
-                return {
-                  quantity: item.quantity,
-                  unitPrice: p ? p.price : 0,
-                };
-              });
-              const totals = calculateOrderTotals(pricingInputs, {
-                isExpress,
-                expressSurchargePercent: storeConfig?.expressSurchargePercent ?? undefined,
-              });
-
-              return (
-                <div className="p-6 h-full overflow-y-auto bg-white">
-                  <h2 className="text-xl font-semibold mb-4">Review Order</h2>
-                  <div className="bg-gray-50 p-6 rounded-lg border">
-                    <div className="space-y-2 mb-6 border-b pb-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Customer ID:</span>
-                        <span className="font-medium">{selectedCustomerId || 'None'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total Items:</span>
-                        <span className="font-medium">
-                          {items.reduce((s, i) => s + i.quantity, 0)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <h3 className="font-semibold mb-3">Financial Breakdown</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span>₹{totals.subtotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Discount:</span>
-                        <span className="text-green-600">-₹{totals.discountAmount.toFixed(2)}</span>
-                      </div>
-                      {isExpress && storeConfig?.expressSurchargePercent != null && (
-                        <div className="flex justify-between text-orange-700">
-                          <span>
-                            ⚡ Express Surcharge ({storeConfig.expressSurchargePercent}%):
-                          </span>
-                          <span>₹{totals.expressSurcharge.toFixed(2)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">GST (18%):</span>
-                        <span>₹{totals.taxAmount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-base pt-2 border-t mt-2">
-                        <span>Total Amount:</span>
-                        <span>₹{totals.totalAmount.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-        </div>
-
+          
         <div className="flex justify-between p-4 border-t bg-white shrink-0">
-          <Button variant="outline" onClick={handlePrev} disabled={step === 1}>
-            Previous
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Cancel
           </Button>
-          {step < 3 ? (
-            <Button onClick={handleNext} disabled={step === 1 && !selectedCustomerId}>
-              Next Step
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              onClick={handleCreateOrder}
-              disabled={isSubmitting || items.length === 0}
-            >
-              {isSubmitting ? 'Creating...' : 'Create Order'}
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            onClick={handleCreateOrder}
+            disabled={isSubmitting || items.length === 0 || !selectedCustomerId}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Order & View Bill'}
+          </Button>
         </div>
       </Card>
     </div>
