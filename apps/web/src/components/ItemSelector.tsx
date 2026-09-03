@@ -10,7 +10,16 @@ interface ItemSelectorProps {
   selectedGarmentId?: string;
 }
 
-const CATEGORIES = Object.values(GarmentCategory);
+const CATEGORIES = [
+  GarmentCategory.MEN,
+  GarmentCategory.WOMEN,
+  GarmentCategory.KIDS,
+  GarmentCategory.HOUSEHOLD,
+  GarmentCategory.HOME_CLEANING,
+  GarmentCategory.SHOES,
+  GarmentCategory.OTHERS,
+  GarmentCategory.WEIGHT_BASED,
+];
 const CATEGORY_LABELS: Record<string, string> = {
   MEN: 'Men',
   WOMEN: 'Women',
@@ -65,44 +74,54 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-white min-h-0 select-none">
-      {/* BAR 1: Service Tabs — horizontally scrollable row */}
-      <div className="flex items-center overflow-x-auto gap-2 p-3 bg-slate-50 border-b border-slate-200 hide-scrollbar shrink-0">
-        {activeServices.map((service) => (
-          <button
-            key={service.id}
-            type="button"
-            onClick={() => setSelectedServiceId(service.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
-              selectedServiceId === service.id
-                ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
-                : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
-            }`}
-          >
-            {service.name}
-          </button>
-        ))}
+      {/* BAR 1: Service Selector Bar */}
+      <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-3 shadow-xs">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+          <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Service</span>
+          <div className="flex-1 flex flex-wrap gap-4 w-full">
+            {activeServices.map((service) => (
+              <button
+                key={service.id}
+                type="button"
+                onClick={() => setSelectedServiceId(service.id)}
+                className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-nowrap min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
+                  selectedServiceId === service.id
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                {service.name}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* BAR 2: Category Tabs — horizontally scrollable row */}
-      <div className="flex items-center overflow-x-auto border-b border-slate-200 bg-white hide-scrollbar shrink-0 px-2">
-        {CATEGORIES.map((category) => (
-          <button
-            key={category}
-            type="button"
-            onClick={() => setSelectedCategory(category)}
-            className={`px-4 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer ${
-              selectedCategory === category
-                ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            {CATEGORY_LABELS[category] || category}
-          </button>
-        ))}
+      {/* BAR 2: Category Selector Bar */}
+      <div className="w-full border-b border-slate-200 bg-white px-5 py-4 shrink-0 mb-3 shadow-xs">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4">
+          <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">Category</span>
+          <div className="flex-1 flex flex-wrap gap-4 w-full">
+            {CATEGORIES.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setSelectedCategory(category)}
+                className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-nowrap text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
+                  selectedCategory === category
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                {CATEGORY_LABELS[category] || category}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Search Bar */}
-      <div className="p-3 border-b border-slate-200 bg-white shrink-0">
+      <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0 mb-3">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Search size={18} />
