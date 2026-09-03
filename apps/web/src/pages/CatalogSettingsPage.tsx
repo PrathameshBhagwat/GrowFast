@@ -527,15 +527,16 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* BAR 1: Service Selector Bar */}
                 <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-3 shrink-0">
                   <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Service</span>
                     {services.map((service) => (
                       <button
                         key={service.id}
                         type="button"
                         onClick={() => setActiveServiceId(service.id)}
-                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
+                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer border ${
                           activeServiceId === service.id
-                            ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
+                            ? 'bg-primary-600 text-white shadow-sm border-primary-600'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
                         }`}
                       >
                         {service.name}
@@ -545,17 +546,18 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* BAR 2: Category Selector Bar */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 shrink-0">
-                  <div className="flex flex-wrap items-center gap-1">
+                <div className="w-full border-b border-slate-200 bg-white px-5 py-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Category</span>
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => setActiveCategory(cat)}
-                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm ${
+                        className={`px-5 py-2.5 whitespace-nowrap text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm border ${
                           activeCategory === cat
-                            ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50 font-bold'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
                         }`}
                       >
                         {CATEGORY_LABELS[cat] || cat}
@@ -671,6 +673,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* Selector Bar 1: Service */}
                 <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-3 shrink-0">
                   <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Service</span>
                     {services.map((service) => (
                       <button
                         key={service.id}
@@ -679,10 +682,10 @@ export const CatalogSettingsPage: React.FC = () => {
                           setPricingServiceId(service.id);
                           setEditedPrices({});
                         }}
-                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer ${
+                        className={`px-5 py-2.5 rounded-sm text-sm font-semibold transition-all whitespace-nowrap min-h-[44px] flex items-center justify-center cursor-pointer border ${
                           pricingServiceId === service.id
-                            ? 'bg-primary-600 text-white shadow-sm border border-primary-600'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:border-primary-300 hover:bg-primary-50/50'
+                            ? 'bg-primary-600 text-white shadow-sm border-primary-600'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
                         }`}
                       >
                         {service.name}
@@ -692,17 +695,18 @@ export const CatalogSettingsPage: React.FC = () => {
                 </div>
 
                 {/* Selector Bar 2: Category */}
-                <div className="w-full border-b border-slate-200 bg-white px-5 shrink-0">
-                  <div className="flex flex-wrap items-center gap-1">
+                <div className="w-full border-b border-slate-200 bg-white px-5 py-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-bold text-slate-800 mr-1 shrink-0">Category</span>
                     {CATEGORIES.map((cat) => (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => setPricingCategory(cat)}
-                        className={`px-5 py-3 whitespace-nowrap text-sm font-semibold transition-colors min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm ${
+                        className={`px-5 py-2.5 whitespace-nowrap text-sm font-semibold transition-all min-h-[44px] flex items-center justify-center cursor-pointer rounded-sm border ${
                           pricingCategory === cat
-                            ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50 font-bold'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                            : 'bg-white text-slate-700 border-slate-300 hover:border-primary-300 hover:bg-primary-50/50'
                         }`}
                       >
                         {CATEGORY_LABELS[cat] || cat}
