@@ -14,7 +14,6 @@ import {
   Save,
   Tag,
   X,
-
   Layers,
   Sparkles,
 } from 'lucide-react';
@@ -102,8 +101,6 @@ export const CatalogSettingsPage: React.FC = () => {
   // ─── Fetch All Catalog Data ─────────────────────────────
   const fetchAllData = useCallback(async () => {
     if (!token) return;
-
-
 
     setLoading(true);
     setError(null);

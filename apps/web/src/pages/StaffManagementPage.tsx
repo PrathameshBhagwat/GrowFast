@@ -146,64 +146,64 @@ export const StaffManagementPage: React.FC = () => {
     setFormLoading(true);
 
     try {
-        if (editingEmployee) {
-          const updatePayload: any = {
-            name: name.trim(),
-            phone: phone.trim() || null,
-            email: email.trim() || null,
-            role,
-            isActive,
-          };
-          if (pin) updatePayload.pin = pin;
+      if (editingEmployee) {
+        const updatePayload: any = {
+          name: name.trim(),
+          phone: phone.trim() || null,
+          email: email.trim() || null,
+          role,
+          isActive,
+        };
+        if (pin) updatePayload.pin = pin;
 
-          const res = await fetch(`${API_URL}/employees/${editingEmployee.id}`, {
-            method: 'PATCH',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatePayload),
-          });
+        const res = await fetch(`${API_URL}/employees/${editingEmployee.id}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatePayload),
+        });
 
-          if (!res.ok) {
-            const errBody = await res.json().catch(() => ({}));
-            throw new Error(errBody.message || 'Failed to update employee details.');
-          }
-
-          const body: ApiResponse<EmployeeDTO> = await res.json();
-          setEmployees((prev) => prev.map((emp) => (emp.id === body.data.id ? body.data : emp)));
-          showNotice(`Staff member "${body.data.name}" updated successfully!`);
-          setIsModalOpen(false);
-        } else {
-          // Create Employee
-          const createPayload = {
-            name: name.trim(),
-            phone: phone.trim() || undefined,
-            email: email.trim() || undefined,
-            pin,
-            role,
-            storeId: currentEmployee?.storeId,
-          };
-
-          const res = await fetch(`${API_URL}/employees`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(createPayload),
-          });
-
-          if (!res.ok) {
-            const errBody = await res.json().catch(() => ({}));
-            throw new Error(errBody.message || 'Failed to create employee account.');
-          }
-
-          const body: ApiResponse<EmployeeDTO> = await res.json();
-          setEmployees((prev) => [body.data, ...prev]);
-          showNotice(`Employee account created for "${body.data.name}"!`);
-          setIsModalOpen(false);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message || 'Failed to update employee details.');
         }
+
+        const body: ApiResponse<EmployeeDTO> = await res.json();
+        setEmployees((prev) => prev.map((emp) => (emp.id === body.data.id ? body.data : emp)));
+        showNotice(`Staff member "${body.data.name}" updated successfully!`);
+        setIsModalOpen(false);
+      } else {
+        // Create Employee
+        const createPayload = {
+          name: name.trim(),
+          phone: phone.trim() || undefined,
+          email: email.trim() || undefined,
+          pin,
+          role,
+          storeId: currentEmployee?.storeId,
+        };
+
+        const res = await fetch(`${API_URL}/employees`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createPayload),
+        });
+
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message || 'Failed to create employee account.');
+        }
+
+        const body: ApiResponse<EmployeeDTO> = await res.json();
+        setEmployees((prev) => [body.data, ...prev]);
+        showNotice(`Employee account created for "${body.data.name}"!`);
+        setIsModalOpen(false);
+      }
     } catch (err: any) {
       setFormError(err.message || 'Failed to save staff information.');
     } finally {
@@ -264,7 +264,11 @@ export const StaffManagementPage: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to completely delete "${emp.name}"? This action cannot be undone.`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to completely delete "${emp.name}"? This action cannot be undone.`,
+      )
+    ) {
       return;
     }
 
@@ -700,7 +704,7 @@ export const StaffManagementPage: React.FC = () => {
                     >
                       {emp.isActive ? 'Deactivate' : 'Activate'}
                     </Button>
-                    
+
                     {/* Delete only allowed if not self, and not manager deleting owner */}
                     <button
                       type="button"
@@ -717,8 +721,8 @@ export const StaffManagementPage: React.FC = () => {
                         border: '1px solid #FECACA',
                         background: '#FEF2F2',
                         color: '#DC2626',
-                        cursor: (isSelf || isManagerEditingOwner) ? 'not-allowed' : 'pointer',
-                        opacity: (isSelf || isManagerEditingOwner) ? 0.5 : 1,
+                        cursor: isSelf || isManagerEditingOwner ? 'not-allowed' : 'pointer',
+                        opacity: isSelf || isManagerEditingOwner ? 0.5 : 1,
                       }}
                     >
                       <Trash2 size={16} />

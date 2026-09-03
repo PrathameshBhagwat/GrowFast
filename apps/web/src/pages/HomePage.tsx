@@ -303,7 +303,8 @@ export const HomePage: React.FC = () => {
                 GrowFast Laundry
               </h1>
               <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                {employee.name} · {employee.role === 'COUNTER' ? 'Employee' : employee.role} ({employee.storeName})
+                {employee.name} · {employee.role === 'COUNTER' ? 'Employee' : employee.role} (
+                {employee.storeName})
               </span>
             </div>
           </div>
