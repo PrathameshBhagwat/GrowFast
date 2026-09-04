@@ -141,58 +141,31 @@ export const CustomerProfilePage: React.FC = () => {
   };
 
   const fetchCustomer = useCallback(async () => {
-    if (!customerId) {
-      setIsNotFound(true);
-      setIsLoading(false);
-      return;
-    }
+    if (!customerId) return;
 
     setIsLoading(true);
     setError(null);
     setIsNotFound(false);
 
     try {
-      if (token && !token.startsWith('dev-mock-jwt-')) {
-        let res: Response | null = null;
-        try {
-          res = await fetch(`${API_URL}/customers/${customerId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-        } catch {
-          res = null;
-        }
+      const res = await fetch(`${API_URL}/customers/${customerId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-        if (res && res.ok) {
-          const body: ApiResponse<CustomerDTO> = await res.json();
-          setCustomer(body.data);
-        } else if (res && res.status === 404) {
-          setIsNotFound(true);
-        } else if (res && res.status >= 400 && res.status < 500) {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody.message || `Failed to load customer (HTTP ${res.status})`);
-        } else {
-          // Dev offline / DB fallback
-          const mockMatch = MOCK_CUSTOMERS.find((c) => c.id === customerId);
-          if (mockMatch) {
-            setCustomer(mockMatch);
-          } else {
-            setIsNotFound(true);
-          }
-        }
+      if (res.ok) {
+        const body: ApiResponse<CustomerDTO> = await res.json();
+        setCustomer(body.data);
+      } else if (res.status === 404) {
+        setIsNotFound(true);
       } else {
-        // Fallback for mock dev token
-        const mockMatch = MOCK_CUSTOMERS.find((c) => c.id === customerId);
-        if (mockMatch) {
-          setCustomer(mockMatch);
-        } else {
-          setIsNotFound(true);
-        }
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Failed to load customer (HTTP ${res.status})`);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred while loading customer profile.');
+      setError(err.message || 'Failed to connect to server.');
     } finally {
       setIsLoading(false);
     }

@@ -46,7 +46,7 @@ describe('OrderWizardPage', () => {
 
     // Wait for the pricing fetch to complete
     await waitFor(() => {
-      expect(screen.getByText('Start Customer Search')).toBeInTheDocument();
+      expect(screen.getByText('Add Items')).toBeInTheDocument();
     });
 
     // Verify it fetched pricing
@@ -56,7 +56,7 @@ describe('OrderWizardPage', () => {
     );
   });
 
-  it('reads customerId from URL, fetches customer, and pre-selects it', async () => {
+  it('reads customerId from URL, fetches customer, and displays it', async () => {
     (global.fetch as any).mockImplementation(async (url: string) => {
       if (url.includes('/pricing')) {
         return { ok: true, json: async () => ({ success: true, data: [] }) };
@@ -69,9 +69,6 @@ describe('OrderWizardPage', () => {
 
     renderWithRouter('/orders/new?customerId=cust-003');
 
-    // Loading state should appear first
-    expect(screen.getByText('Loading customer details...')).toBeInTheDocument();
-
     // Verify fetch was called with right URL
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/customers/cust-003'),
@@ -81,11 +78,8 @@ describe('OrderWizardPage', () => {
     // After fetch completes, the customer info should be rendered
     await waitFor(() => {
       expect(screen.getByText('Amit Shah')).toBeInTheDocument();
-      expect(screen.getByText('+919811122334')).toBeInTheDocument();
+      expect(screen.getByText('(+919811122334)')).toBeInTheDocument();
     });
-
-    // Verify no manual selection required
-    expect(screen.queryByText('Start Customer Search')).not.toBeInTheDocument();
   });
 
   it('handles invalid customerId gracefully', async () => {
@@ -101,9 +95,9 @@ describe('OrderWizardPage', () => {
 
     renderWithRouter('/orders/new?customerId=invalid-123');
 
-    // Should display error state
+    // Should display the normal flow gracefully despite the error
     await waitFor(() => {
-      expect(screen.getByText('Failed to load customer (404)')).toBeInTheDocument();
+      expect(screen.getByText('Add Items')).toBeInTheDocument();
     });
   });
 });

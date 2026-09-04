@@ -58,4 +58,17 @@ export class AuthController {
       role: req.user.role,
     };
   }
+
+  /**
+   * GET /api/auth/directory
+   * Public endpoint to get a list of active employees for the login screen.
+   */
+  @Get('directory')
+  async getDirectory() {
+    const employees = await this.authService.getDirectory();
+    return {
+      success: true,
+      data: employees,
+    };
+  }
 }

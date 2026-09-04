@@ -55,7 +55,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
         });
 
         if (!res.ok) {
-          if (res.status === 401 && !token.startsWith('dev-mock-jwt-')) {
+          if (res.status === 401) {
             logout();
             return;
           }

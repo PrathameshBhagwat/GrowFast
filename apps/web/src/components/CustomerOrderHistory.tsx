@@ -57,7 +57,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
     setIsCrossTeamSeam(false);
 
     try {
-      if (token && !token.startsWith('dev-mock-jwt-')) {
+      if (token) {
         let res: Response | null = null;
         try {
           res = await fetch(`${API_URL}/orders?customerId=${customerId}`, {

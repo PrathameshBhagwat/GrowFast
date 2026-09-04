@@ -240,6 +240,50 @@ export class EmployeeService {
   }
 
   /**
+   * Delete an employee account with store isolation & security rules.
+   */
+  async remove(id: string, currentUser: UserContext): Promise<{ success: boolean }> {
+    const existing = await this.prisma.employee.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Employee with ID "${id}" not found`);
+    }
+
+    // Store Isolation: Manager cannot delete employees belonging to another store
+    if (currentUser.role === Role.MANAGER && existing.storeId !== currentUser.storeId) {
+      throw new ForbiddenException('Managers can only delete employees in their own store');
+    }
+
+    // Security Rule 1: Manager cannot delete an Owner account
+    if (currentUser.role === Role.MANAGER && existing.role === Role.OWNER) {
+      throw new ForbiddenException('Managers cannot delete Owner accounts');
+    }
+
+    // Security Rule 2: Employee cannot delete their own account
+    if (id === currentUser.id) {
+      throw new BadRequestException('You cannot delete your own account');
+    }
+
+    // Security Rule 3: Cannot delete the last active Owner
+    if (existing.role === Role.OWNER && existing.isActive) {
+      const activeOwnerCount = await this.prisma.employee.count({
+        where: { role: Role.OWNER, isActive: true },
+      });
+      if (activeOwnerCount <= 1) {
+        throw new BadRequestException('Cannot delete the last active Owner');
+      }
+    }
+
+    await this.prisma.employee.delete({
+      where: { id },
+    });
+
+    return { success: true };
+  }
+
+  /**
    * Map database Employee entity to safe shared EmployeeDTO contract.
    * Explicitly strips pinHash from response.
    */

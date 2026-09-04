@@ -85,4 +85,24 @@ export class AuthService {
       storeId: employee.storeId,
     };
   }
+
+  /**
+   * GET a public directory of active employees for the login screen.
+   * Excludes sensitive data like PINs, emails, and phones.
+   */
+  async getDirectory() {
+    const employees = await this.prisma.employee.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return employees;
+  }
 }

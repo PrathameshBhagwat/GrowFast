@@ -180,7 +180,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 
       let updatedResult: CustomerDTO;
 
-      if (token && !token.startsWith('dev-mock-jwt-')) {
+      if (token) {
         let res: Response | null = null;
         try {
           res = await fetch(`${API_URL}/customers/${customer.id}`, {
