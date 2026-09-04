@@ -22,6 +22,14 @@ import {
   X,
   Layers,
   Sparkles,
+  FlaskConical,
+  Gift,
+  Recycle,
+  Package,
+  Box,
+  Shield,
+  Zap,
+  Droplets,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -361,38 +369,57 @@ export const CatalogSettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveEditPrice = async (serviceId: string) => {
-    if (!editGarment) return;
-    const rawVal = editPrices[serviceId];
-    if (rawVal === undefined || rawVal === '') return;
-    const price = parseFloat(rawVal);
-    if (isNaN(price) || price < 0) {
-      setSaveGarmentError('Price must be a valid non-negative number');
-      return;
-    }
+  const handleSaveAllPrices = async () => {
+    if (!editGarment) return false;
     setSavingEditPrices(true);
     setSaveGarmentError(null);
+    let hasError = false;
+
     try {
-      const res = await fetch(`${API_URL}/pricing/${editGarment.id}/${serviceId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ price }),
+      const promises = services.map(async (svc) => {
+        const val = editPrices[svc.id] || '';
+        const originalPrice = pricingData.find(
+          (p: any) => p.garmentCatalogId === editGarment.id && p.serviceTypeId === svc.id,
+        );
+        const hasChanged = val !== '' && val !== (originalPrice ? String(originalPrice.price) : '');
+
+        if (hasChanged) {
+          const price = parseFloat(val);
+          if (isNaN(price) || price < 0) {
+            throw new Error(`Invalid price for ${svc.name}`);
+          }
+          const res = await fetch(`${API_URL}/pricing/${editGarment.id}/${svc.id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ price }),
+          });
+          if (!res.ok) {
+            throw new Error(`Failed to save ${svc.name}`);
+          }
+        }
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `Failed to save price (${res.status})`);
-      }
+
+      await Promise.all(promises);
       await fetchAllData();
-      // Update local editPrices to reflect saved value
-      setEditPrices((prev) => ({ ...prev, [serviceId]: String(price) }));
+
+      const updatedMap = { ...editPrices };
+      for (const svc of services) {
+        const val = editPrices[svc.id] || '';
+        if (val !== '') {
+          updatedMap[svc.id] = val;
+        }
+      }
+      setEditPrices(updatedMap);
     } catch (err) {
       setSaveGarmentError(err instanceof Error ? err.message : 'Save failed');
+      hasError = true;
     } finally {
       setSavingEditPrices(false);
     }
+    return !hasError;
   };
 
   const openQuickPriceModal = (garment: GarmentCatalogDTO) => {
@@ -1102,162 +1129,332 @@ export const CatalogSettingsPage: React.FC = () => {
         </div>
       )}
 
+      {/* ─── EDIT GARMENT MODAL ────────────────────────────── */}
       {editModalOpen && editGarment && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-[2px] max-w-lg w-full shadow-xl border border-slate-200 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-5 pb-3 shrink-0">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Edit2 size={18} className="text-primary-600" /> Edit Garment
-              </h2>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
+          <div
+            className="bg-white rounded-[3px] max-w-[690px] w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto"
+            style={{ borderRadius: '3px' }}
+          >
+            {/* Dedicated Inner Content Container: 24px left/right, 16px top/bottom */}
+            <div
+              className="w-full flex flex-col gap-4 box-border"
+              style={{
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                paddingTop: '16px',
+                paddingBottom: '16px',
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 bg-primary-50 flex items-center justify-center shrink-0 border border-primary-100 text-primary-600"
+                    style={{ borderRadius: '3px' }}
+                  >
+                    <Edit2 size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-base font-bold text-slate-900">Edit Garment</h2>
+                      <span
+                        className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200"
+                        style={{ borderRadius: '3px', padding: '2px 6px' }}
+                      >
+                        SKU: GRM-{editGarment.id.substring(0, 4).toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Update catalog metadata and per-service retail rates
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
+                  style={{ borderRadius: '3px' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-            <div className="flex-1 overflow-y-auto px-5 pb-5">
               {saveGarmentError && (
-                <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-[2px]">
+                <div
+                  className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs"
+                  style={{ borderRadius: '3px' }}
+                >
                   {saveGarmentError}
                 </div>
               )}
 
               {/* ── Garment Details Section ── */}
-              <form onSubmit={handleSaveGarment} className="space-y-3 mb-5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Garment Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-[2px] text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Category *
-                  </label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value as GarmentCategory)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-[2px] text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_LABELS[c] || c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-[2px]">
-                  <div>
-                    <span className="text-sm font-semibold text-slate-900 block">
-                      Active Status
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Inactive garments won't appear in order wizard
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={editIsActive}
-                    onChange={(e) => setEditIsActive(e.target.checked)}
-                    className="w-5 h-5 accent-primary-600 rounded cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    type="submit"
-                    disabled={savingGarment}
-                    className="px-4 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-[2px] shadow-xs cursor-pointer min-h-[36px]"
-                  >
-                    {savingGarment ? 'Saving...' : 'Save Details'}
-                  </button>
-                </div>
-              </form>
-
-              {/* ── Service-wise Pricing Section ── */}
-              {canConfigurePricing && (
-                <div>
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Tag size={12} /> Service Pricing
+              <div
+                className="border border-slate-200 bg-white box-border"
+                style={{ borderRadius: '3px', padding: '16px' }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[11px] font-bold text-slate-800 tracking-wider flex items-center gap-2 uppercase">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary-500"></div>
+                    Garment Details
                   </h3>
-                  <div className="border border-slate-200 rounded-[2px] overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left px-3 py-2 font-bold text-slate-700">Service</th>
-                          <th className="text-right px-3 py-2 font-bold text-slate-700 w-28">
-                            Price (₹)
-                          </th>
-                          <th className="w-16"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {services.map((svc: any) => {
-                          const val = editPrices[svc.id] || '';
-                          const originalPrice = pricingData.find(
-                            (p: any) =>
-                              p.garmentCatalogId === editGarment.id && p.serviceTypeId === svc.id,
-                          );
-                          const hasChanged =
-                            val !== '' &&
-                            val !== (originalPrice ? String(originalPrice.price) : '');
-                          return (
-                            <tr key={svc.id} className="border-b border-slate-100 last:border-b-0">
-                              <td className="px-3 py-2 text-slate-800 font-medium">{svc.name}</td>
-                              <td className="px-3 py-1.5">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  placeholder="—"
-                                  value={val}
-                                  onChange={(e) =>
-                                    setEditPrices((prev) => ({ ...prev, [svc.id]: e.target.value }))
-                                  }
-                                  className="w-full px-2 py-1.5 text-right bg-slate-50 border border-slate-200 rounded-[2px] text-xs font-bold focus:bg-white focus:ring-1 focus:ring-primary-500 focus:outline-none min-h-[32px]"
-                                />
-                              </td>
-                              <td className="px-2 py-1.5 text-center">
-                                {hasChanged && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSaveEditPrice(svc.id)}
-                                    disabled={savingEditPrices}
-                                    className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-white rounded-[2px] text-[10px] font-bold cursor-pointer min-h-[28px]"
-                                  >
-                                    Save
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <span className="text-[11px] text-slate-400">* Required fields</span>
+                </div>
+
+                <form onSubmit={handleSaveGarment} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-3">
+                        Garment Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-shadow"
+                        style={{ borderRadius: '3px', padding: '9px 14px' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-3">
+                        Category <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value as GarmentCategory)}
+                        className="w-full bg-white border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-shadow"
+                        style={{ borderRadius: '3px', padding: '9px 14px' }}
+                      >
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {CATEGORY_LABELS[c] || c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div
+                    className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-slate-100 gap-4"
+                    style={{ paddingTop: '16px' }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={editIsActive}
+                            onChange={(e) => setEditIsActive(e.target.checked)}
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold text-slate-900 block">
+                          Active Status
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Inactive garments won't appear in the counter order wizard
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingGarment}
+                      className="shrink-0 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ borderRadius: '3px', padding: '10px 16px', minHeight: '44px' }}
+                    >
+                      <Check size={14} /> {savingGarment ? 'Saving...' : 'Save Details'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* ── Service Pricing Section ── */}
+              {canConfigurePricing && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-2">
+                      <Tag size={16} className="text-primary-500 mt-0.5 shrink-0" />
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Service Pricing</h3>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Set the unit charge for this garment across individual service workflows.
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className="bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-600 shrink-0"
+                      style={{ borderRadius: '3px', padding: '4px 10px' }}
+                    >
+                      8 Services Available
+                    </div>
+                  </div>
+
+                  {/* Pricing Table with 16px inner horizontal padding */}
+                  <div
+                    className="border border-slate-200 overflow-hidden bg-white box-border"
+                    style={{ borderRadius: '3px' }}
+                  >
+                    <div
+                      className="flex items-center justify-between bg-slate-50 border-b border-slate-200"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">
+                        Service Type
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase w-28 text-right">
+                        Rate (₹)
+                      </span>
+                    </div>
+
+                    <div className="divide-y divide-slate-100">
+                      {services.map((svc: any) => {
+                        const val = editPrices[svc.id] || '';
+
+                        const svcName = svc.name.toLowerCase();
+                        let Icon = Box;
+                        let desc = '';
+                        let isPromo = false;
+
+                        if (svcName.includes('dry clean')) {
+                          Icon = FlaskConical;
+                          desc = 'Deep chemical solvent process';
+                        } else if (svcName.includes('free shoe')) {
+                          Icon = Gift;
+                          desc = 'Complimentary bundle item';
+                          isPromo = true;
+                        } else if (svcName.includes('reprocess')) {
+                          Icon = Recycle;
+                          desc = 'Secondary stain remediation cycle';
+                        } else if (svcName.includes('shoe cleaning')) {
+                          Icon = Package;
+                          desc = 'Sole restoration & deodorizing';
+                        } else if (svcName.includes('standard wash')) {
+                          Icon = Box;
+                          desc = 'Regular drum hydro-cleaning';
+                        } else if (svcName.includes('starching')) {
+                          Icon = Shield;
+                          desc = 'Crisp stiffening finish';
+                        } else if (svcName.includes('wash + steam')) {
+                          Icon = Droplets;
+                          desc = 'Combined wash and press';
+                        } else if (svcName.includes('steam iron')) {
+                          Icon = Zap;
+                          desc = 'High-pressure vertical press';
+                        }
+
+                        return (
+                          <div
+                            key={svc.id}
+                            className="flex items-center justify-between hover:bg-slate-50/50 transition-colors box-border"
+                            style={{ padding: '10px 16px', minHeight: '50px' }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-8 h-8 border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 shrink-0"
+                                style={{ borderRadius: '3px' }}
+                              >
+                                <Icon size={16} strokeWidth={1.5} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-slate-800">
+                                    {svc.name}
+                                  </span>
+                                  {isPromo && (
+                                    <span
+                                      className="bg-emerald-100 text-emerald-700 text-[9px] font-bold"
+                                      style={{ borderRadius: '2px', padding: '2px 6px' }}
+                                    >
+                                      Promo
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-0.5">{desc}</p>
+                              </div>
+                            </div>
+
+                            <div className="relative w-28 shrink-0">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className="text-slate-400 text-xs font-semibold">₹</span>
+                              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                placeholder="0"
+                                value={val}
+                                onChange={(e) =>
+                                  setEditPrices((prev) => ({ ...prev, [svc.id]: e.target.value }))
+                                }
+                                className="w-full pl-7 pr-3 bg-white border border-slate-200 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-shadow text-right"
+                                style={{
+                                  borderRadius: '3px',
+                                  paddingTop: '6px',
+                                  paddingBottom: '6px',
+                                  minHeight: '36px',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Single Save Prices Button: inset from right edge */}
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSaveAllPrices}
+                      disabled={savingEditPrices}
+                      className="text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ borderRadius: '3px', padding: '10px 16px', minHeight: '44px' }}
+                    >
+                      <Save size={15} /> {savingEditPrices ? 'Saving Prices...' : 'Save Prices'}
+                    </button>
                   </div>
                 </div>
               )}
-            </div>
 
-            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-[2px] cursor-pointer min-h-[36px]"
+              {/* ── Footer ── */}
+              <div
+                className="border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 box-border"
+                style={{ paddingTop: '16px' }}
               >
-                Close
-              </button>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                  <span className="text-xs font-medium text-slate-600">
+                    Catalog changes sync across all active store branches
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                    style={{ borderRadius: '3px', padding: '10px 16px', minHeight: '44px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const pricesSaved = await handleSaveAllPrices();
+                      if (pricesSaved) closeEditModal();
+                    }}
+                    disabled={savingEditPrices}
+                    className="text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 shadow-xs transition-colors cursor-pointer"
+                    style={{ borderRadius: '3px', padding: '10px 18px', minHeight: '44px' }}
+                  >
+                    Done & Close
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
