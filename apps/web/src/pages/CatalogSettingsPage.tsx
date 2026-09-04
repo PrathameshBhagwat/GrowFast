@@ -655,13 +655,13 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* Search Bar */}
                 <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0">
                   <div className="relative w-full">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                      placeholder={`Search in ${CATEGORY_LABELS[activeCategory]}...`}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      placeholder={`🔍 Search in ${CATEGORY_LABELS[activeCategory]}...`}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -824,13 +824,13 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* Controls Bar & Feedback */}
                 <div className="px-5 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                   <div className="relative w-full sm:w-96">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                      placeholder={`Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      placeholder={`🔍 Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
                       value={pricingSearch}
                       onChange={(e) => setPricingSearch(e.target.value)}
                     />
