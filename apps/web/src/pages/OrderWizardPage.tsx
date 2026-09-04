@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Card, Button, LoadingState, ErrorState } from '@growfast/ui';
+import { Card, Button, LoadingState, ErrorState, PhotoCapture } from '@growfast/ui';
 import { useAuth } from '../contexts/AuthContext';
-import { CustomerDTO, calculateOrderTotals, PricingItemInput } from '@growfast/shared-types';
+import {
+  CustomerDTO,
+  calculateOrderTotals,
+  PricingItemInput,
+  PhotoType,
+} from '@growfast/shared-types';
 import { CustomerSelector } from '../components/CustomerSelector';
 import { ItemSelector } from '../components/ItemSelector';
+import { uploadPhoto } from '../services/photo.api';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -118,7 +124,32 @@ export function OrderWizardPage() {
       }
 
       const body = await res.json();
-      navigate(`/orders/${body.data.id}`);
+      const createdOrder = body.data;
+
+      // Handle async photo uploads for any items that included a photoFile
+      try {
+        const uploadPromises = items.map(async (item, index) => {
+          if (!item.photoFile) return;
+
+          // Match with the created item.
+          const createdItem = createdOrder.items[index];
+          if (!createdItem) return;
+
+          await uploadPhoto(
+            token!,
+            item.photoFile,
+            createdOrder.id,
+            'FRONT' as PhotoType, // Use FRONT by default for main garment photo
+            createdItem.id,
+          );
+        });
+        await Promise.all(uploadPromises);
+      } catch (uploadErr) {
+        console.error('Photo upload failed but order was created:', uploadErr);
+        // We do not throw here to prevent blocking navigation to the success page
+      }
+
+      navigate(`/orders/${createdOrder.id}`);
     } catch (err: any) {
       alert(`Error creating order: ${err.message}`);
     } finally {
@@ -165,6 +196,7 @@ export function OrderWizardPage() {
                       brand: '',
                       defectNotes: '',
                       colorTags: '',
+                      photoFile: null,
                     });
                   }}
                 />
@@ -298,6 +330,26 @@ export function OrderWizardPage() {
                           />
                         </div>
                       </div>
+
+                      {/* Photo Capture */}
+                      <div className="pt-4 border-t">
+                        <PhotoCapture
+                          label="Garment Photo (Optional)"
+                          allowCamera={true}
+                          onCapture={(file) => {
+                            setSelectedItemConfig({
+                              ...selectedItemConfig,
+                              photoFile: file,
+                            });
+                          }}
+                          onRemove={() => {
+                            setSelectedItemConfig({
+                              ...selectedItemConfig,
+                              photoFile: null,
+                            });
+                          }}
+                        />
+                      </div>
                     </div>
 
                     <div className="p-4 border-t bg-white flex gap-2">
@@ -360,6 +412,11 @@ export function OrderWizardPage() {
                               <div className="flex flex-col">
                                 <span className="font-semibold text-gray-900">
                                   {item.garmentName}
+                                  {item.photoFile && (
+                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                      📷 Photo Attached
+                                    </span>
+                                  )}
                                 </span>
                                 <span className="text-gray-500 text-xs">{item.serviceName}</span>
                               </div>

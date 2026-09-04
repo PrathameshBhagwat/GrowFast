@@ -9,6 +9,7 @@ import {
 } from '@growfast/shared-types';
 import { NotificationProvider, LogNotificationProvider } from './notification.provider';
 import { WhatsAppNotificationProvider } from './whatsapp-notification.provider';
+import { BaileysWhatsAppProvider } from './baileys-whatsapp.provider';
 
 /**
  * Notification Service — C8 Foundation
@@ -33,11 +34,19 @@ export class NotificationService {
 
   constructor(private readonly prisma: PrismaService) {
     this.logProvider = new LogNotificationProvider();
-    this.whatsappProvider = new WhatsAppNotificationProvider();
+
+    const providerType = process.env.WHATSAPP_PROVIDER || 'log';
+    if (providerType === 'baileys') {
+      this.whatsappProvider = new BaileysWhatsAppProvider();
+    } else if (providerType === 'meta') {
+      this.whatsappProvider = new WhatsAppNotificationProvider();
+    } else {
+      this.whatsappProvider = this.logProvider; // fallback to log
+    }
   }
 
   private getProvider(channel: NotificationChannel): NotificationProvider {
-    if (channel === NotificationChannel.WHATSAPP) {
+    if (channel === NotificationChannel.WHATSAPP || channel === NotificationChannel.SMS) {
       return this.whatsappProvider;
     }
     return this.logProvider;
