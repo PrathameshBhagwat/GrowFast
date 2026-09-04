@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Shirt, Search } from 'lucide-react';
-import { GarmentCategory, filterServicesForCategory, resolveCatalogSelectionOnCategoryChange, resolveCatalogSelectionOnServiceChange } from '@growfast/shared-types';
+import {
+  GarmentCategory,
+  filterServicesForCategory,
+  resolveCatalogSelectionOnCategoryChange,
+  resolveCatalogSelectionOnServiceChange,
+} from '@growfast/shared-types';
 
 interface ItemSelectorProps {
   garments: any[];
@@ -53,7 +58,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
-    const newServiceId = resolveCatalogSelectionOnCategoryChange(category, selectedServiceId, activeServices);
+    const newServiceId = resolveCatalogSelectionOnCategoryChange(
+      category,
+      selectedServiceId,
+      activeServices,
+    );
     if (newServiceId !== selectedServiceId) {
       setSelectedServiceId(newServiceId);
     }
@@ -61,7 +70,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
   const handleServiceSelect = (serviceId: string) => {
     setSelectedServiceId(serviceId);
-    const newCategory = resolveCatalogSelectionOnServiceChange(serviceId, selectedCategory, activeServices);
+    const newCategory = resolveCatalogSelectionOnServiceChange(
+      serviceId,
+      selectedCategory,
+      activeServices,
+    );
     if (newCategory !== selectedCategory) {
       setSelectedCategory(newCategory as string);
     }

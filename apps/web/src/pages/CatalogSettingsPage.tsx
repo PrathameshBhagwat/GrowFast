@@ -2,7 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingState, EmptyState, ErrorState } from '@growfast/ui';
-import { GarmentCategory, Role, filterServicesForCategory, resolveCatalogSelectionOnCategoryChange, resolveCatalogSelectionOnServiceChange } from '@growfast/shared-types';
+import {
+  GarmentCategory,
+  Role,
+  filterServicesForCategory,
+  resolveCatalogSelectionOnCategoryChange,
+  resolveCatalogSelectionOnServiceChange,
+} from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
 import {
   ArrowLeft,
@@ -198,7 +204,11 @@ export const CatalogSettingsPage: React.FC = () => {
   const handlePricingServiceChange = (serviceId: string) => {
     setPricingServiceId(serviceId);
     setEditedPrices({});
-    const newCategory = resolveCatalogSelectionOnServiceChange(serviceId, pricingCategory, services);
+    const newCategory = resolveCatalogSelectionOnServiceChange(
+      serviceId,
+      pricingCategory,
+      services,
+    );
     if (newCategory !== pricingCategory) {
       setPricingCategory(newCategory as string);
     }
@@ -1149,7 +1159,9 @@ export const CatalogSettingsPage: React.FC = () => {
 
                 <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-[2px]">
                   <div>
-                    <span className="text-sm font-semibold text-slate-900 block">Active Status</span>
+                    <span className="text-sm font-semibold text-slate-900 block">
+                      Active Status
+                    </span>
                     <span className="text-xs text-slate-500">
                       Inactive garments won't appear in order wizard
                     </span>
@@ -1184,7 +1196,9 @@ export const CatalogSettingsPage: React.FC = () => {
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
                           <th className="text-left px-3 py-2 font-bold text-slate-700">Service</th>
-                          <th className="text-right px-3 py-2 font-bold text-slate-700 w-28">Price (₹)</th>
+                          <th className="text-right px-3 py-2 font-bold text-slate-700 w-28">
+                            Price (₹)
+                          </th>
                           <th className="w-16"></th>
                         </tr>
                       </thead>
@@ -1192,9 +1206,12 @@ export const CatalogSettingsPage: React.FC = () => {
                         {services.map((svc: any) => {
                           const val = editPrices[svc.id] || '';
                           const originalPrice = pricingData.find(
-                            (p: any) => p.garmentCatalogId === editGarment.id && p.serviceTypeId === svc.id,
+                            (p: any) =>
+                              p.garmentCatalogId === editGarment.id && p.serviceTypeId === svc.id,
                           );
-                          const hasChanged = val !== '' && val !== (originalPrice ? String(originalPrice.price) : '');
+                          const hasChanged =
+                            val !== '' &&
+                            val !== (originalPrice ? String(originalPrice.price) : '');
                           return (
                             <tr key={svc.id} className="border-b border-slate-100 last:border-b-0">
                               <td className="px-3 py-2 text-slate-800 font-medium">{svc.name}</td>

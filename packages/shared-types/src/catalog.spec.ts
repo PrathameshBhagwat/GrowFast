@@ -52,42 +52,74 @@ describe('filterServicesForCategory', () => {
 describe('resolveCatalogSelectionOnCategoryChange', () => {
   it('auto-selects Shoe Cleaning when switching to Shoe from an invalid service', () => {
     // Steam Iron (id=3) is not valid for Shoe
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '3', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '3',
+      mockServices,
+    );
     expect(result).toBe('5'); // Shoe Cleaning
   });
 
   it('keeps Standard Wash when switching to Shoe (valid shoe service)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '1', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '1',
+      mockServices,
+    );
     expect(result).toBe('1');
   });
 
   it('keeps Dry Clean when switching to Shoe (valid shoe service)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '2', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '2',
+      mockServices,
+    );
     expect(result).toBe('2');
   });
 
   it('keeps Shoe Cleaning when switching to Shoe', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '5', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '5',
+      mockServices,
+    );
     expect(result).toBe('5');
   });
 
   it('keeps Free Shoe when switching to Shoe', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '7', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '7',
+      mockServices,
+    );
     expect(result).toBe('7');
   });
 
   it('keeps Reprocess Cleaning when switching to Shoe', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '6', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '6',
+      mockServices,
+    );
     expect(result).toBe('6');
   });
 
   it('auto-selects Shoe Cleaning when switching to Shoe from Wash + Steam Iron', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '4', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '4',
+      mockServices,
+    );
     expect(result).toBe('5');
   });
 
   it('auto-selects Shoe Cleaning when switching to Shoe from Starching Dc', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.SHOES, '8', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '8',
+      mockServices,
+    );
     expect(result).toBe('5');
   });
 
@@ -102,7 +134,11 @@ describe('resolveCatalogSelectionOnCategoryChange', () => {
   });
 
   it('auto-selects Standard Wash when leaving Shoe with Free Shoe selected (Shoe → Women)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.WOMEN, '7', mockServices);
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.WOMEN,
+      '7',
+      mockServices,
+    );
     expect(result).toBe('1'); // Standard Wash
   });
 

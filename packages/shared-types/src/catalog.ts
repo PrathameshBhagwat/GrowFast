@@ -4,7 +4,13 @@ import { GarmentCategory } from './enums';
 const SHOE_HIDDEN_SERVICES = ['steam iron', 'wash + steam iron', 'starching dc'];
 
 /** Service names that are valid shoe-oriented services. */
-const SHOE_VALID_SERVICES = ['standard wash', 'dry clean', 'shoe cleaning', 'reprocess cleaning', 'free shoe'];
+const SHOE_VALID_SERVICES = [
+  'standard wash',
+  'dry clean',
+  'shoe cleaning',
+  'reprocess cleaning',
+  'free shoe',
+];
 
 /**
  * Returns whether a category value represents the Shoe category.
@@ -24,14 +30,12 @@ function isShoeCategory(category: string | GarmentCategory): boolean {
  */
 export function filterServicesForCategory<T extends { name: string }>(
   services: T[],
-  category: string | GarmentCategory
+  category: string | GarmentCategory,
 ): T[] {
   if (!isShoeCategory(category)) {
     return services;
   }
-  return services.filter(
-    (s) => !SHOE_HIDDEN_SERVICES.includes(s.name.toLowerCase())
-  );
+  return services.filter((s) => !SHOE_HIDDEN_SERVICES.includes(s.name.toLowerCase()));
 }
 
 /**
@@ -42,7 +46,7 @@ export function filterServicesForCategory<T extends { name: string }>(
 export function resolveCatalogSelectionOnCategoryChange<T extends { id: string; name: string }>(
   newCategory: string | GarmentCategory,
   currentServiceId: string,
-  services: T[]
+  services: T[],
 ): string {
   if (isShoeCategory(newCategory)) {
     const currentService = services.find((s) => s.id === currentServiceId);
@@ -79,7 +83,7 @@ export function resolveCatalogSelectionOnCategoryChange<T extends { id: string; 
 export function resolveCatalogSelectionOnServiceChange<T extends { id: string; name: string }>(
   newServiceId: string,
   currentCategory: string | GarmentCategory,
-  services: T[]
+  services: T[],
 ): string | GarmentCategory {
   const newService = services.find((s) => s.id === newServiceId);
   if (!newService) return currentCategory;
