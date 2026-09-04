@@ -105,7 +105,7 @@ describe('CatalogSettingsPage', () => {
       // Formal Shirt price for Steam Pressing is 30
       expect(screen.getByText('₹30')).toBeInTheDocument();
       // Jeans has no Steam Pressing price configured
-      expect(screen.getByText('Not Configured')).toBeInTheDocument();
+      expect(screen.getByText('No Price')).toBeInTheDocument();
     });
   });
 

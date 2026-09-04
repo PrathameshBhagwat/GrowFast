@@ -84,3 +84,4 @@ export type { OrderItemStatusInput, OrderStatusDerivationContext } from './order
 // Pricing Contract
 export { calculateOrderTotals, calculateFulfillmentBreakdown } from './pricing';
 export type { PricingItemInput, PricingTotals, FulfillmentBreakdown } from './pricing';
+export { filterServicesForCategory, resolveCatalogSelectionOnCategoryChange, resolveCatalogSelectionOnServiceChange } from './catalog';
