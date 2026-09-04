@@ -280,149 +280,148 @@ export class OrderService {
   }
 
   async updateOrderItem(orderId: string, itemId: string, dto: UpdateOrderItemDto, storeId: string) {
-    const { oldOrderStatus, oldItemStatus, updatedOrder } = await this.prisma.$transaction(
-      async (tx) => {
-        // 1. Validate order exists and belongs to store
-        const order = await tx.order.findUnique({
-          where: { id: orderId },
-          include: { items: true },
+    const { oldOrderStatus, oldItemStatus } = await this.prisma.$transaction(async (tx) => {
+      // 1. Validate order exists and belongs to store
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new BadRequestException(`Order does not belong to your store`);
+      }
+
+      // 1.5 Fetch Store config
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      if (!store) {
+        throw new NotFoundException(`Store with ID "${storeId}" not found`);
+      }
+      if (order.isExpress && store.expressSurchargePercent == null) {
+        throw new BadRequestException(`Express service is not configured for this store`);
+      }
+
+      // 2. Validate order item belongs to order
+      const orderItem = order.items.find((item) => item.id === itemId);
+      if (!orderItem) {
+        throw new NotFoundException(
+          `OrderItem with ID "${itemId}" not found in order "${orderId}"`,
+        );
+      }
+
+      // 3. Validate garment / service if updated
+      if (dto.garmentCatalogId) {
+        const garment = await tx.garmentCatalog.findUnique({
+          where: { id: dto.garmentCatalogId },
         });
+        if (!garment)
+          throw new NotFoundException(`Garment with ID "${dto.garmentCatalogId}" not found`);
+        if (!garment.isActive)
+          throw new BadRequestException(`Garment "${garment.name}" is not active`);
+      }
+      if (dto.serviceTypeId) {
+        const service = await tx.serviceType.findUnique({ where: { id: dto.serviceTypeId } });
+        if (!service)
+          throw new NotFoundException(`Service type with ID "${dto.serviceTypeId}" not found`);
+        if (!service.isActive)
+          throw new BadRequestException(`Service type "${service.name}" is not active`);
+      }
 
-        if (!order) {
-          throw new NotFoundException(`Order with ID "${orderId}" not found`);
-        }
-        if (order.storeId !== storeId) {
-          throw new BadRequestException(`Order does not belong to your store`);
-        }
+      // 4. Validate quantities
+      const newQuantity = dto.quantity !== undefined ? dto.quantity : orderItem.quantity;
+      const newDeliveredQuantity =
+        dto.deliveredQuantity !== undefined ? dto.deliveredQuantity : orderItem.deliveredQuantity;
 
-        // 1.5 Fetch Store config
-        const store = await tx.store.findUnique({ where: { id: storeId } });
-        if (!store) {
-          throw new NotFoundException(`Store with ID "${storeId}" not found`);
-        }
-        if (order.isExpress && store.expressSurchargePercent == null) {
-          throw new BadRequestException(`Express service is not configured for this store`);
-        }
+      if (newDeliveredQuantity > newQuantity) {
+        throw new BadRequestException(
+          `Delivered quantity (${newDeliveredQuantity}) cannot exceed total quantity (${newQuantity})`,
+        );
+      }
 
-        // 2. Validate order item belongs to order
-        const orderItem = order.items.find((item) => item.id === itemId);
-        if (!orderItem) {
-          throw new NotFoundException(
-            `OrderItem with ID "${itemId}" not found in order "${orderId}"`,
-          );
-        }
+      // 5. Calculate new line total
+      const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
+      const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
 
-        // 3. Validate garment / service if updated
-        if (dto.garmentCatalogId) {
-          const garment = await tx.garmentCatalog.findUnique({
-            where: { id: dto.garmentCatalogId },
-          });
-          if (!garment)
-            throw new NotFoundException(`Garment with ID "${dto.garmentCatalogId}" not found`);
-          if (!garment.isActive)
-            throw new BadRequestException(`Garment "${garment.name}" is not active`);
-        }
-        if (dto.serviceTypeId) {
-          const service = await tx.serviceType.findUnique({ where: { id: dto.serviceTypeId } });
-          if (!service)
-            throw new NotFoundException(`Service type with ID "${dto.serviceTypeId}" not found`);
-          if (!service.isActive)
-            throw new BadRequestException(`Service type "${service.name}" is not active`);
-        }
+      const priceRecord = await tx.serviceGarmentPrice.findFirst({
+        where: {
+          garmentCatalogId,
+          serviceTypeId,
+          OR: [{ storeId: null }, { storeId }],
+        },
+      });
+      const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
+      const lineTotal = unitPrice * newQuantity;
 
-        // 4. Validate quantities
-        const newQuantity = dto.quantity !== undefined ? dto.quantity : orderItem.quantity;
-        const newDeliveredQuantity =
-          dto.deliveredQuantity !== undefined ? dto.deliveredQuantity : orderItem.deliveredQuantity;
+      // 6. Update OrderItem
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          garmentCatalogId: dto.garmentCatalogId,
+          serviceTypeId: dto.serviceTypeId,
+          quantity: dto.quantity,
+          unitPrice,
+          lineTotal,
+          colorTags: dto.colorTags,
+          defectNotes: dto.defectNotes,
+          itemStatus: dto.itemStatus,
+          deliveredQuantity: dto.deliveredQuantity,
+        },
+      });
 
-        if (newDeliveredQuantity > newQuantity) {
-          throw new BadRequestException(
-            `Delivered quantity (${newDeliveredQuantity}) cannot exceed total quantity (${newQuantity})`,
-          );
-        }
-
-        // 5. Calculate new line total
-        const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
-        const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
-
-        const priceRecord = await tx.serviceGarmentPrice.findFirst({
-          where: {
-            garmentCatalogId,
-            serviceTypeId,
-            OR: [{ storeId: null }, { storeId }],
-          },
-        });
-        const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
-        const lineTotal = unitPrice * newQuantity;
-
-        // 6. Update OrderItem
-        await tx.orderItem.update({
-          where: { id: itemId },
-          data: {
-            garmentCatalogId: dto.garmentCatalogId,
-            serviceTypeId: dto.serviceTypeId,
-            quantity: dto.quantity,
-            unitPrice,
-            lineTotal,
-            colorTags: dto.colorTags,
-            defectNotes: dto.defectNotes,
-            itemStatus: dto.itemStatus,
-            deliveredQuantity: dto.deliveredQuantity,
-          },
-        });
-
-        // 7. Recalculate Order Totals
-        const updatedOrder = await tx.order.findUnique({
-          where: { id: orderId },
-          include: {
-            items: {
-              include: {
-                garmentCatalog: true,
-                serviceType: true,
-              },
+      // 7. Recalculate Order Totals
+      const updatedOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              garmentCatalog: true,
+              serviceType: true,
             },
           },
-        });
+        },
+      });
 
-        const pricingInputs = updatedOrder!.items.map((i) => ({
-          unitPrice: i.unitPrice,
-          quantity: i.quantity,
-        }));
-        const totals = calculateOrderTotals(pricingInputs, {
-          isExpress: updatedOrder!.isExpress,
-          expressSurchargePercent: store.expressSurchargePercent ?? undefined,
-        });
+      const pricingInputs = updatedOrder!.items.map((i) => ({
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+      }));
+      const totals = calculateOrderTotals(pricingInputs, {
+        isExpress: updatedOrder!.isExpress,
+        expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+      });
 
-        const itemsForStatus = updatedOrder!.items.map((i: any) => ({
-          status: i.itemStatus as ItemStatus,
-        }));
-        const newOrderStatus = deriveOrderStatus({
-          items: itemsForStatus,
-          currentOrderStatus: updatedOrder!.status as OrderStatus,
-          hasActiveTransitDelivery: false,
-        });
+      const itemsForStatus = updatedOrder!.items.map((i: any) => ({
+        status: i.itemStatus as ItemStatus,
+      }));
+      const newOrderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        currentOrderStatus: updatedOrder!.status as OrderStatus,
+        hasActiveTransitDelivery: false,
+      });
 
-        await tx.order.update({
-          where: { id: orderId },
-          data: {
-            status: newOrderStatus,
-            subtotal: totals.subtotal,
-            discountAmount: totals.discountAmount,
-            expressSurcharge: totals.expressSurcharge,
-            taxAmount: totals.taxAmount,
-            totalAmount: totals.totalAmount,
-            amountDue: totals.totalAmount - updatedOrder!.amountPaid,
-          },
-        });
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: newOrderStatus,
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: totals.totalAmount - updatedOrder!.amountPaid,
+        },
+      });
 
-        // 8. Return updated order detail
-        return {
-          oldOrderStatus: order.status,
-          oldItemStatus: orderItem.itemStatus,
-          updatedOrder: await this.findOrderById(orderId),
-        };
-      },
-    );
+      // 8. Return old statuses
+      return {
+        oldOrderStatus: order.status,
+        oldItemStatus: orderItem.itemStatus,
+      };
+    });
+
+    const updatedOrder = await this.findOrderById(orderId);
 
     // C6: Trigger ORDER_READY notification outside transaction
     if (
@@ -470,12 +469,37 @@ export class OrderService {
             remainingItems: remainingItems.map((i: any) => ({
               id: i.id,
               garmentName: i.garmentName,
-              serviceType: i.serviceType,
               quantity: i.quantity,
             })),
           },
         )
-        .catch(() => {});
+        .catch((err) => {
+          // Swallow any unhandled promises just in case
+        });
+    }
+
+    // Trigger ORDER_DELIVERED when the whole order transitions to DELIVERED
+    if (
+      updatedOrder.status === OrderStatus.DELIVERED &&
+      oldOrderStatus !== OrderStatus.DELIVERED &&
+      updatedOrder.customerPhone
+    ) {
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_DELIVERED,
+          NotificationChannel.SMS,
+          updatedOrder.customerPhone,
+          updatedOrder.id,
+          updatedOrder.customerId,
+          {
+            orderNumber: updatedOrder.orderNumber,
+            totalAmount: updatedOrder.totalAmount,
+          },
+        )
+        .catch((err) => {
+          // Swallow any unhandled promises just in case
+        });
     }
 
     return updatedOrder;

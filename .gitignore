@@ -43,3 +43,6 @@ Thumbs.db
 
 # Photo uploads (local dev)
 uploads/
+
+# Baileys WhatsApp Auth
+baileys_auth/
