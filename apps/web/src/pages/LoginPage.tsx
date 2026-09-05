@@ -15,7 +15,6 @@ export const LoginPage: React.FC = () => {
 
   // UI-only states
   const [showPassword, setShowPassword] = useState(false);
-  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isFocusedEmp, setIsFocusedEmp] = useState(false);
   const [isFocusedPin, setIsFocusedPin] = useState(false);
 
@@ -80,22 +79,22 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex items-center justify-center relative overflow-hidden font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="min-h-screen bg-slate-50/80 flex items-center justify-center relative overflow-hidden font-sans selection:bg-blue-100 selection:text-blue-900">
       {/* ── Background Decorative Elements ── */}
       {/* Top Left Shape */}
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-emerald-100/40 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-blue-100/60 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-0 left-0 w-[40vw] h-[40vh] pointer-events-none opacity-20">
-        <svg viewBox="0 0 400 400" className="w-full h-full text-emerald-200" fill="currentColor">
+        <svg viewBox="0 0 400 400" className="w-full h-full text-blue-300" fill="currentColor">
           <path d="M0 0 L 400 0 C 200 0 0 200 0 400 Z" />
         </svg>
       </div>
 
       {/* Bottom Right Shape */}
-      <div className="absolute -bottom-60 -right-40 w-[800px] h-[800px] bg-emerald-50/60 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-60 -right-40 w-[800px] h-[800px] bg-blue-50/80 rounded-full blur-2xl pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[50vw] h-[50vh] pointer-events-none opacity-20">
         <svg
           viewBox="0 0 400 400"
-          className="w-full h-full text-emerald-300"
+          className="w-full h-full text-blue-300"
           fill="none"
           stroke="currentColor"
           strokeWidth="1"
@@ -106,9 +105,9 @@ export const LoginPage: React.FC = () => {
         </svg>
       </div>
 
-      {/* ── Laundry Themed Floating Illustrations ── */}
+      {/* ── Creative Laundry & Employee Floating Illustrations ── */}
       {/* Hanging Shirt - Top Right */}
-      <div className="absolute top-32 right-10 md:right-32 text-emerald-500/20 pointer-events-none rotate-12 transform scale-150">
+      <div className="absolute top-24 right-10 md:right-32 text-blue-500/20 pointer-events-none rotate-12 transform scale-150">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="64"
@@ -125,7 +124,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Washing Machine - Bottom Left */}
-      <div className="absolute bottom-40 left-10 md:left-32 text-emerald-500/20 pointer-events-none -rotate-6 transform scale-150">
+      <div className="absolute bottom-32 left-10 md:left-32 text-blue-500/20 pointer-events-none -rotate-6 transform scale-150">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="64"
@@ -147,7 +146,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Hanger - Top Left Center */}
-      <div className="absolute top-20 left-1/4 text-emerald-500/15 pointer-events-none -rotate-12 transform scale-125">
+      <div className="absolute top-32 left-1/4 text-blue-500/15 pointer-events-none -rotate-12 transform scale-125">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="48"
@@ -165,15 +164,52 @@ export const LoginPage: React.FC = () => {
         </svg>
       </div>
 
+      {/* Shop / Storefront - Center Right */}
+      <div className="absolute top-1/2 right-1/4 text-blue-500/10 pointer-events-none rotate-6 transform scale-[2] -translate-y-1/2">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </div>
+
+      {/* Tag/Receipt - Bottom Right */}
+      <div className="absolute bottom-20 right-1/3 text-blue-500/15 pointer-events-none rotate-12 transform scale-[1.5]">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
+          <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+          <path d="M12 17V7" />
+        </svg>
+      </div>
+
       {/* ── Top Right Pill ── */}
       <div className="absolute top-6 right-6 hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 backdrop-blur-sm border border-slate-200/60 rounded-full">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-        <span className="text-xs font-medium text-slate-500">Laundry Management</span>
+        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+        <span className="text-xs font-medium text-slate-500">Employee Login</span>
       </div>
 
       {/* ── Bottom Left Branding ── */}
       <div className="absolute bottom-10 left-10 hidden lg:flex items-center gap-4 pointer-events-none">
-        <div className="w-0.5 h-12 bg-emerald-500 rounded-full" />
+        <div className="w-0.5 h-12 bg-blue-500 rounded-full" />
         <div className="flex flex-col">
           <span className="text-sm font-semibold text-slate-600">Clean spaces.</span>
           <span className="text-sm font-semibold text-slate-500">Happier people.</span>
@@ -187,7 +223,7 @@ export const LoginPage: React.FC = () => {
           <span className="text-sm font-semibold text-slate-500">Faster</span>
           <span className="text-sm font-semibold text-slate-600">Cleaner</span>
         </div>
-        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -206,21 +242,21 @@ export const LoginPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-[620px] px-4 sm:px-6">
         <div className="bg-white rounded-[24px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] p-8 sm:p-14 border border-slate-100 relative">
           {/* Header */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-12">
             <h1 className="text-[2.5rem] font-bold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-1">
               <span>Grow</span>
-              <span className="text-emerald-600">Fast</span>
+              <span className="text-blue-600">Fast</span>
             </h1>
             <p className="text-sm font-medium text-slate-400">
               Simpler Operations. Cleaner Tomorrow.
             </p>
 
-            <h2 className="text-[1.75rem] font-bold text-slate-900 mt-10 mb-2">Welcome Back</h2>
-            <p className="text-[0.95rem] text-slate-500">Sign in to continue to your account</p>
+            <h2 className="text-[1.75rem] font-bold text-slate-900 mt-10 mb-2">Staff Portal</h2>
+            <p className="text-[0.95rem] text-slate-500">Sign in to access the system</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="flex flex-col gap-6">
+          <form onSubmit={handleLogin} className="flex flex-col gap-8">
             {/* Global Error/Lockout State */}
             {(error || lockoutUntil) && (
               <div className="bg-red-50/80 border border-red-100 text-red-600 text-sm font-medium p-4 rounded-xl text-center">
@@ -230,26 +266,28 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {/* Username / Employee Dropdown disguised as text input */}
-            <div className="flex flex-col gap-2">
-              <label htmlFor="employeeId" className="text-[0.9rem] font-bold text-slate-800">
-                Username or Email
+            {/* Username / Employee Dropdown */}
+            <div className="flex flex-col gap-3">
+              <label htmlFor="employeeId" className="text-[0.95rem] font-bold text-slate-800">
+                Role of You
               </label>
               <div
-                className={`relative flex items-center h-14 rounded-xl border px-4 gap-3 transition-all duration-200 ${
+                className={`relative flex items-center h-[60px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
                   isFocusedEmp
-                    ? 'border-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.1)] bg-white'
-                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
+                    ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
+                    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
                 } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
               >
                 <User
-                  size={20}
+                  size={22}
                   strokeWidth={2.5}
-                  className="text-slate-400 shrink-0 pointer-events-none"
+                  className="text-blue-400 shrink-0 pointer-events-none"
                 />
 
                 {isFetchingDirectory ? (
-                  <div className="flex-1 text-sm text-slate-400">Loading staff directory...</div>
+                  <div className="flex-1 text-[1rem] text-slate-400">
+                    Loading staff directory...
+                  </div>
                 ) : (
                   <select
                     id="employeeId"
@@ -258,16 +296,16 @@ export const LoginPage: React.FC = () => {
                     onFocus={() => setIsFocusedEmp(true)}
                     onBlur={() => setIsFocusedEmp(false)}
                     disabled={!!lockoutUntil}
-                    className={`flex-1 h-full bg-transparent outline-none appearance-none cursor-pointer text-sm font-medium ${
+                    className={`flex-1 h-full bg-transparent outline-none appearance-none cursor-pointer text-[1rem] font-medium ${
                       employeeId ? 'text-slate-900' : 'text-slate-400'
                     }`}
                   >
                     <option value="" disabled className="text-slate-400">
-                      Enter your username or email
+                      Select who you are
                     </option>
                     {directory.map((emp) => (
                       <option key={emp.id} value={emp.id} className="text-slate-900 font-medium">
-                        {emp.name}
+                        {emp.name} ({emp.role})
                       </option>
                     ))}
                   </select>
@@ -275,8 +313,8 @@ export const LoginPage: React.FC = () => {
 
                 {/* Custom select arrow to match standard inputs */}
                 <svg
-                  width="12"
-                  height="8"
+                  width="14"
+                  height="10"
                   viewBox="0 0 12 8"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -285,7 +323,7 @@ export const LoginPage: React.FC = () => {
                   <path
                     d="M1.5 1.5L6 6L10.5 1.5"
                     stroke="currentColor"
-                    strokeWidth="2"
+                    strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
@@ -294,21 +332,21 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Password / PIN Input */}
-            <div className="flex flex-col gap-2">
-              <label htmlFor="password" className="text-[0.9rem] font-bold text-slate-800">
-                Password
+            <div className="flex flex-col gap-3">
+              <label htmlFor="password" className="text-[0.95rem] font-bold text-slate-800">
+                PIN
               </label>
               <div
-                className={`relative flex items-center h-14 rounded-xl border px-4 gap-3 transition-all duration-200 ${
+                className={`relative flex items-center h-[60px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
                   isFocusedPin
-                    ? 'border-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.1)] bg-white'
-                    : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
+                    ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
+                    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
                 } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
               >
                 <Lock
-                  size={20}
+                  size={22}
                   strokeWidth={2.5}
-                  className="text-slate-400 shrink-0 pointer-events-none"
+                  className="text-blue-400 shrink-0 pointer-events-none"
                 />
 
                 <input
@@ -319,75 +357,51 @@ export const LoginPage: React.FC = () => {
                   onFocus={() => setIsFocusedPin(true)}
                   onBlur={() => setIsFocusedPin(false)}
                   disabled={!!lockoutUntil}
-                  placeholder="Enter your password"
-                  className="flex-1 h-full bg-transparent outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium"
+                  placeholder="Enter your PIN"
+                  className="flex-1 h-full bg-transparent outline-none text-[1rem] font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium tracking-widest"
                 />
 
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={!!lockoutUntil}
-                  className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer outline-none focus-visible:text-emerald-600"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer outline-none focus-visible:text-blue-600"
+                  aria-label={showPassword ? 'Hide PIN' : 'Show PIN'}
                 >
                   {showPassword ? (
-                    <EyeOff size={20} strokeWidth={2} />
+                    <EyeOff size={22} strokeWidth={2.5} />
                   ) : (
-                    <Eye size={20} strokeWidth={2} />
+                    <Eye size={22} strokeWidth={2.5} />
                   )}
                 </button>
               </div>
-            </div>
-
-            {/* Secondary Actions (Keep signed in) */}
-            <div className="flex items-center mt-1">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div
-                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
-                    keepSignedIn
-                      ? 'bg-emerald-600 border-emerald-600 text-white'
-                      : 'bg-white border-slate-300 text-transparent group-hover:border-emerald-400'
-                  }`}
-                >
-                  <Check size={14} strokeWidth={3} />
-                </div>
-                <input
-                  type="checkbox"
-                  className="hidden"
-                  checked={keepSignedIn}
-                  onChange={(e) => setKeepSignedIn(e.target.checked)}
-                />
-                <span className="text-sm font-semibold text-slate-600 select-none">
-                  Keep me signed in
-                </span>
-              </label>
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoggingIn || !!lockoutUntil}
-              className={`mt-4 w-full h-14 rounded-xl flex items-center justify-center gap-2 text-[1.05rem] font-bold text-white transition-all shadow-sm ${
+              className={`mt-6 w-full h-[60px] rounded-xl flex items-center justify-center gap-2 text-[1.1rem] font-bold text-white transition-all shadow-sm ${
                 isLoggingIn || !!lockoutUntil
-                  ? 'bg-emerald-400 cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md cursor-pointer active:scale-[0.99]'
+                  ? 'bg-blue-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md cursor-pointer active:scale-[0.99]'
               }`}
             >
               {isLoggingIn ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  Sign In <ArrowRight size={20} strokeWidth={2.5} />
+                  Sign In <ArrowRight size={22} strokeWidth={2.5} />
                 </>
               )}
             </button>
           </form>
 
           {/* Footer Security Label */}
-          <div className="mt-10 flex items-center justify-center gap-4 opacity-70">
+          <div className="mt-12 flex items-center justify-center gap-4 opacity-70">
             <div className="h-px bg-slate-200 flex-1"></div>
-            <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase">
-              Secure access to your business
+            <span className="text-[0.8rem] font-semibold text-slate-400 tracking-wider uppercase">
+              Secure Staff Portal
             </span>
             <div className="h-px bg-slate-200 flex-1"></div>
           </div>
