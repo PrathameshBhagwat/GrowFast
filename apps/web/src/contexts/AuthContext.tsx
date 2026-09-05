@@ -52,8 +52,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 employee,
                 isLoading: false,
               });
-            } else {
-              // Token invalid or expired — clear storage
+            } else if (res.status === 401 || res.status === 403) {
+              // Token actually invalid or expired — clear storage
               localStorage.removeItem(TOKEN_KEY);
               localStorage.removeItem(EMPLOYEE_KEY);
               setState({
@@ -62,16 +62,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 employee: null,
                 isLoading: false,
               });
+            } else {
+              // Server returned 500 or other error, but token might still be valid.
+              // Don't log them out aggressively. Just assume authenticated for now or show error state.
+              setState({
+                isAuthenticated: true, // Optimistically keep them logged in
+                token,
+                employee,
+                isLoading: false,
+              });
             }
           })
           .catch(() => {
-            // Network or server unreachable — clear session to enforce real authentication
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(EMPLOYEE_KEY);
+            // Network or server unreachable (e.g. backend restarting).
+            // Do NOT aggressively destroy the session here, otherwise a hard refresh while backend is booting will log them out!
             setState({
-              isAuthenticated: false,
-              token: null,
-              employee: null,
+              isAuthenticated: true, // Optimistically keep them logged in
+              token,
+              employee,
               isLoading: false,
             });
           });
