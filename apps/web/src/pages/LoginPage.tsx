@@ -256,7 +256,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="flex flex-col gap-8">
+          <form onSubmit={handleLogin} className="flex flex-col gap-5">
             {/* Global Error/Lockout State */}
             {(error || lockoutUntil) && (
               <div className="bg-red-50/80 border border-red-100 text-red-600 text-sm font-medium p-4 rounded-xl text-center">
@@ -267,25 +267,25 @@ export const LoginPage: React.FC = () => {
             )}
 
             {/* Username / Employee Dropdown */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
               <label htmlFor="employeeId" className="text-[0.95rem] font-bold text-slate-800">
                 Role of You
               </label>
               <div
-                className={`relative flex items-center h-[60px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
+                className={`relative flex items-center h-[56px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
                   isFocusedEmp
                     ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
                     : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
                 } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
               >
                 <User
-                  size={22}
+                  size={20}
                   strokeWidth={2.5}
                   className="text-blue-400 shrink-0 pointer-events-none"
                 />
 
                 {isFetchingDirectory ? (
-                  <div className="flex-1 text-[1rem] text-slate-400">
+                  <div className="flex-1 text-[0.95rem] text-slate-400">
                     Loading staff directory...
                   </div>
                 ) : (
@@ -296,7 +296,7 @@ export const LoginPage: React.FC = () => {
                     onFocus={() => setIsFocusedEmp(true)}
                     onBlur={() => setIsFocusedEmp(false)}
                     disabled={!!lockoutUntil}
-                    className={`flex-1 h-full bg-transparent outline-none appearance-none cursor-pointer text-[1rem] font-medium ${
+                    className={`flex-1 h-full bg-transparent outline-none appearance-none cursor-pointer text-[0.95rem] font-medium ${
                       employeeId ? 'text-slate-900' : 'text-slate-400'
                     }`}
                   >
@@ -313,8 +313,8 @@ export const LoginPage: React.FC = () => {
 
                 {/* Custom select arrow to match standard inputs */}
                 <svg
-                  width="14"
-                  height="10"
+                  width="12"
+                  height="8"
                   viewBox="0 0 12 8"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -332,19 +332,19 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Password / PIN Input */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
               <label htmlFor="password" className="text-[0.95rem] font-bold text-slate-800">
                 PIN
               </label>
               <div
-                className={`relative flex items-center h-[60px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
+                className={`relative flex items-center h-[56px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
                   isFocusedPin
                     ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
                     : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
                 } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
               >
                 <Lock
-                  size={22}
+                  size={20}
                   strokeWidth={2.5}
                   className="text-blue-400 shrink-0 pointer-events-none"
                 />
@@ -358,7 +358,7 @@ export const LoginPage: React.FC = () => {
                   onBlur={() => setIsFocusedPin(false)}
                   disabled={!!lockoutUntil}
                   placeholder="Enter your PIN"
-                  className="flex-1 h-full bg-transparent outline-none text-[1rem] font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium tracking-widest"
+                  className="flex-1 h-full bg-transparent outline-none text-[0.95rem] font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium placeholder:tracking-normal tracking-widest"
                 />
 
                 <button
@@ -369,9 +369,9 @@ export const LoginPage: React.FC = () => {
                   aria-label={showPassword ? 'Hide PIN' : 'Show PIN'}
                 >
                   {showPassword ? (
-                    <EyeOff size={22} strokeWidth={2.5} />
+                    <EyeOff size={20} strokeWidth={2.5} />
                   ) : (
-                    <Eye size={22} strokeWidth={2.5} />
+                    <Eye size={20} strokeWidth={2.5} />
                   )}
                 </button>
               </div>
@@ -381,7 +381,7 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoggingIn || !!lockoutUntil}
-              className={`mt-6 w-full h-[60px] rounded-xl flex items-center justify-center gap-2 text-[1.1rem] font-bold text-white transition-all shadow-sm ${
+              className={`mt-4 w-full h-[56px] rounded-xl flex items-center justify-center gap-2 text-[1.1rem] font-bold text-white transition-all shadow-sm ${
                 isLoggingIn || !!lockoutUntil
                   ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md cursor-pointer active:scale-[0.99]'
@@ -398,7 +398,7 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Footer Security Label */}
-          <div className="mt-12 flex items-center justify-center gap-4 opacity-70">
+          <div className="mt-8 flex items-center justify-center gap-4 opacity-70">
             <div className="h-px bg-slate-200 flex-1"></div>
             <span className="text-[0.8rem] font-semibold text-slate-400 tracking-wider uppercase">
               Secure Staff Portal
