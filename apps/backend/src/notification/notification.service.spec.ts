@@ -187,7 +187,7 @@ describe('NotificationService', () => {
 
     // ─── Provider Failure Handling ────────────────────────────────
 
-    it('should handle provider dispatch failure gracefully', async () => {
+    it('should create event as CREATED (dispatch deferred to background)', async () => {
       const mockNotification = {
         id: 'notif-003',
         storeId: STORE_A,
@@ -206,19 +206,7 @@ describe('NotificationService', () => {
       };
 
       prisma.notification.create.mockResolvedValue(mockNotification);
-      // Simulating default LogProvider (returns success: false)
-      prisma.notification.update.mockResolvedValue({
-        ...mockNotification,
-        status: 'FAILED',
-        failedAt: new Date(),
-        failureReason: 'No real provider configured — event recorded only',
-      });
-      prisma.notification.findUnique.mockResolvedValue({
-        ...mockNotification,
-        status: 'FAILED',
-        failedAt: new Date(),
-        failureReason: 'No real provider configured — event recorded only',
-      });
+      prisma.notification.findUnique.mockResolvedValue(mockNotification);
 
       const result = await service.createNotificationEvent(
         STORE_A,
@@ -227,10 +215,46 @@ describe('NotificationService', () => {
         RECIPIENT,
       );
 
-      // Event is still recorded even though dispatch failed
+      // Event is created successfully and deferred
       expect(result).toBeDefined();
-      expect(result!.status).toBe('FAILED');
-      expect(result!.failureReason).toContain('No real provider configured');
+      expect(result!.status).toBe('CREATED');
+    });
+
+    it('should handle provider dispatch failure gracefully in processNotification', async () => {
+      const mockNotification = {
+        id: 'notif-004',
+        storeId: STORE_A,
+        orderId: null,
+        customerId: null,
+        eventType: NotificationEventType.PAYMENT_RECEIVED,
+        channel: NotificationChannel.SMS,
+        status: 'QUEUED',
+        recipient: RECIPIENT,
+        payload: null,
+        sentAt: null,
+        failedAt: null,
+        failureReason: null,
+        retryCount: 0,
+        createdAt: new Date(),
+      };
+
+      prisma.notification.findUnique.mockResolvedValue(mockNotification);
+      prisma.notification.update.mockResolvedValue({
+        ...mockNotification,
+        status: 'FAILED',
+        failedAt: new Date(),
+        failureReason: 'No real provider configured — event recorded only',
+        retryCount: 1,
+      });
+
+      const success = await service.processNotification('notif-004');
+
+      expect(success).toBe(false);
+      expect(prisma.notification.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'FAILED', retryCount: { increment: 1 } }),
+        }),
+      );
     });
 
     // ─── Notification Failure Must Not Corrupt Business Transactions ──

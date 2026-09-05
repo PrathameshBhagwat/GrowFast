@@ -2,7 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingState, EmptyState, ErrorState } from '@growfast/ui';
-import { GarmentCategory, Role } from '@growfast/shared-types';
+import {
+  GarmentCategory,
+  Role,
+  filterServicesForCategory,
+  resolveCatalogSelectionOnCategoryChange,
+  resolveCatalogSelectionOnServiceChange,
+} from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
 import {
   ArrowLeft,
@@ -16,6 +22,14 @@ import {
   X,
   Layers,
   Sparkles,
+  FlaskConical,
+  Gift,
+  Recycle,
+  Package,
+  Box,
+  Shield,
+  Zap,
+  Droplets,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -89,6 +103,8 @@ export const CatalogSettingsPage: React.FC = () => {
   const [editSection, setEditSection] = useState('');
   const [savingGarment, setSavingGarment] = useState(false);
   const [saveGarmentError, setSaveGarmentError] = useState<string | null>(null);
+  const [editPrices, setEditPrices] = useState<Record<string, string>>({});
+  const [savingEditPrices, setSavingEditPrices] = useState(false);
 
   // Quick Price Edit Modal
   const [quickPriceModalOpen, setQuickPriceModalOpen] = useState(false);
@@ -167,44 +183,53 @@ export const CatalogSettingsPage: React.FC = () => {
     });
   }, [garments, activeCategory, searchQuery]);
 
-  // --- Shoe Category & Service Enforcements ---
-  const isActiveShoeService = services
-    .find((s) => s.id === activeServiceId)
-    ?.name.toLowerCase()
-    .includes('shoe');
-  const isActiveShoeCategory = activeCategory === GarmentCategory.SHOES;
-
-  useEffect(() => {
-    if (isActiveShoeCategory && !isActiveShoeService) {
-      const shoeSvc = services.find((s) => s.name.toLowerCase().includes('shoe'));
-      if (shoeSvc) setActiveServiceId(shoeSvc.id);
-    } else if (!isActiveShoeCategory && isActiveShoeService) {
-      const nonShoeSvc = services.find((s) => !s.name.toLowerCase().includes('shoe'));
-      if (nonShoeSvc) setActiveServiceId(nonShoeSvc.id);
+  // --- Applicability Handlers ---
+  const handleActiveCategoryChange = (cat: string) => {
+    setActiveCategory(cat);
+    const newServiceId = resolveCatalogSelectionOnCategoryChange(cat, activeServiceId, services);
+    if (newServiceId !== activeServiceId) {
+      setActiveServiceId(newServiceId);
     }
-  }, [isActiveShoeCategory, isActiveShoeService, services]);
+  };
 
-  const isPricingShoeService = services
-    .find((s) => s.id === pricingServiceId)
-    ?.name.toLowerCase()
-    .includes('shoe');
-  const isPricingShoeCategory = pricingCategory === GarmentCategory.SHOES;
-
-  useEffect(() => {
-    if (isPricingShoeCategory && !isPricingShoeService) {
-      const shoeSvc = services.find((s) => s.name.toLowerCase().includes('shoe'));
-      if (shoeSvc) {
-        setPricingServiceId(shoeSvc.id);
-        setEditedPrices({});
-      }
-    } else if (!isPricingShoeCategory && isPricingShoeService) {
-      const nonShoeSvc = services.find((s) => !s.name.toLowerCase().includes('shoe'));
-      if (nonShoeSvc) {
-        setPricingServiceId(nonShoeSvc.id);
-        setEditedPrices({});
-      }
+  const handleActiveServiceChange = (serviceId: string) => {
+    setActiveServiceId(serviceId);
+    const newCategory = resolveCatalogSelectionOnServiceChange(serviceId, activeCategory, services);
+    if (newCategory !== activeCategory) {
+      setActiveCategory(newCategory as string);
     }
-  }, [isPricingShoeCategory, isPricingShoeService, services]);
+  };
+
+  const handlePricingCategoryChange = (cat: string) => {
+    setPricingCategory(cat);
+    const newServiceId = resolveCatalogSelectionOnCategoryChange(cat, pricingServiceId, services);
+    if (newServiceId !== pricingServiceId) {
+      setPricingServiceId(newServiceId);
+      setEditedPrices({});
+    }
+  };
+
+  const handlePricingServiceChange = (serviceId: string) => {
+    setPricingServiceId(serviceId);
+    setEditedPrices({});
+    const newCategory = resolveCatalogSelectionOnServiceChange(
+      serviceId,
+      pricingCategory,
+      services,
+    );
+    if (newCategory !== pricingCategory) {
+      setPricingCategory(newCategory as string);
+    }
+  };
+
+  // Visible services for each tab (Shoe hides 3 services)
+  const visibleGarmentServices = useMemo(() => {
+    return filterServicesForCategory(services, activeCategory);
+  }, [services, activeCategory]);
+
+  const visiblePricingServices = useMemo(() => {
+    return filterServicesForCategory(services, pricingCategory);
+  }, [services, pricingCategory]);
 
   // Filtered garments for Pricing Tab
   const pricingFilteredGarments = useMemo(() => {
@@ -286,6 +311,16 @@ export const CatalogSettingsPage: React.FC = () => {
     setEditIsActive(garment.isActive);
     setEditSection((garment as any).section || '');
     setSaveGarmentError(null);
+    // Populate per-service prices
+    const priceMap: Record<string, string> = {};
+    for (const svc of services) {
+      const existing = pricingData.find(
+        (p: any) => p.garmentCatalogId === garment.id && p.serviceTypeId === svc.id,
+      );
+      priceMap[svc.id] = existing ? String(existing.price) : '';
+    }
+    setEditPrices(priceMap);
+    setSavingEditPrices(false);
     setEditModalOpen(true);
   };
 
@@ -332,6 +367,59 @@ export const CatalogSettingsPage: React.FC = () => {
     } finally {
       setSavingGarment(false);
     }
+  };
+
+  const handleSaveAllPrices = async () => {
+    if (!editGarment) return false;
+    setSavingEditPrices(true);
+    setSaveGarmentError(null);
+    let hasError = false;
+
+    try {
+      const promises = services.map(async (svc) => {
+        const val = editPrices[svc.id] || '';
+        const originalPrice = pricingData.find(
+          (p: any) => p.garmentCatalogId === editGarment.id && p.serviceTypeId === svc.id,
+        );
+        const hasChanged = val !== '' && val !== (originalPrice ? String(originalPrice.price) : '');
+
+        if (hasChanged) {
+          const price = parseFloat(val);
+          if (isNaN(price) || price < 0) {
+            throw new Error(`Invalid price for ${svc.name}`);
+          }
+          const res = await fetch(`${API_URL}/pricing/${editGarment.id}/${svc.id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ price }),
+          });
+          if (!res.ok) {
+            throw new Error(`Failed to save ${svc.name}`);
+          }
+        }
+      });
+
+      await Promise.all(promises);
+      await fetchAllData();
+
+      const updatedMap = { ...editPrices };
+      for (const svc of services) {
+        const val = editPrices[svc.id] || '';
+        if (val !== '') {
+          updatedMap[svc.id] = val;
+        }
+      }
+      setEditPrices(updatedMap);
+    } catch (err) {
+      setSaveGarmentError(err instanceof Error ? err.message : 'Save failed');
+      hasError = true;
+    } finally {
+      setSavingEditPrices(false);
+    }
+    return !hasError;
   };
 
   const openQuickPriceModal = (garment: GarmentCatalogDTO) => {
@@ -597,20 +685,16 @@ export const CatalogSettingsPage: React.FC = () => {
                       Service
                     </span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {services.map((service) => {
-                        const isShoeSvc = service.name.toLowerCase().includes('shoe');
-                        const isVisuallyDisabled = isActiveShoeCategory ? !isShoeSvc : false;
+                      {visibleGarmentServices.map((service) => {
                         return (
                           <button
                             key={service.id}
                             type="button"
-                            onClick={() => setActiveServiceId(service.id)}
+                            onClick={() => handleActiveServiceChange(service.id)}
                             className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                               activeServiceId === service.id
                                 ? 'bg-primary-600 text-white border-primary-600'
-                                : isVisuallyDisabled
-                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
-                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                             }`}
                           >
                             {service.name}
@@ -629,19 +713,15 @@ export const CatalogSettingsPage: React.FC = () => {
                     </span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
                       {CATEGORIES.map((cat) => {
-                        const isShoeCat = cat === GarmentCategory.SHOES;
-                        const isVisuallyDisabled = isActiveShoeService ? !isShoeCat : false;
                         return (
                           <button
                             key={cat}
                             type="button"
-                            onClick={() => setActiveCategory(cat)}
+                            onClick={() => handleActiveCategoryChange(cat)}
                             className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                               activeCategory === cat
                                 ? 'bg-primary-600 text-white border-primary-600'
-                                : isVisuallyDisabled
-                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
-                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                             }`}
                           >
                             {CATEGORY_LABELS[cat] || cat}
@@ -655,21 +735,21 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* Search Bar */}
                 <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0">
                   <div className="relative w-full">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                      placeholder={`Search in ${CATEGORY_LABELS[activeCategory]}...`}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      placeholder={`🔍 Search in ${CATEGORY_LABELS[activeCategory]}...`}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
                 </div>
 
-                {/* 4-Column Garment Catalog Grid (Independently Scrollable) */}
-                <div className="flex-1 overflow-y-auto px-5 py-5 md:px-6 md:py-6 bg-slate-50 min-h-0">
+                {/* Garment Catalog Grid — 7-8 cols on wide desktop */}
+                <div className="flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 bg-slate-50 min-h-0">
                   {filteredGarments.length === 0 ? (
                     <EmptyState
                       message={
@@ -679,7 +759,7 @@ export const CatalogSettingsPage: React.FC = () => {
                       }
                     />
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
                       {filteredGarments.map((garment) => {
                         const price = getPriceFor(garment.id, activeServiceId);
                         const hasPrice = price !== null;
@@ -687,7 +767,7 @@ export const CatalogSettingsPage: React.FC = () => {
                         return (
                           <div
                             key={garment.id}
-                            className={`relative flex flex-col items-center justify-between p-6 bg-white rounded-sm border transition-all group min-h-[180px] ${
+                            className={`relative flex flex-col items-center justify-between p-3 bg-white rounded-[2px] border transition-all group min-h-[120px] ${
                               !garment.isActive
                                 ? 'opacity-60 grayscale border-slate-300'
                                 : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400'
@@ -695,52 +775,42 @@ export const CatalogSettingsPage: React.FC = () => {
                           >
                             {/* Price Badge (Top-Right) */}
                             {hasPrice ? (
-                              <div className="absolute top-3 right-3 bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-sm shadow-xs">
+                              <div className="absolute top-1.5 right-1.5 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-[2px] shadow-xs">
                                 ₹{price.toFixed(0)}
                               </div>
                             ) : (
-                              <div className="absolute top-3 right-3 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-2.5 py-1 rounded-sm">
-                                Not Configured
+                              <div className="absolute top-1.5 right-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-semibold px-1.5 py-0.5 rounded-[2px]">
+                                No Price
                               </div>
                             )}
 
                             {/* Inactive State Badge (Top-Left) */}
                             {!garment.isActive && (
-                              <span className="absolute top-3 left-3 bg-slate-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-sm">
-                                Inactive
+                              <span className="absolute top-1.5 left-1.5 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
+                                Off
                               </span>
                             )}
 
                             {/* Garment Icon */}
-                            <div className="w-16 h-16 rounded-sm bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-6 mb-4">
-                              <Shirt size={32} strokeWidth={1.5} />
+                            <div className="w-10 h-10 rounded-[2px] bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-4 mb-2">
+                              <Shirt size={22} strokeWidth={1.5} />
                             </div>
 
                             {/* Garment Name */}
-                            <span className="text-sm font-semibold text-slate-800 text-center line-clamp-2 leading-tight px-1 w-full mb-4">
+                            <span className="text-xs font-semibold text-slate-800 text-center line-clamp-2 leading-tight px-0.5 w-full mb-1">
                               {garment.name}
                             </span>
 
-                            {/* Admin Controls on Tile for OWNER / MANAGER */}
+                            {/* Single Edit Button */}
                             {canManage && (
-                              <div className="w-full pt-3 mt-auto border-t border-slate-100 flex items-center justify-center gap-4 opacity-90 group-hover:opacity-100 transition-opacity px-2">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(garment)}
-                                  className="flex-1 py-2 px-3 rounded-sm text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-1.5 border border-slate-200 cursor-pointer min-h-[36px]"
-                                  title="Edit garment details"
-                                >
-                                  <Edit2 size={12} /> Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openQuickPriceModal(garment)}
-                                  className="flex-1 py-2 px-3 rounded-sm text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 flex items-center justify-center gap-1.5 border border-primary-200 cursor-pointer min-h-[36px]"
-                                  title="Set price for this service"
-                                >
-                                  <Tag size={12} /> Price
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(garment)}
+                                className="w-full mt-auto pt-1.5 border-t border-slate-100 py-1.5 rounded-[2px] text-[10px] font-semibold text-slate-500 hover:text-primary-700 hover:bg-primary-50 flex items-center justify-center gap-1 cursor-pointer transition-all min-h-[28px]"
+                                title="Edit garment & pricing"
+                              >
+                                <Edit2 size={10} /> Edit
+                              </button>
                             )}
                           </div>
                         );
@@ -763,23 +833,16 @@ export const CatalogSettingsPage: React.FC = () => {
                       Service
                     </span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {services.map((service) => {
-                        const isShoeSvc = service.name.toLowerCase().includes('shoe');
-                        const isVisuallyDisabled = isPricingShoeCategory ? !isShoeSvc : false;
+                      {visiblePricingServices.map((service) => {
                         return (
                           <button
                             key={service.id}
                             type="button"
-                            onClick={() => {
-                              setPricingServiceId(service.id);
-                              setEditedPrices({});
-                            }}
+                            onClick={() => handlePricingServiceChange(service.id)}
                             className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                               pricingServiceId === service.id
                                 ? 'bg-primary-600 text-white border-primary-600'
-                                : isVisuallyDisabled
-                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
-                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                             }`}
                           >
                             {service.name}
@@ -798,19 +861,15 @@ export const CatalogSettingsPage: React.FC = () => {
                     </span>
                     <div className="flex-1 flex flex-wrap gap-4 w-full">
                       {CATEGORIES.map((cat) => {
-                        const isShoeCat = cat === GarmentCategory.SHOES;
-                        const isVisuallyDisabled = isPricingShoeService ? !isShoeCat : false;
                         return (
                           <button
                             key={cat}
                             type="button"
-                            onClick={() => setPricingCategory(cat)}
+                            onClick={() => handlePricingCategoryChange(cat)}
                             className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                               pricingCategory === cat
                                 ? 'bg-primary-600 text-white border-primary-600'
-                                : isVisuallyDisabled
-                                  ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
-                                  : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                             }`}
                           >
                             {CATEGORY_LABELS[cat] || cat}
@@ -824,13 +883,13 @@ export const CatalogSettingsPage: React.FC = () => {
                 {/* Controls Bar & Feedback */}
                 <div className="px-5 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                   <div className="relative w-full sm:w-96">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Search size={18} />
                     </div>
                     <input
                       type="text"
-                      className="w-full pl-12 pr-4 py-2.5 min-h-[44px] bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                      placeholder={`Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      placeholder={`🔍 Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
                       value={pricingSearch}
                       onChange={(e) => setPricingSearch(e.target.value)}
                     />
@@ -1073,89 +1132,330 @@ export const CatalogSettingsPage: React.FC = () => {
       {/* ─── EDIT GARMENT MODAL ────────────────────────────── */}
       {editModalOpen && editGarment && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-sm max-w-md w-full p-6 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Edit2 size={18} className="text-primary-600" /> Edit Garment
-              </h2>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {saveGarmentError && (
-              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-sm">
-                {saveGarmentError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveGarment} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Garment Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Category *
-                </label>
-                <select
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value as GarmentCategory)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_LABELS[c] || c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-sm">
-                <div>
-                  <span className="text-sm font-semibold text-slate-900 block">Active Status</span>
-                  <span className="text-xs text-slate-500">
-                    Inactive garments won't appear in order wizard
-                  </span>
+          <div
+            className="bg-white rounded-[3px] max-w-[690px] w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto"
+            style={{ borderRadius: '3px' }}
+          >
+            {/* Dedicated Inner Content Container: 24px left/right, 16px top/bottom */}
+            <div
+              className="w-full flex flex-col gap-4 box-border"
+              style={{
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                paddingTop: '16px',
+                paddingBottom: '16px',
+              }}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 bg-primary-50 flex items-center justify-center shrink-0 border border-primary-100 text-primary-600"
+                    style={{ borderRadius: '3px' }}
+                  >
+                    <Edit2 size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-base font-bold text-slate-900">Edit Garment</h2>
+                      <span
+                        className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200"
+                        style={{ borderRadius: '3px', padding: '2px 6px' }}
+                      >
+                        SKU: GRM-{editGarment.id.substring(0, 4).toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Update catalog metadata and per-service retail rates
+                    </p>
+                  </div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={editIsActive}
-                  onChange={(e) => setEditIsActive(e.target.checked)}
-                  className="w-5 h-5 accent-primary-600 rounded cursor-pointer"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-sm cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
+                  style={{ borderRadius: '3px' }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingGarment}
-                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-sm shadow-xs cursor-pointer"
-                >
-                  {savingGarment ? 'Saving...' : 'Save Changes'}
+                  <X size={18} />
                 </button>
               </div>
-            </form>
+
+              {saveGarmentError && (
+                <div
+                  className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs"
+                  style={{ borderRadius: '3px' }}
+                >
+                  {saveGarmentError}
+                </div>
+              )}
+
+              {/* ── Garment Details Section ── */}
+              <div
+                className="border border-slate-200 bg-white box-border"
+                style={{ borderRadius: '3px', padding: '16px' }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[11px] font-bold text-slate-800 tracking-wider flex items-center gap-2 uppercase">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary-500"></div>
+                    Garment Details
+                  </h3>
+                  <span className="text-[11px] text-slate-400">* Required fields</span>
+                </div>
+
+                <form onSubmit={handleSaveGarment} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-3">
+                        Garment Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-shadow"
+                        style={{ borderRadius: '3px', padding: '9px 14px' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-3">
+                        Category <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value as GarmentCategory)}
+                        className="w-full bg-white border border-slate-200 text-sm text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-shadow"
+                        style={{ borderRadius: '3px', padding: '9px 14px' }}
+                      >
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {CATEGORY_LABELS[c] || c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div
+                    className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-slate-100 gap-4"
+                    style={{ paddingTop: '16px' }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={editIsActive}
+                            onChange={(e) => setEditIsActive(e.target.checked)}
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                      </div>
+                      <div>
+                        <span className="text-sm font-semibold text-slate-900 block">
+                          Active Status
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Inactive garments won't appear in the counter order wizard
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={savingGarment}
+                      className="shrink-0 text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ borderRadius: '3px', padding: '10px 16px', minHeight: '44px' }}
+                    >
+                      <Check size={14} /> {savingGarment ? 'Saving...' : 'Save Details'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* ── Service Pricing Section ── */}
+              {canConfigurePricing && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-2">
+                      <Tag size={16} className="text-primary-500 mt-0.5 shrink-0" />
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Service Pricing</h3>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Set the unit charge for this garment across individual service workflows.
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className="bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-600 shrink-0"
+                      style={{ borderRadius: '3px', padding: '4px 10px' }}
+                    >
+                      8 Services Available
+                    </div>
+                  </div>
+
+                  {/* Pricing Table with 16px inner horizontal padding */}
+                  <div
+                    className="border border-slate-200 overflow-hidden bg-white box-border"
+                    style={{ borderRadius: '3px' }}
+                  >
+                    <div
+                      className="flex items-center justify-between bg-slate-50 border-b border-slate-200"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">
+                        Service Type
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase w-28 text-right">
+                        Rate (₹)
+                      </span>
+                    </div>
+
+                    <div className="divide-y divide-slate-100">
+                      {services.map((svc: any) => {
+                        const val = editPrices[svc.id] || '';
+
+                        const svcName = svc.name.toLowerCase();
+                        let Icon = Box;
+                        let desc = '';
+                        let isPromo = false;
+
+                        if (svcName.includes('dry clean')) {
+                          Icon = FlaskConical;
+                          desc = 'Deep chemical solvent process';
+                        } else if (svcName.includes('free shoe')) {
+                          Icon = Gift;
+                          desc = 'Complimentary bundle item';
+                          isPromo = true;
+                        } else if (svcName.includes('reprocess')) {
+                          Icon = Recycle;
+                          desc = 'Secondary stain remediation cycle';
+                        } else if (svcName.includes('shoe cleaning')) {
+                          Icon = Package;
+                          desc = 'Sole restoration & deodorizing';
+                        } else if (svcName.includes('standard wash')) {
+                          Icon = Box;
+                          desc = 'Regular drum hydro-cleaning';
+                        } else if (svcName.includes('starching')) {
+                          Icon = Shield;
+                          desc = 'Crisp stiffening finish';
+                        } else if (svcName.includes('wash + steam')) {
+                          Icon = Droplets;
+                          desc = 'Combined wash and press';
+                        } else if (svcName.includes('steam iron')) {
+                          Icon = Zap;
+                          desc = 'High-pressure vertical press';
+                        }
+
+                        return (
+                          <div
+                            key={svc.id}
+                            className="flex items-center justify-between hover:bg-slate-50/50 transition-colors box-border"
+                            style={{ padding: '10px 16px', minHeight: '50px' }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-8 h-8 border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 shrink-0"
+                                style={{ borderRadius: '3px' }}
+                              >
+                                <Icon size={16} strokeWidth={1.5} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold text-slate-800">
+                                    {svc.name}
+                                  </span>
+                                  {isPromo && (
+                                    <span
+                                      className="bg-emerald-100 text-emerald-700 text-[9px] font-bold"
+                                      style={{ borderRadius: '2px', padding: '2px 6px' }}
+                                    >
+                                      Promo
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-0.5">{desc}</p>
+                              </div>
+                            </div>
+
+                            <div className="relative w-28 shrink-0">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className="text-slate-400 text-xs font-semibold">₹</span>
+                              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                placeholder="0"
+                                value={val}
+                                onChange={(e) =>
+                                  setEditPrices((prev) => ({ ...prev, [svc.id]: e.target.value }))
+                                }
+                                className="w-full pl-7 pr-3 bg-white border border-slate-200 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:outline-none transition-shadow text-right"
+                                style={{
+                                  borderRadius: '3px',
+                                  paddingTop: '6px',
+                                  paddingBottom: '6px',
+                                  minHeight: '36px',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Single Save Prices Button: inset from right edge */}
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSaveAllPrices}
+                      disabled={savingEditPrices}
+                      className="text-xs font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ borderRadius: '3px', padding: '10px 16px', minHeight: '44px' }}
+                    >
+                      <Save size={15} /> {savingEditPrices ? 'Saving Prices...' : 'Save Prices'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Footer ── */}
+              <div
+                className="border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 box-border"
+                style={{ paddingTop: '16px' }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                  <span className="text-xs font-medium text-slate-600">
+                    Catalog changes sync across all active store branches
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                    style={{ borderRadius: '3px', padding: '10px 16px', minHeight: '44px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const pricesSaved = await handleSaveAllPrices();
+                      if (pricesSaved) closeEditModal();
+                    }}
+                    disabled={savingEditPrices}
+                    className="text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 shadow-xs transition-colors cursor-pointer"
+                    style={{ borderRadius: '3px', padding: '10px 18px', minHeight: '44px' }}
+                  >
+                    Done & Close
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

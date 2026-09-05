@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Shirt, Search } from 'lucide-react';
-import { GarmentCategory } from '@growfast/shared-types';
+import {
+  GarmentCategory,
+  filterServicesForCategory,
+  resolveCatalogSelectionOnCategoryChange,
+  resolveCatalogSelectionOnServiceChange,
+} from '@growfast/shared-types';
 
 interface ItemSelectorProps {
   garments: any[];
@@ -46,32 +51,34 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORIES[0]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Update selected service if it's not in the active services
-  React.useEffect(() => {
-    if (!selectedServiceId && activeServices.length > 0) {
-      setSelectedServiceId(activeServices[0].id);
+  // Visible services based on current category (Shoe hides 3 services)
+  const visibleServices = useMemo(() => {
+    return filterServicesForCategory(activeServices, selectedCategory);
+  }, [activeServices, selectedCategory]);
+
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+    const newServiceId = resolveCatalogSelectionOnCategoryChange(
+      category,
+      selectedServiceId,
+      activeServices,
+    );
+    if (newServiceId !== selectedServiceId) {
+      setSelectedServiceId(newServiceId);
     }
-  }, [activeServices, selectedServiceId]);
+  };
 
-  // Determine if a shoe service is currently selected
-  const isShoeServiceSelected = activeServices
-    .find((s) => s.id === selectedServiceId)
-    ?.name.toLowerCase()
-    .includes('shoe');
-
-  // Determine if the shoe category is currently selected
-  const isShoeCategorySelected = selectedCategory === GarmentCategory.SHOES;
-
-  // Enforce valid combinations if state becomes mismatched
-  React.useEffect(() => {
-    if (isShoeCategorySelected && !isShoeServiceSelected) {
-      const shoeService = activeServices.find((s) => s.name.toLowerCase().includes('shoe'));
-      if (shoeService) setSelectedServiceId(shoeService.id);
-    } else if (!isShoeCategorySelected && isShoeServiceSelected) {
-      const nonShoeService = activeServices.find((s) => !s.name.toLowerCase().includes('shoe'));
-      if (nonShoeService) setSelectedServiceId(nonShoeService.id);
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedServiceId(serviceId);
+    const newCategory = resolveCatalogSelectionOnServiceChange(
+      serviceId,
+      selectedCategory,
+      activeServices,
+    );
+    if (newCategory !== selectedCategory) {
+      setSelectedCategory(newCategory as string);
     }
-  }, [isShoeCategorySelected, isShoeServiceSelected, activeServices]);
+  };
 
   const filteredGarments = useMemo(() => {
     return activeGarments.filter((g) => {
@@ -102,21 +109,16 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
             Service
           </span>
           <div className="flex-1 flex flex-wrap gap-4 w-full">
-            {activeServices.map((service) => {
-              const isShoeService = service.name.toLowerCase().includes('shoe');
-              const isVisuallyDisabled = isShoeCategorySelected ? !isShoeService : false;
-
+            {visibleServices.map((service) => {
               return (
                 <button
                   key={service.id}
                   type="button"
-                  onClick={() => setSelectedServiceId(service.id)}
+                  onClick={() => handleServiceSelect(service.id)}
                   className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
                     selectedServiceId === service.id
                       ? 'bg-primary-600 text-white border-primary-600'
-                      : isVisuallyDisabled
-                        ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
-                        : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                   }`}
                 >
                   {service.name}
@@ -135,20 +137,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
           </span>
           <div className="flex-1 flex flex-wrap gap-4 w-full">
             {CATEGORIES.map((category) => {
-              const isShoeCat = category === GarmentCategory.SHOES;
-              const isVisuallyDisabled = isShoeServiceSelected ? !isShoeCat : false;
-
               return (
                 <button
                   key={category}
                   type="button"
-                  onClick={() => setSelectedCategory(category)}
+                  onClick={() => handleCategorySelect(category)}
                   className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
                     selectedCategory === category
                       ? 'bg-primary-600 text-white border-primary-600'
-                      : isVisuallyDisabled
-                        ? 'bg-gray-50 text-gray-400 border-gray-200 opacity-60'
-                        : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                   }`}
                 >
                   {CATEGORY_LABELS[category] || category}
@@ -175,9 +172,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
         </div>
       </div>
 
-      {/* Garment Grid (Scrollable) — 4-column desktop */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-5 bg-slate-50 min-h-0">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+      {/* Garment Grid (Scrollable) — 7-8 cols on wide desktop */}
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 bg-slate-50 min-h-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-2.5">
           {filteredGarments.map((garment) => {
             const priceRecord = prices.find(
               (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId,
@@ -191,7 +188,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 key={garment.id}
                 type="button"
                 onClick={() => handleGarmentClick(garment)}
-                className={`relative flex flex-col items-center justify-between p-4 bg-white rounded-[2px] border transition-all text-left group min-h-[140px] cursor-pointer ${
+                className={`relative flex flex-col items-center justify-between p-3 bg-white rounded-[2px] border transition-all text-left group min-h-[110px] cursor-pointer ${
                   isSelected
                     ? 'border-primary-600 ring-2 ring-primary-500 bg-primary-50/30 shadow-md'
                     : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400 hover:bg-slate-50/50'
@@ -200,20 +197,20 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
               >
                 {/* Price Badge */}
                 {hasPrice ? (
-                  <div className="absolute top-0 right-0 bg-slate-900 text-white text-xs font-bold px-2.5 py-1 rounded-bl-[2px] rounded-tr-[2px] shadow-xs">
+                  <div className="absolute top-1 right-1 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-[2px] shadow-xs">
                     ₹{price}
                   </div>
                 ) : (
-                  <div className="absolute top-0 right-0 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[10px] font-semibold px-2 py-0.5 rounded-bl-[2px] rounded-tr-[2px]">
-                    Not Configured
+                  <div className="absolute top-1 right-1 bg-amber-50 text-amber-800 border-l border-b border-amber-200 text-[9px] font-semibold px-1.5 py-0.5 rounded-[2px]">
+                    No Price
                   </div>
                 )}
 
-                <div className="w-14 h-14 rounded-[2px] bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-2 mb-2">
-                  <Shirt size={28} strokeWidth={1.5} />
+                <div className="w-10 h-10 rounded-[2px] bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-3 mb-1.5">
+                  <Shirt size={22} strokeWidth={1.5} />
                 </div>
 
-                <span className="text-sm text-center font-medium text-slate-800 line-clamp-2 leading-tight px-1 w-full">
+                <span className="text-xs text-center font-medium text-slate-800 line-clamp-2 leading-tight px-0.5 w-full">
                   {garment.name}
                 </span>
               </button>

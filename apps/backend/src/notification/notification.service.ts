@@ -8,6 +8,8 @@ import {
   type NotificationDTO,
 } from '@growfast/shared-types';
 import { NotificationProvider, LogNotificationProvider } from './notification.provider';
+import { WhatsAppNotificationProvider } from './whatsapp-notification.provider';
+import { BaileysWhatsAppProvider } from './baileys-whatsapp.provider';
 
 /**
  * Notification Service — C8 Foundation
@@ -27,11 +29,27 @@ import { NotificationProvider, LogNotificationProvider } from './notification.pr
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
-  private readonly provider: NotificationProvider;
+  private readonly logProvider: NotificationProvider;
+  private readonly whatsappProvider: NotificationProvider;
 
   constructor(private readonly prisma: PrismaService) {
-    // Default to log-only provider. Future: inject via DI / config.
-    this.provider = new LogNotificationProvider();
+    this.logProvider = new LogNotificationProvider();
+
+    const providerType = process.env.WHATSAPP_PROVIDER || 'log';
+    if (providerType === 'baileys') {
+      this.whatsappProvider = new BaileysWhatsAppProvider();
+    } else if (providerType === 'meta') {
+      this.whatsappProvider = new WhatsAppNotificationProvider();
+    } else {
+      this.whatsappProvider = this.logProvider; // fallback to log
+    }
+  }
+
+  private getProvider(channel: NotificationChannel): NotificationProvider {
+    if (channel === NotificationChannel.WHATSAPP || channel === NotificationChannel.SMS) {
+      return this.whatsappProvider;
+    }
+    return this.logProvider;
   }
 
   /**
@@ -81,58 +99,76 @@ export class NotificationService {
         },
       });
 
-      // 3. Attempt provider dispatch (non-fatal)
-      try {
-        const result = await this.provider.dispatch({
-          id: notification.id,
-          channel: notification.channel,
-          recipient: notification.recipient,
-          eventType: notification.eventType,
-          payload: (notification.payload as Record<string, unknown>) || null,
-        });
+      // 3. Return the created state (background worker will handle dispatch)
+      return this.toDTO(notification);
+    } catch (err: any) {
+      // CRITICAL: Never throw from this method — calling transactions must not break
+      this.logger.error(`Failed to create notification event: ${err.message}`);
+      return null;
+    }
+  }
 
-        if (result.success) {
-          await this.prisma.notification.update({
-            where: { id: notification.id },
-            data: {
-              status: 'SENT',
-              sentAt: new Date(),
-            },
-          });
-        } else {
-          await this.prisma.notification.update({
-            where: { id: notification.id },
-            data: {
-              status: 'FAILED',
-              failedAt: new Date(),
-              failureReason: result.failureReason || 'Provider returned failure',
-            },
-          });
-        }
-      } catch (dispatchErr: any) {
-        this.logger.error(
-          `Notification dispatch failed for ${notification.id}: ${dispatchErr.message}`,
-        );
+  /**
+   * Process a single notification (called by the background worker).
+   */
+  async processNotification(notificationId: string): Promise<boolean> {
+    const notification = await this.prisma.notification.findUnique({
+      where: { id: notificationId },
+    });
+
+    if (!notification) return false;
+
+    try {
+      const store = await this.prisma.store.findUnique({
+        where: { id: notification.storeId },
+        select: { name: true },
+      });
+
+      const provider = this.getProvider(notification.channel as NotificationChannel);
+      const result = await provider.dispatch({
+        id: notification.id,
+        channel: notification.channel,
+        recipient: notification.recipient,
+        eventType: notification.eventType,
+        payload: (notification.payload as Record<string, unknown>) || null,
+        storeName: store?.name || 'GrowFast Laundry',
+      });
+
+      if (result.success) {
+        await this.prisma.notification.update({
+          where: { id: notification.id },
+          data: {
+            status: 'SENT',
+            sentAt: new Date(),
+          },
+        });
+        return true;
+      } else {
         await this.prisma.notification.update({
           where: { id: notification.id },
           data: {
             status: 'FAILED',
             failedAt: new Date(),
-            failureReason: dispatchErr.message || 'Dispatch exception',
+            failureReason: result.failureReason || 'Provider returned failure',
+            retryCount: { increment: 1 },
           },
         });
+        return false;
       }
-
-      // 4. Return the final state
-      const updated = await this.prisma.notification.findUnique({
+    } catch (dispatchErr: any) {
+      this.logger.error(
+        `Notification dispatch failed for ${notification.id}: ${dispatchErr.message}`,
+      );
+      await this.prisma.notification.update({
         where: { id: notification.id },
+        data: {
+          status: 'FAILED',
+          failedAt: new Date(),
+          failureReason: dispatchErr.message || 'Dispatch exception',
+          retryCount: { increment: 1 },
+        },
       });
-
-      return updated ? this.toDTO(updated) : this.toDTO(notification);
-    } catch (err: any) {
-      // CRITICAL: Never throw from this method — calling transactions must not break
-      this.logger.error(`Failed to create notification event: ${err.message}`);
-      return null;
+      return false;
     }
   }
 

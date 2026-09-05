@@ -36,7 +36,7 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('growfast_token');
       const res = await fetch(`${API_URL}/payments`, {
         method: 'POST',
         headers: {

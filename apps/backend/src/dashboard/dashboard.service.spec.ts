@@ -13,6 +13,7 @@ describe('DashboardService', () => {
       groupBy: jest.fn(),
       count: jest.fn(),
       aggregate: jest.fn(),
+      findMany: jest.fn(),
     },
     orderItem: {
       count: jest.fn(),
@@ -22,6 +23,9 @@ describe('DashboardService', () => {
     },
     customer: {
       count: jest.fn(),
+    },
+    notification: {
+      findMany: jest.fn(),
     },
   };
 
@@ -47,6 +51,8 @@ describe('DashboardService', () => {
     mockPrisma.orderItem.count.mockResolvedValue(0);
     mockPrisma.deliveryRecord.groupBy.mockResolvedValue([]);
     mockPrisma.customer.count.mockResolvedValue(0);
+    mockPrisma.order.findMany.mockResolvedValue([]);
+    mockPrisma.notification.findMany.mockResolvedValue([]);
   }
 
   function setupPopulatedMocks() {
@@ -91,6 +97,68 @@ describe('DashboardService', () => {
     mockPrisma.customer.count
       .mockResolvedValueOnce(50) // total
       .mockResolvedValueOnce(5); // new in period
+
+    // Ready orders findMany
+    mockPrisma.order.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'order-ready-1',
+          orderNumber: 'ORD-101',
+          totalAmount: 500,
+          amountPaid: 300,
+          amountDue: 200,
+          customer: { name: 'Rahul Sharma', phone: '9876543210' },
+          items: [
+            {
+              itemStatus: 'READY',
+              quantity: 2,
+              garmentCatalog: { name: 'Shirt' },
+            },
+            {
+              itemStatus: 'PROCESSING',
+              quantity: 1,
+              garmentCatalog: { name: 'Pants' },
+            },
+            {
+              itemStatus: 'CANCELLED',
+              quantity: 1,
+              garmentCatalog: { name: 'Tie' },
+            },
+          ],
+        },
+      ])
+      // Recent orders findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'order-rec-1',
+          orderNumber: 'ORD-102',
+          totalAmount: 1200,
+          amountPaid: 1200,
+          amountDue: 0,
+          status: 'RECEIVED',
+          paymentStatus: 'PAID',
+          orderDate: new Date('2026-09-01T14:30:00Z'),
+          customer: { name: 'Priya Patel' },
+          _count: { items: 3 },
+        },
+      ])
+      // Order number map lookup (for activities with orderId)
+      .mockResolvedValueOnce([
+        {
+          id: 'order-ready-1',
+          orderNumber: 'ORD-101',
+        },
+      ]);
+
+    // Notification activity findMany
+    mockPrisma.notification.findMany.mockResolvedValueOnce([
+      {
+        id: 'notif-1',
+        eventType: 'ORDER_READY',
+        orderId: 'order-ready-1',
+        createdAt: new Date('2026-09-01T15:00:00Z'),
+      },
+    ]);
   }
 
   // ─── BASIC FUNCTIONALITY ──────────────────────────────────────
@@ -135,11 +203,34 @@ describe('DashboardService', () => {
     // Customers
     expect(result.customers.total).toBe(50);
     expect(result.customers.newInPeriod).toBe(5);
+
+    // Ready Orders
+    expect(result.readyOrders).toHaveLength(1);
+    expect(result.readyOrders[0].orderNumber).toBe('ORD-101');
+    expect(result.readyOrders[0].customerName).toBe('Rahul Sharma');
+    expect(result.readyOrders[0].customerPhone).toBe('9876543210');
+    expect(result.readyOrders[0].readyItems).toEqual([{ garmentName: 'Shirt', quantity: 2 }]);
+    expect(result.readyOrders[0].remainingItems).toEqual([{ garmentName: 'Pants', quantity: 1 }]);
+
+    // Recent Orders
+    expect(result.recentOrders).toHaveLength(1);
+    expect(result.recentOrders[0].orderNumber).toBe('ORD-102');
+    expect(result.recentOrders[0].customerName).toBe('Priya Patel');
+    expect(result.recentOrders[0].itemCount).toBe(3);
+    expect(result.recentOrders[0].totalAmount).toBe(1200);
+    expect(result.recentOrders[0].status).toBe('RECEIVED');
+    expect(result.recentOrders[0].paymentStatus).toBe('PAID');
+
+    // Recent Activity
+    expect(result.recentActivity).toHaveLength(1);
+    expect(result.recentActivity[0].eventType).toBe('ORDER_READY');
+    expect(result.recentActivity[0].orderNumber).toBe('ORD-101');
+    expect(result.recentActivity[0].message).toBe('Order is ready');
   });
 
   // ─── EMPTY STORE ──────────────────────────────────────────────
 
-  it('should return all zeros for an empty store', async () => {
+  it('should return all zeros and empty lists for an empty store', async () => {
     setupEmptyMocks();
 
     const result = await service.getSummary(STORE_A, startDate, endDate);
@@ -155,11 +246,14 @@ describe('DashboardService', () => {
     expect(result.delivery.completed).toBe(0);
     expect(result.customers.total).toBe(0);
     expect(result.customers.newInPeriod).toBe(0);
+    expect(result.readyOrders).toEqual([]);
+    expect(result.recentOrders).toEqual([]);
+    expect(result.recentActivity).toEqual([]);
   });
 
   // ─── STORE ISOLATION ──────────────────────────────────────────
 
-  it('should pass storeId to all Prisma queries for store isolation', async () => {
+  it('should pass storeId to all Prisma queries including readyOrders, recentOrders, and notifications', async () => {
     setupEmptyMocks();
 
     await service.getSummary(STORE_A, startDate, endDate);
@@ -183,6 +277,18 @@ describe('DashboardService', () => {
     // Verify customer queries use store-scoped relation
     const customerTotalCall = mockPrisma.customer.count.mock.calls[0][0];
     expect(customerTotalCall.where.orders.some.storeId).toBe(STORE_A);
+
+    // Verify ready orders findMany uses storeId
+    const readyOrdersCall = mockPrisma.order.findMany.mock.calls[0][0];
+    expect(readyOrdersCall.where.storeId).toBe(STORE_A);
+
+    // Verify recent orders findMany uses storeId
+    const recentOrdersCall = mockPrisma.order.findMany.mock.calls[1][0];
+    expect(recentOrdersCall.where.storeId).toBe(STORE_A);
+
+    // Verify notifications findMany uses storeId
+    const notifCall = mockPrisma.notification.findMany.mock.calls[0][0];
+    expect(notifCall.where.storeId).toBe(STORE_A);
   });
 
   it('should scope queries to different stores independently', async () => {
@@ -192,6 +298,9 @@ describe('DashboardService', () => {
 
     const orderGroupByCall = mockPrisma.order.groupBy.mock.calls[0][0];
     expect(orderGroupByCall.where.storeId).toBe(STORE_B);
+
+    const readyOrdersCall = mockPrisma.order.findMany.mock.calls[0][0];
+    expect(readyOrdersCall.where.storeId).toBe(STORE_B);
   });
 
   // ─── DATE FILTERING ───────────────────────────────────────────
@@ -213,12 +322,12 @@ describe('DashboardService', () => {
 
     await service.getSummary(STORE_A, startDate, endDate);
 
-    // Verify no create/update/delete/upsert was called
+    // Verify only query methods were called
     expect(mockPrisma.order.groupBy).toHaveBeenCalled();
     expect(mockPrisma.order.count).toHaveBeenCalled();
     expect(mockPrisma.order.aggregate).toHaveBeenCalled();
-    // These mutation methods should NOT exist or NOT be called
-    // The dashboard service only reads
+    expect(mockPrisma.order.findMany).toHaveBeenCalled();
+    expect(mockPrisma.notification.findMany).toHaveBeenCalled();
   });
 
   // ─── NULL FINANCIAL SAFETY ────────────────────────────────────
@@ -246,6 +355,8 @@ describe('DashboardService', () => {
     });
     mockPrisma.deliveryRecord.groupBy.mockResolvedValue([]);
     mockPrisma.customer.count.mockResolvedValue(0);
+    mockPrisma.order.findMany.mockResolvedValue([]);
+    mockPrisma.notification.findMany.mockResolvedValue([]);
 
     const result = await service.getSummary(STORE_A, startDate, endDate);
 
@@ -260,5 +371,26 @@ describe('DashboardService', () => {
     expect(result.orders.qualityCheck).toBe(0);
     expect(result.orders.packed).toBe(0);
     expect(result.orders.outForDelivery).toBe(0);
+  });
+
+  // ─── RECENT ACTIVITY HANDLING ─────────────────────────────────
+
+  it('should handle activity without orderId and fallback messages gracefully', async () => {
+    setupEmptyMocks();
+
+    mockPrisma.notification.findMany.mockResolvedValueOnce([
+      {
+        id: 'notif-system',
+        eventType: 'CUSTOM_NOTIFICATION',
+        orderId: null,
+        createdAt: new Date('2026-09-01T16:00:00Z'),
+      },
+    ]);
+
+    const result = await service.getSummary(STORE_A, startDate, endDate);
+
+    expect(result.recentActivity).toHaveLength(1);
+    expect(result.recentActivity[0].orderNumber).toBeNull();
+    expect(result.recentActivity[0].message).toBe('CUSTOM_NOTIFICATION');
   });
 });

@@ -362,6 +362,39 @@ export interface DashboardCustomerMetrics {
   newInPeriod: number;
 }
 
+export interface DashboardReadyOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  readyItems: { garmentName: string; quantity: number }[];
+  remainingItems: { garmentName: string; quantity: number }[];
+}
+
+export interface DashboardRecentOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  itemCount: number;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  status: OrderStatus;
+  paymentStatus: string;
+  orderDate: string;
+}
+
+export interface DashboardActivity {
+  id: string;
+  eventType: string;
+  orderNumber: string | null;
+  message: string;
+  createdAt: string;
+}
+
 export interface DashboardSummaryDTO {
   period: DashboardPeriod;
   overview: DashboardOverview;
@@ -369,6 +402,9 @@ export interface DashboardSummaryDTO {
   financial: DashboardFinancialMetrics;
   delivery: DashboardDeliveryMetrics;
   customers: DashboardCustomerMetrics;
+  readyOrders: DashboardReadyOrder[];
+  recentOrders: DashboardRecentOrder[];
+  recentActivity: DashboardActivity[];
 }
 
 export interface ApiResponse<T> {
