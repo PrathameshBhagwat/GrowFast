@@ -276,8 +276,9 @@ export class EmployeeService {
       }
     }
 
-    await this.prisma.employee.delete({
+    await this.prisma.employee.update({
       where: { id },
+      data: { isActive: false },
     });
 
     return { success: true };
