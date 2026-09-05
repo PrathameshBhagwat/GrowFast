@@ -6,6 +6,8 @@
  * falsely claiming delivery.
  */
 
+import { formatNotificationMessage } from './templates/notification-templates';
+
 /**
  * Result of a notification dispatch attempt.
  */
@@ -25,6 +27,7 @@ export interface NotificationDispatchPayload {
   recipient: string;
   eventType: string;
   payload: Record<string, unknown> | null;
+  storeName?: string;
 }
 
 /**
@@ -48,23 +51,11 @@ export class LogNotificationProvider implements NotificationProvider {
   readonly name = 'LogNotificationProvider';
 
   async dispatch(payload: NotificationDispatchPayload): Promise<NotificationDispatchResult> {
-    if (payload.eventType === 'ORDER_READY' && payload.payload) {
-      const p = payload.payload as any;
+    const formattedMessage = formatNotificationMessage(payload.eventType, payload.payload, payload.storeName);
+
+    if (formattedMessage) {
       console.log(`\n================= CUSTOMER SMS =================`);
-      console.log(`Your GrowFast order ${p.orderNumber} has items ready for collection.`);
-
-      if (p.readyItems && p.readyItems.length > 0) {
-        console.log(`\nReady:`);
-        p.readyItems.forEach((i: any) => console.log(`• ${i.garmentName} ×${i.quantity}`));
-      }
-      if (p.remainingItems && p.remainingItems.length > 0) {
-        console.log(`\nStill processing:`);
-        p.remainingItems.forEach((i: any) => console.log(`• ${i.garmentName} ×${i.quantity}`));
-      }
-
-      console.log(`\nOrder total: ₹${p.totalAmount}`);
-      console.log(`Paid: ₹${p.amountPaid}`);
-      console.log(`Balance due: ₹${p.amountDue}`);
+      console.log(formattedMessage);
       console.log(`================================================\n`);
     } else {
       console.log(

@@ -5,6 +5,7 @@ import {
   NotificationDispatchResult,
 } from './notification.provider';
 import { NotificationEventType } from '@growfast/shared-types';
+import { formatNotificationMessage } from './templates/notification-templates';
 
 export class WhatsAppNotificationProvider implements NotificationProvider {
   readonly name = 'WhatsAppNotificationProvider';
@@ -51,7 +52,7 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
       };
     }
 
-    const messageBody = this.generateMessageBody(payload.eventType, payload.payload);
+    const messageBody = formatNotificationMessage(payload.eventType, payload.payload, payload.storeName);
     if (!messageBody) {
       return {
         success: false,
@@ -116,55 +117,7 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
     }
   }
 
-  private generateMessageBody(
-    eventType: string,
-    payload: Record<string, any> | null,
-  ): string | null {
-    if (!payload) return null;
-
-    switch (eventType as NotificationEventType) {
-      case NotificationEventType.ORDER_CREATED:
-        return `Hello! Your GrowFast order ${payload.orderNumber} has been received.\nTotal Amount: ₹${payload.totalAmount}\nWe'll notify you once it's ready.`;
-
-      case NotificationEventType.ORDER_READY: {
-        let msg = `Good news! Your GrowFast order ${payload.orderNumber} is ready for collection.`;
-        if (
-          payload.readyItems &&
-          Array.isArray(payload.readyItems) &&
-          payload.readyItems.length > 0
-        ) {
-          msg += `\n\nReady items:`;
-          payload.readyItems.forEach((item: any) => {
-            msg += `\n• ${item.garmentName} ×${item.quantity}`;
-          });
-        }
-        if (
-          payload.remainingItems &&
-          Array.isArray(payload.remainingItems) &&
-          payload.remainingItems.length > 0
-        ) {
-          msg += `\n\nStill processing:`;
-          payload.remainingItems.forEach((item: any) => {
-            msg += `\n• ${item.garmentName} ×${item.quantity}`;
-          });
-        }
-        msg += `\n\nAmount Paid: ₹${payload.amountPaid}\nBalance Due: ₹${payload.amountDue}\nSee you soon!`;
-        return msg;
-      }
-
-      case NotificationEventType.PAYMENT_RECEIVED:
-        return `We have received your payment of ₹${payload.amountPaid}.\nThank you for choosing GrowFast!`;
-
-      case NotificationEventType.ORDER_OUT_FOR_DELIVERY:
-        return `Your GrowFast order is out for delivery! Our rider will reach you soon.`;
-
-      case NotificationEventType.ORDER_DELIVERED:
-        return `Your GrowFast order has been delivered. Thank you!`;
-
-      default:
-        return null;
-    }
-  }
+  // generateMessageBody has been moved to notification-templates.ts
 
   /**
    * Ensure error messages never contain the access token.

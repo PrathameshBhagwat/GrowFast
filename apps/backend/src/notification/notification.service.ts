@@ -119,6 +119,11 @@ export class NotificationService {
     if (!notification) return false;
 
     try {
+      const store = await this.prisma.store.findUnique({
+        where: { id: notification.storeId },
+        select: { name: true },
+      });
+
       const provider = this.getProvider(notification.channel as NotificationChannel);
       const result = await provider.dispatch({
         id: notification.id,
@@ -126,6 +131,7 @@ export class NotificationService {
         recipient: notification.recipient,
         eventType: notification.eventType,
         payload: (notification.payload as Record<string, unknown>) || null,
+        storeName: store?.name || 'GrowFast Laundry',
       });
 
       if (result.success) {
