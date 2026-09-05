@@ -15,6 +15,8 @@ import pino from 'pino';
 import { Boom } from '@hapi/boom';
 import * as fs from 'fs';
 
+import { formatNotificationMessage } from './templates/notification-templates';
+
 export class BaileysWhatsAppProvider implements NotificationProvider {
   readonly name = 'BaileysWhatsAppProvider';
   private readonly logger = new Logger(BaileysWhatsAppProvider.name);
@@ -58,27 +60,23 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
       }
 
       if (connection === 'close') {
-        this.isConnected = false;
         const shouldReconnect =
-          (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-
-        this.logger.warn(
-          `Connection closed due to ${lastDisconnect?.error}, reconnecting: ${shouldReconnect}`,
-        );
+          (lastDisconnect?.error as Boom)?.output?.statusCode !==
+          DisconnectReason.loggedOut;
+        this.logger.log('connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
+        this.isConnected = false;
 
         if (shouldReconnect) {
-          setTimeout(() => this.connectToWhatsApp(), 5000);
+          this.connectToWhatsApp();
         } else {
-          this.logger.error(
-            'Logged out from WhatsApp. Please delete baileys_auth folder and restart to scan new QR.',
-          );
+          this.logger.log('Logged out from WhatsApp. Delete baileys_auth folder to scan again.');
           if (fs.existsSync(this.authFolder)) {
             fs.rmSync(this.authFolder, { recursive: true, force: true });
           }
         }
       } else if (connection === 'open') {
+        this.logger.log('Baileys opened connection successfully!');
         this.isConnected = true;
-        this.logger.log('WhatsApp connection successfully opened!');
       }
     });
   }
@@ -88,7 +86,7 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
       return {
         success: false,
         providerName: this.name,
-        failureReason: 'Baileys WhatsApp socket is not connected',
+        failureReason: 'Baileys provider not connected to WhatsApp',
       };
     }
 
@@ -103,7 +101,7 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
     // Determine target recipient (override with WHATSAPP_DEV_PHONE if set)
     const targetRecipient = process.env.WHATSAPP_DEV_PHONE || payload.recipient;
 
-    // Format phone number
+    // Format phone number: strip non-numeric characters and ensure country code
     const formattedPhone = targetRecipient.replace(/\D/g, '');
     if (!formattedPhone) {
       return {
@@ -114,7 +112,7 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
     }
 
     const jid = `${formattedPhone}@s.whatsapp.net`;
-    const messageBody = this.generateMessageBody(payload.eventType, payload.payload);
+    const messageBody = formatNotificationMessage(payload.eventType, payload.payload, payload.storeName);
 
     if (!messageBody) {
       return {
@@ -152,53 +150,5 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
     }
   }
 
-  private generateMessageBody(
-    eventType: string,
-    payload: Record<string, any> | null,
-  ): string | null {
-    if (!payload) return null;
-
-    switch (eventType as NotificationEventType) {
-      case NotificationEventType.ORDER_CREATED:
-        return `Hello! Your GrowFast order ${payload.orderNumber} has been received.\nTotal Amount: ₹${payload.totalAmount}\nWe'll notify you once it's ready.`;
-
-      case NotificationEventType.ORDER_READY: {
-        let msg = `Good news! Your GrowFast order ${payload.orderNumber} is ready for collection.`;
-        if (
-          payload.readyItems &&
-          Array.isArray(payload.readyItems) &&
-          payload.readyItems.length > 0
-        ) {
-          msg += `\n\nReady items:`;
-          payload.readyItems.forEach((item: any) => {
-            msg += `\n• ${item.garmentName} ×${item.quantity}`;
-          });
-        }
-        if (
-          payload.remainingItems &&
-          Array.isArray(payload.remainingItems) &&
-          payload.remainingItems.length > 0
-        ) {
-          msg += `\n\nStill processing:`;
-          payload.remainingItems.forEach((item: any) => {
-            msg += `\n• ${item.garmentName} ×${item.quantity}`;
-          });
-        }
-        msg += `\n\nAmount Paid: ₹${payload.amountPaid}\nBalance Due: ₹${payload.amountDue}\nSee you soon!`;
-        return msg;
-      }
-
-      case NotificationEventType.PAYMENT_RECEIVED:
-        return `We have received your payment of ₹${payload.amountPaid}.\nThank you for choosing GrowFast!`;
-
-      case NotificationEventType.ORDER_OUT_FOR_DELIVERY:
-        return `Your GrowFast order is out for delivery! Our rider will reach you soon.`;
-
-      case NotificationEventType.ORDER_DELIVERED:
-        return `Your GrowFast order has been delivered. Thank you!`;
-
-      default:
-        return null;
-    }
-  }
+  // generateMessageBody has been moved to notification-templates.ts
 }
