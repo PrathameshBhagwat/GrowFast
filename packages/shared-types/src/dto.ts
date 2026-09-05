@@ -168,6 +168,17 @@ export interface OrderItemDTO {
   itemStatus: ItemStatus;
   deliveredQuantity: number;
   itemDueDate: string | null;
+  physicalGarments?: PhysicalGarmentDTO[];
+}
+
+export interface PhysicalGarmentDTO {
+  id: string;
+  orderItemId: string;
+  unitNumber: number;
+  isReady: boolean;
+  createdAt: string;
+  updatedAt: string;
+  photos?: OrderPhotoDTO[];
 }
 
 export interface CreateOrderRequest {
@@ -258,7 +269,8 @@ export interface ServiceTypeDTO {
 
 export interface OrderPhotoDTO {
   id: string;
-  orderItemId: string;
+  orderItemId: string | null;
+  physicalGarmentId: string | null;
   type: PhotoType;
   url: string;
   uploadedAt: string;

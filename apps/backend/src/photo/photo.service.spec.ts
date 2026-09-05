@@ -18,6 +18,9 @@ const mockPrismaService = {
     create: jest.fn(),
     findMany: jest.fn(),
   },
+  physicalGarment: {
+    findUnique: jest.fn(),
+  },
 };
 
 // ── Mock PhotoStorageService ────────────────────────────────────────
@@ -228,6 +231,58 @@ describe('PhotoService', () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(mockStorageService.store).not.toHaveBeenCalled();
+    });
+
+    it('should accept valid physicalGarmentId belonging to the order and store', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
+      mockPrismaService.physicalGarment.findUnique.mockResolvedValue({
+        id: 'garment-001',
+        orderItemId: 'item-001',
+        orderItem: { orderId: 'order-001', order: { storeId: MOCK_STORE_ID } },
+      });
+      mockStorageService.store.mockResolvedValue(MOCK_STORED_URL);
+      mockPrismaService.orderPhoto.create.mockResolvedValue(MOCK_PHOTO_RECORD);
+
+      const result = await service.uploadPhoto(
+        { orderId: 'order-001', physicalGarmentId: 'garment-001', type: PhotoType.FRONT },
+        createMockFile(),
+        MOCK_STORE_ID,
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('should reject physicalGarmentId belonging to a different store', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
+      mockPrismaService.physicalGarment.findUnique.mockResolvedValue({
+        id: 'garment-002',
+        orderItemId: 'item-001',
+        orderItem: { orderId: 'order-001', order: { storeId: 'store-wrong' } },
+      });
+
+      await expect(
+        service.uploadPhoto(
+          { orderId: 'order-001', physicalGarmentId: 'garment-002', type: PhotoType.FRONT },
+          createMockFile(),
+          MOCK_STORE_ID,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject physicalGarmentId belonging to a different order', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
+      mockPrismaService.physicalGarment.findUnique.mockResolvedValue({
+        id: 'garment-003',
+        orderItemId: 'item-002',
+        orderItem: { orderId: 'order-999', order: { storeId: MOCK_STORE_ID } },
+      });
+
+      await expect(
+        service.uploadPhoto(
+          { orderId: 'order-001', physicalGarmentId: 'garment-003', type: PhotoType.FRONT },
+          createMockFile(),
+          MOCK_STORE_ID,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

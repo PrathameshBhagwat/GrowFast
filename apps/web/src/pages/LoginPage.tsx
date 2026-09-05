@@ -1,3 +1,4 @@
+<div className="bg-white rounded-[32px] ..." style={{ border: '6px solid red' }}></div>;
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -240,23 +241,24 @@ export const LoginPage: React.FC = () => {
 
       {/* ── Main Login Card ── */}
       <div className="relative z-10 w-full max-w-[620px] px-4 sm:px-6">
-        <div className="bg-white rounded-[24px] shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] p-8 sm:p-14 border border-slate-100 relative">
+        <div className="bg-white rounded-[32px] shadow-[0_28px_80px_-24px_rgba(15,23,42,0.20)] p-10 sm:p-16 border border-slate-100 relative">
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-[2.5rem] font-bold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-1">
+          <div className="text-center mb-14">
+            <h1 className="text-[2.75rem] font-bold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-1">
               <span>Grow</span>
               <span className="text-blue-600">Fast</span>
             </h1>
             <p className="text-sm font-medium text-slate-400">
               Simpler Operations. Cleaner Tomorrow.
             </p>
+            <div className="w-[72px] h-px bg-slate-100 mx-auto mt-8" />
 
-            <h2 className="text-[1.75rem] font-bold text-slate-900 mt-10 mb-2">Staff Portal</h2>
+            <h2 className="text-[1.875rem] font-bold text-slate-900 mt-10 mb-2.5">Staff Portal</h2>
             <p className="text-[0.95rem] text-slate-500">Sign in to access the system</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+          <form onSubmit={handleLogin} className="flex flex-col gap-9">
             {/* Global Error/Lockout State */}
             {(error || lockoutUntil) && (
               <div className="bg-red-50/80 border border-red-100 text-red-600 text-sm font-medium p-4 rounded-xl text-center">
@@ -267,12 +269,12 @@ export const LoginPage: React.FC = () => {
             )}
 
             {/* Username / Employee Dropdown */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-3">
               <label htmlFor="employeeId" className="text-[0.95rem] font-bold text-slate-800">
                 Role of You
               </label>
               <div
-                className={`relative flex items-center h-[56px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
+                className={`relative flex items-center h-[58px] rounded-2xl border px-[18px] gap-3 transition-all duration-200 ${
                   isFocusedEmp
                     ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
                     : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
@@ -332,12 +334,12 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Password / PIN Input */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-3">
               <label htmlFor="password" className="text-[0.95rem] font-bold text-slate-800">
                 PIN
               </label>
               <div
-                className={`relative flex items-center h-[56px] rounded-xl border px-4 gap-3 transition-all duration-200 ${
+                className={`relative flex items-center h-[58px] rounded-2xl border px-[18px] gap-3 transition-all duration-200 ${
                   isFocusedPin
                     ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
                     : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
@@ -381,24 +383,29 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoggingIn || !!lockoutUntil}
-              className={`mt-4 w-full h-[56px] rounded-xl flex items-center justify-center gap-2 text-[1.1rem] font-bold text-white transition-all shadow-sm ${
+              className={`group mt-2 w-full h-[58px] rounded-2xl flex items-center justify-center gap-2.5 text-[1.1rem] font-bold text-white transition-all duration-200 shadow-sm ${
                 isLoggingIn || !!lockoutUntil
                   ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md cursor-pointer active:scale-[0.99]'
+                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/25 cursor-pointer active:scale-[0.99]'
               }`}
             >
               {isLoggingIn ? (
                 <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  Sign In <ArrowRight size={22} strokeWidth={2.5} />
+                  Sign In
+                  <ArrowRight
+                    size={22}
+                    strokeWidth={2.5}
+                    className="transition-transform duration-200 group-hover:translate-x-1"
+                  />
                 </>
               )}
             </button>
           </form>
 
           {/* Footer Security Label */}
-          <div className="mt-8 flex items-center justify-center gap-4 opacity-70">
+          <div className="mt-12 flex items-center justify-center gap-4 opacity-70">
             <div className="h-px bg-slate-200 flex-1"></div>
             <span className="text-[0.8rem] font-semibold text-slate-400 tracking-wider uppercase">
               Secure Staff Portal

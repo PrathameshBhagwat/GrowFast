@@ -108,6 +108,12 @@ export class OrderService {
           lineTotal,
           colorTags: item.colorTags || [],
           defectNotes: item.defectNotes,
+          physicalGarments: {
+            create: Array.from({ length: item.quantity }, (_, i) => ({
+              unitNumber: i + 1,
+              isReady: false,
+            })),
+          },
         });
 
         pricingInputs.push({
@@ -229,6 +235,10 @@ export class OrderService {
           include: {
             garmentCatalog: true,
             serviceType: true,
+            physicalGarments: {
+              include: { photos: true },
+              orderBy: { unitNumber: 'asc' },
+            },
           },
         },
         customer: true,
@@ -535,6 +545,140 @@ export class OrderService {
     });
   }
 
+  async markPhysicalGarmentReady(
+    orderId: string,
+    itemId: string,
+    garmentId: string,
+    isReady: boolean,
+    storeId: string,
+  ) {
+    const { order, oldItemStatus, newItemStatus } = await this.prisma.$transaction(async (tx) => {
+      // 1. Verify access
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!order) throw new NotFoundException(`Order not found`);
+      if (order.storeId !== storeId)
+        throw new BadRequestException(`Order does not belong to your store`);
+
+      const orderItem = order.items.find((i) => i.id === itemId);
+      if (!orderItem) throw new NotFoundException(`Item not found`);
+
+      // 2. Update physical garment
+      const pg = await tx.physicalGarment.findUnique({ where: { id: garmentId } });
+      if (!pg || pg.orderItemId !== itemId) {
+        throw new NotFoundException(`Physical garment not found`);
+      }
+
+      await tx.physicalGarment.update({
+        where: { id: garmentId },
+        data: { isReady },
+      });
+
+      // 3. Rollup status
+      const allGarments = await tx.physicalGarment.findMany({
+        where: { orderItemId: itemId },
+      });
+      const allReady = allGarments.length > 0 && allGarments.every((g) => g.isReady);
+      const anyReady = allGarments.some((g) => g.isReady);
+
+      let newItemStatus = orderItem.itemStatus;
+      if (
+        allReady &&
+        orderItem.itemStatus !== ItemStatus.DELIVERED &&
+        orderItem.itemStatus !== ItemStatus.CANCELLED
+      ) {
+        newItemStatus = ItemStatus.READY;
+      } else if (!allReady && orderItem.itemStatus === ItemStatus.READY) {
+        newItemStatus = anyReady ? ItemStatus.PROCESSING : ItemStatus.RECEIVED;
+      }
+
+      if (newItemStatus !== orderItem.itemStatus) {
+        await tx.orderItem.update({
+          where: { id: itemId },
+          data: { itemStatus: newItemStatus },
+        });
+
+        // 4. Rollup Order Status
+        const updatedItems = await tx.orderItem.findMany({ where: { orderId } });
+        const itemsForStatus = updatedItems.map((i: any) => ({
+          status: i.itemStatus as ItemStatus,
+        }));
+
+        const newOrderStatus = deriveOrderStatus({
+          items: itemsForStatus,
+          currentOrderStatus: order.status as OrderStatus,
+          hasActiveTransitDelivery: false,
+        });
+
+        if (newOrderStatus !== order.status) {
+          await tx.order.update({
+            where: { id: orderId },
+            data: { status: newOrderStatus },
+          });
+        }
+      }
+
+      return { order, oldItemStatus: orderItem.itemStatus, newItemStatus };
+    });
+
+    const updatedOrder = await this.findOrderById(orderId);
+
+    // Trigger ORDER_READY notification
+    if (
+      newItemStatus === ItemStatus.READY &&
+      oldItemStatus !== ItemStatus.READY &&
+      updatedOrder.customerPhone
+    ) {
+      const readyItems = updatedOrder.items.filter((i: any) => i.itemStatus === ItemStatus.READY);
+      const remainingItems = updatedOrder.items.filter(
+        (i: any) =>
+          i.itemStatus !== ItemStatus.READY &&
+          i.itemStatus !== ItemStatus.DELIVERED &&
+          i.itemStatus !== ItemStatus.CANCELLED,
+      );
+
+      const breakdown = calculateFulfillmentBreakdown(
+        updatedOrder.totalAmount,
+        updatedOrder.amountPaid,
+        updatedOrder.items as any,
+      );
+
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_READY,
+          NotificationChannel.SMS,
+          updatedOrder.customerPhone,
+          updatedOrder.id,
+          updatedOrder.customerId,
+          {
+            orderNumber: updatedOrder.orderNumber,
+            totalAmount: updatedOrder.totalAmount,
+            amountPaid: updatedOrder.amountPaid,
+            amountDue: updatedOrder.amountDue,
+            readyAmount: breakdown.readyAmount,
+            remainingAmount: breakdown.remainingAmount,
+            readyItems: readyItems.map((i: any) => ({
+              id: i.id,
+              garmentName: i.garmentName,
+              serviceType: i.serviceType,
+              quantity: i.quantity,
+            })),
+            remainingItems: remainingItems.map((i: any) => ({
+              id: i.id,
+              garmentName: i.garmentName,
+              quantity: i.quantity,
+            })),
+          },
+        )
+        .catch(() => {});
+    }
+
+    return updatedOrder;
+  }
+
   // --- Helpers ---
   private mapToSummaryDto(order: any) {
     return {
@@ -587,6 +731,22 @@ export class OrderService {
         itemStatus: item.itemStatus,
         deliveredQuantity: item.deliveredQuantity,
         itemDueDate: item.itemDueDate?.toISOString() || null,
+        physicalGarments: item.physicalGarments?.map((pg: any) => ({
+          id: pg.id,
+          orderItemId: pg.orderItemId,
+          unitNumber: pg.unitNumber,
+          isReady: pg.isReady,
+          createdAt: pg.createdAt.toISOString(),
+          updatedAt: pg.updatedAt.toISOString(),
+          photos: pg.photos?.map((photo: any) => ({
+            id: photo.id,
+            orderItemId: photo.orderItemId,
+            physicalGarmentId: photo.physicalGarmentId,
+            type: photo.type as any,
+            url: photo.url,
+            uploadedAt: photo.uploadedAt.toISOString(),
+          })),
+        })),
       })),
       payments:
         order.payments?.map((p: any) => ({

@@ -13,19 +13,19 @@ datasource db {
 // ─── STORE ──────────────────────────────────────────────────────────
 
 model Store {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  phone     String?
+  id                      String   @id @default(cuid())
+  name                    String
+  address                 String?
+  phone                   String?
   isActive                Boolean  @default(true)
   expressSurchargePercent Float?   @map("express_surcharge_percent")
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
-  employees Employee[]
-  orders    Order[]
-  garmentCatalogs GarmentCatalog[]
-  serviceTypes ServiceType[]
+  employees            Employee[]
+  orders               Order[]
+  garmentCatalogs      GarmentCatalog[]
+  serviceTypes         ServiceType[]
   serviceGarmentPrices ServiceGarmentPrice[]
   notifications        Notification[]
 
@@ -46,10 +46,10 @@ model Employee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  store             Store            @relation(fields: [storeId], references: [id])
-  createdOrders     Order[]          @relation("OrderCreatedBy")
-  receivedPayments  Payment[]        @relation("PaymentReceivedBy")
-  deliveryRecords   DeliveryRecord[] @relation("DeliveryRider")
+  store            Store            @relation(fields: [storeId], references: [id])
+  createdOrders    Order[]          @relation("OrderCreatedBy")
+  receivedPayments Payment[]        @relation("PaymentReceivedBy")
+  deliveryRecords  DeliveryRecord[] @relation("DeliveryRider")
 
   @@index([storeId])
   @@index([role])
@@ -67,18 +67,18 @@ enum Role {
 // ─── CUSTOMER ───────────────────────────────────────────────────────
 
 model Customer {
-  id                 String          @id @default(cuid())
+  id                 String         @id @default(cuid())
   name               String
-  phone              String          @unique
+  phone              String         @unique
   email              String?
   address            String?
   pincode            String?
-  membership         MembershipTier  @default(NONE)
-  discountPercent    Float           @default(0)
-  preferences        Json?           // fragrance, starch, fold pref, etc.
-  registrationSource String          @default("WALK_IN") @map("registration_source")
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  membership         MembershipTier @default(NONE)
+  discountPercent    Float          @default(0)
+  preferences        Json? // fragrance, starch, fold pref, etc.
+  registrationSource String         @default("WALK_IN") @map("registration_source")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   orders Order[]
 
@@ -106,7 +106,7 @@ model GarmentCatalog {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
-  store         Store?          @relation(fields: [storeId], references: [id])
+  store         Store?                @relation(fields: [storeId], references: [id])
   orderItems    OrderItem[]
   servicePrices ServiceGarmentPrice[]
 
@@ -139,7 +139,7 @@ model ServiceType {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  store         Store?          @relation(fields: [storeId], references: [id])
+  store         Store?                @relation(fields: [storeId], references: [id])
   orderItems    OrderItem[]
   servicePrices ServiceGarmentPrice[]
 
@@ -162,17 +162,17 @@ enum ServiceCategory {
 // ─── PRICING ────────────────────────────────────────────────────────
 
 model ServiceGarmentPrice {
-  id               String         @id @default(cuid())
-  garmentCatalogId String         @map("garment_catalog_id")
-  serviceTypeId    String         @map("service_type_id")
+  id               String   @id @default(cuid())
+  garmentCatalogId String   @map("garment_catalog_id")
+  serviceTypeId    String   @map("service_type_id")
   price            Float
-  storeId          String?        @map("store_id")
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  storeId          String?  @map("store_id")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  garmentCatalog   GarmentCatalog @relation(fields: [garmentCatalogId], references: [id], onDelete: Cascade)
-  serviceType      ServiceType    @relation(fields: [serviceTypeId], references: [id], onDelete: Cascade)
-  store            Store?         @relation(fields: [storeId], references: [id])
+  garmentCatalog GarmentCatalog @relation(fields: [garmentCatalogId], references: [id], onDelete: Cascade)
+  serviceType    ServiceType    @relation(fields: [serviceTypeId], references: [id], onDelete: Cascade)
+  store          Store?         @relation(fields: [storeId], references: [id])
 
   @@unique([garmentCatalogId, serviceTypeId, storeId])
   @@index([garmentCatalogId])
@@ -184,33 +184,33 @@ model ServiceGarmentPrice {
 // ─── ORDER ──────────────────────────────────────────────────────────
 
 model Order {
-  id                     String        @id @default(cuid())
-  orderNumber            String        @unique @map("order_number")
-  customerId             String        @map("customer_id")
-  orderDate              DateTime      @default(now()) @map("order_date")
-  systemDueDate          DateTime      @map("system_due_date")
-  effectiveDueDate       DateTime      @map("effective_due_date")
-  dueDateOverrideReason  String?       @map("due_date_override_reason")
-  dueDateOverriddenBy    String?       @map("due_date_overridden_by")
-  isExpress              Boolean       @default(false) @map("is_express")
-  serviceSummary         String?       @map("service_summary")
-  status                 OrderStatus   @default(RECEIVED)
-  subtotal               Float         @default(0)
-  discountAmount         Float         @default(0) @map("discount_amount")
-  expressSurcharge       Float         @default(0) @map("express_surcharge")
-  taxAmount              Float         @default(0) @map("tax_amount")
-  totalAmount            Float         @default(0) @map("total_amount")
-  amountPaid             Float         @default(0) @map("amount_paid")
-  amountDue              Float         @default(0) @map("amount_due")
-  paymentStatus          PaymentStatus @default(PENDING) @map("payment_status")
-  pickupType             PickupType    @default(STORE_PICKUP) @map("pickup_type")
-  priority               OrderPriority @default(STANDARD)
-  notes                  String?
-  syncStatus             SyncStatus    @default(SYNCED) @map("sync_status")
-  createdById            String        @map("created_by_id")
-  storeId                String        @map("store_id")
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  orderNumber           String        @unique @map("order_number")
+  customerId            String        @map("customer_id")
+  orderDate             DateTime      @default(now()) @map("order_date")
+  systemDueDate         DateTime      @map("system_due_date")
+  effectiveDueDate      DateTime      @map("effective_due_date")
+  dueDateOverrideReason String?       @map("due_date_override_reason")
+  dueDateOverriddenBy   String?       @map("due_date_overridden_by")
+  isExpress             Boolean       @default(false) @map("is_express")
+  serviceSummary        String?       @map("service_summary")
+  status                OrderStatus   @default(RECEIVED)
+  subtotal              Float         @default(0)
+  discountAmount        Float         @default(0) @map("discount_amount")
+  expressSurcharge      Float         @default(0) @map("express_surcharge")
+  taxAmount             Float         @default(0) @map("tax_amount")
+  totalAmount           Float         @default(0) @map("total_amount")
+  amountPaid            Float         @default(0) @map("amount_paid")
+  amountDue             Float         @default(0) @map("amount_due")
+  paymentStatus         PaymentStatus @default(PENDING) @map("payment_status")
+  pickupType            PickupType    @default(STORE_PICKUP) @map("pickup_type")
+  priority              OrderPriority @default(STANDARD)
+  notes                 String?
+  syncStatus            SyncStatus    @default(SYNCED) @map("sync_status")
+  createdById           String        @map("created_by_id")
+  storeId               String        @map("store_id")
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   customer        Customer         @relation(fields: [customerId], references: [id])
   createdBy       Employee         @relation("OrderCreatedBy", fields: [createdById], references: [id])
@@ -270,25 +270,26 @@ enum SyncStatus {
 // ─── ORDER ITEM ─────────────────────────────────────────────────────
 
 model OrderItem {
-  id                String       @id @default(cuid())
-  orderId           String       @map("order_id")
-  garmentCatalogId  String       @map("garment_catalog_id")
-  serviceTypeId     String       @map("service_type_id")
-  quantity          Int          @default(1)
-  unitPrice         Float        @map("unit_price")
-  lineTotal         Float        @map("line_total")
-  colorTags         String[]     @default([]) @map("color_tags")
-  defectNotes       String?      @map("defect_notes")
-  itemStatus        ItemStatus   @default(RECEIVED) @map("item_status")
-  deliveredQuantity Int          @default(0) @map("delivered_quantity")
-  itemDueDate       DateTime?    @map("item_due_date")
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  id                String     @id @default(cuid())
+  orderId           String     @map("order_id")
+  garmentCatalogId  String     @map("garment_catalog_id")
+  serviceTypeId     String     @map("service_type_id")
+  quantity          Int        @default(1)
+  unitPrice         Float      @map("unit_price")
+  lineTotal         Float      @map("line_total")
+  colorTags         String[]   @default([]) @map("color_tags")
+  defectNotes       String?    @map("defect_notes")
+  itemStatus        ItemStatus @default(RECEIVED) @map("item_status")
+  deliveredQuantity Int        @default(0) @map("delivered_quantity")
+  itemDueDate       DateTime?  @map("item_due_date")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  garmentCatalog GarmentCatalog @relation(fields: [garmentCatalogId], references: [id])
-  serviceType    ServiceType    @relation(fields: [serviceTypeId], references: [id])
-  photos         OrderPhoto[]
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  garmentCatalog   GarmentCatalog    @relation(fields: [garmentCatalogId], references: [id])
+  serviceType      ServiceType       @relation(fields: [serviceTypeId], references: [id])
+  photos           OrderPhoto[]
+  physicalGarments PhysicalGarment[]
 
   @@index([orderId])
   @@index([itemStatus])
@@ -304,21 +305,41 @@ enum ItemStatus {
   CANCELLED
 }
 
+// ─── PHYSICAL GARMENT ───────────────────────────────────────────────
+
+model PhysicalGarment {
+  id          String   @id @default(cuid())
+  orderItemId String   @map("order_item_id")
+  unitNumber  Int // e.g., 1, 2, 3 up to quantity
+  isReady     Boolean  @default(false) @map("is_ready")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  orderItem OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  photos    OrderPhoto[]
+
+  @@index([orderItemId])
+  @@map("physical_garments")
+}
+
 // ─── ORDER PHOTO ────────────────────────────────────────────────────
 
 model OrderPhoto {
-  id          String    @id @default(cuid())
-  orderId     String    @map("order_id")
-  orderItemId String?   @map("order_item_id")
-  type        PhotoType
-  url         String
-  uploadedAt  DateTime  @default(now()) @map("uploaded_at")
+  id                String    @id @default(cuid())
+  orderId           String    @map("order_id")
+  orderItemId       String?   @map("order_item_id")
+  physicalGarmentId String?   @map("physical_garment_id")
+  type              PhotoType
+  url               String
+  uploadedAt        DateTime  @default(now()) @map("uploaded_at")
 
-  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem       OrderItem?       @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  physicalGarment PhysicalGarment? @relation(fields: [physicalGarmentId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([orderItemId])
+  @@index([physicalGarmentId])
   @@map("order_photos")
 }
 
@@ -372,7 +393,7 @@ model DeliveryRecord {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  order Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   rider Employee? @relation("DeliveryRider", fields: [riderId], references: [id])
 
   @@index([orderId])
@@ -392,20 +413,20 @@ enum DeliveryStatus {
 // ─── NOTIFICATION ───────────────────────────────────────────────────
 
 model Notification {
-  id             String                @id @default(cuid())
-  storeId        String                @map("store_id")
-  orderId        String?               @map("order_id")
-  customerId     String?               @map("customer_id")
-  eventType      NotificationEventType @map("event_type")
-  channel        NotificationChannel
-  status         NotificationStatus    @default(CREATED)
-  recipient      String
-  payload        Json?
-  sentAt         DateTime?             @map("sent_at")
-  failedAt       DateTime?             @map("failed_at")
-  failureReason  String?               @map("failure_reason")
-  retryCount     Int                   @default(0) @map("retry_count")
-  createdAt      DateTime              @default(now()) @map("created_at")
+  id            String                @id @default(cuid())
+  storeId       String                @map("store_id")
+  orderId       String?               @map("order_id")
+  customerId    String?               @map("customer_id")
+  eventType     NotificationEventType @map("event_type")
+  channel       NotificationChannel
+  status        NotificationStatus    @default(CREATED)
+  recipient     String
+  payload       Json?
+  sentAt        DateTime?             @map("sent_at")
+  failedAt      DateTime?             @map("failed_at")
+  failureReason String?               @map("failure_reason")
+  retryCount    Int                   @default(0) @map("retry_count")
+  createdAt     DateTime              @default(now()) @map("created_at")
 
   store Store @relation(fields: [storeId], references: [id])
 

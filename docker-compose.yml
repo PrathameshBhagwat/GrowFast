@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-growfast}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-growfast} -d ${POSTGRES_DB:-growfast_laundry}"]
       interval: 10s
       timeout: 5s
       retries: 5

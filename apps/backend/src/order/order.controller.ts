@@ -74,6 +74,30 @@ export class OrderController {
     };
   }
 
+  @Patch(':orderId/items/:itemId/garments/:garmentId/ready')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'COUNTER')
+  async markGarmentReady(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Param('garmentId') garmentId: string,
+    @Body('isReady') isReady: boolean,
+    @Request() req: any,
+  ) {
+    const storeId = req.user.storeId;
+    const order = await this.orderService.markPhysicalGarmentReady(
+      orderId,
+      itemId,
+      garmentId,
+      isReady,
+      storeId,
+    );
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
   @Patch(':id/due-date')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'MANAGER')
