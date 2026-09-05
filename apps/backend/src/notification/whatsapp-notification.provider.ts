@@ -52,7 +52,11 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
       };
     }
 
-    const messageBody = formatNotificationMessage(payload.eventType, payload.payload, payload.storeName);
+    const messageBody = formatNotificationMessage(
+      payload.eventType,
+      payload.payload,
+      payload.storeName,
+    );
     if (!messageBody) {
       return {
         success: false,

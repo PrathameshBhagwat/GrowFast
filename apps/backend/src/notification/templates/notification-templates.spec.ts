@@ -5,7 +5,9 @@ describe('Notification Templates', () => {
   const defaultStore = 'FreshCare Laundry';
 
   it('should return null if payload is missing', () => {
-    expect(formatNotificationMessage(NotificationEventType.ORDER_CREATED, null, defaultStore)).toBeNull();
+    expect(
+      formatNotificationMessage(NotificationEventType.ORDER_CREATED, null, defaultStore),
+    ).toBeNull();
   });
 
   describe('ORDER_CREATED', () => {
@@ -18,12 +20,16 @@ describe('Notification Templates', () => {
         amountDue: 1000,
         items: [
           { garmentName: 'Shirt', quantity: 2 },
-          { garmentName: 'Pant', quantity: 1 }
-        ]
+          { garmentName: 'Pant', quantity: 1 },
+        ],
       };
-      
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_CREATED, payload, defaultStore);
-      
+
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_CREATED,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('*FreshCare Laundry*');
       expect(msg).toContain('Hello Rahul,');
       expect(msg).toContain('Your order *#GF-1001* has been successfully received.');
@@ -39,8 +45,12 @@ describe('Notification Templates', () => {
 
     it('should handle missing optional values safely', () => {
       const payload = { orderNumber: 'GF-1002' }; // missing total, paid, due, items, customerName
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_CREATED, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_CREATED,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('Hello,'); // Fallback greeting
       expect(msg).toContain('Your order *#GF-1002* has been successfully received.');
       expect(msg).not.toContain('*Order Summary*');
@@ -59,11 +69,15 @@ describe('Notification Templates', () => {
         totalPaid: 1500,
         totalAmount: 1500,
         amountDue: 0,
-        paymentMethod: 'UPI'
+        paymentMethod: 'UPI',
       };
 
-      const msg = formatNotificationMessage(NotificationEventType.PAYMENT_RECEIVED, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.PAYMENT_RECEIVED,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('We received your payment for order *#GF-2001*.');
       expect(msg).toContain('Amount Received: ₹1500');
       expect(msg).toContain('Payment Method: UPI');
@@ -78,11 +92,15 @@ describe('Notification Templates', () => {
         amountPaid: 500,
         totalPaid: 500,
         totalAmount: 2000,
-        amountDue: 1500
+        amountDue: 1500,
       };
 
-      const msg = formatNotificationMessage(NotificationEventType.PAYMENT_RECEIVED, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.PAYMENT_RECEIVED,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('Amount Received: ₹500');
       expect(msg).not.toContain('Payment Method:');
       expect(msg).toContain('Paid: ₹500');
@@ -95,17 +113,19 @@ describe('Notification Templates', () => {
       const payload = {
         customerName: 'Aman',
         orderNumber: 'GF-3001',
-        readyItems: [
-          { garmentName: 'Suit', quantity: 1 }
-        ],
+        readyItems: [{ garmentName: 'Suit', quantity: 1 }],
         remainingItems: [],
         totalAmount: 800,
         amountPaid: 800,
-        amountDue: 0
+        amountDue: 0,
       };
 
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_READY, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_READY,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('Your order *#GF-3001* is *READY FOR PICKUP*.');
       expect(msg).toContain('*Ready Items*');
       expect(msg).toContain('• 1 × Suit');
@@ -118,19 +138,19 @@ describe('Notification Templates', () => {
       const payload = {
         customerName: 'Aman',
         orderNumber: 'GF-3002',
-        readyItems: [
-          { garmentName: 'Shirt', quantity: 2 }
-        ],
-        remainingItems: [
-          { garmentName: 'Blazer', quantity: 1 }
-        ],
+        readyItems: [{ garmentName: 'Shirt', quantity: 2 }],
+        remainingItems: [{ garmentName: 'Blazer', quantity: 1 }],
         totalAmount: 1200,
         amountPaid: 400,
-        amountDue: 800
+        amountDue: 800,
       };
 
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_READY, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_READY,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('Some items from your order *#GF-3002* are ready for pickup.');
       expect(msg).toContain('*Ready Items*');
       expect(msg).toContain('• 2 × Shirt');
@@ -149,11 +169,15 @@ describe('Notification Templates', () => {
         riderName: 'Raju',
         totalAmount: 500,
         amountPaid: 0,
-        amountDue: 500
+        amountDue: 500,
       };
 
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_OUT_FOR_DELIVERY, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_OUT_FOR_DELIVERY,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('Your order *#GF-4001* is out for delivery!');
       expect(msg).toContain('Our rider Raju will reach you soon.');
       expect(msg).toContain('Balance: ₹500'); // Included because due > 0
@@ -164,11 +188,15 @@ describe('Notification Templates', () => {
         orderNumber: 'GF-4002',
         totalAmount: 500,
         amountPaid: 500,
-        amountDue: 0
+        amountDue: 0,
       };
 
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_OUT_FOR_DELIVERY, payload, defaultStore);
-      
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_OUT_FOR_DELIVERY,
+        payload,
+        defaultStore,
+      );
+
       expect(msg).toContain('Our rider will reach you soon.');
       expect(msg).not.toContain('*Payment Summary*');
       expect(msg).not.toContain('Balance: ₹0');
@@ -178,7 +206,11 @@ describe('Notification Templates', () => {
   describe('ORDER_DELIVERED', () => {
     it('should format simple delivered message', () => {
       const payload = { orderNumber: 'GF-5001' };
-      const msg = formatNotificationMessage(NotificationEventType.ORDER_DELIVERED, payload, defaultStore);
+      const msg = formatNotificationMessage(
+        NotificationEventType.ORDER_DELIVERED,
+        payload,
+        defaultStore,
+      );
       expect(msg).toContain('Your order *#GF-5001* has been successfully delivered.');
     });
   });

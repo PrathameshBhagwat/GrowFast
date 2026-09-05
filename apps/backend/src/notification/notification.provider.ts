@@ -51,7 +51,11 @@ export class LogNotificationProvider implements NotificationProvider {
   readonly name = 'LogNotificationProvider';
 
   async dispatch(payload: NotificationDispatchPayload): Promise<NotificationDispatchResult> {
-    const formattedMessage = formatNotificationMessage(payload.eventType, payload.payload, payload.storeName);
+    const formattedMessage = formatNotificationMessage(
+      payload.eventType,
+      payload.payload,
+      payload.storeName,
+    );
 
     if (formattedMessage) {
       console.log(`\n================= CUSTOMER SMS =================`);

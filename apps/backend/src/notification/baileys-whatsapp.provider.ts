@@ -61,9 +61,13 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
 
       if (connection === 'close') {
         const shouldReconnect =
-          (lastDisconnect?.error as Boom)?.output?.statusCode !==
-          DisconnectReason.loggedOut;
-        this.logger.log('connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
+          (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+        this.logger.log(
+          'connection closed due to ',
+          lastDisconnect?.error,
+          ', reconnecting ',
+          shouldReconnect,
+        );
         this.isConnected = false;
 
         if (shouldReconnect) {
@@ -112,7 +116,11 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
     }
 
     const jid = `${formattedPhone}@s.whatsapp.net`;
-    const messageBody = formatNotificationMessage(payload.eventType, payload.payload, payload.storeName);
+    const messageBody = formatNotificationMessage(
+      payload.eventType,
+      payload.payload,
+      payload.storeName,
+    );
 
     if (!messageBody) {
       return {
