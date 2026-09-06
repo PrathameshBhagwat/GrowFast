@@ -48,14 +48,27 @@ describe('CatalogSettingsPage', () => {
       storeId: 'store-kp-001',
     };
 
-    (global.fetch as any).mockImplementation(async (url: string) => {
+    (global.fetch as any).mockImplementation(async (url: string, init?: any) => {
       if (url.includes('/services')) {
         return { ok: true, json: async () => ({ success: true, data: mockServices }) };
       }
       if (url.includes('/garments')) {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(init.body || '{}');
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              data: { id: 'g-new-123', name: body.name, category: body.category },
+            }),
+          };
+        }
         return { ok: true, json: async () => ({ success: true, data: mockGarments }) };
       }
       if (url.includes('/pricing')) {
+        if (init?.method === 'POST') {
+          return { ok: true, json: async () => ({ success: true, data: { id: 'p-new' } }) };
+        }
         return { ok: true, json: async () => ({ success: true, data: mockPrices }) };
       }
       return { ok: true, json: async () => ({ success: true, data: [] }) };
@@ -162,4 +175,98 @@ describe('CatalogSettingsPage', () => {
     expect(screen.queryByText('Service Pricing')).not.toBeInTheDocument();
     expect(screen.queryByText(/View Only \(Counter\)/i)).not.toBeInTheDocument();
   });
+
+  it('renders Add New Garment modal matching Stitch design layout with optional pricing for OWNER', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Add Garment')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Add Garment'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Add New Garment')).toBeInTheDocument();
+      expect(screen.getByText('QUICK CREATE')).toBeInTheDocument();
+      expect(screen.getByText('GARMENT DETAILS')).toBeInTheDocument();
+      expect(screen.getByText('SERVICE PRICING (OPTIONAL)')).toBeInTheDocument();
+      expect(screen.getByText(/You can set standard prices now or configure them later/i)).toBeInTheDocument();
+      expect(screen.getByText('Prices can be edited anytime from catalog')).toBeInTheDocument();
+      expect(screen.getByText('Create Garment')).toBeInTheDocument();
+      expect(screen.getByText('Cancel')).toBeInTheDocument();
+    });
+  });
+
+  it('successfully creates garment when all prices are empty', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Add Garment')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Add Garment'));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. Silk Blazer/i)).toBeInTheDocument();
+    });
+
+    const nameInput = screen.getByPlaceholderText(/e\.g\. Silk Blazer/i);
+    fireEvent.change(nameInput, { target: { value: 'Linen Kurta' } });
+
+    const createBtn = screen.getByText('Create Garment');
+    fireEvent.click(createBtn);
+
+    await waitFor(() => {
+      // Modal closes upon successful creation
+      expect(screen.queryByText('Add New Garment')).not.toBeInTheDocument();
+    });
+
+    // Verify POST /garments was called with correct payload
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/garments'),
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"name":"Linen Kurta"'),
+      }),
+    );
+  });
+
+  it('saves optional service prices when entered during garment creation', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Add Garment')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Add Garment'));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/e\.g\. Silk Blazer/i)).toBeInTheDocument();
+    });
+
+    const nameInput = screen.getByPlaceholderText(/e\.g\. Silk Blazer/i);
+    fireEvent.change(nameInput, { target: { value: 'Sherwani Set' } });
+
+    // Enter price for Dry Cleaning
+    const priceInputs = screen.getAllByPlaceholderText('—');
+    expect(priceInputs.length).toBeGreaterThan(0);
+    fireEvent.change(priceInputs[0], { target: { value: '250' } });
+
+    const createBtn = screen.getByText('Create Garment');
+    fireEvent.click(createBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Add New Garment')).not.toBeInTheDocument();
+    });
+
+    // Verify POST /pricing was called for the entered price
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/pricing/g-new-123/'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ price: 250 }),
+      }),
+    );
+  });
 });
+

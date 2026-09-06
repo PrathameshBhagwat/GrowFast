@@ -17,23 +17,37 @@ export const LoginPage: React.FC = () => {
 
   const [directory, setDirectory] = useState<{ id: string; name: string; role: string }[]>([]);
   const [isFetchingDirectory, setIsFetchingDirectory] = useState(true);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
+
+  const fetchDirectory = async (retryCount = 0) => {
+    setIsFetchingDirectory(true);
+    setDirectoryError(null);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '/api';
+      const res = await fetch(`${API_URL}/auth/directory`);
+      if (res.ok) {
+        const body = await res.json();
+        setDirectory(body.data || []);
+        setIsFetchingDirectory(false);
+        return;
+      }
+      throw new Error(`Server returned status ${res.status}`);
+    } catch (err: any) {
+      if (retryCount < 5) {
+        // Backend might still be starting up, retry with backoff
+        setTimeout(() => {
+          fetchDirectory(retryCount + 1);
+        }, 1500);
+      } else {
+        console.error('Failed to fetch employee directory', err);
+        setDirectoryError('Backend offline or starting up');
+        setIsFetchingDirectory(false);
+      }
+    }
+  };
 
   // Fetch directory on mount
   useEffect(() => {
-    const fetchDirectory = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || '/api';
-        const res = await fetch(`${API_URL}/auth/directory`);
-        if (res.ok) {
-          const body = await res.json();
-          setDirectory(body.data || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch employee directory', err);
-      } finally {
-        setIsFetchingDirectory(false);
-      }
-    };
     fetchDirectory();
   }, []);
 
@@ -148,7 +162,41 @@ export const LoginPage: React.FC = () => {
                   color: '#64748B',
                 }}
               >
-                Loading staff directory...
+                Connecting to server...
+              </div>
+            ) : directoryError ? (
+              <div
+                style={{
+                  width: '100%',
+                  minHeight: '48px',
+                  padding: '0 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #FECACA',
+                  background: '#FEF2F2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '0.85rem',
+                  color: '#991B1B',
+                }}
+              >
+                <span>Backend starting up or offline</span>
+                <button
+                  type="button"
+                  onClick={() => fetchDirectory(0)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #F87171',
+                    background: '#FFFFFF',
+                    color: '#991B1B',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retry
+                </button>
               </div>
             ) : (
               <select
