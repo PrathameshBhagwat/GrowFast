@@ -46,10 +46,12 @@ model Employee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  store            Store            @relation(fields: [storeId], references: [id])
-  createdOrders    Order[]          @relation("OrderCreatedBy")
-  receivedPayments Payment[]        @relation("PaymentReceivedBy")
-  deliveryRecords  DeliveryRecord[] @relation("DeliveryRider")
+  store            Store                 @relation(fields: [storeId], references: [id])
+  createdOrders    Order[]               @relation("OrderCreatedBy")
+  deliveredOrders  Order[]               @relation("OrderDeliveredBy")
+  receivedPayments Payment[]             @relation("PaymentReceivedBy")
+  createdAdjustments FinancialAdjustment[] @relation("AdjustmentCreatedBy")
+  deliveryRecords  DeliveryRecord[]      @relation("DeliveryRider")
 
   @@index([storeId])
   @@index([role])
@@ -208,15 +210,19 @@ model Order {
   notes                 String?
   syncStatus            SyncStatus    @default(SYNCED) @map("sync_status")
   createdById           String        @map("created_by_id")
+  deliveredAt           DateTime?     @map("delivered_at")
+  deliveredById         String?       @map("delivered_by_id")
   storeId               String        @map("store_id")
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
   customer        Customer         @relation(fields: [customerId], references: [id])
   createdBy       Employee         @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  deliveredBy     Employee?        @relation("OrderDeliveredBy", fields: [deliveredById], references: [id])
   store           Store            @relation(fields: [storeId], references: [id])
   items           OrderItem[]
   payments        Payment[]
+  adjustments     FinancialAdjustment[]
   photos          OrderPhoto[]
   deliveryRecords DeliveryRecord[]
 
@@ -226,6 +232,7 @@ model Order {
   @@index([orderDate])
   @@index([storeId])
   @@index([createdById])
+  @@index([deliveredById])
   @@map("orders")
 }
 
@@ -308,16 +315,20 @@ enum ItemStatus {
 // ─── PHYSICAL GARMENT ───────────────────────────────────────────────
 
 model PhysicalGarment {
-  id          String   @id @default(cuid())
-  orderItemId String   @map("order_item_id")
+  id          String    @id @default(cuid())
+  orderItemId String    @map("order_item_id")
   unitNumber  Int // e.g., 1, 2, 3 up to quantity
-  isReady     Boolean  @default(false) @map("is_ready")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  isReady     Boolean   @default(false) @map("is_ready")
+  isCancelled Boolean   @default(false) @map("is_cancelled")
+  isDelivered Boolean   @default(false) @map("is_delivered")
+  deliveredAt DateTime? @map("delivered_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   orderItem OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   photos    OrderPhoto[]
 
+  @@unique([orderItemId, unitNumber])
   @@index([orderItemId])
   @@map("physical_garments")
 }
@@ -376,6 +387,38 @@ enum PaymentMode {
   CARD
   ONLINE
   STORE_CREDIT
+}
+
+// ─── FINANCIAL ADJUSTMENT ──────────────────────────────────────────
+
+model FinancialAdjustment {
+  id          String           @id @default(cuid())
+  orderId     String           @map("order_id")
+  type        AdjustmentType
+  amount      Float
+  reason      String
+  status      AdjustmentStatus @default(COMPLETED)
+  reference   String?
+  createdById String           @map("created_by_id")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdBy Employee @relation("AdjustmentCreatedBy", fields: [createdById], references: [id])
+
+  @@index([orderId])
+  @@index([createdById])
+  @@map("financial_adjustments")
+}
+
+enum AdjustmentType {
+  REFUND
+  STORE_CREDIT
+}
+
+enum AdjustmentStatus {
+  COMPLETED
+  VOIDED
 }
 
 // ─── DELIVERY RECORD ────────────────────────────────────────────────

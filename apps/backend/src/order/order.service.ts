@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -13,10 +18,16 @@ import {
   deriveOrderStatus,
   ItemStatus,
   OrderStatus,
+  Role,
+  AdjustmentType,
+  AdjustmentStatus,
+  CancelGarmentRequest,
   NotificationEventType,
   NotificationChannel,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
+import { PaymentService, derivePaymentStatus } from '../payment/payment.service';
+import { OrderPickupDto } from './dto/order-pickup.dto';
 
 @Injectable()
 export class OrderService {
@@ -24,6 +35,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly catalogService: CatalogService,
     private readonly notificationService: NotificationService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   async createOrder(dto: CreateOrderDto, employeeId: string, storeId: string) {
@@ -243,7 +255,16 @@ export class OrderService {
         },
         customer: true,
         createdBy: true,
-        payments: true, // we might need to map these properly
+        deliveredBy: true,
+        store: true,
+        payments: {
+          include: { receivedBy: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        adjustments: {
+          include: { createdBy: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -321,6 +342,28 @@ export class OrderService {
         );
       }
 
+      // 2.5 Check if item has physical garments
+      const physicalGarmentCount = await tx.physicalGarment.count({
+        where: { orderItemId: itemId },
+      });
+      const hasPhysicalGarments = physicalGarmentCount > 0;
+
+      if (hasPhysicalGarments && dto.itemStatus !== undefined) {
+        throw new BadRequestException(
+          'Item status is derived from physical garments and cannot be manually set.',
+        );
+      }
+
+      if (
+        hasPhysicalGarments &&
+        dto.quantity !== undefined &&
+        dto.quantity !== orderItem.quantity
+      ) {
+        throw new BadRequestException(
+          'Quantity cannot be modified for items with physical garments.',
+        );
+      }
+
       // 3. Validate garment / service if updated
       if (dto.garmentCatalogId) {
         const garment = await tx.garmentCatalog.findUnique({
@@ -350,6 +393,16 @@ export class OrderService {
         );
       }
 
+      if (
+        hasPhysicalGarments &&
+        dto.deliveredQuantity !== undefined &&
+        dto.deliveredQuantity > orderItem.deliveredQuantity &&
+        orderItem.itemStatus !== ItemStatus.READY &&
+        orderItem.itemStatus !== ItemStatus.DELIVERED
+      ) {
+        throw new BadRequestException('Cannot deliver garments before they are marked ready.');
+      }
+
       // 5. Calculate new line total
       const garmentCatalogId = dto.garmentCatalogId || orderItem.garmentCatalogId;
       const serviceTypeId = dto.serviceTypeId || orderItem.serviceTypeId;
@@ -365,6 +418,14 @@ export class OrderService {
       const lineTotal = unitPrice * newQuantity;
 
       // 6. Update OrderItem
+      const updatedItemStatus = hasPhysicalGarments
+        ? newDeliveredQuantity === newQuantity && orderItem.itemStatus === ItemStatus.READY
+          ? ItemStatus.DELIVERED
+          : orderItem.itemStatus
+        : dto.itemStatus !== undefined
+          ? dto.itemStatus
+          : orderItem.itemStatus;
+
       await tx.orderItem.update({
         where: { id: itemId },
         data: {
@@ -375,7 +436,7 @@ export class OrderService {
           lineTotal,
           colorTags: dto.colorTags,
           defectNotes: dto.defectNotes,
-          itemStatus: dto.itemStatus,
+          itemStatus: updatedItemStatus,
           deliveredQuantity: dto.deliveredQuantity,
         },
       });
@@ -390,6 +451,7 @@ export class OrderService {
               serviceType: true,
             },
           },
+          adjustments: true,
         },
       });
 
@@ -411,6 +473,13 @@ export class OrderService {
         hasActiveTransitDelivery: false,
       });
 
+      const financial = this.paymentService.calculateOrderFinancialState({
+        totalAmount: totals.totalAmount,
+        amountPaid: updatedOrder!.amountPaid,
+        paymentStatus: updatedOrder!.paymentStatus as any,
+        adjustments: (updatedOrder as any).adjustments,
+      });
+
       await tx.order.update({
         where: { id: orderId },
         data: {
@@ -420,7 +489,8 @@ export class OrderService {
           expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
-          amountDue: totals.totalAmount - updatedOrder!.amountPaid,
+          amountDue: financial.amountDue,
+          paymentStatus: financial.paymentStatus as any,
         },
       });
 
@@ -465,6 +535,7 @@ export class OrderService {
           updatedOrder.customerId,
           {
             orderNumber: updatedOrder.orderNumber,
+            customerName: updatedOrder.customerName,
             totalAmount: updatedOrder.totalAmount,
             amountPaid: updatedOrder.amountPaid,
             amountDue: updatedOrder.amountDue,
@@ -483,7 +554,7 @@ export class OrderService {
             })),
           },
         )
-        .catch((err) => {
+        .catch(() => {
           // Swallow any unhandled promises just in case
         });
     }
@@ -507,7 +578,7 @@ export class OrderService {
             totalAmount: updatedOrder.totalAmount,
           },
         )
-        .catch((err) => {
+        .catch(() => {
           // Swallow any unhandled promises just in case
         });
     }
@@ -552,7 +623,7 @@ export class OrderService {
     isReady: boolean,
     storeId: string,
   ) {
-    const { order, oldItemStatus, newItemStatus } = await this.prisma.$transaction(async (tx) => {
+    const { oldItemStatus, newItemStatus } = await this.prisma.$transaction(async (tx) => {
       // 1. Verify access
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -570,6 +641,9 @@ export class OrderService {
       if (!pg || pg.orderItemId !== itemId) {
         throw new NotFoundException(`Physical garment not found`);
       }
+      if (pg.isCancelled) {
+        throw new BadRequestException('Cannot mark a cancelled garment as ready.');
+      }
 
       await tx.physicalGarment.update({
         where: { id: garmentId },
@@ -580,18 +654,22 @@ export class OrderService {
       const allGarments = await tx.physicalGarment.findMany({
         where: { orderItemId: itemId },
       });
-      const allReady = allGarments.length > 0 && allGarments.every((g) => g.isReady);
-      const anyReady = allGarments.some((g) => g.isReady);
+      const activeGarments = allGarments.filter((g) => !g.isCancelled);
+      const allReady = activeGarments.length > 0 && activeGarments.every((g) => g.isReady);
+      const anyReady = activeGarments.some((g) => g.isReady);
 
       let newItemStatus = orderItem.itemStatus;
       if (
-        allReady &&
         orderItem.itemStatus !== ItemStatus.DELIVERED &&
         orderItem.itemStatus !== ItemStatus.CANCELLED
       ) {
-        newItemStatus = ItemStatus.READY;
-      } else if (!allReady && orderItem.itemStatus === ItemStatus.READY) {
-        newItemStatus = anyReady ? ItemStatus.PROCESSING : ItemStatus.RECEIVED;
+        if (allReady) {
+          newItemStatus = ItemStatus.READY;
+        } else if (anyReady) {
+          newItemStatus = ItemStatus.PROCESSING;
+        } else {
+          newItemStatus = ItemStatus.RECEIVED;
+        }
       }
 
       if (newItemStatus !== orderItem.itemStatus) {
@@ -646,7 +724,7 @@ export class OrderService {
       );
 
       this.notificationService
-        .createNotificationEvent(
+        ?.createNotificationEvent(
           storeId,
           NotificationEventType.ORDER_READY,
           NotificationChannel.SMS,
@@ -655,6 +733,7 @@ export class OrderService {
           updatedOrder.customerId,
           {
             orderNumber: updatedOrder.orderNumber,
+            customerName: updatedOrder.customerName,
             totalAmount: updatedOrder.totalAmount,
             amountPaid: updatedOrder.amountPaid,
             amountDue: updatedOrder.amountDue,
@@ -673,7 +752,840 @@ export class OrderService {
             })),
           },
         )
-        .catch(() => {});
+        ?.catch?.(() => {});
+    }
+
+    return updatedOrder;
+  }
+
+  async addPhysicalGarment(orderId: string, itemId: string, storeId: string) {
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Fetch order with store isolation and items with garments
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              physicalGarments: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.status === OrderStatus.CANCELLED) {
+        throw new BadRequestException('Cannot add garment to a cancelled order');
+      }
+      if (order.status === OrderStatus.DELIVERED) {
+        throw new BadRequestException('Cannot add garment to a delivered order');
+      }
+
+      // 2. Fetch order item
+      const orderItem = order.items.find((i) => i.id === itemId);
+      if (!orderItem) {
+        throw new NotFoundException(
+          `OrderItem with ID "${itemId}" not found in order "${orderId}"`,
+        );
+      }
+
+      // 3. Confirm it is backed by physical garments
+      const existingGarments = orderItem.physicalGarments || [];
+      if (existingGarments.length === 0) {
+        throw new BadRequestException(
+          'Cannot add physical garments to a legacy item without physical garments.',
+        );
+      }
+
+      if (orderItem.itemStatus === ItemStatus.DELIVERED) {
+        throw new BadRequestException('Cannot add garment to an item that is already delivered.');
+      }
+      if (orderItem.itemStatus === ItemStatus.CANCELLED) {
+        throw new BadRequestException('Cannot add garment to a cancelled item.');
+      }
+
+      // 4. Determine next unit number (max + 1, never reuse cancelled numbers)
+      const maxUnitNumber = existingGarments.reduce((max, g) => Math.max(max, g.unitNumber), 0);
+      const nextUnitNumber = maxUnitNumber + 1;
+
+      // 5. Create new PhysicalGarment
+      await tx.physicalGarment.create({
+        data: {
+          orderItemId: itemId,
+          unitNumber: nextUnitNumber,
+          isReady: false,
+          isCancelled: false,
+        },
+      });
+
+      // 6. Increment quantity and lineTotal
+      const newQuantity = orderItem.quantity + 1;
+      const newLineTotal = Number((orderItem.unitPrice * newQuantity).toFixed(2));
+
+      // 7. Derive new itemStatus (new garment is not ready, so all active garments cannot be all ready)
+      const activeGarments = existingGarments.filter((g) => !g.isCancelled);
+      const anyReady = activeGarments.some((g) => g.isReady);
+      const newItemStatus = anyReady ? ItemStatus.PROCESSING : ItemStatus.RECEIVED;
+
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          quantity: newQuantity,
+          lineTotal: newLineTotal,
+          itemStatus: newItemStatus,
+        },
+      });
+
+      // 8. Recalculate order totals
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      const pricingInputs = order.items.map((i) => ({
+        unitPrice: i.unitPrice,
+        quantity: i.id === itemId ? newQuantity : i.quantity,
+      }));
+      const totals = calculateOrderTotals(pricingInputs, {
+        isExpress: order.isExpress,
+        expressSurchargePercent: store?.expressSurchargePercent ?? undefined,
+      });
+
+      const newAmountDue = Number((totals.totalAmount - order.amountPaid).toFixed(2));
+      const newPaymentStatus = derivePaymentStatus(
+        order.amountPaid,
+        totals.totalAmount,
+        order.paymentStatus as unknown as any,
+      );
+
+      // 9. Derive canonical order status
+      const itemsForStatus = order.items.map((i: any) => ({
+        status: (i.id === itemId ? newItemStatus : i.itemStatus) as ItemStatus,
+      }));
+      const newOrderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        currentOrderStatus: order.status as OrderStatus,
+        hasActiveTransitDelivery: false,
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: newOrderStatus,
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: newAmountDue,
+          paymentStatus: newPaymentStatus as unknown as any,
+        },
+      });
+    });
+
+    return await this.findOrderById(orderId, storeId);
+  }
+
+  async cancelPhysicalGarment(
+    orderId: string,
+    itemId: string,
+    garmentId: string,
+    storeId: string,
+    employeeId?: string,
+    employeeRole?: string,
+    adjustmentDto?: CancelGarmentRequest['adjustment'],
+  ) {
+    let triggeredReady = false;
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Fetch order with store isolation and items with garments
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              physicalGarments: true,
+            },
+          },
+          adjustments: true,
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.storeId !== storeId) {
+        throw new NotFoundException(`Order with ID "${orderId}" not found`);
+      }
+      if (order.status === OrderStatus.CANCELLED) {
+        throw new BadRequestException('Cannot cancel garment on a cancelled order');
+      }
+      if (order.status === OrderStatus.DELIVERED) {
+        throw new BadRequestException('Cannot cancel garment on a delivered order');
+      }
+
+      // 2. Fetch order item
+      const orderItem = order.items.find((i) => i.id === itemId);
+      if (!orderItem) {
+        throw new NotFoundException(
+          `OrderItem with ID "${itemId}" not found in order "${orderId}"`,
+        );
+      }
+
+      // 3. Delivered quantity check (Decision D)
+      if (orderItem.deliveredQuantity > 0) {
+        throw new BadRequestException(
+          'Cannot cancel garment when delivered quantity is greater than 0.',
+        );
+      }
+
+      // 4. Fetch garment
+      const garment = orderItem.physicalGarments.find((g) => g.id === garmentId);
+      if (!garment) {
+        throw new NotFoundException(
+          `Physical garment with ID "${garmentId}" not found in item "${itemId}"`,
+        );
+      }
+
+      // 5. Already cancelled check (Decision B)
+      if (garment.isCancelled) {
+        throw new BadRequestException('Garment is already cancelled.');
+      }
+
+      // 6. READY garment check (Decision C)
+      if (garment.isReady) {
+        throw new BadRequestException('Cannot cancel a garment that is already marked ready.');
+      }
+
+      // 7. Last active garment check (Decision E)
+      const activeGarments = orderItem.physicalGarments.filter((g) => !g.isCancelled);
+      if (activeGarments.length <= 1) {
+        throw new BadRequestException('Cannot cancel the last active garment of an item.');
+      }
+
+      // 8. Financial check (Phase 3E)
+      const newQuantity = orderItem.quantity - 1;
+      const newLineTotal = Number((orderItem.unitPrice * newQuantity).toFixed(2));
+
+      const store = await tx.store.findUnique({ where: { id: storeId } });
+      const pricingInputs = order.items.map((i) => ({
+        unitPrice: i.unitPrice,
+        quantity: i.id === itemId ? newQuantity : i.quantity,
+      }));
+      const totals = calculateOrderTotals(pricingInputs, {
+        isExpress: order.isExpress,
+        expressSurchargePercent: store?.expressSurchargePercent ?? undefined,
+      });
+
+      // Compute existing adjustments and current effective paid
+      const existingRefunds = Number(
+        (order.adjustments || [])
+          .filter(
+            (a: any) => a.status === AdjustmentStatus.COMPLETED && a.type === AdjustmentType.REFUND,
+          )
+          .reduce((sum: number, a: any) => sum + a.amount, 0)
+          .toFixed(2),
+      );
+      const existingStoreCredits = Number(
+        (order.adjustments || [])
+          .filter(
+            (a: any) =>
+              a.status === AdjustmentStatus.COMPLETED && a.type === AdjustmentType.STORE_CREDIT,
+          )
+          .reduce((sum: number, a: any) => sum + a.amount, 0)
+          .toFixed(2),
+      );
+      const existingAdjustmentsTotal = Number((existingRefunds + existingStoreCredits).toFixed(2));
+      const currentEffectivePaid = Number((order.amountPaid - existingAdjustmentsTotal).toFixed(2));
+
+      let newRefunds = existingRefunds;
+      let newStoreCredits = existingStoreCredits;
+
+      if (totals.totalAmount < currentEffectivePaid) {
+        const excess = Number((currentEffectivePaid - totals.totalAmount).toFixed(2));
+
+        if (!adjustmentDto) {
+          throw new BadRequestException(
+            `Cancellation requires a financial adjustment (refund or store credit) because the resulting order total (₹${totals.totalAmount}) is less than effective amount paid (₹${currentEffectivePaid}). Excess amount: ₹${excess}.`,
+          );
+        }
+
+        // Only OWNER can authorize adjustments
+        if (employeeRole !== Role.OWNER) {
+          throw new ForbiddenException('Only store owners can authorize financial adjustments');
+        }
+
+        if (
+          !adjustmentDto.amount ||
+          adjustmentDto.amount <= 0 ||
+          !Number.isFinite(adjustmentDto.amount)
+        ) {
+          throw new BadRequestException('Adjustment amount must be greater than zero');
+        }
+
+        if (Math.abs(adjustmentDto.amount - excess) > 0.01) {
+          throw new BadRequestException(
+            `Adjustment amount (₹${adjustmentDto.amount}) must match the required reduction amount (₹${excess})`,
+          );
+        }
+
+        if (
+          !adjustmentDto.reason ||
+          typeof adjustmentDto.reason !== 'string' ||
+          adjustmentDto.reason.trim().length === 0
+        ) {
+          throw new BadRequestException('Adjustment reason is required');
+        }
+
+        if (
+          adjustmentDto.type !== AdjustmentType.REFUND &&
+          adjustmentDto.type !== AdjustmentType.STORE_CREDIT
+        ) {
+          throw new BadRequestException(`Invalid adjustment type: ${adjustmentDto.type}`);
+        }
+
+        // Create adjustment atomically in same transaction
+        await tx.financialAdjustment.create({
+          data: {
+            orderId,
+            type: adjustmentDto.type,
+            amount: Number(adjustmentDto.amount.toFixed(2)),
+            reason: adjustmentDto.reason.trim(),
+            reference: adjustmentDto.reference,
+            status: AdjustmentStatus.COMPLETED,
+            createdById: employeeId || order.createdById,
+          },
+        });
+
+        if (adjustmentDto.type === AdjustmentType.REFUND) {
+          newRefunds = Number((existingRefunds + adjustmentDto.amount).toFixed(2));
+        } else {
+          newStoreCredits = Number((existingStoreCredits + adjustmentDto.amount).toFixed(2));
+        }
+      }
+
+      // 9. Soft-cancel the physical garment
+      await tx.physicalGarment.update({
+        where: { id: garmentId },
+        data: { isCancelled: true },
+      });
+
+      // 10. Recompute itemStatus from remaining active garments
+      const remainingActive = activeGarments.filter((g) => g.id !== garmentId);
+      const allReady = remainingActive.length > 0 && remainingActive.every((g) => g.isReady);
+      const anyReady = remainingActive.some((g) => g.isReady);
+
+      let newItemStatus = orderItem.itemStatus;
+      if (allReady) {
+        newItemStatus = ItemStatus.READY;
+      } else {
+        newItemStatus = anyReady ? ItemStatus.PROCESSING : ItemStatus.RECEIVED;
+      }
+
+      if (newItemStatus === ItemStatus.READY && orderItem.itemStatus !== ItemStatus.READY) {
+        triggeredReady = true;
+      }
+
+      await tx.orderItem.update({
+        where: { id: itemId },
+        data: {
+          quantity: newQuantity,
+          lineTotal: newLineTotal,
+          itemStatus: newItemStatus,
+        },
+      });
+
+      // 11. Recalculate order totals and derive canonical order status
+      const newAdjustmentsTotal = Number((newRefunds + newStoreCredits).toFixed(2));
+      const newEffectivePaid = Number((order.amountPaid - newAdjustmentsTotal).toFixed(2));
+      const newAmountDue = Math.max(0, Number((totals.totalAmount - newEffectivePaid).toFixed(2)));
+
+      let newPaymentStatus = derivePaymentStatus(
+        newEffectivePaid,
+        totals.totalAmount,
+        order.paymentStatus as unknown as any,
+      );
+
+      if (
+        totals.totalAmount === 0 ||
+        (newEffectivePaid === 0 && order.amountPaid > 0 && newRefunds >= order.amountPaid)
+      ) {
+        newPaymentStatus = PaymentStatus.REFUNDED;
+      }
+
+      const itemsForStatus = order.items.map((i: any) => ({
+        status: (i.id === itemId ? newItemStatus : i.itemStatus) as ItemStatus,
+      }));
+      const newOrderStatus = deriveOrderStatus({
+        items: itemsForStatus,
+        currentOrderStatus: order.status as OrderStatus,
+        hasActiveTransitDelivery: false,
+      });
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: newOrderStatus,
+          subtotal: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          expressSurcharge: totals.expressSurcharge,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.totalAmount,
+          amountDue: newAmountDue,
+          paymentStatus: newPaymentStatus as unknown as any,
+        },
+      });
+    });
+
+    const updatedOrder = await this.findOrderById(orderId, storeId);
+
+    // If cancellation transitioned the order to READY, trigger canonical notification
+    if (triggeredReady && updatedOrder.status === OrderStatus.READY && updatedOrder.customerPhone) {
+      const readyItems = updatedOrder.items.filter((i: any) => i.itemStatus === ItemStatus.READY);
+      const remainingItems = updatedOrder.items.filter(
+        (i: any) =>
+          i.itemStatus !== ItemStatus.READY &&
+          i.itemStatus !== ItemStatus.DELIVERED &&
+          i.itemStatus !== ItemStatus.CANCELLED,
+      );
+
+      const breakdown = calculateFulfillmentBreakdown(
+        updatedOrder.totalAmount,
+        updatedOrder.amountPaid,
+        updatedOrder.items as any,
+      );
+
+      this.notificationService
+        ?.createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_READY,
+          NotificationChannel.SMS,
+          updatedOrder.customerPhone,
+          updatedOrder.id,
+          updatedOrder.customerId,
+          {
+            orderNumber: updatedOrder.orderNumber,
+            customerName: updatedOrder.customerName,
+            totalAmount: updatedOrder.totalAmount,
+            amountPaid: updatedOrder.amountPaid,
+            amountDue: updatedOrder.amountDue,
+            readyAmount: breakdown.readyAmount,
+            remainingAmount: breakdown.remainingAmount,
+            readyItems: readyItems.map((i: any) => ({
+              id: i.id,
+              garmentName: i.garmentName,
+              serviceType: i.serviceType,
+              quantity: i.quantity,
+            })),
+            remainingItems: remainingItems.map((i: any) => ({
+              id: i.id,
+              garmentName: i.garmentName,
+              serviceType: i.serviceType,
+              quantity: i.quantity,
+            })),
+          },
+        )
+        ?.catch?.(() => {});
+    }
+
+    return updatedOrder;
+  }
+
+  async notifyPartialReady(orderId: string, storeId: string) {
+    const order = await this.findOrderById(orderId, storeId);
+
+    if (!order.customerPhone) {
+      throw new BadRequestException('Customer does not have a phone number');
+    }
+
+    // Duplicate protection / Rate limiting: 30s cooldown
+    const recent = await this.prisma.notification.findFirst({
+      where: {
+        orderId,
+        eventType: NotificationEventType.ORDER_READY,
+        createdAt: { gte: new Date(Date.now() - 30000) },
+      },
+    });
+    if (recent) {
+      throw new BadRequestException(
+        'A readiness notification was sent recently. Please wait before sending another.',
+      );
+    }
+
+    // Build authoritative ready vs remaining items based on physical garments
+    const readyItems: {
+      id?: string;
+      garmentName: string;
+      serviceType?: string;
+      quantity: number;
+    }[] = [];
+    const remainingItems: { id?: string; garmentName: string; quantity: number }[] = [];
+
+    for (const item of order.items) {
+      if (item.physicalGarments && item.physicalGarments.length > 0) {
+        const activeGarments = item.physicalGarments.filter((pg: any) => !pg.isCancelled);
+        const readyGarments = activeGarments.filter((pg: any) => pg.isReady);
+        const remainingGarments = activeGarments.filter((pg: any) => !pg.isReady);
+
+        if (readyGarments.length > 0) {
+          readyItems.push({
+            id: item.id,
+            garmentName: item.garmentName,
+            serviceType: item.serviceType,
+            quantity: readyGarments.length,
+          });
+        }
+        if (remainingGarments.length > 0) {
+          remainingItems.push({
+            id: item.id,
+            garmentName: item.garmentName,
+            quantity: remainingGarments.length,
+          });
+        }
+      } else {
+        // Legacy order item fallback without PhysicalGarment records
+        if (item.itemStatus === ItemStatus.READY) {
+          readyItems.push({
+            id: item.id,
+            garmentName: item.garmentName,
+            serviceType: item.serviceType,
+            quantity: item.quantity,
+          });
+        } else if (
+          item.itemStatus !== ItemStatus.DELIVERED &&
+          item.itemStatus !== ItemStatus.CANCELLED
+        ) {
+          remainingItems.push({
+            id: item.id,
+            garmentName: item.garmentName,
+            quantity: item.quantity,
+          });
+        }
+      }
+    }
+
+    if (readyItems.length === 0) {
+      throw new BadRequestException('No garments are ready to notify');
+    }
+
+    // Reuse existing authoritative financial values
+    const payload = {
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      totalAmount: order.totalAmount,
+      amountPaid: order.amountPaid,
+      amountDue: order.amountDue,
+      readyItems,
+      remainingItems,
+    };
+
+    const notification = await this.notificationService.createNotificationEvent(
+      storeId,
+      NotificationEventType.ORDER_READY,
+      NotificationChannel.SMS,
+      order.customerPhone,
+      order.id,
+      order.customerId,
+      payload,
+    );
+
+    return {
+      success: true,
+      message: 'Readiness notification queued successfully',
+      notificationId: notification?.id || null,
+    };
+  }
+
+  /**
+   * Phase 4C — Counter Pickup & Order Handover
+   *
+   * Atomically delivers physical garments and/or legacy items, records optional
+   * payment, verifies financial settlement gates, synchronizes delivered quantities,
+   * derives canonical OrderStatus, and updates delivery audit fields.
+   */
+  async recordPickup(orderId: string, dto: OrderPickupDto, employeeId: string, storeId: string) {
+    const hasGarments = Array.isArray(dto.garmentIds) && dto.garmentIds.length > 0;
+    const hasLegacy = Array.isArray(dto.legacyItems) && dto.legacyItems.length > 0;
+    if (!hasGarments && !hasLegacy) {
+      throw new BadRequestException(
+        'At least one garment or legacy item must be selected for pickup',
+      );
+    }
+
+    if (dto.payment) {
+      if (dto.payment.amount <= 0 || !Number.isFinite(dto.payment.amount)) {
+        throw new BadRequestException('Payment amount must be greater than zero');
+      }
+    }
+
+    const { oldOrderStatus, wasDelivered, customerPhone, customerId, orderNumber, totalAmount } =
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Fetch order with items and physical garments
+        const order = await tx.order.findUnique({
+          where: { id: orderId },
+          include: {
+            items: {
+              include: {
+                physicalGarments: true,
+              },
+            },
+            customer: true,
+          },
+        });
+
+        if (!order) {
+          throw new NotFoundException(`Order with ID "${orderId}" not found`);
+        }
+        if (order.storeId !== storeId) {
+          throw new ForbiddenException('Cannot access orders from a different store');
+        }
+        if (order.status === OrderStatus.CANCELLED) {
+          throw new BadRequestException('Cannot pickup items from a cancelled order');
+        }
+
+        const oldOrderStatus = order.status;
+
+        // 2. Process payment within same transaction if provided
+        if (dto.payment) {
+          await this.paymentService.recordPayment(
+            employeeId,
+            storeId,
+            {
+              orderId,
+              amount: dto.payment.amount,
+              mode: dto.payment.mode,
+              reference: dto.payment.reference,
+            },
+            tx,
+          );
+        }
+
+        // 3. Process physical garments
+        if (hasGarments) {
+          const requestedIds = dto.garmentIds!;
+          const uniqueRequestedIds = new Set(requestedIds);
+          if (requestedIds.length !== uniqueRequestedIds.size) {
+            throw new BadRequestException('Duplicate garment IDs in pickup request');
+          }
+
+          // Build map of physical garments belonging to this order
+          const orderGarmentMap = new Map<string, { pg: any; item: any }>();
+          for (const item of order.items) {
+            for (const pg of item.physicalGarments) {
+              orderGarmentMap.set(pg.id, { pg, item });
+            }
+          }
+
+          // Validate every garment
+          for (const gid of requestedIds) {
+            const entry = orderGarmentMap.get(gid);
+            if (!entry) {
+              throw new BadRequestException(
+                `Garment with ID "${gid}" does not belong to order "${orderId}"`,
+              );
+            }
+            const { pg } = entry;
+            if (pg.isCancelled) {
+              throw new BadRequestException(`Cannot pick up cancelled garment with ID "${gid}"`);
+            }
+            if (!pg.isReady) {
+              throw new BadRequestException(
+                `Cannot pick up garment with ID "${gid}" because it is not ready`,
+              );
+            }
+            if (pg.isDelivered) {
+              throw new BadRequestException(`Garment with ID "${gid}" has already been delivered`);
+            }
+          }
+
+          // Concurrency-safe atomic update
+          const now = new Date();
+          for (const gid of requestedIds) {
+            const updateResult = await tx.physicalGarment.updateMany({
+              where: {
+                id: gid,
+                isDelivered: false,
+                isReady: true,
+                isCancelled: false,
+              },
+              data: {
+                isDelivered: true,
+                deliveredAt: now,
+              },
+            });
+
+            if (updateResult.count === 0) {
+              throw new BadRequestException(
+                `Garment "${gid}" was concurrently modified or already delivered`,
+              );
+            }
+          }
+
+          // Synchronize OrderItem.deliveredQuantity and itemStatus for affected items
+          for (const item of order.items) {
+            if (item.physicalGarments && item.physicalGarments.length > 0) {
+              const updatedGarments = await tx.physicalGarment.findMany({
+                where: { orderItemId: item.id },
+              });
+              const activeGarments = updatedGarments.filter((g) => !g.isCancelled);
+              const deliveredCount = activeGarments.filter((g) => g.isDelivered).length;
+
+              let newItemStatus = item.itemStatus;
+              if (activeGarments.length > 0 && deliveredCount === activeGarments.length) {
+                newItemStatus = ItemStatus.DELIVERED;
+              }
+
+              await tx.orderItem.update({
+                where: { id: item.id },
+                data: {
+                  deliveredQuantity: deliveredCount,
+                  itemStatus: newItemStatus,
+                },
+              });
+            }
+          }
+        }
+
+        // 4. Process legacy items
+        if (hasLegacy) {
+          for (const legacy of dto.legacyItems!) {
+            const item = order.items.find((i) => i.id === legacy.itemId);
+            if (!item) {
+              throw new BadRequestException(
+                `Legacy order item "${legacy.itemId}" does not belong to order "${orderId}"`,
+              );
+            }
+            if (item.itemStatus === ItemStatus.CANCELLED) {
+              throw new BadRequestException(`Cannot pick up cancelled item "${legacy.itemId}"`);
+            }
+            if (legacy.quantity <= 0) {
+              throw new BadRequestException(
+                `Pickup quantity for item "${legacy.itemId}" must be greater than zero`,
+              );
+            }
+            const remaining = item.quantity - item.deliveredQuantity;
+            if (legacy.quantity > remaining) {
+              throw new BadRequestException(
+                `Cannot deliver ${legacy.quantity} of item "${legacy.itemId}". Only ${remaining} remaining.`,
+              );
+            }
+
+            const newDelivered = item.deliveredQuantity + legacy.quantity;
+            const newItemStatus =
+              newDelivered === item.quantity ? ItemStatus.DELIVERED : item.itemStatus;
+
+            const updateRes = await tx.orderItem.updateMany({
+              where: {
+                id: item.id,
+                deliveredQuantity: item.deliveredQuantity,
+              },
+              data: {
+                deliveredQuantity: newDelivered,
+                itemStatus: newItemStatus,
+              },
+            });
+
+            if (updateRes.count === 0) {
+              throw new BadRequestException(
+                `Concurrent modification detected for order item "${item.id}"`,
+              );
+            }
+          }
+        }
+
+        // 5. Check full order completion and financial settlement gate
+        const currentOrder = await tx.order.findUnique({
+          where: { id: orderId },
+          include: {
+            items: {
+              include: {
+                physicalGarments: true,
+              },
+            },
+            adjustments: true,
+          },
+        });
+
+        let allActiveItemsDelivered = true;
+        for (const item of currentOrder!.items) {
+          if (item.itemStatus === ItemStatus.CANCELLED) {
+            continue;
+          }
+          const activeGarments = item.physicalGarments.filter((g) => !g.isCancelled);
+          if (activeGarments.length > 0) {
+            const allGarmentsDelivered = activeGarments.every((g) => g.isDelivered);
+            if (!allGarmentsDelivered) {
+              allActiveItemsDelivered = false;
+              break;
+            }
+          } else {
+            if (item.deliveredQuantity < item.quantity) {
+              allActiveItemsDelivered = false;
+              break;
+            }
+          }
+        }
+
+        const financialState = this.paymentService.calculateOrderFinancialState(currentOrder!);
+
+        // Final settlement gate: If all active items delivered, amountDue must be 0
+        if (allActiveItemsDelivered && financialState.amountDue > 0) {
+          throw new BadRequestException(
+            `Cannot complete final handover: Order #${currentOrder!.orderNumber} has an outstanding balance of ₹${financialState.amountDue}. Full payment must be settled before final delivery.`,
+          );
+        }
+
+        // Derive canonical order status
+        const itemsForStatus = currentOrder!.items.map((i) => ({
+          status: i.itemStatus as ItemStatus,
+        }));
+        const derivedStatus = deriveOrderStatus({
+          items: itemsForStatus,
+          currentOrderStatus: currentOrder!.status as OrderStatus,
+        });
+
+        const orderUpdateData: any = {
+          status: derivedStatus,
+        };
+
+        if (allActiveItemsDelivered && derivedStatus === OrderStatus.DELIVERED) {
+          orderUpdateData.deliveredAt = new Date();
+          orderUpdateData.deliveredById = employeeId;
+        }
+
+        await tx.order.update({
+          where: { id: orderId },
+          data: orderUpdateData,
+        });
+
+        return {
+          oldOrderStatus,
+          wasDelivered: allActiveItemsDelivered && derivedStatus === OrderStatus.DELIVERED,
+          customerPhone: order.customer?.phone,
+          customerId: order.customerId,
+          orderNumber: currentOrder!.orderNumber,
+          totalAmount: currentOrder!.totalAmount,
+        };
+      });
+
+    // Outside transaction: Fetch updated order details
+    const updatedOrder = await this.findOrderById(orderId, storeId);
+
+    // Trigger ORDER_DELIVERED notification if full handover completed
+    if (wasDelivered && oldOrderStatus !== OrderStatus.DELIVERED && customerPhone) {
+      this.notificationService
+        .createNotificationEvent(
+          storeId,
+          NotificationEventType.ORDER_DELIVERED,
+          NotificationChannel.SMS,
+          customerPhone,
+          orderId,
+          customerId,
+          {
+            orderNumber,
+            totalAmount,
+          },
+        )
+        ?.catch?.(() => {});
     }
 
     return updatedOrder;
@@ -681,6 +1593,8 @@ export class OrderService {
 
   // --- Helpers ---
   private mapToSummaryDto(order: any) {
+    const financial = this.paymentService.calculateOrderFinancialState(order);
+
     return {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -698,9 +1612,13 @@ export class OrderService {
       totalAmount: order.totalAmount,
       expressSurcharge: order.expressSurcharge,
       amountPaid: order.amountPaid,
-      amountDue: order.amountDue,
-      paymentStatus: order.paymentStatus,
+      refundAmount: financial.refundAmount,
+      storeCreditAmount: financial.storeCreditAmount,
+      effectivePaid: financial.effectivePaid,
+      amountDue: financial.amountDue,
+      paymentStatus: financial.paymentStatus,
       pickupType: order.pickupType,
+      deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
       itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
       ...calculateFulfillmentBreakdown(order.totalAmount, order.amountPaid, order.items),
     };
@@ -716,8 +1634,13 @@ export class OrderService {
       dueDateOverriddenBy: order.dueDateOverriddenBy,
       serviceSummary: order.serviceSummary,
       storeId: order.storeId,
+      storeName: order.store?.name || undefined,
+      storeAddress: order.store?.address || null,
+      storePhone: order.store?.phone || null,
       createdById: order.createdById,
-      createdByName: order.createdBy.name,
+      createdByName: order.createdBy?.name || 'Staff',
+      deliveredById: order.deliveredById || null,
+      deliveredByName: order.deliveredBy?.name || null,
       items: order.items.map((item: any) => ({
         id: item.id,
         garmentName: item.garmentCatalog.name,
@@ -736,6 +1659,9 @@ export class OrderService {
           orderItemId: pg.orderItemId,
           unitNumber: pg.unitNumber,
           isReady: pg.isReady,
+          isCancelled: pg.isCancelled ?? false,
+          isDelivered: pg.isDelivered ?? false,
+          deliveredAt: pg.deliveredAt ? pg.deliveredAt.toISOString() : null,
           createdAt: pg.createdAt.toISOString(),
           updatedAt: pg.updatedAt.toISOString(),
           photos: pg.photos?.map((photo: any) => ({
@@ -756,8 +1682,22 @@ export class OrderService {
           mode: p.mode,
           reference: p.reference,
           receivedById: p.receivedById,
-          receivedByName: 'Unknown', // Need to join employee for this later if needed
+          receivedByName: p.receivedBy?.name || 'Staff',
           createdAt: p.createdAt.toISOString(),
+        })) || [],
+      adjustments:
+        order.adjustments?.map((a: any) => ({
+          id: a.id,
+          orderId: a.orderId,
+          type: a.type,
+          amount: a.amount,
+          reason: a.reason,
+          status: a.status,
+          reference: a.reference,
+          createdById: a.createdById,
+          createdByName: a.createdBy?.name || 'Unknown',
+          createdAt: a.createdAt.toISOString(),
+          updatedAt: a.updatedAt.toISOString(),
         })) || [],
     };
   }

@@ -121,3 +121,75 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ─── Receipt & Print Styles (Phase 4E) ─────────────────────────── */
+.receipt-standard {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.receipt-thermal {
+  max-width: 320px;
+  width: 100%;
+  margin: 0 auto;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+}
+
+@media print {
+  @page {
+    margin: 8mm;
+    size: auto;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide all application UI, navigation, sidebars, modal backdrops, and action buttons */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only reveal the printable receipt content and its descendants */
+  #printable-receipt,
+  #printable-receipt * {
+    visibility: visible;
+  }
+
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  #printable-receipt.receipt-thermal {
+    width: 76mm !important;
+    max-width: 76mm !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

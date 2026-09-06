@@ -28,6 +28,8 @@ export {
   NotificationEventType,
   NotificationChannel,
   NotificationStatus,
+  AdjustmentType,
+  AdjustmentStatus,
 } from './enums';
 
 // DTOs
@@ -44,13 +46,18 @@ export type {
   OrderSummaryDTO,
   OrderDetailDTO,
   OrderItemDTO,
+  PhysicalGarmentDTO,
   CreateOrderRequest,
   CreateOrderItemRequest,
   UpdateOrderItemRequest,
+  OrderPickupRequest,
   UpdateDueDateRequest,
   PaymentDTO,
   RecordPaymentRequest,
   PaymentSummaryDTO,
+  FinancialAdjustmentDTO,
+  CreateAdjustmentRequest,
+  CancelGarmentRequest,
   GarmentCatalogDTO,
   UpdateGarmentRequest,
   ServiceTypeDTO,

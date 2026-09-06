@@ -39,7 +39,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
       className = '',
       optionClassName = '',
     },
-    ref
+    ref,
   ) => {
     const [isOpen, setIsOpen] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -108,7 +108,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
             break;
         }
       },
-      [isOpen, highlightedIndex, options, onChange]
+      [isOpen, highlightedIndex, options, onChange],
     );
 
     const handleOptionClick = (optionValue: string, optionDisabled: boolean) => {
@@ -212,7 +212,11 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
 
     return (
       <div ref={dropdownRef} className={className} style={containerStyle}>
-        {label && <label htmlFor={selectId} style={labelStyle}>{label}</label>}
+        {label && (
+          <label htmlFor={selectId} style={labelStyle}>
+            {label}
+          </label>
+        )}
         <div style={{ position: 'relative' }}>
           <button
             ref={buttonRef}
@@ -229,7 +233,15 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
             aria-labelledby={label ? selectId : undefined}
             aria-disabled={disabled}
           >
-            <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span
+              style={{
+                flex: 1,
+                textAlign: 'left',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {displayValue}
             </span>
             <svg
@@ -255,7 +267,9 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
             <div
               ref={optionsRef}
               role="listbox"
-              aria-activedescendant={highlightedIndex >= 0 ? `${selectId}-option-${highlightedIndex}` : undefined}
+              aria-activedescendant={
+                highlightedIndex >= 0 ? `${selectId}-option-${highlightedIndex}` : undefined
+              }
               style={optionsContainerStyle}
             >
               {options.map((option, index) => {
@@ -300,7 +314,14 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
                 );
               })}
               {options.length === 0 && (
-                <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
+                <div
+                  style={{
+                    padding: '16px',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    fontSize: '0.9rem',
+                  }}
+                >
                   No options available
                 </div>
               )}
@@ -308,13 +329,20 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
           )}
         </div>
         {error && (
-          <span style={{ fontSize: '0.75rem', color: '#ef4444', fontFamily: "'Inter', sans-serif", marginTop: '2px' }}>
+          <span
+            style={{
+              fontSize: '0.75rem',
+              color: '#ef4444',
+              fontFamily: "'Inter', sans-serif",
+              marginTop: '2px',
+            }}
+          >
             {error}
           </span>
         )}
       </div>
     );
-  }
+  },
 );
 
 Dropdown.displayName = 'Dropdown';

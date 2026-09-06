@@ -54,6 +54,18 @@ export enum PaymentMode {
   STORE_CREDIT = 'STORE_CREDIT',
 }
 
+// ─── Financial Adjustment ──────────────────────────────────────────
+
+export enum AdjustmentType {
+  REFUND = 'REFUND',
+  STORE_CREDIT = 'STORE_CREDIT',
+}
+
+export enum AdjustmentStatus {
+  COMPLETED = 'COMPLETED',
+  VOIDED = 'VOIDED',
+}
+
 // ─── Pickup & Delivery ─────────────────────────────────────────────
 
 export enum PickupType {
