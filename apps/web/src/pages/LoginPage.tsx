@@ -21,37 +21,23 @@ export const LoginPage: React.FC = () => {
 
   const [directory, setDirectory] = useState<{ id: string; name: string; role: string }[]>([]);
   const [isFetchingDirectory, setIsFetchingDirectory] = useState(true);
-  const [directoryError, setDirectoryError] = useState<string | null>(null);
-
-  const fetchDirectory = async (retryCount = 0) => {
-    setIsFetchingDirectory(true);
-    setDirectoryError(null);
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || '/api';
-      const res = await fetch(`${API_URL}/auth/directory`);
-      if (res.ok) {
-        const body = await res.json();
-        setDirectory(body.data || []);
-        setIsFetchingDirectory(false);
-        return;
-      }
-      throw new Error(`Server returned status ${res.status}`);
-    } catch (err: any) {
-      if (retryCount < 5) {
-        // Backend might still be starting up, retry with backoff
-        setTimeout(() => {
-          fetchDirectory(retryCount + 1);
-        }, 1500);
-      } else {
-        console.error('Failed to fetch employee directory', err);
-        setDirectoryError('Backend offline or starting up');
-        setIsFetchingDirectory(false);
-      }
-    }
-  };
 
   // Fetch directory on mount
   useEffect(() => {
+    const fetchDirectory = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '/api';
+        const res = await fetch(`${API_URL}/auth/directory`);
+        if (res.ok) {
+          const body = await res.json();
+          setDirectory(body.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch employee directory', err);
+      } finally {
+        setIsFetchingDirectory(false);
+      }
+    };
     fetchDirectory();
   }, []);
 
