@@ -1,8 +1,8 @@
-<div className="bg-white rounded-[32px] ..." style={{ border: '6px solid red' }}></div>;
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, User, Lock, ArrowRight, Check } from 'lucide-react';
+import { Dropdown, DropdownOption } from '@growfast/ui';
 
 export const LoginPage: React.FC = () => {
   const { login, error } = useAuth();
@@ -241,9 +241,9 @@ export const LoginPage: React.FC = () => {
 
       {/* ── Main Login Card ── */}
       <div className="relative z-10 w-full max-w-[620px] px-4 sm:px-6">
-        <div className="bg-white rounded-[32px] shadow-[0_28px_80px_-24px_rgba(15,23,42,0.20)] p-10 sm:p-16 border border-slate-100 relative">
+        <div className="bg-white rounded-[32px] shadow-[0_28px_80px_-24px_rgba(15,23,42,0.20)] px-6 py-10 sm:px-12 sm:py-12 md:px-16 md:py-14 border border-slate-100 relative">
           {/* Header */}
-          <div className="text-center mb-14">
+          <div className="text-center mb-10">
             <h1 className="text-[2.75rem] font-bold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-1">
               <span>Grow</span>
               <span className="text-blue-600">Fast</span>
@@ -251,163 +251,137 @@ export const LoginPage: React.FC = () => {
             <p className="text-sm font-medium text-slate-400">
               Simpler Operations. Cleaner Tomorrow.
             </p>
-            <div className="w-[72px] h-px bg-slate-100 mx-auto mt-8" />
+            <div className="w-[72px] h-px bg-slate-200 mx-auto mt-6" />
 
-            <h2 className="text-[1.875rem] font-bold text-slate-900 mt-10 mb-2.5">Staff Portal</h2>
+            <h2 className="text-[1.875rem] font-bold text-slate-900 mt-8 mb-2">Staff Portal</h2>
             <p className="text-[0.95rem] text-slate-500">Sign in to access the system</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="flex flex-col gap-9">
-            {/* Global Error/Lockout State */}
-            {(error || lockoutUntil) && (
-              <div className="bg-red-50/80 border border-red-100 text-red-600 text-sm font-medium p-4 rounded-xl text-center">
-                {lockoutUntil
-                  ? `Too many failed attempts. Try again in ${timeLeft}s.`
-                  : `${error} (Attempt ${failedAttempts}/5)`}
-              </div>
-            )}
+          <form onSubmit={handleLogin}>
+            {/* Form Content Container — consistent inset from card edges */}
+            <div className="max-w-[420px] mx-auto w-full flex flex-col gap-6">
+              {/* Global Error/Lockout State */}
+              {(error || lockoutUntil) && (
+                <div className="bg-red-50/80 border border-red-100 text-red-600 text-sm font-medium p-4 rounded-xl text-center">
+                  {lockoutUntil
+                    ? `Too many failed attempts. Try again in ${timeLeft}s.`
+                    : `${error} (Attempt ${failedAttempts}/5)`}
+                </div>
+              )}
 
-            {/* Username / Employee Dropdown */}
-            <div className="flex flex-col gap-3">
-              <label htmlFor="employeeId" className="text-[0.95rem] font-bold text-slate-800">
-                Role of You
-              </label>
-              <div
-                className={`relative flex items-center h-[58px] rounded-2xl border px-[18px] gap-3 transition-all duration-200 ${
-                  isFocusedEmp
-                    ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
-                    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
-                } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
-              >
-                <User
-                  size={20}
-                  strokeWidth={2.5}
-                  className="text-blue-400 shrink-0 pointer-events-none"
-                />
-
+              {/* Username / Employee Dropdown */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="employeeId" className="text-[0.95rem] font-bold text-slate-800">
+                  Role of You
+                </label>
                 {isFetchingDirectory ? (
-                  <div className="flex-1 text-[0.95rem] text-slate-400">
-                    Loading staff directory...
+                  <div className="relative flex items-center h-[52px] rounded-2xl border border-slate-200 bg-slate-50/80 px-[18px] gap-3">
+                    <User
+                      size={20}
+                      strokeWidth={2.5}
+                      className="text-blue-400 shrink-0 pointer-events-none"
+                    />
+                    <div className="flex-1 text-[0.95rem] text-slate-400">
+                      Loading staff directory...
+                    </div>
                   </div>
                 ) : (
-                  <select
+                  <Dropdown
                     id="employeeId"
+                    name="employeeId"
                     value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    onFocus={() => setIsFocusedEmp(true)}
-                    onBlur={() => setIsFocusedEmp(false)}
+                    onChange={setEmployeeId}
+                    placeholder="Select who you are"
                     disabled={!!lockoutUntil}
-                    className={`flex-1 h-full bg-transparent outline-none appearance-none cursor-pointer text-[0.95rem] font-medium ${
-                      employeeId ? 'text-slate-900' : 'text-slate-400'
-                    }`}
-                  >
-                    <option value="" disabled className="text-slate-400">
-                      Select who you are
-                    </option>
-                    {directory.map((emp) => (
-                      <option key={emp.id} value={emp.id} className="text-slate-900 font-medium">
-                        {emp.name} ({emp.role})
-                      </option>
-                    ))}
-                  </select>
+                    error={error ?? undefined}
+                    fullWidth={true}
+                    options={
+                      directory.map((emp) => ({
+                        value: emp.id,
+                        label: `${emp.name} (${emp.role})`,
+                      })) as DropdownOption[]
+                    }
+                  />
                 )}
-
-                {/* Custom select arrow to match standard inputs */}
-                <svg
-                  width="12"
-                  height="8"
-                  viewBox="0 0 12 8"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-slate-400 shrink-0 pointer-events-none"
-                >
-                  <path
-                    d="M1.5 1.5L6 6L10.5 1.5"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
               </div>
-            </div>
 
-            {/* Password / PIN Input */}
-            <div className="flex flex-col gap-3">
-              <label htmlFor="password" className="text-[0.95rem] font-bold text-slate-800">
-                PIN
-              </label>
-              <div
-                className={`relative flex items-center h-[58px] rounded-2xl border px-[18px] gap-3 transition-all duration-200 ${
-                  isFocusedPin
-                    ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
-                    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
-                } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
-              >
-                <Lock
-                  size={20}
-                  strokeWidth={2.5}
-                  className="text-blue-400 shrink-0 pointer-events-none"
-                />
-
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  onFocus={() => setIsFocusedPin(true)}
-                  onBlur={() => setIsFocusedPin(false)}
-                  disabled={!!lockoutUntil}
-                  placeholder="Enter your PIN"
-                  className="flex-1 h-full bg-transparent outline-none text-[0.95rem] font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium placeholder:tracking-normal tracking-widest"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={!!lockoutUntil}
-                  className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer outline-none focus-visible:text-blue-600"
-                  aria-label={showPassword ? 'Hide PIN' : 'Show PIN'}
+              {/* Password / PIN Input */}
+              <div className="flex flex-col gap-2">
+                <label htmlFor="password" className="text-[0.95rem] font-bold text-slate-800">
+                  PIN
+                </label>
+                <div
+                  className={`relative flex items-center h-[52px] rounded-2xl border px-[18px] gap-3 transition-all duration-200 ${
+                    isFocusedPin
+                      ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
+                      : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
+                  } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
                 >
-                  {showPassword ? (
-                    <EyeOff size={20} strokeWidth={2.5} />
-                  ) : (
-                    <Eye size={20} strokeWidth={2.5} />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoggingIn || !!lockoutUntil}
-              className={`group mt-2 w-full h-[58px] rounded-2xl flex items-center justify-center gap-2.5 text-[1.1rem] font-bold text-white transition-all duration-200 shadow-sm ${
-                isLoggingIn || !!lockoutUntil
-                  ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/25 cursor-pointer active:scale-[0.99]'
-              }`}
-            >
-              {isLoggingIn ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight
-                    size={22}
+                  <Lock
+                    size={20}
                     strokeWidth={2.5}
-                    className="transition-transform duration-200 group-hover:translate-x-1"
+                    className="text-blue-400 shrink-0 pointer-events-none"
                   />
-                </>
-              )}
-            </button>
+
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onFocus={() => setIsFocusedPin(true)}
+                    onBlur={() => setIsFocusedPin(false)}
+                    disabled={!!lockoutUntil}
+                    placeholder="Enter your PIN"
+                    className="flex-1 h-full bg-transparent outline-none text-[0.95rem] font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium placeholder:tracking-normal tracking-widest"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={!!lockoutUntil}
+                    className="shrink-0 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer outline-none focus-visible:text-blue-600 rounded-lg"
+                    aria-label={showPassword ? 'Hide PIN' : 'Show PIN'}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={20} strokeWidth={2.5} />
+                    ) : (
+                      <Eye size={20} strokeWidth={2.5} />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoggingIn || !!lockoutUntil}
+                className={`group mt-2 w-full h-[52px] rounded-2xl flex items-center justify-center gap-2.5 text-[1.05rem] font-bold text-white transition-all duration-200 shadow-sm ${
+                  isLoggingIn || !!lockoutUntil
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/25 cursor-pointer active:scale-[0.99]'
+                }`}
+              >
+                {isLoggingIn ? (
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight
+                      size={22}
+                      strokeWidth={2.5}
+                      className="transition-transform duration-200 group-hover:translate-x-1"
+                    />
+                  </>
+                )}
+              </button>
+            </div>
           </form>
 
           {/* Footer Security Label */}
-          <div className="mt-12 flex items-center justify-center gap-4 opacity-70">
+          <div className="mt-10 max-w-[420px] mx-auto w-full flex items-center justify-center gap-4 opacity-70">
             <div className="h-px bg-slate-200 flex-1"></div>
-            <span className="text-[0.8rem] font-semibold text-slate-400 tracking-wider uppercase">
+            <span className="text-[0.8rem] font-semibold text-slate-400 tracking-wider uppercase whitespace-nowrap">
               Secure Staff Portal
             </span>
             <div className="h-px bg-slate-200 flex-1"></div>
