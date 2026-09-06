@@ -15,6 +15,7 @@ import {
   NotificationChannel,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
+import { PaymentService } from '../payment/payment.service';
 
 /**
  * Delivery State Machine — valid transitions.
@@ -39,6 +40,7 @@ export class DeliveryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   /**
@@ -448,7 +450,7 @@ export class DeliveryService {
       // Re-fetch items after update and derive order status
       const updatedOrder = await tx.order.findUnique({
         where: { id: order.id },
-        include: { items: true },
+        include: { items: true, adjustments: true },
       });
 
       // Check if there are other active (non-completed) deliveries for this order
@@ -469,9 +471,24 @@ export class DeliveryService {
         hasActiveTransitDelivery: activeDeliveries > 0,
       });
 
+      if (derivedStatus === OrderStatus.DELIVERED) {
+        const financialState = this.paymentService.calculateOrderFinancialState(updatedOrder!);
+        if (financialState.amountDue > 0) {
+          throw new BadRequestException(
+            `Cannot complete delivery: Order #${updatedOrder!.orderNumber} has an outstanding balance of ₹${financialState.amountDue}. Full payment must be settled before final delivery.`,
+          );
+        }
+      }
+
+      const orderUpdateData: any = { status: derivedStatus };
+      if (derivedStatus === OrderStatus.DELIVERED) {
+        orderUpdateData.deliveredAt = new Date();
+        orderUpdateData.deliveredById = employeeId;
+      }
+
       await tx.order.update({
         where: { id: order.id },
-        data: { status: derivedStatus },
+        data: orderUpdateData,
       });
 
       // Return the final delivery record

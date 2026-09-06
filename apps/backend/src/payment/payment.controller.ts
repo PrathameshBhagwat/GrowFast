@@ -46,3 +46,41 @@ export class OrderPaymentController {
     };
   }
 }
+
+@Controller('orders/:orderId/adjustments')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class OrderAdjustmentController {
+  constructor(private readonly paymentService: PaymentService) {}
+
+  @Post()
+  @Roles('OWNER')
+  async createAdjustment(
+    @Request() req: any,
+    @Param('orderId') orderId: string,
+    @Body() body: any,
+  ) {
+    const adjustment = await this.paymentService.createAdjustment(
+      req.user.id,
+      req.user.storeId,
+      req.user.role,
+      {
+        ...body,
+        orderId,
+      },
+    );
+    return {
+      success: true,
+      data: adjustment,
+    };
+  }
+
+  @Get()
+  @Roles('OWNER', 'COUNTER')
+  async getOrderAdjustments(@Request() req: any, @Param('orderId') orderId: string) {
+    const adjustments = await this.paymentService.getOrderAdjustments(orderId, req.user.storeId);
+    return {
+      success: true,
+      data: adjustments,
+    };
+  }
+}

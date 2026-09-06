@@ -19,6 +19,8 @@ import {
   NotificationEventType,
   NotificationChannel,
   NotificationStatus,
+  AdjustmentType,
+  AdjustmentStatus,
 } from './enums';
 
 // ─── Auth DTOs ──────────────────────────────────────────────────────
@@ -129,12 +131,17 @@ export interface OrderSummaryDTO {
   status: OrderStatus;
   subtotal: number;
   discountAmount: number;
+  expressSurcharge?: number;
   taxAmount: number;
   totalAmount: number;
   amountPaid: number;
   amountDue: number;
+  refundAmount?: number;
+  storeCreditAmount?: number;
+  effectivePaid?: number;
   paymentStatus: PaymentStatus;
   pickupType: PickupType;
+  deliveredAt?: string | null;
   itemCount: number;
   readyAmount: number;
   remainingAmount: number;
@@ -149,10 +156,16 @@ export interface OrderDetailDTO extends OrderSummaryDTO {
   dueDateOverriddenBy: string | null;
   serviceSummary: string | null;
   storeId: string;
+  storeName?: string;
+  storeAddress?: string | null;
+  storePhone?: string | null;
   createdById: string;
   createdByName: string;
+  deliveredById?: string | null;
+  deliveredByName?: string | null;
   items: OrderItemDTO[];
   payments: PaymentDTO[];
+  adjustments?: FinancialAdjustmentDTO[];
 }
 
 export interface OrderItemDTO {
@@ -168,6 +181,20 @@ export interface OrderItemDTO {
   itemStatus: ItemStatus;
   deliveredQuantity: number;
   itemDueDate: string | null;
+  physicalGarments?: PhysicalGarmentDTO[];
+}
+
+export interface PhysicalGarmentDTO {
+  id: string;
+  orderItemId: string;
+  unitNumber: number;
+  isReady: boolean;
+  isCancelled?: boolean;
+  isDelivered?: boolean;
+  deliveredAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  photos?: OrderPhotoDTO[];
 }
 
 export interface CreateOrderRequest {
@@ -201,6 +228,20 @@ export interface UpdateOrderItemRequest {
   deliveredQuantity?: number;
 }
 
+export interface OrderPickupRequest {
+  garmentIds?: string[];
+  legacyItems?: {
+    itemId: string;
+    quantity: number;
+  }[];
+  payment?: {
+    amount: number;
+    mode: PaymentMode;
+    reference?: string;
+  };
+  notes?: string;
+}
+
 // ─── Payment DTOs ───────────────────────────────────────────────────
 
 export interface PaymentDTO {
@@ -225,10 +266,47 @@ export interface PaymentSummaryDTO {
   orderId: string;
   totalAmount: number;
   amountPaid: number;
+  refundAmount?: number;
+  storeCreditAmount?: number;
+  effectivePaid?: number;
   amountDue: number;
   paymentStatus: PaymentStatus;
   paymentCount: number;
+  adjustmentCount?: number;
   isConsistent: boolean;
+}
+
+// ─── Financial Adjustment DTOs ──────────────────────────────────────
+
+export interface FinancialAdjustmentDTO {
+  id: string;
+  orderId: string;
+  type: AdjustmentType;
+  amount: number;
+  reason: string;
+  status: AdjustmentStatus;
+  reference: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAdjustmentRequest {
+  orderId: string;
+  type: AdjustmentType;
+  amount: number;
+  reason: string;
+  reference?: string;
+}
+
+export interface CancelGarmentRequest {
+  adjustment?: {
+    type: AdjustmentType;
+    amount: number;
+    reason: string;
+    reference?: string;
+  };
 }
 
 // ─── Catalog DTOs ───────────────────────────────────────────────────
@@ -258,7 +336,8 @@ export interface ServiceTypeDTO {
 
 export interface OrderPhotoDTO {
   id: string;
-  orderItemId: string;
+  orderItemId: string | null;
+  physicalGarmentId: string | null;
   type: PhotoType;
   url: string;
   uploadedAt: string;

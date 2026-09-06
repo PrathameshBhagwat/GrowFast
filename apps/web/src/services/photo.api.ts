@@ -30,6 +30,7 @@ export async function uploadPhoto(
   orderId: string,
   type: PhotoType,
   orderItemId?: string,
+  physicalGarmentId?: string,
 ): Promise<OrderPhotoDTO> {
   const formData = new FormData();
   formData.append('file', file);
@@ -38,6 +39,9 @@ export async function uploadPhoto(
 
   if (orderItemId) {
     formData.append('orderItemId', orderItemId);
+  }
+  if (physicalGarmentId) {
+    formData.append('physicalGarmentId', physicalGarmentId);
   }
 
   const res = await fetch(`${API_URL}/photos/upload`, {

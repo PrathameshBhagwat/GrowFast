@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DeliveryService } from './delivery.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notification/notification.service';
+import { PaymentService } from '../payment/payment.service';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DeliveryStatus, ItemStatus, Role } from '@growfast/shared-types';
 
@@ -99,6 +100,17 @@ describe('DeliveryService', () => {
       },
     };
 
+    const mockPaymentService = {
+      calculateOrderFinancialState: jest.fn((order: any) => ({
+        amountDue: order.amountDue ?? 0,
+        effectivePaid: order.amountPaid ?? 0,
+        refundAmount: 0,
+        storeCreditAmount: 0,
+        totalAdjustments: 0,
+        paymentStatus: 'PAID',
+      })),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DeliveryService,
@@ -107,6 +119,7 @@ describe('DeliveryService', () => {
           provide: NotificationService,
           useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) },
         },
+        { provide: PaymentService, useValue: mockPaymentService },
       ],
     }).compile();
 
@@ -568,6 +581,37 @@ describe('DeliveryService', () => {
           orderNumber: mockOrder.orderNumber,
         }),
       );
+    });
+
+    it('should reject completeDelivery when order status is DELIVERED and amountDue > 0', async () => {
+      mockTx.deliveryRecord.findUnique.mockResolvedValueOnce({
+        ...mockDelivery,
+        status: DeliveryStatus.IN_TRANSIT,
+      });
+      mockTx.deliveryRecord.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.orderItem.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        amountDue: 250,
+        items: mockOrder.items.map((i) => ({
+          ...i,
+          itemStatus: ItemStatus.DELIVERED,
+          deliveredQuantity: i.quantity,
+        })),
+        customer: { id: 'cust1', phone: '1234567890' },
+      });
+
+      await expect(
+        service.completeDelivery(
+          DELIVERY_ID,
+          'proof-url',
+          'Delivered OK',
+          undefined,
+          STORE_ID,
+          DRIVER_ID,
+          Role.DELIVERY,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should not rollback if ORDER_DELIVERED notification fails', async () => {

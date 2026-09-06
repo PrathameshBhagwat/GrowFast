@@ -8,8 +8,13 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { PaymentStatus, OrderStatus } from '@prisma/client';
-import { RecordPaymentRequest, PaymentMode } from '@growfast/shared-types';
+import {
+  PaymentStatus,
+  OrderStatus,
+  AdjustmentType as PrismaAdjustmentType,
+  AdjustmentStatus as PrismaAdjustmentStatus,
+} from '@prisma/client';
+import { RecordPaymentRequest, PaymentMode, Role, AdjustmentType } from '@growfast/shared-types';
 
 // ─── Test Fixtures ──────────────────────────────────────────────────
 
@@ -39,6 +44,8 @@ function makeOrder(
     amountDue: 1000,
     paymentStatus: PaymentStatus.PENDING,
     status: OrderStatus.RECEIVED,
+    adjustments: [] as any,
+    payments: [] as any,
     ...overrides,
   };
 }
@@ -120,8 +127,10 @@ describe('PaymentService', () => {
     order?: any;
     onUpdate?: (data: any) => void;
     paymentResult?: any;
+    adjustmentResult?: any;
     shouldFailOnCreate?: Error;
     shouldFailOnUpdate?: Error;
+    shouldFailOnAdjustmentCreate?: Error;
   }) {
     mockPrisma.$transaction.mockImplementation(async (cb: any) => {
       const tx = {
@@ -137,6 +146,26 @@ describe('PaymentService', () => {
           create: jest.fn().mockImplementation(() => {
             if (opts.shouldFailOnCreate) throw opts.shouldFailOnCreate;
             return opts.paymentResult ?? makePaymentResult(400);
+          }),
+        },
+        financialAdjustment: {
+          create: jest.fn().mockImplementation(({ data }: any) => {
+            if (opts.shouldFailOnAdjustmentCreate) throw opts.shouldFailOnAdjustmentCreate;
+            return (
+              opts.adjustmentResult ?? {
+                id: 'adj-1',
+                orderId: data.orderId,
+                type: data.type,
+                amount: data.amount,
+                reason: data.reason,
+                reference: data.reference ?? null,
+                status: PrismaAdjustmentStatus.COMPLETED,
+                createdById: EMPLOYEE_ID,
+                createdBy: { name: 'Owner User' },
+                createdAt: new Date('2026-01-01T00:00:00Z'),
+                updatedAt: new Date('2026-01-01T00:00:00Z'),
+              }
+            );
           }),
         },
       };
@@ -1151,5 +1180,463 @@ describe('derivePaymentStatus', () => {
 
   it('should transition from PENDING to PARTIAL correctly', () => {
     expect(derivePaymentStatus(1, 1000, PaymentStatus.PENDING)).toBe(PaymentStatus.PARTIAL);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase 3E — Financial Adjustments (Refunds & Store Credit) Suites
+// ═══════════════════════════════════════════════════════════════════
+
+describe('PaymentService — Phase 3E Financial Adjustments', () => {
+  let service: PaymentService;
+  const mockPrisma = {
+    $transaction: jest.fn(),
+    order: {
+      findUnique: jest.fn(),
+    },
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentService,
+        { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: NotificationService,
+          useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) },
+        },
+      ],
+    }).compile();
+
+    service = module.get<PaymentService>(PaymentService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function setupTx(opts: {
+    order?: any;
+    onUpdate?: (data: any) => void;
+    adjustmentResult?: any;
+    shouldFail?: Error;
+  }) {
+    mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+      const tx = {
+        order: {
+          findUnique: jest.fn().mockResolvedValue(opts.order ?? null),
+          update: jest.fn().mockImplementation(({ data }: any) => {
+            if (opts.shouldFail) throw opts.shouldFail;
+            opts.onUpdate?.(data);
+            return {};
+          }),
+        },
+        financialAdjustment: {
+          create: jest.fn().mockImplementation(({ data }: any) => {
+            if (opts.shouldFail) throw opts.shouldFail;
+            return (
+              opts.adjustmentResult ?? {
+                id: 'adj-1',
+                orderId: data.orderId,
+                type: data.type,
+                amount: data.amount,
+                reason: data.reason,
+                reference: data.reference ?? null,
+                status: PrismaAdjustmentStatus.COMPLETED,
+                createdById: EMPLOYEE_ID,
+                createdBy: { name: 'Owner User' },
+                createdAt: new Date('2026-01-01T00:00:00Z'),
+                updatedAt: new Date('2026-01-01T00:00:00Z'),
+              }
+            );
+          }),
+        },
+      };
+      return cb(tx);
+    });
+  }
+
+  describe('1. Payment History Integrity', () => {
+    it('existing payments remain unchanged after refund', async () => {
+      const existingPayments = [{ id: 'pay-1', amount: 1000, mode: 'CASH', createdAt: new Date() }];
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        status: OrderStatus.PROCESSING,
+        payments: existingPayments,
+        adjustments: [],
+      };
+
+      setupTx({ order: mockOrder });
+
+      await service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+        orderId: ORDER_ID,
+        type: AdjustmentType.REFUND,
+        amount: 200,
+        reason: 'Customer cancelled garment #5',
+      });
+
+      // Assert payment row in memory was not modified
+      expect(existingPayments[0].amount).toBe(1000);
+      expect(existingPayments.length).toBe(1);
+    });
+
+    it('existing payments remain unchanged after store credit', async () => {
+      const existingPayments = [{ id: 'pay-1', amount: 1000, mode: 'UPI', createdAt: new Date() }];
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        status: OrderStatus.PROCESSING,
+        payments: existingPayments,
+        adjustments: [],
+      };
+
+      setupTx({ order: mockOrder });
+
+      await service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+        orderId: ORDER_ID,
+        type: AdjustmentType.STORE_CREDIT,
+        amount: 200,
+        reason: 'Customer opted for store credit',
+      });
+
+      expect(existingPayments[0].amount).toBe(1000);
+    });
+
+    it('adjustment is recorded as a separate record and does not delete or edit payment records', async () => {
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        payments: [{ id: 'p1', amount: 1000 }],
+        adjustments: [],
+      };
+
+      let createdAdjustment: any = null;
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        const tx = {
+          order: {
+            findUnique: jest.fn().mockResolvedValue(mockOrder),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          financialAdjustment: {
+            create: jest.fn().mockImplementation(({ data }: any) => {
+              createdAdjustment = data;
+              return {
+                id: 'adj-99',
+                ...data,
+                createdBy: { name: 'Owner' },
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
+            }),
+          },
+        };
+        return cb(tx);
+      });
+
+      const res = await service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+        orderId: ORDER_ID,
+        type: AdjustmentType.REFUND,
+        amount: 200,
+        reason: 'Garment cancellation',
+      });
+
+      expect(res.id).toBe('adj-99');
+      expect(createdAdjustment.amount).toBe(200);
+      expect(createdAdjustment.type).toBe('REFUND');
+    });
+  });
+
+  describe('2. Refunds Validation & Role Security', () => {
+    it('valid refund succeeds and updates amountDue to 0 and paymentStatus to PAID', async () => {
+      let updatedData: any = null;
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        payments: [{ id: 'p1', amount: 1000 }],
+        adjustments: [],
+      };
+
+      setupTx({
+        order: mockOrder,
+        onUpdate: (data) => {
+          updatedData = data;
+        },
+      });
+
+      const res = await service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+        orderId: ORDER_ID,
+        type: AdjustmentType.REFUND,
+        amount: 200,
+        reason: 'Valid refund',
+      });
+
+      expect(res.amount).toBe(200);
+      expect(res.type).toBe(AdjustmentType.REFUND);
+      expect(updatedData.amountDue).toBe(0);
+      expect(updatedData.paymentStatus).toBe(PaymentStatus.PAID);
+    });
+
+    it('refund amount exceeding maximum eligible overpayment is rejected with BadRequestException', async () => {
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000, // eligible is 1000 - 800 = 200
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        payments: [{ id: 'p1', amount: 1000 }],
+        adjustments: [],
+      };
+
+      setupTx({ order: mockOrder });
+
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: 250, // exceeds 200
+          reason: 'Excessive refund',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('refund amount <= 0 is rejected with BadRequestException', async () => {
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: 0,
+          reason: 'Zero refund',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: -50,
+          reason: 'Negative refund',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('missing or whitespace reason is rejected with BadRequestException', async () => {
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: 100,
+          reason: '   ',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('COUNTER role is rejected with ForbiddenException', async () => {
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.COUNTER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: 100,
+          reason: 'Counter attempt',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('DELIVERY role is rejected with ForbiddenException', async () => {
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.DELIVERY, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: 100,
+          reason: 'Delivery attempt',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('order belonging to different store is rejected with ForbiddenException', async () => {
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: OTHER_STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000,
+        payments: [],
+        adjustments: [],
+      };
+
+      setupTx({ order: mockOrder });
+
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.REFUND,
+          amount: 100,
+          reason: 'Cross store attempt',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('non-existent order throws NotFoundException', async () => {
+      setupTx({ order: null });
+
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: 'non-existent-order',
+          type: AdjustmentType.REFUND,
+          amount: 100,
+          reason: 'Order missing',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('3. Store Credit Validation', () => {
+    it('valid store credit succeeds and records COMPLETED adjustment', async () => {
+      let updatedData: any = null;
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 600,
+        amountPaid: 900,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        payments: [{ id: 'p1', amount: 900 }],
+        adjustments: [],
+      };
+
+      setupTx({
+        order: mockOrder,
+        onUpdate: (data) => {
+          updatedData = data;
+        },
+      });
+
+      const res = await service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+        orderId: ORDER_ID,
+        type: AdjustmentType.STORE_CREDIT,
+        amount: 300,
+        reason: 'Store credit granted for piece cancel',
+      });
+
+      expect(res.amount).toBe(300);
+      expect(res.type).toBe(AdjustmentType.STORE_CREDIT);
+      expect(updatedData.amountDue).toBe(0);
+      expect(updatedData.paymentStatus).toBe(PaymentStatus.PAID);
+    });
+
+    it('store credit cannot exceed eligible overpayment amount', async () => {
+      const mockOrder = {
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 600,
+        amountPaid: 700, // eligible: 100
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        payments: [{ id: 'p1', amount: 700 }],
+        adjustments: [],
+      };
+
+      setupTx({ order: mockOrder });
+
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.OWNER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.STORE_CREDIT,
+          amount: 150, // exceeds 100
+          reason: 'Excessive credit',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('COUNTER role cannot grant store credit', async () => {
+      await expect(
+        service.createAdjustment(EMPLOYEE_ID, STORE_ID, Role.COUNTER, {
+          orderId: ORDER_ID,
+          type: AdjustmentType.STORE_CREDIT,
+          amount: 50,
+          reason: 'Counter credit attempt',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('4. Payment Summary Reconciliation with Adjustments', () => {
+    it('getPaymentSummary accounts for refunds and store credits in effectivePaid and amountDue', async () => {
+      mockPrisma.order.findUnique.mockResolvedValueOnce({
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 800,
+        amountPaid: 1000,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        payments: [{ amount: 1000 }],
+        adjustments: [
+          {
+            amount: 150,
+            type: PrismaAdjustmentType.REFUND,
+            status: PrismaAdjustmentStatus.COMPLETED,
+          },
+          {
+            amount: 50,
+            type: PrismaAdjustmentType.STORE_CREDIT,
+            status: PrismaAdjustmentStatus.COMPLETED,
+          },
+        ],
+      });
+
+      const summary = await service.getPaymentSummary(ORDER_ID, STORE_ID);
+
+      expect(summary.totalAmount).toBe(800);
+      expect(summary.amountPaid).toBe(1000);
+      expect(summary.refundAmount).toBe(150);
+      expect(summary.storeCreditAmount).toBe(50);
+      expect(summary.effectivePaid).toBe(800);
+      expect(summary.amountDue).toBe(0);
+      expect(summary.paymentStatus).toBe(PaymentStatus.PAID);
+      expect(summary.isConsistent).toBe(true);
+    });
+
+    it('getPaymentSummary transitions to REFUNDED when totalAmount is 0 and full refund is granted', async () => {
+      mockPrisma.order.findUnique.mockResolvedValueOnce({
+        id: ORDER_ID,
+        storeId: STORE_ID,
+        totalAmount: 0,
+        amountPaid: 500,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.REFUNDED,
+        payments: [{ amount: 500 }],
+        adjustments: [
+          {
+            amount: 500,
+            type: PrismaAdjustmentType.REFUND,
+            status: PrismaAdjustmentStatus.COMPLETED,
+          },
+        ],
+      });
+
+      const summary = await service.getPaymentSummary(ORDER_ID, STORE_ID);
+
+      expect(summary.totalAmount).toBe(0);
+      expect(summary.refundAmount).toBe(500);
+      expect(summary.effectivePaid).toBe(0);
+      expect(summary.paymentStatus).toBe(PaymentStatus.REFUNDED);
+      expect(summary.isConsistent).toBe(true);
+    });
   });
 });

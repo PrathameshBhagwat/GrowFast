@@ -73,6 +73,37 @@ export class PhotoService {
       }
     }
 
+    // ── 3.5 Validate physical garment (if provided) ───────────────
+    if (dto.physicalGarmentId) {
+      const garment = await this.prisma.physicalGarment.findUnique({
+        where: { id: dto.physicalGarmentId },
+        select: {
+          id: true,
+          orderItemId: true,
+          orderItem: { select: { orderId: true, order: { select: { storeId: true } } } },
+        },
+      });
+
+      if (!garment) {
+        throw new NotFoundException('Physical garment not found');
+      }
+
+      if (
+        garment.orderItem.orderId !== dto.orderId ||
+        garment.orderItem.order.storeId !== storeId
+      ) {
+        throw new BadRequestException(
+          'Physical garment does not belong to the specified order or store',
+        );
+      }
+
+      if (dto.orderItemId && garment.orderItemId !== dto.orderItemId) {
+        throw new BadRequestException(
+          'Physical garment does not belong to the specified order item',
+        );
+      }
+    }
+
     // ── 4. Generate secure object key ─────────────────────────────
     const extension = this.extractExtension(file.originalname, file.mimetype);
     const objectKey = this.generateObjectKey(dto.orderId, dto.type, extension);
@@ -92,6 +123,7 @@ export class PhotoService {
         data: {
           orderId: dto.orderId,
           orderItemId: dto.orderItemId || null,
+          physicalGarmentId: dto.physicalGarmentId || null,
           type: dto.type,
           url: storedUrl,
         },
@@ -226,13 +258,15 @@ export class PhotoService {
     id: string;
     orderId: string;
     orderItemId: string | null;
+    physicalGarmentId?: string | null;
     type: string;
     url: string;
     uploadedAt: Date;
   }): OrderPhotoDTO {
     return {
       id: photo.id,
-      orderItemId: photo.orderItemId || '',
+      orderItemId: photo.orderItemId || null,
+      physicalGarmentId: photo.physicalGarmentId || null,
       type: photo.type as any,
       url: photo.url,
       uploadedAt: photo.uploadedAt.toISOString(),

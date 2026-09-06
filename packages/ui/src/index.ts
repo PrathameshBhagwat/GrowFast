@@ -25,6 +25,9 @@ export type { InputProps } from './components/Input';
 export { Select } from './components/Select';
 export type { SelectProps, SelectOption } from './components/Select';
 
+export { Dropdown } from './components/Dropdown';
+export type { DropdownProps, DropdownOption } from './components/Dropdown';
+
 export { Modal } from './components/Modal';
 export type { ModalProps } from './components/Modal';
 

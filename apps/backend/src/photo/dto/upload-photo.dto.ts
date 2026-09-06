@@ -16,6 +16,10 @@ export class UploadPhotoDto {
   @IsString()
   orderItemId?: string;
 
+  @IsOptional()
+  @IsString()
+  physicalGarmentId?: string;
+
   @IsEnum(PhotoType, {
     message: `type must be one of: ${Object.values(PhotoType).join(', ')}`,
   })
