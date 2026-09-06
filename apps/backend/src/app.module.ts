@@ -19,8 +19,8 @@ import { NotificationModule } from './notification/notification.module';
   imports: [
     ThrottlerModule.forRoot([
       {
-        ttl: 60000,
-        limit: 10,
+        ttl: parseInt(process.env.THROTTLE_TTL || '60000', 10),
+        limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
       },
     ]),
     PrismaModule,
