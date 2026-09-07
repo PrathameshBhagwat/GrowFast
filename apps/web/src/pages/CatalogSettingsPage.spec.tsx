@@ -270,4 +270,93 @@ describe('CatalogSettingsPage', () => {
       }),
     );
   });
+
+  it('sorts garments in outer catalog view matching Create Order sort options', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
+      expect(screen.getByText('Jeans')).toBeInTheDocument();
+    });
+
+    const sortSelect = screen.getByLabelText('Sort garments');
+    expect(sortSelect).toBeInTheDocument();
+
+    // Verify all 4 options matching Create Order are present
+    expect(screen.getByRole('option', { name: 'Name (A to Z)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Name (Z to A)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Price (Low to High)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Price (High to Low)' })).toBeInTheDocument();
+
+    // Change to Name (Z to A)
+    fireEvent.change(sortSelect, { target: { value: 'name-desc' } });
+
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole('heading', { level: 3 })
+        .filter((h) => h.textContent === 'Formal Shirt' || h.textContent === 'Jeans');
+      const names = headings.map((el) => el.textContent?.trim());
+      expect(names).toEqual(['Jeans', 'Formal Shirt']);
+    });
+
+    // Change to Price (High to Low) -> Jeans is 110, Formal Shirt is 105
+    fireEvent.change(sortSelect, { target: { value: 'price-desc' } });
+
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole('heading', { level: 3 })
+        .filter((h) => h.textContent === 'Formal Shirt' || h.textContent === 'Jeans');
+      const names = headings.map((el) => el.textContent?.trim());
+      expect(names).toEqual(['Jeans', 'Formal Shirt']);
+    });
+
+    // Change to Price (Low to High) -> Formal Shirt is 105, Jeans is 110
+    fireEvent.change(sortSelect, { target: { value: 'price-asc' } });
+
+    await waitFor(() => {
+      const headings = screen
+        .getAllByRole('heading', { level: 3 })
+        .filter((h) => h.textContent === 'Formal Shirt' || h.textContent === 'Jeans');
+      const names = headings.map((el) => el.textContent?.trim());
+      expect(names).toEqual(['Formal Shirt', 'Jeans']);
+    });
+  });
+
+  it('renders all matching garments without pagination controls or Showing footer', async () => {
+    // Generate 30 garments to exceed what was previously 24 items per page
+    const manyGarments = Array.from({ length: 30 }, (_, i) => ({
+      id: `g-bulk-${i + 1}`,
+      name: `Garment Bulk ${String(i + 1).padStart(2, '0')}`,
+      category: GarmentCategory.MEN,
+      isActive: true,
+    }));
+
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/services')) {
+        return { ok: true, json: async () => ({ success: true, data: mockServices }) };
+      }
+      if (url.includes('/garments')) {
+        return { ok: true, json: async () => ({ success: true, data: manyGarments }) };
+      }
+      if (url.includes('/pricing')) {
+        return { ok: true, json: async () => ({ success: true, data: [] }) };
+      }
+      return { ok: true, json: async () => ({ success: true, data: [] }) };
+    });
+
+    renderComponent();
+
+    // Verify all 30 garments are rendered in the DOM
+    await waitFor(() => {
+      expect(screen.getByText('Garment Bulk 01')).toBeInTheDocument();
+      expect(screen.getByText('Garment Bulk 30')).toBeInTheDocument();
+    });
+
+    // Ensure no pagination buttons (Previous, Next, or page numbers) or "Showing 1–" footer exist
+    expect(screen.queryByRole('button', { name: /previous/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/showing 1–/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/showing \d+–\d+/i)).not.toBeInTheDocument();
+  });
 });
+

@@ -6,7 +6,13 @@ import {
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
 } from '@growfast/shared-types';
-import { CatalogNavFilter, DEFAULT_CATEGORIES, DEFAULT_CATEGORY_LABELS } from './CatalogNavFilter';
+import {
+  CatalogNavFilter,
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY_LABELS,
+  CATALOG_SORT_OPTIONS,
+  sortCatalogGarments,
+} from './CatalogNavFilter';
 import { renderStitchGarmentIcon } from './GarmentIcon';
 
 interface ItemSelectorProps {
@@ -99,23 +105,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
       return matchesCategory && matchesSearch;
     });
 
-    return list.sort((a, b) => {
-      if (sortBy === 'name-asc') {
-        return a.name.localeCompare(b.name);
-      }
-      if (sortBy === 'name-desc') {
-        return b.name.localeCompare(a.name);
-      }
-      if (sortBy === 'price-asc' || sortBy === 'price-desc') {
-        const priceA =
-          prices.find((p) => p.garmentCatalogId === a.id && p.serviceTypeId === selectedServiceId)
-            ?.price || 0;
-        const priceB =
-          prices.find((p) => p.garmentCatalogId === b.id && p.serviceTypeId === selectedServiceId)
-            ?.price || 0;
-        return sortBy === 'price-asc' ? priceA - priceB : priceB - priceA;
-      }
-      return 0;
+    return sortCatalogGarments(list, sortBy, (garmentId) => {
+      return (
+        prices.find(
+          (p) => p.garmentCatalogId === garmentId && p.serviceTypeId === selectedServiceId,
+        )?.price || 0
+      );
     });
   }, [
     activeGarments,
@@ -187,10 +182,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                       outline: 'none',
                     }}
                   >
-                    <option value="name-asc">Name (A to Z)</option>
-                    <option value="name-desc">Name (Z to A)</option>
-                    <option value="price-asc">Price (Low to High)</option>
-                    <option value="price-desc">Price (High to Low)</option>
+                    {CATALOG_SORT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                   <ChevronDown
                     size={13}

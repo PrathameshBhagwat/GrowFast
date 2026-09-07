@@ -11,7 +11,11 @@ import {
 } from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
 import { CatalogHeader } from '../components/CatalogHeader';
-import { CatalogNavFilter } from '../components/CatalogNavFilter';
+import {
+  CatalogNavFilter,
+  CATALOG_SORT_OPTIONS,
+  sortCatalogGarments,
+} from '../components/CatalogNavFilter';
 import {
   ArrowLeft,
   ChevronDown,
@@ -38,8 +42,6 @@ import {
   RefreshCw,
   LayoutGrid,
   Upload,
-  ChevronLeft,
-  ChevronRight,
   Footprints,
 } from 'lucide-react';
 
@@ -477,9 +479,8 @@ export const CatalogSettingsPage: React.FC = () => {
   const [activeServiceId, setActiveServiceId] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[0]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<string>('name_asc');
+  const [sortOrder, setSortOrder] = useState<string>('name-asc');
   const [activeOnly, setActiveOnly] = useState<boolean>(false);
-  const [currentPage, setCurrentPage] = useState<number>(1);
   const catalogSearchRef = useRef<HTMLInputElement>(null);
 
   // ─── Modals State ───────────────────────────────────────
@@ -581,6 +582,17 @@ export const CatalogSettingsPage: React.FC = () => {
     return counts;
   }, [garments]);
 
+  // Helper to lookup configured price
+  const getPriceFor = useCallback(
+    (garmentId: string, serviceId: string): number | null => {
+      const record = pricingData.find(
+        (p: any) => p.garmentCatalogId === garmentId && p.serviceTypeId === serviceId,
+      );
+      return record !== undefined && record !== null ? record.price : null;
+    },
+    [pricingData],
+  );
+
   // Filtered & Sorted garments for Garment Tab
   const filteredGarments = useMemo(() => {
     const list = garments.filter((g) => {
@@ -595,31 +607,19 @@ export const CatalogSettingsPage: React.FC = () => {
       return matchesCategory && matchesSearch && matchesActive;
     });
 
-    list.sort((a, b) => {
-      if (sortOrder === 'name_asc') return a.name.localeCompare(b.name);
-      if (sortOrder === 'name_desc') return b.name.localeCompare(a.name);
-      const priceA = getPriceFor(a.id, activeServiceId) ?? -1;
-      const priceB = getPriceFor(b.id, activeServiceId) ?? -1;
-      if (sortOrder === 'price_asc') return priceA - priceB;
-      if (sortOrder === 'price_desc') return priceB - priceA;
-      return 0;
+    return sortCatalogGarments(list, sortOrder, (garmentId) => {
+      return getPriceFor(garmentId, activeServiceId) ?? 0;
     });
-
-    return list;
-  }, [garments, activeCategory, searchQuery, activeOnly, sortOrder, activeServiceId, pricingData]);
-
-  // Pagination for Garments Tab (24 per page matching Stitch layout)
-  const ITEMS_PER_PAGE = 24;
-  const totalPages = Math.ceil(filteredGarments.length / ITEMS_PER_PAGE) || 1;
-  const paginatedGarments = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredGarments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredGarments, currentPage]);
-
-  // Reset pagination on category/filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeCategory, searchQuery, activeOnly, sortOrder]);
+  }, [
+    garments,
+    activeCategory,
+    searchQuery,
+    activeOnly,
+    sortOrder,
+    activeServiceId,
+    pricingData,
+    getPriceFor,
+  ]);
 
   // Keyboard shortcuts: F2 focuses search, Esc resets filter
   useEffect(() => {
@@ -741,16 +741,7 @@ export const CatalogSettingsPage: React.FC = () => {
     });
   }, [garments, pricingCategory, pricingSearch]);
 
-  // Helper to lookup configured price
-  const getPriceFor = useCallback(
-    (garmentId: string, serviceId: string): number | null => {
-      const record = pricingData.find(
-        (p: any) => p.garmentCatalogId === garmentId && p.serviceTypeId === serviceId,
-      );
-      return record !== undefined && record !== null ? record.price : null;
-    },
-    [pricingData],
-  );
+  // (getPriceFor is defined above before filteredGarments)
 
   // Active pricing service object
   const currentPricingService = useMemo(() => {
@@ -1285,7 +1276,7 @@ export const CatalogSettingsPage: React.FC = () => {
                 <div
                   className="flex flex-col max-w-[1600px] mx-auto w-full"
                   style={{
-                    padding: '8px 16px',
+                    padding: '8px 16px 32px 16px',
                     maxWidth: '1600px',
                     margin: '0 auto',
                     width: '100%',
@@ -1318,6 +1309,7 @@ export const CatalogSettingsPage: React.FC = () => {
                           <select
                             value={sortOrder}
                             onChange={(e) => setSortOrder(e.target.value)}
+                            aria-label="Sort garments"
                             style={{
                               height: '32px',
                               padding: '0 12px',
@@ -1331,7 +1323,11 @@ export const CatalogSettingsPage: React.FC = () => {
                               outline: 'none',
                             }}
                           >
-                            <option value="name_asc">Name (A to Z)</option>
+                            {CATALOG_SORT_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
 
@@ -1361,7 +1357,7 @@ export const CatalogSettingsPage: React.FC = () => {
                   />
 
                   {/* ─── 4. GARMENT CATALOG GRID ──────────────────── */}
-                  {paginatedGarments.length === 0 ? (
+                  {filteredGarments.length === 0 ? (
                     <div
                       className="bg-white border border-slate-200 rounded-[3px] p-8 shadow-xs"
                       style={{
@@ -1409,10 +1405,10 @@ export const CatalogSettingsPage: React.FC = () => {
                         }
                       `}</style>
                       <div className="garment-grid-responsive w-full">
-                        {paginatedGarments.map((garment, idx) => {
+                        {filteredGarments.map((garment, idx) => {
                           const price = getPriceFor(garment.id, activeServiceId);
                           const hasPrice = price !== null;
-                          const skuIndex = (currentPage - 1) * ITEMS_PER_PAGE + idx;
+                          const skuIndex = idx;
                           const categoryPrefix = (
                             CATEGORY_LABELS[garment.category] || garment.category
                           )
@@ -1635,123 +1631,6 @@ export const CatalogSettingsPage: React.FC = () => {
                         })}
                       </div>
                     </>
-                  )}
-
-                  {/* ─── 5. CLEAN PAGINATION BAR ─────────────────── */}
-                  {filteredGarments.length > 0 && (
-                    <div
-                      className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-6 text-xs text-slate-500"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        paddingTop: '8px',
-                        paddingBottom: '24px',
-                        fontSize: '12px',
-                        color: '#64748b',
-                      }}
-                    >
-                      <span className="text-slate-500">
-                        Showing{' '}
-                        <strong
-                          className="text-slate-800 font-semibold"
-                          style={{ color: '#1e293b', fontWeight: 600 }}
-                        >
-                          {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}
-                          {Math.min(currentPage * ITEMS_PER_PAGE, filteredGarments.length)}
-                        </strong>{' '}
-                        of{' '}
-                        <strong
-                          className="text-slate-800 font-semibold"
-                          style={{ color: '#1e293b', fontWeight: 600 }}
-                        >
-                          {filteredGarments.length}
-                        </strong>{' '}
-                        {CATEGORY_LABELS[activeCategory]} Garments
-                      </span>
-
-                      {totalPages > 1 && (
-                        <div
-                          className="flex items-center gap-1.5"
-                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                        >
-                          <button
-                            type="button"
-                            disabled={currentPage <= 1}
-                            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                            className="w-8 h-8 rounded-[3px] border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center transition-colors shadow-xs"
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '3px',
-                              border: '1px solid #e2e8f0',
-                              background: '#ffffff',
-                              color: '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-                              opacity: currentPage <= 1 ? 0.4 : 1,
-                            }}
-                          >
-                            <ChevronLeft size={14} />
-                          </button>
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                            <button
-                              key={pageNum}
-                              type="button"
-                              onClick={() => setCurrentPage(pageNum)}
-                              className={`w-8 h-8 rounded-[3px] text-xs font-semibold flex items-center justify-center cursor-pointer transition-all ${
-                                currentPage === pageNum
-                                  ? 'bg-blue-50 text-[#2563eb] border border-blue-200'
-                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-xs'
-                              }`}
-                              style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '3px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                border:
-                                  currentPage === pageNum
-                                    ? '1px solid #bfdbfe'
-                                    : '1px solid #e2e8f0',
-                                background: currentPage === pageNum ? '#eff6ff' : '#ffffff',
-                                color: currentPage === pageNum ? '#2563eb' : '#475569',
-                              }}
-                            >
-                              {pageNum}
-                            </button>
-                          ))}
-                          <button
-                            type="button"
-                            disabled={currentPage >= totalPages}
-                            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                            className="w-8 h-8 rounded-[3px] border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center transition-colors shadow-xs"
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '3px',
-                              border: '1px solid #e2e8f0',
-                              background: '#ffffff',
-                              color: '#475569',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
-                              opacity: currentPage >= totalPages ? 0.4 : 1,
-                            }}
-                          >
-                            <ChevronRight size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   )}
                 </div>
               </div>

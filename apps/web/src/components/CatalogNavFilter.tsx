@@ -30,6 +30,49 @@ export const DEFAULT_CATEGORY_LABELS: Record<string, string> = {
   WEIGHT_BASED: 'Weight Based',
 };
 
+export type CatalogSortOption = 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
+
+export interface CatalogSortOptionItem {
+  value: CatalogSortOption;
+  label: string;
+}
+
+export const CATALOG_SORT_OPTIONS: CatalogSortOptionItem[] = [
+  { value: 'name-asc', label: 'Name (A to Z)' },
+  { value: 'name-desc', label: 'Name (Z to A)' },
+  { value: 'price-asc', label: 'Price (Low to High)' },
+  { value: 'price-desc', label: 'Price (High to Low)' },
+];
+
+/**
+ * Shared sorting logic for catalog garments across Create Order and Outer Catalog view
+ */
+export function sortCatalogGarments<T extends { id: string; name: string }>(
+  garments: T[],
+  sortBy: string,
+  getPrice: (garmentId: string) => number | null | undefined,
+): T[] {
+  return [...garments].sort((a, b) => {
+    if (sortBy === 'name-asc' || sortBy === 'name_asc') {
+      return a.name.localeCompare(b.name);
+    }
+    if (sortBy === 'name-desc' || sortBy === 'name_desc') {
+      return b.name.localeCompare(a.name);
+    }
+    if (
+      sortBy === 'price-asc' ||
+      sortBy === 'price_asc' ||
+      sortBy === 'price-desc' ||
+      sortBy === 'price_desc'
+    ) {
+      const priceA = getPrice(a.id) ?? 0;
+      const priceB = getPrice(b.id) ?? 0;
+      return sortBy.includes('asc') ? priceA - priceB : priceB - priceA;
+    }
+    return 0;
+  });
+}
+
 export interface CatalogNavFilterProps {
   services: CatalogServiceItem[];
   activeServiceId: string;
