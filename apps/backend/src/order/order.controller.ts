@@ -14,6 +14,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateDueDateDto } from './dto/update-due-date.dto';
+import { OrderPickupDto } from './dto/order-pickup.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -59,7 +60,7 @@ export class OrderController {
 
   @Patch(':orderId/items/:itemId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'MANAGER', 'COUNTER')
+  @Roles('OWNER', 'COUNTER')
   async updateOrderItem(
     @Param('orderId') orderId: string,
     @Param('itemId') itemId: string,
@@ -68,6 +69,74 @@ export class OrderController {
   ) {
     const storeId = req.user.storeId;
     const order = await this.orderService.updateOrderItem(orderId, itemId, dto, storeId);
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
+  @Patch(':orderId/items/:itemId/garments/:garmentId/ready')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'COUNTER')
+  async markGarmentReady(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Param('garmentId') garmentId: string,
+    @Body('isReady') isReady: boolean,
+    @Request() req: any,
+  ) {
+    const storeId = req.user.storeId;
+    const order = await this.orderService.markPhysicalGarmentReady(
+      orderId,
+      itemId,
+      garmentId,
+      isReady,
+      storeId,
+    );
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
+  @Post(':orderId/items/:itemId/garments')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'COUNTER')
+  async addPhysicalGarment(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Request() req: any,
+  ) {
+    const storeId = req.user.storeId;
+    const order = await this.orderService.addPhysicalGarment(orderId, itemId, storeId);
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
+  @Patch(':orderId/items/:itemId/garments/:garmentId/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'COUNTER')
+  async cancelPhysicalGarment(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Param('garmentId') garmentId: string,
+    @Request() req: any,
+    @Body() body?: any,
+  ) {
+    const storeId = req.user.storeId;
+    const employeeId = req.user.id;
+    const employeeRole = req.user.role;
+    const order = await this.orderService.cancelPhysicalGarment(
+      orderId,
+      itemId,
+      garmentId,
+      storeId,
+      employeeId,
+      employeeRole,
+      body?.adjustment,
+    );
     return {
       success: true,
       data: order,
@@ -87,6 +156,31 @@ export class OrderController {
       employeeId,
       storeId,
     );
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
+  @Post(':id/notify-partial-ready')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'COUNTER')
+  async notifyPartialReady(@Param('id') id: string, @Request() req: any) {
+    const storeId = req.user.storeId;
+    return this.orderService.notifyPartialReady(id, storeId);
+  }
+
+  @Post(':orderId/pickup')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'COUNTER')
+  async recordPickup(
+    @Param('orderId') orderId: string,
+    @Body() dto: OrderPickupDto,
+    @Request() req: any,
+  ) {
+    const employeeId = req.user.id;
+    const storeId = req.user.storeId;
+    const order = await this.orderService.recordPickup(orderId, dto, employeeId, storeId);
     return {
       success: true,
       data: order,

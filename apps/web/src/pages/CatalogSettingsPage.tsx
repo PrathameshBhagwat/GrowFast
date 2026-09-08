@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingState, EmptyState, ErrorState } from '@growfast/ui';
@@ -10,8 +10,11 @@ import {
   resolveCatalogSelectionOnServiceChange,
 } from '@growfast/shared-types';
 import type { GarmentCatalogDTO } from '@growfast/shared-types';
+import { CatalogHeader } from '../components/CatalogHeader';
+import { CatalogNavFilter } from '../components/CatalogNavFilter';
 import {
   ArrowLeft,
+  ChevronDown,
   Edit2,
   Shirt,
   Plus,
@@ -30,6 +33,14 @@ import {
   Shield,
   Zap,
   Droplets,
+  User,
+  Lock,
+  RefreshCw,
+  LayoutGrid,
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  Footprints,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -58,6 +69,388 @@ const CATEGORY_LABELS: Record<string, string> = {
   WEIGHT_BASED: 'Weight Based',
 };
 
+/** Deterministic SKU code generator matching Stitch design: SKU - [3-char code] - [index] */
+const getGarmentSKU = (garmentName: string, index: number): string => {
+  const clean = garmentName.replace(/[^a-zA-Z]/g, '').toUpperCase();
+  let code = clean.slice(0, 3);
+  if (code.length < 3) code = (code + 'XXX').slice(0, 3);
+  const num = String(index + 1).padStart(2, '0');
+  return `SKU - ${code} - ${num}`;
+};
+
+/** Garment subtitle descriptions matching Stitch design */
+const GARMENT_SUBTITLES: Record<string, string> = {
+  Achkan: 'Traditional Heavy',
+  Capri: 'Casual Wear',
+  Coat: 'Formal Blazer',
+  Dhoti: 'Silk / Cotton',
+  'Jacket Full Sleeves': 'Outerwear',
+  'Jacket Half Sleeves': 'Sleeveless / Vest',
+  'Jacket With Hood': 'Winter Parka',
+  Jeans: 'Denim Trousers',
+  Kurta: 'Standard Ethnic',
+  'Kurta (Men)': 'Standard Ethnic',
+  'Kurta Heavy': 'Embroidered / Zari',
+  'Leather Jacket': 'Special Care DC',
+  'Long Coat': 'Overcoat / Trench',
+  'Long Pullover': 'Wool Knit',
+  Pants: 'Formal Trousers',
+  Pyjama: 'Cotton Lounge',
+  'Safari Suit Coat': 'Top Piece',
+  'Safari Suit Pant': 'Matching Bottom',
+  Sherwani: 'Wedding Heavy',
+  Shirt: 'Regular Formal',
+  'Shirt Woolen': 'Warm Blend',
+  Shorts: 'Bermuda / Sports',
+  'Suede Leather Jacket': 'Delicate Finish',
+  'Suit (2 Piece)': 'Coat + Trouser',
+  'Sweat Pants': 'Fleece Trackpants',
+  'Sweat Shirt': 'Casual Fleece',
+  'Sweat Shirt With Hood': 'Hooded Fleece',
+  'Sweater Full Sleeves Heavy': 'Cable Knit Wool',
+  'Sweater Full Heavy': 'Cable Knit Wool',
+  'Sweater Full Sleeves Plain': 'Fine Merino / Cashmere',
+  'Sweater Full Plain': 'Fine Merino / Cashmere',
+  'Swimming Costume': 'Active / Swim',
+  'T Shirt': 'Casual Cotton',
+  'Track Pant': 'Athletic / Gym',
+  'Under Wear': 'Inner Wear',
+  Vest: 'Inner / Casual',
+  'Waist Coat': 'Formal Layer',
+  'Shirt Silk': 'Pure Silk',
+  'Sweater Half': 'Knitted Vest',
+  'Sweater Half Sleeves Heavy': 'Heavy Knit Vest',
+  Saree: 'Traditional Silk / Georgette',
+  'Women Dress': 'Evening Wear',
+  Blouse: 'Designer / Silk',
+  Salwar: 'Cotton / Silk',
+  Kameez: 'Ethnic Top',
+  Kurti: 'Daily Casual',
+  Skirt: 'Flared / Pleated',
+  Leggings: 'Stretch Cotton',
+  Dupatta: 'Chiffon / Zari',
+  Shawl: 'Pashmina / Wool',
+  Lehenga: 'Bridal / Heavy',
+  Churidar: 'Traditional Bottom',
+};
+
+/** Render Stitch-tailored garment vector icon */
+const renderStitchGarmentIcon = (name: string) => {
+  const lower = name.toLowerCase();
+
+  // Shorts
+  if (lower.includes('short')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 4h12v7l-2 5h-3.5l-0.5-3-0.5 3H8l-2-5V4z" />
+        <path d="M6 7h12" />
+      </svg>
+    );
+  }
+
+  // Pants, Jeans, Capri, Pyjama, Trousers, Track Pant, Sweat Pants
+  if (
+    lower.includes('pant') ||
+    lower.includes('jean') ||
+    lower.includes('capri') ||
+    lower.includes('pyjama') ||
+    lower.includes('trous')
+  ) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 4h10v6l-2 10h-2.5l-0.5-6-0.5 6H9L7 10V4z" />
+      </svg>
+    );
+  }
+
+  // Dhoti
+  if (lower.includes('dhoti')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 4h10l-1.5 16H8.5L7 4z" />
+        <path d="M12 4v16" />
+      </svg>
+    );
+  }
+
+  // Leather Jacket / Suede Leather Jacket -> Shield icon (matching Stitch reference exactly)
+  if (lower.includes('leather')) {
+    return <Shield size={20} strokeWidth={1.5} />;
+  }
+
+  // Achkan, Sherwani (Traditional Indian Heavy Outerwear)
+  if (lower.includes('achkan') || lower.includes('sherwani')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="5" r="2" />
+        <path d="M8 9h8l1 11H7L8 9z" />
+        <path d="M12 9v11" />
+      </svg>
+    );
+  }
+
+  // Kurta (Men), Kurta Heavy
+  if (lower.includes('kurta')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M9 3h6l3 4-2.5 1.5v12.5H8.5V8.5L6 7l3-4z" />
+        <path d="M12 3v7" />
+      </svg>
+    );
+  }
+
+  // Coat, Suit (2 Piece), Safari Suit Coat
+  if (lower.includes('suit') || (lower.includes('coat') && !lower.includes('long coat'))) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 4h12l1.5 6-2 10H6.5L4.5 10 6 4z" />
+        <path d="M6 4l6 7 6-7" />
+        <path d="M12 11v9" />
+      </svg>
+    );
+  }
+
+  // Long Coat / Trench
+  if (lower.includes('long coat')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 2h10l2 5-2 15H7L5 7l2-5z" />
+        <path d="M7 2l5 6 5-6" />
+        <path d="M12 8v14" />
+      </svg>
+    );
+  }
+
+  // Jacket With Hood, Sweat Shirt With Hood
+  if (lower.includes('hood')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M10 2a3 3 0 00-3 3v2l-3 3 2 2v9h12v-9l2-2-3-3V5a3 3 0 00-3-3h-4z" />
+        <path d="M10 2a2 2 0 014 0v4h-4V2z" />
+      </svg>
+    );
+  }
+
+  // Jacket Half Sleeves / Vest
+  if (lower.includes('half sleeve') || lower.includes('vest')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M8 4h8l2 5-3 1v10H9V10L6 9l2-5z" />
+        <path d="M9 4a3 3 0 006 0" />
+      </svg>
+    );
+  }
+
+  // Jacket Full Sleeves, Sweat Shirt
+  if (lower.includes('full sleeve') || lower.includes('sweat shirt')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M8 4h8l3 4-2 3-1-1v10H8V10L7 11 5 8l3-4z" />
+        <path d="M9 4a3 3 0 006 0" />
+      </svg>
+    );
+  }
+
+  // Pullover / Sweater
+  if (lower.includes('pullover') || lower.includes('sweater')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 4h12l3 5-3 2v10H6V11L3 9l3-5z" />
+        <path d="M8 4a4 4 0 008 0" />
+        <path d="M6 18h12" />
+      </svg>
+    );
+  }
+
+  // Shoes
+  if (lower.includes('shoe')) {
+    return <Footprints size={20} strokeWidth={1.5} />;
+  }
+
+  // Default: Shirt icon
+  return <Shirt size={20} strokeWidth={1.5} />;
+};
+
+/** Render contextual icon matching Stitch design */
+const renderGarmentIcon = (garmentName: string) => {
+  const lower = garmentName.toLowerCase();
+  if (lower.includes('leather')) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-200/70 flex items-center justify-center text-amber-600 shrink-0">
+        <Lock size={18} />
+      </div>
+    );
+  }
+  if (
+    lower.includes('achkan') ||
+    lower.includes('kurta') ||
+    lower.includes('sherwani') ||
+    lower.includes('suit')
+  ) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-500 shrink-0">
+        <User size={18} />
+      </div>
+    );
+  }
+  if (lower.includes('jacket') || lower.includes('coat') || lower.includes('blazer')) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-500 shrink-0">
+        <Layers size={18} />
+      </div>
+    );
+  }
+  if (
+    lower.includes('jean') ||
+    lower.includes('pant') ||
+    lower.includes('trous') ||
+    lower.includes('capri') ||
+    lower.includes('dhoti')
+  ) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-500 shrink-0">
+        <Package size={18} />
+      </div>
+    );
+  }
+  if (lower.includes('pullover') || lower.includes('sweater') || lower.includes('cardigan')) {
+    return (
+      <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-500 shrink-0">
+        <Box size={18} />
+      </div>
+    );
+  }
+  return (
+    <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-500 shrink-0">
+      <Shirt size={18} />
+    </div>
+  );
+};
+
+/** Canonical order of services matching Stitch design */
+const SERVICE_CANONICAL_ORDER = [
+  'standard wash',
+  'dry clean',
+  'steam iron',
+  'wash + steam iron',
+  'shoe cleaning',
+  'reprocess cleaning',
+  'free shoe',
+  'starching dc',
+];
+
+/** Color dot indicator for services in the Add Garment modal matching Stitch design */
+const getServiceDotColor = (name: string): string => {
+  const lower = name.toLowerCase();
+  if (lower.includes('standard') || lower.includes('free shoe')) return 'bg-emerald-500';
+  if (lower.includes('dry clean')) return 'bg-indigo-500';
+  if (lower.includes('steam iron') && !lower.includes('wash')) return 'bg-sky-500';
+  if (lower.includes('wash') && lower.includes('steam')) return 'bg-blue-500';
+  if (lower.includes('shoe')) return 'bg-amber-500';
+  if (lower.includes('reprocess')) return 'bg-purple-500';
+  if (lower.includes('starch')) return 'bg-rose-500';
+  return 'bg-slate-400';
+};
+
 type PageTab = 'garments' | 'pricing';
 
 export const CatalogSettingsPage: React.FC = () => {
@@ -84,6 +477,10 @@ export const CatalogSettingsPage: React.FC = () => {
   const [activeServiceId, setActiveServiceId] = useState<string>('');
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[0]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<string>('name_asc');
+  const [activeOnly, setActiveOnly] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const catalogSearchRef = useRef<HTMLInputElement>(null);
 
   // ─── Modals State ───────────────────────────────────────
   // Create Modal
@@ -91,6 +488,7 @@ export const CatalogSettingsPage: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState<GarmentCategory>(GarmentCategory.MEN);
   const [newSection, setNewSection] = useState('');
+  const [newPrices, setNewPrices] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -117,6 +515,7 @@ export const CatalogSettingsPage: React.FC = () => {
   const [pricingServiceId, setPricingServiceId] = useState<string>('');
   const [pricingCategory, setPricingCategory] = useState<string>(CATEGORIES[0]);
   const [pricingSearch, setPricingSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
   const [editedPrices, setEditedPrices] = useState<Record<string, string>>({});
   const [savingPrices, setSavingPrices] = useState(false);
   const [priceSaveSuccess, setPriceSaveSuccess] = useState<string | null>(null);
@@ -173,15 +572,101 @@ export const CatalogSettingsPage: React.FC = () => {
     return services.find((s) => s.id === activeServiceId) || services[0];
   }, [services, activeServiceId]);
 
-  // Filtered garments for Garment Tab
+  // Category counts for all tabs
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    CATEGORIES.forEach((cat) => {
+      counts[cat] = garments.filter((g) => g.category === cat).length;
+    });
+    return counts;
+  }, [garments]);
+
+  // Filtered & Sorted garments for Garment Tab
   const filteredGarments = useMemo(() => {
-    return garments.filter((g) => {
+    const list = garments.filter((g) => {
       const matchesCategory = g.category === activeCategory;
       const matchesSearch =
-        !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+        !searchQuery ||
+        g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (CATEGORY_LABELS[g.category] || g.category)
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+      const matchesActive = !activeOnly || g.isActive;
+      return matchesCategory && matchesSearch && matchesActive;
     });
-  }, [garments, activeCategory, searchQuery]);
+
+    list.sort((a, b) => {
+      if (sortOrder === 'name_asc') return a.name.localeCompare(b.name);
+      if (sortOrder === 'name_desc') return b.name.localeCompare(a.name);
+      const priceA = getPriceFor(a.id, activeServiceId) ?? -1;
+      const priceB = getPriceFor(b.id, activeServiceId) ?? -1;
+      if (sortOrder === 'price_asc') return priceA - priceB;
+      if (sortOrder === 'price_desc') return priceB - priceA;
+      return 0;
+    });
+
+    return list;
+  }, [garments, activeCategory, searchQuery, activeOnly, sortOrder, activeServiceId, pricingData]);
+
+  // Pagination for Garments Tab (24 per page matching Stitch layout)
+  const ITEMS_PER_PAGE = 24;
+  const totalPages = Math.ceil(filteredGarments.length / ITEMS_PER_PAGE) || 1;
+  const paginatedGarments = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredGarments.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredGarments, currentPage]);
+
+  // Reset pagination on category/filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, searchQuery, activeOnly, sortOrder]);
+
+  // Keyboard shortcuts: F2 focuses search, Esc resets filter
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeTab !== 'garments') return;
+      if (e.key === 'F2') {
+        e.preventDefault();
+        catalogSearchRef.current?.focus();
+      } else if (e.key === 'Escape') {
+        if (searchQuery || activeOnly) {
+          e.preventDefault();
+          setSearchQuery('');
+          setActiveOnly(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, searchQuery, activeOnly]);
+
+  // Export CSV handler
+  const handleExportCSV = () => {
+    const headers = ['SKU', 'Garment Name', 'Category', 'Service', 'Price (INR)', 'Status'];
+    const rows = filteredGarments.map((g, idx) => {
+      const sku = `${(CATEGORY_LABELS[g.category] || g.category).substring(0, 3).toUpperCase()}-${String(idx + 1).padStart(2, '0')}`;
+      const price = getPriceFor(g.id, activeServiceId);
+      return [
+        sku,
+        `"${g.name.replace(/"/g, '""')}"`,
+        CATEGORY_LABELS[g.category] || g.category,
+        currentActiveService?.name || 'Standard',
+        price !== null ? price : 'N/A',
+        g.isActive ? 'Active' : 'Inactive',
+      ].join(',');
+    });
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `garment-catalog-${(CATEGORY_LABELS[activeCategory] || activeCategory).toLowerCase()}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // --- Applicability Handlers ---
   const handleActiveCategoryChange = (cat: string) => {
@@ -227,9 +712,24 @@ export const CatalogSettingsPage: React.FC = () => {
     return filterServicesForCategory(services, activeCategory);
   }, [services, activeCategory]);
 
+  // Sorted services for Garment Tab matching Stitch design
+  const sortedGarmentServices = useMemo(() => {
+    return [...visibleGarmentServices].sort((a, b) => a.name.localeCompare(b.name));
+  }, [visibleGarmentServices]);
+
   const visiblePricingServices = useMemo(() => {
     return filterServicesForCategory(services, pricingCategory);
   }, [services, pricingCategory]);
+
+  // Visible services for Add Garment modal based on selected category (canonical Stitch ordering)
+  const visibleCreateServices = useMemo(() => {
+    const filtered = filterServicesForCategory(services, newCategory);
+    return [...filtered].sort((a, b) => {
+      const idxA = SERVICE_CANONICAL_ORDER.findIndex((s) => a.name.toLowerCase().includes(s));
+      const idxB = SERVICE_CANONICAL_ORDER.findIndex((s) => b.name.toLowerCase().includes(s));
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+  }, [services, newCategory]);
 
   // Filtered garments for Pricing Tab
   const pricingFilteredGarments = useMemo(() => {
@@ -252,18 +752,70 @@ export const CatalogSettingsPage: React.FC = () => {
     [pricingData],
   );
 
+  // Active pricing service object
+  const currentPricingService = useMemo(() => {
+    return services.find((s) => s.id === pricingServiceId) || services[0];
+  }, [services, pricingServiceId]);
+
+  // Helper to calculate base / minimum configured price for a garment
+  const getBasePriceFor = useCallback(
+    (garmentId: string): number | null => {
+      const garmentPrices = pricingData
+        .filter(
+          (p: any) => p.garmentCatalogId === garmentId && p.price !== undefined && p.price !== null,
+        )
+        .map((p: any) => p.price);
+      if (garmentPrices.length === 0) return null;
+      return Math.min(...garmentPrices);
+    },
+    [pricingData],
+  );
+
+  // How many items in current category have a price configured for current pricing service
+  const pricingConfiguredCount = useMemo(() => {
+    return pricingFilteredGarments.filter((g) => getPriceFor(g.id, pricingServiceId) !== null)
+      .length;
+  }, [pricingFilteredGarments, pricingServiceId, getPriceFor]);
+
+  // POS keyboard fast keys (F2 focus search, Esc revert pending edits)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeTab !== 'pricing') return;
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === 'Escape') {
+        if (Object.keys(editedPrices).length > 0) {
+          e.preventDefault();
+          setEditedPrices({});
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, editedPrices]);
+
   // ─── Modal Handlers ─────────────────────────────────────
   const openCreateModal = () => {
     setNewName('');
     setNewCategory(activeCategory as GarmentCategory);
     setNewSection('');
+    setNewPrices({});
     setCreateError(null);
     setCreateModalOpen(true);
   };
 
   const closeCreateModal = () => {
     setCreateModalOpen(false);
+    setNewPrices({});
     setCreateError(null);
+  };
+
+  const handleNewPriceChange = (serviceId: string, value: string) => {
+    setNewPrices((prev) => ({
+      ...prev,
+      [serviceId]: value,
+    }));
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -271,6 +823,20 @@ export const CatalogSettingsPage: React.FC = () => {
     if (!newName.trim()) {
       setCreateError('Garment name is required');
       return;
+    }
+
+    // Validate optional prices if entered
+    if (canConfigurePricing) {
+      for (const svc of visibleCreateServices) {
+        const val = newPrices[svc.id];
+        if (val !== undefined && val.trim() !== '') {
+          const num = parseFloat(val);
+          if (isNaN(num) || num < 0) {
+            setCreateError(`Please enter a valid, non-negative price for ${svc.name}`);
+            return;
+          }
+        }
+      }
     }
 
     setCreating(true);
@@ -293,6 +859,32 @@ export const CatalogSettingsPage: React.FC = () => {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.message || `Failed to create garment (${res.status})`);
+      }
+
+      const json = await res.json();
+      const createdGarment = json.data || json;
+
+      // Optionally save entered prices using existing POST /pricing/:garmentId/:serviceId
+      if (createdGarment?.id && canConfigurePricing) {
+        const pricePromises = visibleCreateServices
+          .filter((svc) => newPrices[svc.id] !== undefined && newPrices[svc.id].trim() !== '')
+          .map(async (svc) => {
+            const price = parseFloat(newPrices[svc.id]);
+            const pRes = await fetch(`${API_URL}/pricing/${createdGarment.id}/${svc.id}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ price }),
+            });
+            if (!pRes.ok) {
+              const errBody = await pRes.json().catch(() => ({}));
+              throw new Error(errBody.message || `Failed to save price for ${svc.name}`);
+            }
+          });
+
+        await Promise.all(pricePromises);
       }
 
       closeCreateModal();
@@ -612,59 +1204,68 @@ export const CatalogSettingsPage: React.FC = () => {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-100 font-sans">
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-5 py-3 shrink-0 shadow-xs z-10 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="p-2 rounded-sm text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Back to home"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-lg font-bold text-slate-900">Garment Catalog</h1>
-        </div>
+      <CatalogHeader
+        title="Garment Catalog"
+        subtitle="Downtown Connaught Place #102 • Active Master Catalog"
+        onBack={() => navigate('/')}
+        showLogo={true}
+        rightContent={
+          <>
+            {/* Catalog View / Service Pricing Tab Switcher */}
+            {canConfigurePricing && (
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-[3px] border border-slate-200 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('garments')}
+                  className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'garments'
+                      ? 'bg-white text-blue-600 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <LayoutGrid size={14} />
+                  <span>Catalog View</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('pricing')}
+                  className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'pricing'
+                      ? 'bg-white text-blue-600 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Tag size={14} />
+                  <span>Service Pricing</span>
+                </button>
+              </div>
+            )}
 
-        {/* Header Action Controls */}
-        <div className="flex items-center gap-4">
-          {canConfigurePricing && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-sm border border-slate-200 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveTab('garments')}
-                className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'garments'
-                    ? 'bg-white text-primary-700 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Layers size={14} /> Catalog View
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('pricing')}
-                className={`px-3 py-1.5 rounded-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'pricing'
-                    ? 'bg-white text-primary-700 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Tag size={14} /> Service Pricing
-              </button>
-            </div>
-          )}
-
-          {canManage && (
+            {/* Export CSV Button */}
             <button
               type="button"
-              onClick={openCreateModal}
-              className="px-3.5 py-2 bg-primary-600 hover:bg-primary-700 active:scale-98 text-white rounded-sm text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              onClick={handleExportCSV}
+              className="hidden sm:flex items-center gap-1.5 border border-slate-200 bg-white rounded-[3px] px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-xs"
+              title="Export catalog as CSV"
             >
-              <Plus size={16} /> Add Garment
+              <Upload size={14} />
+              <span>Export CSV</span>
             </button>
-          )}
-        </div>
-      </header>
+
+            {/* Add Garment Button */}
+            {canManage && (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 active:scale-98 text-white rounded-[3px] text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>Add Garment</span>
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ─── MAIN CONTENT VIEWPORT ────────────────────────── */}
       <main className="flex-1 flex flex-col min-h-0 bg-slate-50">
@@ -677,144 +1278,479 @@ export const CatalogSettingsPage: React.FC = () => {
             {/* ══ TAB 1: POS GARMENT CATALOG VIEW ════════════════ */}
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'garments' && (
-              <div className="flex-1 flex flex-col min-h-0 bg-white">
-                {/* BAR 1: Service Selector Bar */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
-                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
-                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
-                      Service
-                    </span>
-                    <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {visibleGarmentServices.map((service) => {
-                        return (
-                          <button
-                            key={service.id}
-                            type="button"
-                            onClick={() => handleActiveServiceChange(service.id)}
-                            className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
-                              activeServiceId === service.id
-                                ? 'bg-primary-600 text-white border-primary-600'
-                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                            }`}
+              <div
+                className="flex-1 overflow-y-auto bg-slate-50 min-h-0"
+                style={{ background: '#f8fafc' }}
+              >
+                <div
+                  className="flex flex-col max-w-[1600px] mx-auto w-full"
+                  style={{
+                    padding: '8px 16px',
+                    maxWidth: '1600px',
+                    margin: '0 auto',
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
+                  {/* ─── 1. REUSABLE CATALOG NAV & FILTER (SERVICE + CATEGORY + SEARCH) ── */}
+                  <CatalogNavFilter
+                    services={sortedGarmentServices}
+                    activeServiceId={activeServiceId}
+                    onServiceChange={handleActiveServiceChange}
+                    categories={CATEGORIES}
+                    categoryLabels={CATEGORY_LABELS}
+                    activeCategory={activeCategory}
+                    onCategoryChange={handleActiveCategoryChange}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchRef={catalogSearchRef}
+                    rightToolbarContent={
+                      <>
+                        <div
+                          className="flex items-center gap-2"
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <span style={{ color: '#64748b', fontWeight: 500, fontSize: '13px' }}>
+                            Sort:
+                          </span>
+                          <select
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value)}
+                            style={{
+                              height: '32px',
+                              padding: '0 12px',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '3px',
+                              fontSize: '13px',
+                              color: '#334155',
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              outline: 'none',
+                            }}
                           >
-                            {service.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+                            <option value="name_asc">Name (A to Z)</option>
+                          </select>
+                        </div>
 
-                {/* BAR 2: Category Selector Bar */}
-                <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
-                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
-                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
-                      Category
-                    </span>
-                    <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {CATEGORIES.map((cat) => {
-                        return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => handleActiveCategoryChange(cat)}
-                            className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
-                              activeCategory === cat
-                                ? 'bg-primary-600 text-white border-primary-600'
-                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                            }`}
-                          >
-                            {CATEGORY_LABELS[cat] || cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+                        <label
+                          className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer select-none"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '12px',
+                            color: '#334155',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={activeOnly}
+                            onChange={(e) => setActiveOnly(e.target.checked)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          />
+                          <span>Active Only</span>
+                        </label>
+                      </>
+                    }
+                  />
 
-                {/* Search Bar */}
-                <div className="px-5 py-3 border-b border-slate-200 bg-white shrink-0">
-                  <div className="relative w-full">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search size={18} />
+                  {/* ─── 4. GARMENT CATALOG GRID ──────────────────── */}
+                  {paginatedGarments.length === 0 ? (
+                    <div
+                      className="bg-white border border-slate-200 rounded-[3px] p-8 shadow-xs"
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '3px',
+                        padding: '32px',
+                      }}
+                    >
+                      <EmptyState
+                        message={
+                          searchQuery
+                            ? `No garments matching "${searchQuery}" in ${CATEGORY_LABELS[activeCategory]}`
+                            : `No garments found in the "${CATEGORY_LABELS[activeCategory]}" category.`
+                        }
+                      />
                     </div>
-                    <input
-                      type="text"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                      placeholder={`🔍 Search in ${CATEGORY_LABELS[activeCategory]}...`}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Garment Catalog Grid — 7-8 cols on wide desktop */}
-                <div className="flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5 bg-slate-50 min-h-0">
-                  {filteredGarments.length === 0 ? (
-                    <EmptyState
-                      message={
-                        searchQuery
-                          ? `No garments matching "${searchQuery}" in ${CATEGORY_LABELS[activeCategory]}`
-                          : `No garments found in the "${CATEGORY_LABELS[activeCategory]}" category.`
-                      }
-                    />
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
-                      {filteredGarments.map((garment) => {
-                        const price = getPriceFor(garment.id, activeServiceId);
-                        const hasPrice = price !== null;
+                    <>
+                      <style>{`
+                        .garment-grid-responsive {
+                          display: grid;
+                          grid-template-columns: repeat(2, minmax(0, 1fr));
+                          gap: 12px;
+                        }
+                        @media (min-width: 640px) {
+                          .garment-grid-responsive {
+                            grid-template-columns: repeat(3, minmax(0, 1fr));
+                          }
+                        }
+                        @media (min-width: 768px) {
+                          .garment-grid-responsive {
+                            grid-template-columns: repeat(4, minmax(0, 1fr));
+                          }
+                        }
+                        @media (min-width: 1024px) {
+                          .garment-grid-responsive {
+                            grid-template-columns: repeat(6, minmax(0, 1fr));
+                          }
+                        }
+                        @media (min-width: 1200px) {
+                          .garment-grid-responsive {
+                            grid-template-columns: repeat(8, minmax(0, 1fr));
+                          }
+                        }
+                      `}</style>
+                      <div className="garment-grid-responsive w-full">
+                        {paginatedGarments.map((garment, idx) => {
+                          const price = getPriceFor(garment.id, activeServiceId);
+                          const hasPrice = price !== null;
+                          const skuIndex = (currentPage - 1) * ITEMS_PER_PAGE + idx;
+                          const categoryPrefix = (
+                            CATEGORY_LABELS[garment.category] || garment.category
+                          )
+                            .substring(0, 3)
+                            .toUpperCase();
+                          const sku = `${categoryPrefix}-${String(skuIndex + 1).padStart(2, '0')}`;
+                          const subtitle =
+                            (garment as any).section ||
+                            (garment as any).description ||
+                            GARMENT_SUBTITLES[garment.name] ||
+                            'Standard Wear';
 
-                        return (
-                          <div
-                            key={garment.id}
-                            className={`relative flex flex-col items-center justify-between p-3 bg-white rounded-[2px] border transition-all group min-h-[120px] ${
-                              !garment.isActive
-                                ? 'opacity-60 grayscale border-slate-300'
-                                : 'border-slate-200 shadow-xs hover:shadow-md hover:border-primary-400'
-                            }`}
-                          >
-                            {/* Price Badge (Top-Right) */}
-                            {hasPrice ? (
-                              <div className="absolute top-1.5 right-1.5 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-[2px] shadow-xs">
-                                ₹{price.toFixed(0)}
-                              </div>
-                            ) : (
-                              <div className="absolute top-1.5 right-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-semibold px-1.5 py-0.5 rounded-[2px]">
-                                No Price
-                              </div>
-                            )}
-
-                            {/* Inactive State Badge (Top-Left) */}
-                            {!garment.isActive && (
-                              <span className="absolute top-1.5 left-1.5 bg-slate-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
-                                Off
-                              </span>
-                            )}
-
-                            {/* Garment Icon */}
-                            <div className="w-10 h-10 rounded-[2px] bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-primary-600 group-hover:bg-primary-50 transition-colors mt-4 mb-2">
-                              <Shirt size={22} strokeWidth={1.5} />
-                            </div>
-
-                            {/* Garment Name */}
-                            <span className="text-xs font-semibold text-slate-800 text-center line-clamp-2 leading-tight px-0.5 w-full mb-1">
-                              {garment.name}
-                            </span>
-
-                            {/* Single Edit Button */}
-                            {canManage && (
-                              <button
-                                type="button"
-                                onClick={() => openEditModal(garment)}
-                                className="w-full mt-auto pt-1.5 border-t border-slate-100 py-1.5 rounded-[2px] text-[10px] font-semibold text-slate-500 hover:text-primary-700 hover:bg-primary-50 flex items-center justify-center gap-1 cursor-pointer transition-all min-h-[28px]"
-                                title="Edit garment & pricing"
+                          return (
+                            <div
+                              key={garment.id}
+                              className={`border border-slate-200 rounded-[3px] bg-white p-3 flex flex-col justify-between group transition-all shadow-xs ${
+                                !garment.isActive
+                                  ? 'opacity-60 grayscale bg-slate-50/60 border-slate-300'
+                                  : 'hover:border-blue-300 hover:shadow-sm'
+                              }`}
+                              style={{
+                                background: garment.isActive ? '#ffffff' : '#f8fafc',
+                                border: garment.isActive
+                                  ? '1px solid #e2e8f0'
+                                  : '1px solid #cbd5e1',
+                                borderRadius: '3px',
+                                padding: '12px 10px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                minHeight: '215px',
+                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                opacity: garment.isActive ? 1 : 0.65,
+                              }}
+                            >
+                              {/* Top Row: SKU + Price Badge */}
+                              <div
+                                className="flex items-center justify-between w-full mb-1"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  width: '100%',
+                                  marginBottom: '6px',
+                                }}
                               >
-                                <Edit2 size={10} /> Edit
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
+                                <span
+                                  className="text-[11px] font-mono text-slate-400 font-medium tracking-wider select-none"
+                                  style={{
+                                    fontSize: '11px',
+                                    fontFamily: 'monospace',
+                                    color: '#94a3b8',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.05em',
+                                    userSelect: 'none',
+                                  }}
+                                >
+                                  {sku}
+                                </span>
+                                <div
+                                  className="flex items-center gap-1.5 shrink-0"
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {!garment.isActive && (
+                                    <span
+                                      className="bg-slate-100 text-slate-500 text-[10px] font-semibold px-1.5 py-0.5 rounded-[2px]"
+                                      style={{
+                                        background: '#f1f5f9',
+                                        color: '#64748b',
+                                        fontSize: '10px',
+                                        fontWeight: 600,
+                                        padding: '2px 5px',
+                                        borderRadius: '2px',
+                                      }}
+                                    >
+                                      Inactive
+                                    </span>
+                                  )}
+                                  {hasPrice ? (
+                                    <span
+                                      className="bg-[#eff6ff] text-[#2563eb] font-bold text-xs px-2.5 py-0.5 rounded-[3px] border border-[#bfdbfe] whitespace-nowrap shrink-0"
+                                      style={{
+                                        background: '#eff6ff',
+                                        color: '#2563eb',
+                                        fontWeight: 700,
+                                        fontSize: '12px',
+                                        padding: '2px 8px',
+                                        borderRadius: '3px',
+                                        border: '1px solid #bfdbfe',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      ₹{price.toFixed(0)}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="bg-slate-50 text-slate-400 text-[11px] font-medium px-2 py-0.5 rounded-[3px] border border-slate-200 whitespace-nowrap shrink-0"
+                                      style={{
+                                        background: '#f8fafc',
+                                        color: '#94a3b8',
+                                        fontSize: '11px',
+                                        fontWeight: 500,
+                                        padding: '2px 6px',
+                                        borderRadius: '3px',
+                                        border: '1px solid #e2e8f0',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      No Price
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Center Icon Box */}
+                              <div
+                                className="w-12 h-12 mx-auto rounded-[3px] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50/60 transition-colors my-2 shrink-0"
+                                style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  margin: '8px auto',
+                                  borderRadius: '3px',
+                                  background: '#f8fafc',
+                                  border: '1px solid #f1f5f9',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#64748b',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {renderStitchGarmentIcon(garment.name)}
+                              </div>
+
+                              {/* Garment Title & Subtitle */}
+                              <div
+                                className="text-center w-full mb-2"
+                                style={{ textAlign: 'center', width: '100%', marginBottom: '8px' }}
+                              >
+                                <h3
+                                  className="text-xs font-bold text-slate-900 truncate leading-snug"
+                                  style={{
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    color: '#0f172a',
+                                    lineHeight: 1.3,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                  title={garment.name}
+                                >
+                                  {garment.name}
+                                </h3>
+                                <p
+                                  className="text-[11px] text-slate-400 truncate mt-0.5"
+                                  style={{
+                                    fontSize: '11px',
+                                    color: '#94a3b8',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    marginTop: '2px',
+                                  }}
+                                  title={subtitle}
+                                >
+                                  {subtitle}
+                                </p>
+                              </div>
+
+                              {/* Subtle Divider Line above Edit Button */}
+                              <div
+                                className="w-full border-t border-slate-100 my-2"
+                                style={{
+                                  width: '100%',
+                                  borderTop: '1px solid #f1f5f9',
+                                  margin: '8px 0',
+                                }}
+                              ></div>
+
+                              {/* Single Edit Button */}
+                              {canManage && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditModal(garment)}
+                                  className="w-full h-8 border border-slate-200 rounded-[3px] text-xs font-medium text-slate-700 hover:text-blue-600 hover:border-blue-300 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                                  style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '3px',
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    color: '#334155',
+                                    background: '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                  }}
+                                  title="Edit garment"
+                                >
+                                  <Edit2
+                                    size={12}
+                                    className="text-slate-400 group-hover:text-blue-600"
+                                  />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {/* ─── 5. CLEAN PAGINATION BAR ─────────────────── */}
+                  {filteredGarments.length > 0 && (
+                    <div
+                      className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-6 text-xs text-slate-500"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        paddingTop: '8px',
+                        paddingBottom: '24px',
+                        fontSize: '12px',
+                        color: '#64748b',
+                      }}
+                    >
+                      <span className="text-slate-500">
+                        Showing{' '}
+                        <strong
+                          className="text-slate-800 font-semibold"
+                          style={{ color: '#1e293b', fontWeight: 600 }}
+                        >
+                          {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}
+                          {Math.min(currentPage * ITEMS_PER_PAGE, filteredGarments.length)}
+                        </strong>{' '}
+                        of{' '}
+                        <strong
+                          className="text-slate-800 font-semibold"
+                          style={{ color: '#1e293b', fontWeight: 600 }}
+                        >
+                          {filteredGarments.length}
+                        </strong>{' '}
+                        {CATEGORY_LABELS[activeCategory]} Garments
+                      </span>
+
+                      {totalPages > 1 && (
+                        <div
+                          className="flex items-center gap-1.5"
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <button
+                            type="button"
+                            disabled={currentPage <= 1}
+                            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                            className="w-8 h-8 rounded-[3px] border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center transition-colors shadow-xs"
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '3px',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+                              opacity: currentPage <= 1 ? 0.4 : 1,
+                            }}
+                          >
+                            <ChevronLeft size={14} />
+                          </button>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                            <button
+                              key={pageNum}
+                              type="button"
+                              onClick={() => setCurrentPage(pageNum)}
+                              className={`w-8 h-8 rounded-[3px] text-xs font-semibold flex items-center justify-center cursor-pointer transition-all ${
+                                currentPage === pageNum
+                                  ? 'bg-blue-50 text-[#2563eb] border border-blue-200'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-xs'
+                              }`}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '3px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                border:
+                                  currentPage === pageNum
+                                    ? '1px solid #bfdbfe'
+                                    : '1px solid #e2e8f0',
+                                background: currentPage === pageNum ? '#eff6ff' : '#ffffff',
+                                color: currentPage === pageNum ? '#2563eb' : '#475569',
+                              }}
+                            >
+                              {pageNum}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            disabled={currentPage >= totalPages}
+                            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                            className="w-8 h-8 rounded-[3px] border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center transition-colors shadow-xs"
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '3px',
+                              border: '1px solid #e2e8f0',
+                              background: '#ffffff',
+                              color: '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+                              opacity: currentPage >= totalPages ? 0.4 : 1,
+                            }}
+                          >
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -825,214 +1761,358 @@ export const CatalogSettingsPage: React.FC = () => {
             {/* ══ TAB 2: SERVICE PRICING MATRIX (ADMIN) ═════════ */}
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'pricing' && canConfigurePricing && (
-              <div className="flex-1 flex flex-col min-h-0 bg-white">
-                {/* Selector Bar 1: Service */}
-                <div className="w-full bg-slate-50 border-b border-slate-200 px-5 py-4 shrink-0 mb-6 shadow-xs">
-                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
-                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
-                      Service
-                    </span>
-                    <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {visiblePricingServices.map((service) => {
-                        return (
-                          <button
-                            key={service.id}
-                            type="button"
-                            onClick={() => handlePricingServiceChange(service.id)}
-                            className={`flex-1 min-w-[120px] px-[22px] py-3 rounded-sm text-sm font-bold transition-all whitespace-normal text-center leading-tight break-words min-h-[48px] flex items-center justify-center cursor-pointer border shadow-sm ${
-                              pricingServiceId === service.id
-                                ? 'bg-primary-600 text-white border-primary-600'
-                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                            }`}
-                          >
-                            {service.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+                <div
+                  className="flex-1 overflow-y-auto bg-slate-50 min-h-0 flex flex-col justify-between"
+                  style={{ background: '#f8fafc' }}
+                >
+                  <div
+                    className="flex flex-col max-w-[1600px] mx-auto w-full"
+                    style={{
+                      padding: '8px 16px',
+                      maxWidth: '1600px',
+                      margin: '0 auto',
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    {/* ─── REUSABLE CATALOG NAV & FILTER (SERVICE + CATEGORY + SEARCH) ── */}
+                    <CatalogNavFilter
+                      services={visiblePricingServices}
+                      activeServiceId={pricingServiceId}
+                      onServiceChange={handlePricingServiceChange}
+                      categories={CATEGORIES}
+                      categoryLabels={CATEGORY_LABELS}
+                      activeCategory={pricingCategory}
+                      onCategoryChange={handlePricingCategoryChange}
+                      searchQuery={pricingSearch}
+                      onSearchChange={setPricingSearch}
+                      searchRef={searchRef}
+                      searchPlaceholder={`Filter ${CATEGORY_LABELS[pricingCategory] || 'items'} items or barcode (F2)...`}
+                      rightToolbarContent={
+                        <div
+                          className="flex items-center gap-3 shrink-0 flex-wrap justify-end"
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+                        >
+                          {/* Configured Status Indicator */}
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 px-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span>
+                              {pricingConfiguredCount}/{pricingFilteredGarments.length} configured
+                              for {currentPricingService?.name || 'Selected Service'}
+                            </span>
+                          </div>
 
-                {/* Selector Bar 2: Category */}
-                <div className="w-full border-y border-slate-200 bg-white px-5 py-4 shrink-0 mt-4 mb-4 shadow-xs">
-                  <div className="flex flex-col xl:flex-row xl:items-center gap-4">
-                    <span className="text-sm font-bold text-slate-800 w-20 shrink-0 uppercase tracking-wider">
-                      Category
-                    </span>
-                    <div className="flex-1 flex flex-wrap gap-4 w-full">
-                      {CATEGORIES.map((cat) => {
-                        return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => handlePricingCategoryChange(cat)}
-                            className={`flex-1 min-w-[120px] px-[22px] py-3 whitespace-normal text-center leading-tight break-words text-sm font-bold transition-all min-h-[48px] flex items-center justify-center cursor-pointer rounded-sm border shadow-sm ${
-                              pricingCategory === cat
-                                ? 'bg-primary-600 text-white border-primary-600'
-                                : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                            }`}
-                          >
-                            {CATEGORY_LABELS[cat] || cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+                          <div className="flex items-center gap-2">
+                            {/* Auto-fill All Missing Button */}
+                            <button
+                              type="button"
+                              onClick={handleAutoFillAllMissingPrices}
+                              disabled={savingPrices}
+                              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-[3px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                            >
+                              <Zap size={14} className="fill-white" />
+                              <span>Auto-fill All Missing</span>
+                            </button>
 
-                {/* Controls Bar & Feedback */}
-                <div className="px-5 py-3 border-b border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
-                  <div className="relative w-full sm:w-96">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Search size={18} />
-                    </div>
-                    <input
-                      type="text"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
-                      placeholder={`🔍 Filter ${CATEGORY_LABELS[pricingCategory]} items...`}
-                      value={pricingSearch}
-                      onChange={(e) => setPricingSearch(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleAutoFillAllMissingPrices}
-                      disabled={savingPrices}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-sm text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                    >
-                      <Sparkles size={15} /> Auto-fill All Missing
-                    </button>
-                    {Object.keys(editedPrices).length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleSaveAllEditedPrices}
-                        disabled={savingPrices}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-sm text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                      >
-                        <Save size={15} /> Save All Changes ({Object.keys(editedPrices).length})
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notifications */}
-                {priceSaveSuccess && (
-                  <div className="mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-sm flex items-center gap-2">
-                    <Check size={16} /> {priceSaveSuccess}
-                  </div>
-                )}
-                {priceSaveError && (
-                  <div className="mx-4 mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-sm flex items-center justify-between">
-                    <span>{priceSaveError}</span>
-                    <button
-                      type="button"
-                      onClick={() => setPriceSaveError(null)}
-                      className="text-rose-500 hover:text-rose-800"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Pricing Table (Scrollable) */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 min-h-0">
-                  {pricingFilteredGarments.length === 0 ? (
-                    <EmptyState
-                      message={`No garments found in ${CATEGORY_LABELS[pricingCategory]}`}
-                    />
-                  ) : (
-                    <div className="bg-white rounded-sm border border-slate-200 shadow-xs overflow-hidden">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
-                          <tr>
-                            <th className="py-3.5 px-5">Garment</th>
-                            <th className="py-3.5 px-5">Category</th>
-                            <th className="py-3.5 px-5">Current Price</th>
-                            <th className="py-3.5 px-5 w-56">Configure Price (₹)</th>
-                            <th className="py-3.5 px-5 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {pricingFilteredGarments.map((garment) => {
-                            const currentPrice = getPriceFor(garment.id, pricingServiceId);
-                            const hasPrice = currentPrice !== null;
-                            const isEdited = editedPrices[garment.id] !== undefined;
-                            const inputValue = isEdited
-                              ? editedPrices[garment.id]
-                              : hasPrice
-                                ? String(currentPrice)
-                                : '';
-
-                            return (
-                              <tr
-                                key={garment.id}
-                                className="hover:bg-slate-50/70 transition-colors"
+                            {/* Save All Changes Button (if pending edits exist) */}
+                            {Object.keys(editedPrices).length > 0 && (
+                              <button
+                                type="button"
+                                onClick={handleSaveAllEditedPrices}
+                                disabled={savingPrices}
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-[3px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                               >
-                                <td className="py-3.5 px-5 font-semibold text-slate-900 flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-sm bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
-                                    <Shirt size={16} />
-                                  </div>
-                                  <span>{garment.name}</span>
-                                </td>
-                                <td className="py-3.5 px-5 text-xs text-slate-500">
-                                  <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-sm font-medium">
-                                    {CATEGORY_LABELS[garment.category] || garment.category}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-5 font-semibold">
-                                  {hasPrice ? (
-                                    <span className="text-slate-900">
-                                      ₹{currentPrice.toFixed(0)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-amber-700 text-xs italic bg-amber-50 px-2.5 py-1 rounded-sm border border-amber-200">
-                                      Not Configured
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-3.5 px-5">
-                                  <div className="relative w-44">
-                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 font-bold text-sm">
-                                      ₹
-                                    </span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="1"
-                                      placeholder="0"
-                                      value={inputValue}
-                                      onChange={(e) =>
-                                        handlePriceInputChange(garment.id, e.target.value)
-                                      }
-                                      className={`w-full pl-8 pr-4 py-2 text-sm font-bold rounded-sm border min-h-[40px] focus:outline-none focus:ring-2 ${
-                                        isEdited
-                                          ? 'border-primary-500 bg-primary-50/40 text-primary-900 ring-2 ring-primary-400'
-                                          : 'border-slate-200 bg-slate-50 focus:bg-white focus:ring-primary-500'
-                                      }`}
-                                    />
-                                  </div>
-                                </td>
-                                <td className="py-3.5 px-5 text-right min-w-[100px]">
-                                  {isEdited && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveSinglePrice(garment.id)}
-                                      disabled={savingPrices}
-                                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-sm text-xs font-bold cursor-pointer transition-all shadow-xs min-h-[36px]"
+                                <Save size={14} />
+                                <span>Save All ({Object.keys(editedPrices).length})</span>
+                              </button>
+                            )}
+
+                            {/* Refresh / Reload Button */}
+                            <button
+                              type="button"
+                              onClick={fetchAllData}
+                              disabled={loading || savingPrices}
+                              title="Refresh pricing data"
+                              className="p-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 rounded-[3px] shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
+                            >
+                              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                            </button>
+                          </div>
+                        </div>
+                      }
+                    />
+
+                    {/* Notifications & Pricing Table Content Area */}
+                    <div className="space-y-3 mt-1">
+                      {/* Notifications */}
+                      {priceSaveSuccess && (
+                        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg flex items-center gap-2 shadow-2xs">
+                          <Check size={16} className="text-emerald-600 shrink-0" />{' '}
+                          {priceSaveSuccess}
+                        </div>
+                      )}
+                      {priceSaveError && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-lg flex items-center justify-between shadow-2xs">
+                          <span>{priceSaveError}</span>
+                          <button
+                            type="button"
+                            onClick={() => setPriceSaveError(null)}
+                            className="text-rose-500 hover:text-rose-800 cursor-pointer"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Stitch-styled Pricing Table Card */}
+                      {pricingFilteredGarments.length === 0 ? (
+                        <EmptyState
+                          message={
+                            pricingSearch
+                              ? `No garments matching "${pricingSearch}" in ${CATEGORY_LABELS[pricingCategory]}`
+                              : `No garments found in ${CATEGORY_LABELS[pricingCategory]}`
+                          }
+                        />
+                      ) : (
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm border-collapse">
+                              <thead className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                <tr>
+                                  <th className="py-3.5 px-4 w-16 text-center">Icon</th>
+                                  <th className="py-3.5 px-4">Garment Name</th>
+                                  <th className="py-3.5 px-4">Category</th>
+                                  <th className="py-3.5 px-4">Status</th>
+                                  <th className="py-3.5 px-4">Base Price</th>
+                                  <th className="py-3.5 px-4 min-w-[190px]">
+                                    Configure Price (
+                                    {currentPricingService?.name?.toUpperCase() || 'SERVICE'} ₹)
+                                  </th>
+                                  <th className="py-3.5 px-4">Services Status</th>
+                                  <th className="py-3.5 px-4 text-right pr-6">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {pricingFilteredGarments.map((garment, idx) => {
+                                  const currentPrice = getPriceFor(garment.id, pricingServiceId);
+                                  const hasPrice = currentPrice !== null;
+                                  const isEdited = editedPrices[garment.id] !== undefined;
+                                  const inputValue = isEdited
+                                    ? editedPrices[garment.id]
+                                    : hasPrice
+                                      ? String(currentPrice)
+                                      : '';
+                                  const basePrice = getBasePriceFor(garment.id);
+                                  const configuredCountForGarment = services.filter(
+                                    (s) => getPriceFor(garment.id, s.id) !== null,
+                                  ).length;
+                                  const totalServices = services.length;
+                                  const allConfigured =
+                                    configuredCountForGarment === totalServices &&
+                                    totalServices > 0;
+
+                                  return (
+                                    <tr
+                                      key={garment.id}
+                                      className="hover:bg-slate-50/70 transition-colors"
                                     >
-                                      Save
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                      {/* Column 1: ICON */}
+                                      <td className="py-3 px-4 text-center">
+                                        <div className="flex justify-center">
+                                          {renderGarmentIcon(garment.name)}
+                                        </div>
+                                      </td>
+
+                                      {/* Column 2: GARMENT NAME + SKU */}
+                                      <td className="py-3 px-4">
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-bold text-slate-900 leading-snug">
+                                            {garment.name}
+                                          </span>
+                                          <span className="text-[11px] font-mono text-slate-400 mt-0.5 tracking-wider">
+                                            {getGarmentSKU(garment.name, idx)}
+                                          </span>
+                                        </div>
+                                      </td>
+
+                                      {/* Column 3: CATEGORY */}
+                                      <td className="py-3 px-4">
+                                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/80 inline-block">
+                                          {CATEGORY_LABELS[garment.category] || garment.category}
+                                        </span>
+                                      </td>
+
+                                      {/* Column 4: STATUS */}
+                                      <td className="py-3 px-4">
+                                        {garment.isActive !== false ? (
+                                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 inline-block">
+                                            Active
+                                          </span>
+                                        ) : (
+                                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200 inline-block">
+                                            Inactive
+                                          </span>
+                                        )}
+                                      </td>
+
+                                      {/* Column 5: BASE PRICE */}
+                                      <td className="py-3 px-4 font-semibold text-slate-600">
+                                        {basePrice !== null ? (
+                                          <span>₹{basePrice.toFixed(0)}</span>
+                                        ) : (
+                                          <span className="text-slate-400 font-normal">—</span>
+                                        )}
+                                      </td>
+
+                                      {/* Column 6: CONFIGURE PRICE (SERVICE ₹) */}
+                                      <td className="py-3 px-4">
+                                        <div
+                                          className={`relative flex items-center bg-white border rounded-lg px-3 py-1.5 w-36 shadow-2xs hover:border-slate-300 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-100 transition-all ${
+                                            isEdited
+                                              ? 'border-primary-500 ring-2 ring-primary-200'
+                                              : 'border-slate-200'
+                                          }`}
+                                        >
+                                          <span className="text-slate-400 text-sm font-medium mr-1.5 select-none">
+                                            ₹
+                                          </span>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            placeholder="0"
+                                            value={inputValue}
+                                            onChange={(e) =>
+                                              handlePriceInputChange(garment.id, e.target.value)
+                                            }
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleSaveSinglePrice(garment.id);
+                                              }
+                                            }}
+                                            className="w-full text-sm font-bold text-slate-900 bg-transparent outline-none"
+                                          />
+                                          {isEdited ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleSaveSinglePrice(garment.id)}
+                                              disabled={savingPrices}
+                                              title="Save price (Enter)"
+                                              className="ml-1 text-primary-600 hover:text-primary-700 p-0.5 cursor-pointer shrink-0"
+                                            >
+                                              <Save size={15} />
+                                            </button>
+                                          ) : hasPrice ? (
+                                            <Check
+                                              size={16}
+                                              className="text-emerald-500 ml-1 shrink-0"
+                                              strokeWidth={2.5}
+                                            />
+                                          ) : null}
+                                        </div>
+                                      </td>
+
+                                      {/* Column 7: SERVICES STATUS */}
+                                      <td className="py-3 px-4">
+                                        <span
+                                          className={`px-3 py-1 rounded-full text-xs font-semibold border inline-flex items-center ${
+                                            allConfigured
+                                              ? 'bg-blue-50/90 text-blue-600 border-blue-200'
+                                              : configuredCountForGarment > 0
+                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                : 'bg-slate-100 text-slate-500 border-slate-200'
+                                          }`}
+                                        >
+                                          {configuredCountForGarment}/{totalServices} Configured
+                                        </span>
+                                      </td>
+
+                                      {/* Column 8: ACTION */}
+                                      <td className="py-3 px-4 text-right pr-6">
+                                        {canManage && (
+                                          <button
+                                            type="button"
+                                            onClick={() => openEditModal(garment)}
+                                            className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer transition-colors"
+                                          >
+                                            Edit
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Card Pagination Footer */}
+                          <div className="px-5 py-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                            <div>
+                              Showing 1–{pricingFilteredGarments.length} of{' '}
+                              {pricingFilteredGarments.length}{' '}
+                              {CATEGORY_LABELS[pricingCategory] || pricingCategory}'s garments
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 bg-white font-medium cursor-not-allowed text-xs"
+                              >
+                                Previous
+                              </button>
+                              <button
+                                type="button"
+                                className="w-7 h-7 rounded-md bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs"
+                              >
+                                1
+                              </button>
+                              <button
+                                type="button"
+                                disabled
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-400 bg-white font-medium cursor-not-allowed text-xs"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+
+                    {/* Stitch POS Fast Keys Footer Bar */}
+                    <div className="mt-6 -mx-4 -mb-4 md:-mx-6 md:-mb-6 bg-slate-900 text-slate-300 px-5 py-2.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800 shrink-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-bold uppercase tracking-wider text-slate-400 text-[11px]">
+                          POS FAST KEYS:
+                        </span>
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-[11px]">
+                          <span className="font-mono text-slate-400 font-bold">↵ Enter</span>
+                          <span className="text-slate-300">Save Rate</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-[11px]">
+                          <span className="font-mono text-slate-400 font-bold">Tab</span>
+                          <span className="text-slate-300">Next Line</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-[11px]">
+                          <span className="font-mono text-slate-400 font-bold">Esc</span>
+                          <span className="text-slate-300">Revert changes</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-400 text-[11px]">
+                        <span>GrowFast Retail POS 4.8.2</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          Cloud Database Connected
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1040,89 +2120,270 @@ export const CatalogSettingsPage: React.FC = () => {
         )}
       </main>
 
-      {/* ─── CREATE GARMENT MODAL ──────────────────────────── */}
+      {/* ─── CREATE GARMENT MODAL (Exact Stitch Match with 28px Inset) ──────────────────────────── */}
       {createModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-sm max-w-md w-full p-6 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Sparkles size={18} className="text-primary-600" /> Add New Garment
-              </h2>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                className="text-slate-400 hover:text-slate-600"
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div
+            className="bg-white shadow-2xl border border-slate-200 my-auto flex flex-col box-border overflow-hidden"
+            style={{ width: '560px', maxWidth: '95vw', maxHeight: '95vh', borderRadius: '3px' }}
+          >
+            <form
+              onSubmit={handleCreate}
+              className="flex flex-col m-0 p-0 w-full h-full box-border overflow-hidden"
+            >
+              {/* Modal Header (Pinned) */}
+              <div
+                className="flex items-start justify-between border-b border-slate-100 box-border shrink-0 bg-white"
+                style={{ padding: '16px 28px' }}
               >
-                <X size={18} />
-              </button>
-            </div>
-
-            {createError && (
-              <div className="mb-4 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-sm">
-                {createError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Garment Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Silk Blazer"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Category *
-                </label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value as GarmentCategory)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_LABELS[c] || c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Section / Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Formal, Delicate"
-                  value={newSection}
-                  onChange={(e) => setNewSection(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-sm text-sm focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 flex items-center justify-center bg-[#edf5ff] border border-[#dbeafe] text-[#2563eb] shrink-0"
+                    style={{ borderRadius: '3px' }}
+                  >
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-[15px] font-bold text-slate-900 leading-none">
+                        Add New Garment
+                      </h2>
+                      <span
+                        className="px-1.5 py-0.5 text-[9px] font-bold text-[#2563eb] bg-[#edf5ff] border border-[#bfdbfe] tracking-wider uppercase leading-none"
+                        style={{ borderRadius: '3px' }}
+                      >
+                        QUICK CREATE
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-400 mt-1 font-normal">
+                      Define garment metadata and optional workflow pricing
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={closeCreateModal}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-sm cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-50 transition-colors cursor-pointer"
+                  style={{ borderRadius: '3px' }}
+                  aria-label="Close modal"
                 >
-                  Cancel
+                  <X size={17} />
                 </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-sm shadow-xs cursor-pointer"
+              </div>
+
+              {createError && (
+                <div
+                  className="bg-rose-50 border border-rose-200 text-rose-700 text-xs box-border shrink-0"
+                  style={{ margin: '12px 28px 0 28px', padding: '10px 12px', borderRadius: '3px' }}
                 >
-                  {creating ? 'Adding...' : 'Create Garment'}
-                </button>
+                  {createError}
+                </div>
+              )}
+
+              {/* ONE inner content wrapper inside the modal body with 28px left/right padding */}
+              <div
+                className="w-full box-border flex flex-col overflow-y-auto flex-1"
+                style={{ padding: '18px 28px 20px 28px' }}
+              >
+                {/* Section 1: GARMENT DETAILS */}
+                <div className="w-full">
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb] inline-block shrink-0"></span>
+                    <span className="text-[10.5px] font-bold text-slate-700 tracking-wider uppercase">
+                      GARMENT DETAILS
+                    </span>
+                  </div>
+
+                  {/* 16px between form fields */}
+                  <div className="flex flex-col w-full" style={{ gap: '16px' }}>
+                    <div className="w-full">
+                      <label className="block text-[10px] font-bold text-slate-700 tracking-wider uppercase mb-1.5">
+                        GARMENT NAME <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Silk Blazer, Kurta Pajama, Suit 2-Piece"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        className="w-full bg-white border border-slate-300 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors box-border"
+                        style={{ height: '36px', padding: '0 12px', borderRadius: '3px' }}
+                      />
+                    </div>
+
+                    <div className="w-full">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10px] font-bold text-slate-700 tracking-wider uppercase">
+                          CATEGORY <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10.5px] text-slate-400 font-normal">
+                          Controls service workflow defaults
+                        </span>
+                      </div>
+                      <div className="relative w-full">
+                        <select
+                          value={newCategory}
+                          onChange={(e) => setNewCategory(e.target.value as GarmentCategory)}
+                          className="w-full bg-white border border-slate-300 text-xs text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none appearance-none cursor-pointer box-border"
+                          style={{ height: '36px', padding: '0 32px 0 12px', borderRadius: '3px' }}
+                        >
+                          {CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                              {CATEGORY_LABELS[c] || c}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                          <ChevronDown size={14} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full">
+                      <label className="block text-[10px] font-bold text-slate-700 tracking-wider uppercase mb-1.5">
+                        SECTION / NOTES{' '}
+                        <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Formal, Delicate, Heavy Embroidery, Woolen"
+                        value={newSection}
+                        onChange={(e) => setNewSection(e.target.value)}
+                        className="w-full bg-white border border-slate-300 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-colors box-border"
+                        style={{ height: '36px', padding: '0 12px', borderRadius: '3px' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: SERVICE PRICING (OPTIONAL) - 20px before Service Pricing */}
+                {canConfigurePricing && (
+                  <div className="w-full" style={{ marginTop: '20px' }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Tag size={13} className="text-[#2563eb]" />
+                        <span className="text-[10.5px] font-bold text-slate-700 tracking-wider uppercase">
+                          SERVICE PRICING (OPTIONAL)
+                        </span>
+                      </div>
+                      <span className="text-[10.5px] text-slate-400 font-normal">
+                        {visibleCreateServices.length} GrowFast Services
+                      </span>
+                    </div>
+
+                    {/* 12px between pricing header and info box */}
+                    <div
+                      className="w-full bg-[#f0f6ff] border border-[#d8e6fd] text-[11.5px] text-slate-700 flex items-start gap-2.5 leading-relaxed box-border"
+                      style={{
+                        marginTop: '12px',
+                        marginBottom: '12px',
+                        padding: '10px 12px',
+                        borderRadius: '3px',
+                      }}
+                    >
+                      <span className="text-sm select-none shrink-0 leading-none mt-0.5">💡</span>
+                      <div>
+                        You can set standard prices now or configure them later in{' '}
+                        <span className="font-semibold text-slate-900">Service Pricing</span>. Item
+                        creation does not require pricing.
+                      </div>
+                    </div>
+
+                    {/* Compact Services Table without inner scrollbar - 44px row height */}
+                    <div
+                      className="w-full border border-slate-200 overflow-hidden box-border"
+                      style={{ borderRadius: '3px' }}
+                    >
+                      <div
+                        className="bg-slate-50/80 border-b border-slate-200 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider box-border"
+                        style={{ height: '32px', padding: '0 14px' }}
+                      >
+                        <span>SERVICE NAME</span>
+                        <span>STANDARD PRICE (₹)</span>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {visibleCreateServices.map((svc) => {
+                          const isPromo = svc.name.toLowerCase().includes('free');
+                          return (
+                            <div
+                              key={svc.id}
+                              className="flex items-center justify-between hover:bg-slate-50/50 transition-colors box-border"
+                              style={{ height: '44px', padding: '0 14px' }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${getServiceDotColor(svc.name)}`}
+                                ></span>
+                                <span className="text-xs font-medium text-slate-800">
+                                  {svc.name}
+                                </span>
+                                {isPromo && (
+                                  <span
+                                    className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300/80 tracking-wide leading-none"
+                                    style={{ padding: '2px 6px', borderRadius: '3px' }}
+                                  >
+                                    Promo
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                className="flex items-center border border-slate-200 bg-white focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 overflow-hidden transition-colors box-border"
+                                style={{ width: '120px', height: '28px', borderRadius: '3px' }}
+                              >
+                                <div
+                                  className="h-full bg-slate-50/80 border-r border-slate-200 flex items-center justify-center text-xs text-slate-400 select-none shrink-0"
+                                  style={{ width: '26px' }}
+                                >
+                                  ₹
+                                </div>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  placeholder={isPromo ? '0.00' : '—'}
+                                  value={newPrices[svc.id] ?? ''}
+                                  onChange={(e) => handleNewPriceChange(svc.id, e.target.value)}
+                                  className="w-full h-full bg-transparent text-right text-xs font-medium text-slate-800 placeholder:text-slate-300 focus:outline-none box-border"
+                                  style={{ padding: '0 8px' }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer (Pinned) with 28px left/right padding */}
+              <div
+                className="w-full bg-[#f8fafc] border-t border-slate-200 flex items-center justify-between shrink-0 box-border"
+                style={{ padding: '12px 28px' }}
+              >
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <Check size={14} className="text-emerald-500 shrink-0 stroke-[2.5]" />
+                  <span>Prices can be edited anytime from catalog</span>
+                </div>
+                <div className="flex items-center shrink-0" style={{ gap: '11px' }}>
+                  <button
+                    type="button"
+                    onClick={closeCreateModal}
+                    className="text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs box-border"
+                    style={{ padding: '7px 16px', borderRadius: '3px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="text-xs font-semibold text-white bg-[#2563eb] hover:bg-blue-700 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 box-border"
+                    style={{ padding: '7px 20px', borderRadius: '3px' }}
+                  >
+                    <Plus size={14} className="stroke-[2.5]" />
+                    <span>{creating ? 'Creating...' : 'Create Garment'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

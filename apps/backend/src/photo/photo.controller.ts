@@ -50,11 +50,11 @@ export class PhotoController {
    * - orderItemId: string (optional)
    * - type: PhotoType enum value (required)
    *
-   * Roles: OWNER, MANAGER, COUNTER (not DELIVERY — intake photos are counter tasks)
+   * Roles: OWNER, COUNTER (not DELIVERY — intake photos are counter tasks)
    */
   @Post('photos/upload')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'MANAGER', 'COUNTER')
+  @Roles('OWNER', 'COUNTER')
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: PHOTO_MAX_FILE_SIZE },
