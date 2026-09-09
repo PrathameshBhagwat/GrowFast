@@ -4,7 +4,7 @@ import { OrderService } from './order.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { NotificationService } from '../notification/notification.service';
-import { PaymentService } from '../payment/payment.service';
+import { PaymentService, derivePaymentStatus } from '../payment/payment.service';
 import {
   PaymentStatus,
   PickupType,
@@ -75,6 +75,10 @@ const mockPrismaService: any = {
     update: jest.fn(),
     delete: jest.fn(),
   },
+  orderPhoto: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+  },
 };
 
 const mockCatalogService = {};
@@ -115,6 +119,18 @@ describe('OrderService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     };
+    mockPrismaService.orderPhoto = {
+      create: jest
+        .fn()
+        .mockImplementation((args: any) => Promise.resolve({ id: 'photo-mock-1', ...args.data })),
+      findMany: jest.fn().mockResolvedValue([]),
+    };
+    mockPrismaService.financialAdjustment = {
+      create: jest
+        .fn()
+        .mockImplementation((args: any) => Promise.resolve({ id: 'adj-mock-1', ...args.data })),
+      findMany: jest.fn().mockResolvedValue([]),
+    };
     mockPaymentService.recordPayment = jest.fn();
     mockPaymentService.getPaymentSummary = jest.fn();
     mockPaymentService.createAdjustment = jest.fn();
@@ -127,18 +143,31 @@ describe('OrderService', () => {
         .filter((a: any) => a.status === 'COMPLETED' && a.type === 'STORE_CREDIT')
         .reduce((sum: number, a: any) => sum + a.amount, 0);
       const totalAdjustments = refundAmount + storeCreditAmount;
-      const effectivePaid = (order.amountPaid ?? 0) - totalAdjustments;
+      const effectivePaid = Number(((order.amountPaid ?? 0) - totalAdjustments).toFixed(2));
       const amountDue =
         order.amountDue !== undefined
           ? order.amountDue
-          : Math.max(0, (order.totalAmount ?? 0) - effectivePaid);
+          : Math.max(0, Number(((order.totalAmount ?? 0) - effectivePaid).toFixed(2)));
+      let paymentStatus = derivePaymentStatus(
+        effectivePaid,
+        order.totalAmount ?? 0,
+        order.paymentStatus,
+      );
+      if (
+        order.totalAmount === 0 ||
+        (effectivePaid === 0 &&
+          (order.amountPaid ?? 0) > 0 &&
+          refundAmount >= (order.amountPaid ?? 0))
+      ) {
+        paymentStatus = PaymentStatus.REFUNDED;
+      }
       return {
         refundAmount,
         storeCreditAmount,
         totalAdjustments,
         effectivePaid,
         amountDue,
-        paymentStatus: order.paymentStatus ?? 'PAID',
+        paymentStatus,
       };
     });
 
@@ -166,6 +195,10 @@ describe('OrderService', () => {
           garmentCatalogId: 'g1',
           serviceTypeId: 's1',
           quantity: 2,
+          pieces: [
+            { unitNumber: 1, photoCount: 1 },
+            { unitNumber: 2, photoCount: 1 },
+          ],
         },
       ],
     };
@@ -569,7 +602,14 @@ describe('OrderService', () => {
         customerId: 'cust-1',
         isExpress: true,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'g1', serviceTypeId: 's1', quantity: 1 }],
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
       };
 
       await expect(service.createOrder(dto, 'emp-1', 'store-1')).rejects.toThrow(
@@ -1710,6 +1750,370 @@ describe('OrderService', () => {
     });
   });
 
+  describe('Phase 7A — Financial Authority Regression (add/cancel garment + adjustments)', () => {
+    const mockStore = { id: 'store1', expressSurchargePercent: 0 };
+
+    it('A. Existing paid order + add garment: recalculates amountDue and derives paymentStatus via PaymentService authority', async () => {
+      const paidOrder = {
+        id: 'o-paid-add',
+        storeId: 'store1',
+        status: OrderStatus.PROCESSING,
+        isExpress: false,
+        subtotal: 500,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 90,
+        totalAmount: 590,
+        amountPaid: 590,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        adjustments: [],
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 250,
+            lineTotal: 500,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            physicalGarments: [
+              { id: 'g1', unitNumber: 1, isReady: false, isCancelled: false },
+              { id: 'g2', unitNumber: 2, isReady: false, isCancelled: false },
+            ],
+          },
+        ],
+      };
+
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(paidOrder);
+      mockPrismaService.store.findUnique = jest.fn().mockResolvedValue(mockStore);
+      mockPrismaService.physicalGarment.create = jest
+        .fn()
+        .mockResolvedValue({ id: 'g3', unitNumber: 3 });
+      mockPrismaService.orderItem.update = jest.fn();
+      mockPrismaService.order.update = jest.fn();
+      service.findOrderById = jest.fn().mockResolvedValue(paidOrder);
+
+      await service.addPhysicalGarment('o-paid-add', 'item1', 'store1');
+
+      // Verify authoritative PaymentService call
+      expect(mockPaymentService.calculateOrderFinancialState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalAmount: 885,
+          amountPaid: 590,
+          paymentStatus: PaymentStatus.PAID,
+          adjustments: [],
+        }),
+      );
+
+      // Verify order update contains authoritative amountDue (295) and paymentStatus (PARTIAL)
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'o-paid-add' },
+          data: expect.objectContaining({
+            subtotal: 750,
+            totalAmount: 885,
+            amountDue: 295,
+            paymentStatus: PaymentStatus.PARTIAL,
+          }),
+        }),
+      );
+    });
+
+    it('B. Existing paid order + refund/store credit + add garment: proves adjustments are included in amountDue and paymentStatus', async () => {
+      const paidOrderWithAdjustments = {
+        id: 'o-adj-add',
+        storeId: 'store1',
+        status: OrderStatus.PROCESSING,
+        isExpress: false,
+        subtotal: 500,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 90,
+        totalAmount: 590,
+        amountPaid: 590,
+        amountDue: 150,
+        paymentStatus: PaymentStatus.PARTIAL,
+        adjustments: [
+          {
+            id: 'adj-1',
+            amount: 100,
+            type: AdjustmentType.REFUND,
+            status: AdjustmentStatus.COMPLETED,
+          },
+          {
+            id: 'adj-2',
+            amount: 50,
+            type: AdjustmentType.STORE_CREDIT,
+            status: AdjustmentStatus.COMPLETED,
+          },
+        ],
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 250,
+            lineTotal: 500,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            physicalGarments: [
+              { id: 'g1', unitNumber: 1, isReady: false, isCancelled: false },
+              { id: 'g2', unitNumber: 2, isReady: false, isCancelled: false },
+            ],
+          },
+        ],
+      };
+
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(paidOrderWithAdjustments);
+      mockPrismaService.store.findUnique = jest.fn().mockResolvedValue(mockStore);
+      mockPrismaService.physicalGarment.create = jest
+        .fn()
+        .mockResolvedValue({ id: 'g3', unitNumber: 3 });
+      mockPrismaService.orderItem.update = jest.fn();
+      mockPrismaService.order.update = jest.fn();
+      service.findOrderById = jest.fn().mockResolvedValue(paidOrderWithAdjustments);
+
+      await service.addPhysicalGarment('o-adj-add', 'item1', 'store1');
+
+      // Verify PaymentService was called with adjustments
+      expect(mockPaymentService.calculateOrderFinancialState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalAmount: 885,
+          amountPaid: 590,
+          adjustments: paidOrderWithAdjustments.adjustments,
+        }),
+      );
+
+      // Effective paid = 590 - 150 = 440; new total = 885; amountDue = 885 - 440 = 445
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'o-adj-add' },
+          data: expect.objectContaining({
+            totalAmount: 885,
+            amountDue: 445,
+            paymentStatus: PaymentStatus.PARTIAL,
+          }),
+        }),
+      );
+    });
+
+    it('C. Existing paid order + refund/store credit + cancel garment: creates adjustment and reconciles authoritative balance', async () => {
+      const orderWithAdjustments = {
+        id: 'o-adj-cancel',
+        storeId: 'store1',
+        status: OrderStatus.PROCESSING,
+        isExpress: false,
+        subtotal: 750,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 135,
+        totalAmount: 885,
+        amountPaid: 885,
+        amountDue: 50,
+        paymentStatus: PaymentStatus.PARTIAL,
+        adjustments: [
+          {
+            id: 'adj-existing',
+            amount: 50,
+            type: AdjustmentType.STORE_CREDIT,
+            status: AdjustmentStatus.COMPLETED,
+          },
+        ],
+        items: [
+          {
+            id: 'item1',
+            quantity: 3,
+            unitPrice: 250,
+            lineTotal: 750,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            physicalGarments: [
+              { id: 'g1', unitNumber: 1, isReady: true, isCancelled: false },
+              { id: 'g2', unitNumber: 2, isReady: true, isCancelled: false },
+              { id: 'g3', unitNumber: 3, isReady: false, isCancelled: false },
+            ],
+          },
+        ],
+      };
+
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(orderWithAdjustments);
+      mockPrismaService.store.findUnique = jest.fn().mockResolvedValue(mockStore);
+      mockPrismaService.physicalGarment.update = jest.fn().mockResolvedValue({});
+      mockPrismaService.orderItem.update = jest.fn();
+      mockPrismaService.order.update = jest.fn();
+      // Current effective paid = 885 - 50 = 835. New total = 590. Reduction required = 835 - 590 = 245.
+      mockPrismaService.financialAdjustment.create = jest.fn().mockResolvedValue({
+        id: 'adj-new',
+        orderId: 'o-adj-cancel',
+        type: AdjustmentType.REFUND,
+        amount: 245,
+        reason: 'Refund for cancelled piece',
+        status: AdjustmentStatus.COMPLETED,
+      });
+      service.findOrderById = jest.fn().mockResolvedValue(orderWithAdjustments);
+
+      await service.cancelPhysicalGarment(
+        'o-adj-cancel',
+        'item1',
+        'g3',
+        'store1',
+        'emp-owner',
+        Role.OWNER,
+        {
+          type: AdjustmentType.REFUND,
+          amount: 245,
+          reason: 'Refund for cancelled piece',
+        },
+      );
+
+      // Verify financial adjustment was created
+      expect(mockPrismaService.financialAdjustment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          orderId: 'o-adj-cancel',
+          type: AdjustmentType.REFUND,
+          amount: 245,
+          status: AdjustmentStatus.COMPLETED,
+          createdById: 'emp-owner',
+        }),
+      });
+
+      // Total adjustments = 50 + 245 = 295. Effective paid = 885 - 295 = 590. Total = 590 => amountDue = 0, status = PAID.
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'o-adj-cancel' },
+          data: expect.objectContaining({
+            totalAmount: 590,
+            amountDue: 0,
+            paymentStatus: PaymentStatus.PAID,
+          }),
+        }),
+      );
+    });
+
+    it('D. amountDue remains authoritative: directly uses PaymentService.calculateOrderFinancialState return value', async () => {
+      const order = {
+        id: 'o-auth-due',
+        storeId: 'store1',
+        status: OrderStatus.PROCESSING,
+        isExpress: false,
+        subtotal: 500,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 90,
+        totalAmount: 590,
+        amountPaid: 300,
+        amountDue: 290,
+        paymentStatus: PaymentStatus.PARTIAL,
+        adjustments: [],
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 250,
+            lineTotal: 500,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            physicalGarments: [
+              { id: 'g1', unitNumber: 1, isReady: false, isCancelled: false },
+              { id: 'g2', unitNumber: 2, isReady: false, isCancelled: false },
+            ],
+          },
+        ],
+      };
+
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(order);
+      mockPrismaService.store.findUnique = jest.fn().mockResolvedValue(mockStore);
+      mockPrismaService.physicalGarment.create = jest
+        .fn()
+        .mockResolvedValue({ id: 'g3', unitNumber: 3 });
+      mockPrismaService.orderItem.update = jest.fn();
+      mockPrismaService.order.update = jest.fn();
+      service.findOrderById = jest.fn().mockResolvedValue(order);
+
+      // Explicitly mock a distinct authoritative return from calculateOrderFinancialState
+      mockPaymentService.calculateOrderFinancialState.mockReturnValueOnce({
+        refundAmount: 0,
+        storeCreditAmount: 0,
+        totalAdjustments: 0,
+        effectivePaid: 300,
+        amountDue: 585, // Authoritative override
+        paymentStatus: PaymentStatus.PARTIAL,
+      });
+
+      await service.addPhysicalGarment('o-auth-due', 'item1', 'store1');
+
+      // Order update must strictly receive the authoritative amountDue from PaymentService
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            amountDue: 585,
+          }),
+        }),
+      );
+    });
+
+    it('E. paymentStatus remains authoritative: directly uses PaymentService.calculateOrderFinancialState return value', async () => {
+      const order = {
+        id: 'o-auth-status',
+        storeId: 'store1',
+        status: OrderStatus.PROCESSING,
+        isExpress: false,
+        subtotal: 500,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 90,
+        totalAmount: 590,
+        amountPaid: 590,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+        adjustments: [],
+        items: [
+          {
+            id: 'item1',
+            quantity: 2,
+            unitPrice: 250,
+            lineTotal: 500,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            physicalGarments: [
+              { id: 'g1', unitNumber: 1, isReady: false, isCancelled: false },
+              { id: 'g2', unitNumber: 2, isReady: false, isCancelled: false },
+            ],
+          },
+        ],
+      };
+
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(order);
+      mockPrismaService.store.findUnique = jest.fn().mockResolvedValue(mockStore);
+      mockPrismaService.physicalGarment.create = jest
+        .fn()
+        .mockResolvedValue({ id: 'g3', unitNumber: 3 });
+      mockPrismaService.orderItem.update = jest.fn();
+      mockPrismaService.order.update = jest.fn();
+      service.findOrderById = jest.fn().mockResolvedValue(order);
+
+      // Explicitly mock an authoritative paymentStatus return
+      mockPaymentService.calculateOrderFinancialState.mockReturnValueOnce({
+        refundAmount: 0,
+        storeCreditAmount: 0,
+        totalAdjustments: 0,
+        effectivePaid: 590,
+        amountDue: 0,
+        paymentStatus: PaymentStatus.PAID,
+      });
+
+      await service.addPhysicalGarment('o-auth-status', 'item1', 'store1');
+
+      // Order update must strictly receive the authoritative paymentStatus from PaymentService
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            paymentStatus: PaymentStatus.PAID,
+          }),
+        }),
+      );
+    });
+  });
+
   describe('Phase 4B — Physical Garment Delivery & Handover Foundation', () => {
     it('should map isDelivered and deliveredAt on physicalGarments and order handover fields in detail DTO', () => {
       const orderData = {
@@ -2666,6 +3070,713 @@ describe('OrderService', () => {
       await expect(
         service.recordPickup(orderId, { garmentIds: ['pg-1', 'pg-1'] }, employeeId, storeId),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('createOrder - Photo Requirement Flow (15 Required Scenarios)', () => {
+    const storeId = 'store-test-1';
+    const employeeId = 'emp-test-1';
+    const customerId = 'cust-test-1';
+
+    const mockCustomer = {
+      id: customerId,
+      name: 'Alice Smith',
+      phone: '9876543210',
+    };
+
+    const mockStore = {
+      id: storeId,
+      name: 'Main Dry Cleaners',
+      expressSurchargePercent: 20,
+    };
+
+    const mockGarmentRegular = {
+      id: 'g-regular',
+      name: 'Shirt',
+      isActive: true,
+      category: 'MEN',
+    };
+
+    const mockGarmentWeightBased = {
+      id: 'g-weight',
+      name: 'Mixed Laundry (kg)',
+      isActive: true,
+      category: 'WEIGHT_BASED',
+    };
+
+    const mockServiceRegular = {
+      id: 's-regular',
+      name: 'Wash & Fold',
+      isActive: true,
+      estimatedDays: 2,
+      category: 'WASH',
+    };
+
+    const mockServiceWeightBased = {
+      id: 's-weight',
+      name: 'Weight Wash',
+      isActive: true,
+      estimatedDays: 1,
+      category: 'WEIGHT_BASED',
+    };
+
+    function setupMocks(options?: {
+      isWeightGarment?: boolean;
+      isWeightService?: boolean;
+      price?: number;
+    }) {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomer);
+      mockPrismaService.store.findUnique.mockResolvedValue(mockStore);
+
+      const garments = [options?.isWeightGarment ? mockGarmentWeightBased : mockGarmentRegular];
+      const services = [options?.isWeightService ? mockServiceWeightBased : mockServiceRegular];
+
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue(garments);
+      mockPrismaService.serviceType.findMany.mockResolvedValue(services);
+
+      const unitPrice = options?.price ?? 100;
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+        {
+          garmentCatalogId: garments[0].id,
+          serviceTypeId: services[0].id,
+          price: unitPrice,
+        },
+      ]);
+
+      mockPrismaService.order.count.mockResolvedValue(0);
+
+      mockPrismaService.order.create.mockImplementation((args: any) => {
+        const orderId = 'order-created-123';
+        const items = (args.data.items.create || []).map((it: any, itemIdx: number) => {
+          const itemId = `item-${itemIdx + 1}`;
+          const physicalGarments = Array.from({ length: it.quantity }, (_, pIdx) => ({
+            id: `pg-${itemId}-${pIdx + 1}`,
+            orderItemId: itemId,
+            unitNumber: pIdx + 1,
+            isReady: false,
+            isCancelled: false,
+            isDelivered: false,
+            deliveredAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            photos: [],
+          }));
+          return {
+            id: itemId,
+            orderId,
+            garmentCatalogId: it.garmentCatalogId,
+            serviceTypeId: it.serviceTypeId,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            lineTotal: it.lineTotal,
+            colorTags: it.colorTags || [],
+            defectNotes: it.defectNotes || null,
+            itemStatus: 'RECEIVED',
+            deliveredQuantity: 0,
+            itemDueDate: new Date(),
+            garmentCatalog: garments.find((g) => g.id === it.garmentCatalogId) || garments[0],
+            serviceType: services.find((s) => s.id === it.serviceTypeId) || services[0],
+            physicalGarments,
+          };
+        });
+
+        return Promise.resolve({
+          id: orderId,
+          orderNumber: 'GF-000001',
+          customerId: args.data.customerId,
+          storeId: args.data.storeId,
+          orderDate: new Date(),
+          effectiveDueDate: new Date(),
+          systemDueDate: new Date(),
+          dueDateOverrideReason: null,
+          dueDateOverriddenBy: null,
+          isExpress: args.data.isExpress,
+          priority: args.data.priority,
+          status: 'RECEIVED',
+          subtotal: args.data.subtotal,
+          discountAmount: args.data.discountAmount,
+          taxAmount: args.data.taxAmount,
+          totalAmount: args.data.totalAmount,
+          expressSurcharge: args.data.expressSurcharge,
+          amountPaid: 0,
+          pickupType: args.data.pickupType,
+          deliveredAt: null,
+          notes: args.data.notes,
+          createdById: args.data.createdById,
+          createdBy: { id: employeeId, name: 'Staff' },
+          customer: mockCustomer,
+          items,
+          payments: [],
+          adjustments: [],
+        });
+      });
+    }
+
+    // 1. One piece with one photo => succeeds
+    it('Scenario 1a: One piece with one photo => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.status).toBe(OrderStatus.RECEIVED);
+    });
+
+    // 1b. One piece with two photos => succeeds
+    it('Scenario 1b: One piece with two photos => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 2 }],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.status).toBe(OrderStatus.RECEIVED);
+    });
+
+    // 1c. One piece with five photos => succeeds
+    it('Scenario 1c: One piece with five photos => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 5 }],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.status).toBe(OrderStatus.RECEIVED);
+    });
+
+    // 1. Walk-in, 3 pieces, no photos => rejected.
+    it('Scenario 1: Walk-in, 3 pieces, no photos => rejected', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 3,
+            pieces: [], // no photos
+          },
+        ],
+      };
+      await expect(service.createOrder(dto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 2. Walk-in, 3 pieces, only 2 pieces photographed => rejected.
+    it('Scenario 2: Walk-in, 3 pieces, only 2 pieces photographed => rejected', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 3,
+            pieces: [
+              { unitNumber: 1, photoCount: 1 },
+              { unitNumber: 2, photoCount: 1 },
+              // unitNumber 3 missing
+            ],
+          },
+        ],
+      };
+      await expect(service.createOrder(dto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 3. Walk-in, 3 pieces, all 3 photographed => succeeds.
+    it('Scenario 3: Walk-in, 3 pieces, all 3 photographed => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 3,
+            pieces: [
+              { unitNumber: 1, photoCount: 1 },
+              { unitNumber: 2, photoCount: 1 },
+              { unitNumber: 3, photoCount: 1 },
+            ],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.id).toBe('order-created-123');
+      expect(result.status).toBe(OrderStatus.RECEIVED);
+    });
+
+    // 4. Walk-in, 3 pieces, multiple photos distributed across pieces (Piece 1: 3, Piece 2: 1, Piece 3: 2) => succeeds.
+    it('Scenario 4: Walk-in, 3 pieces, multiple photos distributed (Piece 1: 3, Piece 2: 1, Piece 3: 2) => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 3,
+            pieces: [
+              { unitNumber: 1, photoCount: 3 }, // multiple photos on piece 1
+              { unitNumber: 2, photoCount: 1 },
+              { unitNumber: 3, photoCount: 2 }, // multiple photos on piece 3
+            ],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.status).toBe(OrderStatus.RECEIVED);
+    });
+
+    // 5. Walk-in, 49 pieces, all required pieces photographed => succeeds.
+    it('Scenario 5: Walk-in, 49 pieces, all required pieces photographed => succeeds', async () => {
+      setupMocks();
+      const pieces = Array.from({ length: 49 }, (_, i) => ({
+        unitNumber: i + 1,
+        photoCount: 1,
+      }));
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 49,
+            pieces,
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.itemCount).toBe(49);
+    });
+
+    // 6. Walk-in, 50 pieces, no photos => succeeds.
+    it('Scenario 6: Walk-in, 50 pieces (bulk threshold), no photos => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 50,
+            pieces: [], // no photos
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.itemCount).toBe(50);
+    });
+
+    // 7. Walk-in, 60 pieces, no photos => succeeds.
+    it('Scenario 7: Walk-in, 60 pieces (bulk), no photos => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 60,
+            pieces: [],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.itemCount).toBe(60);
+    });
+
+    // 7b. Bulk order with multiple photos on one piece => succeeds
+    it('Scenario 7b: Bulk order with multiple photos on one piece => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 50,
+            pieces: [
+              { unitNumber: 1, photoCount: 3 }, // piece 1 has 3 photos, others have 0
+            ],
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.itemCount).toBe(50);
+    });
+
+    // 8. Weight-based order, no photos => rejected.
+    it('Scenario 8: Weight-based order (item category WEIGHT_BASED), no photos => rejected', async () => {
+      setupMocks({ isWeightGarment: true });
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            pieces: [],
+          },
+        ],
+      };
+      await expect(service.createOrder(dto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 9. Weight-based order with 50+ pieces, no photos => rejected.
+    it('Scenario 9: Weight-based order with 50+ pieces, no photos => rejected', async () => {
+      setupMocks({ isWeightService: true });
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-weight',
+            quantity: 55,
+            pieces: [],
+          },
+        ],
+      };
+      await expect(service.createOrder(dto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 10. Weight-based order with every required piece photographed => succeeds.
+    it('Scenario 10: Weight-based order with every required piece photographed => succeeds', async () => {
+      setupMocks({ isWeightGarment: true });
+      const pieces = Array.from({ length: 50 }, (_, i) => ({
+        unitNumber: i + 1,
+        photoCount: 1,
+      }));
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            quantity: 50,
+            pieces,
+          },
+        ],
+      };
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.itemCount).toBe(50);
+    });
+
+    // 11. Captured photos are visible immediately after order creation.
+    it('Scenario 11: Captured photos are returned with physicalGarments immediately after order creation', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 2,
+            pieces: [
+              { unitNumber: 1, photos: ['http://img.com/p1.jpg'] },
+              { unitNumber: 2, photos: ['http://img.com/p2.jpg'] },
+            ],
+          },
+        ],
+      };
+
+      // Mock tx.order.findUnique after photo creation
+      mockPrismaService.order.findUnique.mockResolvedValue({
+        id: 'order-created-123',
+        orderNumber: 'GF-000001',
+        customerId,
+        storeId,
+        orderDate: new Date(),
+        effectiveDueDate: new Date(),
+        systemDueDate: new Date(),
+        dueDateOverrideReason: null,
+        dueDateOverriddenBy: null,
+        isExpress: false,
+        priority: OrderPriority.STANDARD,
+        status: OrderStatus.RECEIVED,
+        subtotal: 200,
+        discountAmount: 0,
+        taxAmount: 0,
+        totalAmount: 200,
+        expressSurcharge: 0,
+        amountPaid: 0,
+        pickupType: PickupType.STORE_PICKUP,
+        deliveredAt: null,
+        notes: '',
+        createdById: employeeId,
+        createdBy: { id: employeeId, name: 'Staff' },
+        customer: mockCustomer,
+        items: [
+          {
+            id: 'item-1',
+            orderId: 'order-created-123',
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 2,
+            unitPrice: 100,
+            lineTotal: 200,
+            colorTags: [],
+            defectNotes: null,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            itemDueDate: new Date(),
+            garmentCatalog: mockGarmentRegular,
+            serviceType: mockServiceRegular,
+            physicalGarments: [
+              {
+                id: 'pg-item-1-1',
+                orderItemId: 'item-1',
+                unitNumber: 1,
+                isReady: false,
+                isCancelled: false,
+                isDelivered: false,
+                deliveredAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                photos: [
+                  {
+                    id: 'ph-1',
+                    orderItemId: 'item-1',
+                    physicalGarmentId: 'pg-item-1-1',
+                    type: 'FRONT',
+                    url: 'http://img.com/p1.jpg',
+                    uploadedAt: new Date(),
+                  },
+                ],
+              },
+              {
+                id: 'pg-item-1-2',
+                orderItemId: 'item-1',
+                unitNumber: 2,
+                isReady: false,
+                isCancelled: false,
+                isDelivered: false,
+                deliveredAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                photos: [
+                  {
+                    id: 'ph-2',
+                    orderItemId: 'item-1',
+                    physicalGarmentId: 'pg-item-1-2',
+                    type: 'FRONT',
+                    url: 'http://img.com/p2.jpg',
+                    uploadedAt: new Date(),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        payments: [],
+        adjustments: [],
+      });
+
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result.items[0].physicalGarments[0].photos).toHaveLength(1);
+      expect(result.items[0].physicalGarments[0].photos[0].url).toBe('http://img.com/p1.jpg');
+      expect(result.items[0].physicalGarments[1].photos[0].url).toBe('http://img.com/p2.jpg');
+    });
+
+    // 12. Photo belongs to the correct PhysicalGarment.
+    it('Scenario 12: Photo belongs to the correct PhysicalGarment by unitNumber', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 2,
+            pieces: [
+              { unitNumber: 1, photos: ['http://img.com/piece1.jpg'] },
+              { unitNumber: 2, photos: ['http://img.com/piece2.jpg'] },
+            ],
+          },
+        ],
+      };
+
+      await service.createOrder(dto, employeeId, storeId);
+      expect(mockPrismaService.orderPhoto.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            physicalGarmentId: 'pg-item-1-1',
+            url: 'http://img.com/piece1.jpg',
+          }),
+        }),
+      );
+      expect(mockPrismaService.orderPhoto.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            physicalGarmentId: 'pg-item-1-2',
+            url: 'http://img.com/piece2.jpg',
+          }),
+        }),
+      );
+    });
+
+    // 13. Multiple photos for one PhysicalGarment are preserved.
+    it('Scenario 13: Multiple photos for one PhysicalGarment are preserved', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            pieces: [
+              {
+                unitNumber: 1,
+                photos: [
+                  'http://img.com/piece1_front.jpg',
+                  'http://img.com/piece1_back.jpg',
+                  'http://img.com/piece1_tag.jpg',
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.createOrder(dto, employeeId, storeId);
+      expect(mockPrismaService.orderPhoto.create).toHaveBeenCalledTimes(3);
+    });
+
+    // 14. Existing legacy orders remain unaffected.
+    it('Scenario 14: Existing legacy orders remain unaffected', async () => {
+      const order = {
+        id: 'legacy-order-1',
+        orderNumber: 'GF-LEGACY-001',
+        customerId,
+        storeId,
+        orderDate: new Date(),
+        effectiveDueDate: new Date(),
+        systemDueDate: new Date(),
+        dueDateOverrideReason: null,
+        dueDateOverriddenBy: null,
+        isExpress: false,
+        priority: OrderPriority.STANDARD,
+        status: OrderStatus.RECEIVED,
+        subtotal: 100,
+        discountAmount: 0,
+        taxAmount: 0,
+        totalAmount: 100,
+        expressSurcharge: 0,
+        amountPaid: 0,
+        pickupType: PickupType.STORE_PICKUP,
+        deliveredAt: null,
+        notes: '',
+        createdById: employeeId,
+        createdBy: { id: employeeId, name: 'Staff' },
+        customer: mockCustomer,
+        items: [
+          {
+            id: 'legacy-item-1',
+            orderId: 'legacy-order-1',
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            unitPrice: 100,
+            lineTotal: 100,
+            colorTags: [],
+            defectNotes: null,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            itemDueDate: new Date(),
+            garmentCatalog: mockGarmentRegular,
+            serviceType: mockServiceRegular,
+            physicalGarments: [], // No physical garments, no photos
+          },
+        ],
+        payments: [],
+        adjustments: [],
+      };
+
+      mockPrismaService.order.findUnique.mockResolvedValue(order);
+      const result = await service.findOrderById('legacy-order-1', storeId);
+      expect(result).toBeDefined();
+      expect(result.id).toBe('legacy-order-1');
+      expect(result.items[0].physicalGarments).toHaveLength(0);
+    });
+
+    // 15. Unauthorized/store-isolation behavior remains unchanged.
+    it('Scenario 15: Unauthorized / store-isolation behavior remains unchanged', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomer);
+      mockPrismaService.store.findUnique.mockResolvedValue(null); // Store not found for storeId
+
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await expect(
+        service.createOrder(dto, employeeId, 'different-unauthorized-store'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

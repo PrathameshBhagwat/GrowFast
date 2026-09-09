@@ -176,8 +176,7 @@ export const DashboardPage: React.FC = () => {
   return (
     <div
       style={{
-        height: '100vh',
-        overflowY: 'auto',
+        minHeight: '100vh',
         background: '#F3F4F6',
         paddingBottom: 40,
       }}

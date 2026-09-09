@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, User, Lock, ArrowRight, Check } from 'lucide-react';
 import { Dropdown, DropdownOption } from '@growfast/ui';
+import { apiFetch } from '../services/api';
 
 export const LoginPage: React.FC = () => {
   const { login, error } = useAuth();
@@ -26,12 +27,11 @@ export const LoginPage: React.FC = () => {
   useEffect(() => {
     const fetchDirectory = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || '/api';
-        const res = await fetch(`${API_URL}/auth/directory`);
-        if (res.ok) {
-          const body = await res.json();
-          setDirectory(body.data || []);
-        }
+        const body = await apiFetch<{ data: { id: string; name: string; role: string }[] }>(
+          '/auth/directory',
+          { noAuth: true, retries: 2, retryDelay: 1000 },
+        );
+        setDirectory(body.data || []);
       } catch (err) {
         console.error('Failed to fetch employee directory', err);
       } finally {
@@ -80,7 +80,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex items-center justify-center relative overflow-hidden font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-slate-50/80 flex items-center justify-center relative font-sans selection:bg-blue-100 selection:text-blue-900">
       {/* ── Background Decorative Elements ── */}
       {/* Top Left Shape */}
       <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-blue-100/60 rounded-full blur-3xl pointer-events-none" />

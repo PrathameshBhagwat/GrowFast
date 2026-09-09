@@ -3,6 +3,7 @@ import { DeliveryService } from './delivery.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
+import { PhotoStorageService } from '../photo/photo-storage.service';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DeliveryStatus, ItemStatus, Role } from '@growfast/shared-types';
 
@@ -20,6 +21,7 @@ import { deriveOrderStatus } from '@growfast/shared-types';
 describe('DeliveryService', () => {
   let service: DeliveryService;
   let prisma: any;
+  let mockPhotoStorage: any;
 
   const STORE_ID = 'store-1';
   const OTHER_STORE_ID = 'store-2';
@@ -111,6 +113,15 @@ describe('DeliveryService', () => {
       })),
     };
 
+    mockPhotoStorage = {
+      getAccessUrl: jest.fn().mockImplementation(async (url: string) => {
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        return `https://presigned.example.com/${url}?token=signed`;
+      }),
+      store: jest.fn(),
+      delete: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DeliveryService,
@@ -120,6 +131,7 @@ describe('DeliveryService', () => {
           useValue: { createNotificationEvent: jest.fn().mockResolvedValue(null) },
         },
         { provide: PaymentService, useValue: mockPaymentService },
+        { provide: PhotoStorageService, useValue: mockPhotoStorage },
       ],
     }).compile();
 
@@ -846,6 +858,123 @@ describe('DeliveryService', () => {
           }),
         }),
       );
+    });
+  });
+
+  // ─── PROOF PHOTO URL RESOLUTION ───────────────────────────────────
+
+  describe('proofPhotoUrl resolution via PhotoStorageService', () => {
+    it('should keep proofPhotoUrl null when delivery has no proof photo', async () => {
+      prisma.deliveryRecord.findUnique.mockResolvedValue({
+        ...mockDelivery,
+        proofPhotoUrl: null,
+      });
+
+      const result = await service.findDeliveryById(
+        DELIVERY_ID,
+        STORE_ID,
+        EMPLOYEE_ID,
+        Role.MANAGER,
+      );
+
+      expect(result.proofPhotoUrl).toBeNull();
+      expect(mockPhotoStorage.getAccessUrl).not.toHaveBeenCalled();
+    });
+
+    it('should resolve R2 object key to presigned URL via getAccessUrl()', async () => {
+      const r2Key = 'stores/store-1/orders/order-1/delivery/delivery_proof_abc123.jpg';
+      prisma.deliveryRecord.findUnique.mockResolvedValue({
+        ...mockDelivery,
+        proofPhotoUrl: r2Key,
+      });
+
+      const result = await service.findDeliveryById(
+        DELIVERY_ID,
+        STORE_ID,
+        EMPLOYEE_ID,
+        Role.MANAGER,
+      );
+
+      expect(mockPhotoStorage.getAccessUrl).toHaveBeenCalledWith(r2Key);
+      expect(result.proofPhotoUrl).toBe(`https://presigned.example.com/${r2Key}?token=signed`);
+    });
+
+    it('should pass through existing http/https URLs safely', async () => {
+      const legacyUrl = 'https://example.com/photos/proof.jpg';
+      prisma.deliveryRecord.findUnique.mockResolvedValue({
+        ...mockDelivery,
+        proofPhotoUrl: legacyUrl,
+      });
+
+      const result = await service.findDeliveryById(
+        DELIVERY_ID,
+        STORE_ID,
+        EMPLOYEE_ID,
+        Role.MANAGER,
+      );
+
+      expect(mockPhotoStorage.getAccessUrl).toHaveBeenCalledWith(legacyUrl);
+      // getAccessUrl mock returns http/https URLs as-is
+      expect(result.proofPhotoUrl).toBe(legacyUrl);
+    });
+
+    it('should return null proofPhotoUrl when PhotoStorageService.getAccessUrl() fails', async () => {
+      const r2Key = 'stores/store-1/orders/order-1/delivery/delivery_proof_abc123.jpg';
+      prisma.deliveryRecord.findUnique.mockResolvedValue({
+        ...mockDelivery,
+        proofPhotoUrl: r2Key,
+      });
+      mockPhotoStorage.getAccessUrl.mockRejectedValueOnce(new Error('R2 signing failed'));
+
+      const result = await service.findDeliveryById(
+        DELIVERY_ID,
+        STORE_ID,
+        EMPLOYEE_ID,
+        Role.MANAGER,
+      );
+
+      // Should not expose raw R2 key
+      expect(result.proofPhotoUrl).toBeNull();
+    });
+
+    it('should resolve proof photo URL in completeDelivery response', async () => {
+      const r2Key = 'stores/store-1/orders/order-1/delivery/delivery_proof_xyz.jpg';
+
+      mockTx.deliveryRecord.findUnique
+        .mockResolvedValueOnce({
+          ...mockDelivery,
+          status: DeliveryStatus.IN_TRANSIT,
+        })
+        .mockResolvedValueOnce({
+          ...mockDelivery,
+          status: DeliveryStatus.COMPLETED,
+          proofPhotoUrl: r2Key,
+        });
+      mockTx.deliveryRecord.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.orderItem.updateMany.mockResolvedValue({ count: 1 });
+      mockTx.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        items: mockOrder.items.map((i) => ({
+          ...i,
+          itemStatus: ItemStatus.DELIVERED,
+          deliveredQuantity: i.quantity,
+        })),
+      });
+      mockTx.deliveryRecord.count.mockResolvedValue(0);
+      mockTx.order.update.mockResolvedValue({});
+
+      const result = await service.completeDelivery(
+        DELIVERY_ID,
+        r2Key,
+        'Delivered OK',
+        undefined,
+        STORE_ID,
+        DRIVER_ID,
+        Role.DELIVERY,
+      );
+
+      expect(mockPhotoStorage.getAccessUrl).toHaveBeenCalledWith(r2Key);
+      expect(result.proofPhotoUrl).toBe(`https://presigned.example.com/${r2Key}?token=signed`);
     });
   });
 });
