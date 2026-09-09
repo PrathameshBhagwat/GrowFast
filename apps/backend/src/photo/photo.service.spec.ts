@@ -81,6 +81,7 @@ describe('PhotoService', () => {
 
     service = module.get<PhotoService>(PhotoService);
     jest.clearAllMocks();
+    mockStorageService.getAccessUrl.mockImplementation(async (url: string) => url);
   });
 
   // ── VALIDATION TESTS ──────────────────────────────────────────────
@@ -479,7 +480,7 @@ describe('PhotoService', () => {
   // ── SECURITY TESTS ────────────────────────────────────────────────
 
   describe('Security', () => {
-    it('should generate unpredictable object keys', async () => {
+    it('should generate unpredictable, tenant-safe object keys', async () => {
       mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
       mockStorageService.store.mockResolvedValue(MOCK_STORED_URL);
       mockPrismaService.orderPhoto.create.mockResolvedValue(MOCK_PHOTO_RECORD);
@@ -490,13 +491,84 @@ describe('PhotoService', () => {
         MOCK_STORE_ID,
       );
 
-      // Verify the key passed to storage is not simply "orderId/type.ext"
+      // Verify the key passed to storage is tenant-safe with storeId and orderId
       const storeCall = mockStorageService.store.mock.calls[0];
       const key = storeCall[0] as string;
 
-      // Key should NOT be just "order-001/front.jpg" — it must contain a UUID
       expect(key).not.toBe('order-001/front.jpg');
-      expect(key).toMatch(/^.+\/.+_.+\.\w+$/); // pattern: prefix/type_uuid.ext
+      expect(key).toMatch(/^stores\/store-001\/orders\/order-001\/front_[a-f0-9-]+\.jpg$/);
+    });
+
+    it('should generate tenant-safe keys for physical garments', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
+      mockPrismaService.physicalGarment.findUnique.mockResolvedValue({
+        id: 'garment-123',
+        orderItemId: 'item-001',
+        orderItem: { orderId: 'order-001', order: { storeId: MOCK_STORE_ID } },
+      });
+      mockStorageService.store.mockResolvedValue(MOCK_STORED_URL);
+      mockPrismaService.orderPhoto.create.mockResolvedValue(MOCK_PHOTO_RECORD);
+
+      await service.uploadPhoto(
+        { orderId: 'order-001', physicalGarmentId: 'garment-123', type: PhotoType.STAIN },
+        createMockFile(),
+        MOCK_STORE_ID,
+      );
+
+      const key = mockStorageService.store.mock.calls[0][0] as string;
+      expect(key).toMatch(
+        /^stores\/store-001\/orders\/order-001\/garments\/garment-123\/stain_[a-f0-9-]+\.jpg$/,
+      );
+    });
+
+    it('should generate tenant-safe keys for delivery proof photos', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
+      mockStorageService.store.mockResolvedValue(MOCK_STORED_URL);
+      mockPrismaService.orderPhoto.create.mockResolvedValue(MOCK_PHOTO_RECORD);
+
+      await service.uploadPhoto(
+        { orderId: 'order-001', type: PhotoType.DELIVERY_PROOF },
+        createMockFile(),
+        MOCK_STORE_ID,
+      );
+
+      const key = mockStorageService.store.mock.calls[0][0] as string;
+      expect(key).toMatch(
+        /^stores\/store-001\/orders\/order-001\/delivery\/delivery_proof_[a-f0-9-]+\.jpg$/,
+      );
+    });
+
+    it('supports multiple photos per garment independently without overwriting', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue(MOCK_ORDER);
+      mockPrismaService.physicalGarment.findUnique.mockResolvedValue({
+        id: 'garment-123',
+        orderItemId: 'item-001',
+        orderItem: { orderId: 'order-001', order: { storeId: MOCK_STORE_ID } },
+      });
+      mockStorageService.store.mockResolvedValue(MOCK_STORED_URL);
+      mockPrismaService.orderPhoto.create
+        .mockResolvedValueOnce({ ...MOCK_PHOTO_RECORD, id: 'photo-1', type: 'FRONT' })
+        .mockResolvedValueOnce({ ...MOCK_PHOTO_RECORD, id: 'photo-2', type: 'BACK' });
+
+      const photo1 = await service.uploadPhoto(
+        { orderId: 'order-001', physicalGarmentId: 'garment-123', type: PhotoType.FRONT },
+        createMockFile(),
+        MOCK_STORE_ID,
+      );
+      const photo2 = await service.uploadPhoto(
+        { orderId: 'order-001', physicalGarmentId: 'garment-123', type: PhotoType.BACK },
+        createMockFile(),
+        MOCK_STORE_ID,
+      );
+
+      expect(photo1.id).toBe('photo-1');
+      expect(photo2.id).toBe('photo-2');
+      expect(mockStorageService.store).toHaveBeenCalledTimes(2);
+      expect(mockPrismaService.orderPhoto.create).toHaveBeenCalledTimes(2);
+
+      const key1 = mockStorageService.store.mock.calls[0][0] as string;
+      const key2 = mockStorageService.store.mock.calls[1][0] as string;
+      expect(key1).not.toBe(key2);
     });
 
     it('should not expose storage credentials in the response', async () => {

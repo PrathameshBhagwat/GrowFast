@@ -892,7 +892,7 @@ export const CatalogSettingsPage: React.FC = () => {
     setEditName(garment.name);
     setEditCategory(garment.category);
     setEditIsActive(garment.isActive);
-    setEditSection((garment as any).section || '');
+    setEditSection(garment.section || '');
     setSaveGarmentError(null);
     // Populate per-service prices
     const priceMap: Record<string, string> = {};
@@ -1416,8 +1416,8 @@ export const CatalogSettingsPage: React.FC = () => {
                             .toUpperCase();
                           const sku = `${categoryPrefix}-${String(skuIndex + 1).padStart(2, '0')}`;
                           const subtitle =
-                            (garment as any).section ||
-                            (garment as any).description ||
+                            garment.section ||
+                            garment.description ||
                             GARMENT_SUBTITLES[garment.name] ||
                             'Standard Wear';
 

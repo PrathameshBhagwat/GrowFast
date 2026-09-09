@@ -382,10 +382,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
                 {/* Center Icon Box */}
                 <div
-                  className="w-10 h-10 mx-auto rounded-[3px] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50/60 transition-colors my-1 shrink-0"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] mx-auto rounded-[3px] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50/60 transition-colors my-1 shrink-0"
                   style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '44px',
+                    height: '44px',
+                    minWidth: '44px',
+                    minHeight: '44px',
                     margin: '4px auto',
                     borderRadius: '3px',
                     background: '#f8fafc',

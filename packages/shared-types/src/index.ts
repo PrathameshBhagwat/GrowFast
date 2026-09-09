@@ -49,6 +49,7 @@ export type {
   PhysicalGarmentDTO,
   CreateOrderRequest,
   CreateOrderItemRequest,
+  CreateOrderPieceRequest,
   UpdateOrderItemRequest,
   OrderPickupRequest,
   UpdateDueDateRequest,
@@ -87,6 +88,10 @@ export type {
 // Order Status Contract
 export { deriveOrderStatus, ORDER_STATUS_COLORS } from './order-status';
 export type { OrderItemStatusInput, OrderStatusDerivationContext } from './order-status';
+
+// Photo Rules Contract
+export { isPhotoRequiredForOrder } from './photo-rules';
+export type { PhotoRequirementContext } from './photo-rules';
 
 // Pricing Contract
 export { calculateOrderTotals, calculateFulfillmentBreakdown } from './pricing';

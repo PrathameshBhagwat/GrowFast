@@ -205,12 +205,19 @@ export interface CreateOrderRequest {
   notes?: string;
 }
 
+export interface CreateOrderPieceRequest {
+  unitNumber: number;
+  photoCount?: number;
+  photos?: string[];
+}
+
 export interface CreateOrderItemRequest {
   garmentCatalogId: string;
   serviceTypeId: string;
   quantity: number;
   colorTags?: string[];
   defectNotes?: string;
+  pieces?: CreateOrderPieceRequest[];
 }
 
 export interface UpdateDueDateRequest {
@@ -316,12 +323,16 @@ export interface GarmentCatalogDTO {
   name: string;
   category: GarmentCategory;
   isActive: boolean;
+  section?: string | null;
+  description?: string | null;
 }
 
 export interface UpdateGarmentRequest {
   name?: string;
   category?: GarmentCategory;
   isActive?: boolean;
+  section?: string | null;
+  description?: string | null;
 }
 
 export interface ServiceTypeDTO {

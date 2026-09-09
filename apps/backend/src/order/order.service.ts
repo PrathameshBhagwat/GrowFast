@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
@@ -24,9 +25,15 @@ import {
   CancelGarmentRequest,
   NotificationEventType,
   NotificationChannel,
+  PickupType,
+  PhotoType,
+  isPhotoRequiredForOrder,
+  GarmentCategory,
+  ServiceCategory,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
-import { PaymentService, derivePaymentStatus } from '../payment/payment.service';
+import { PaymentService } from '../payment/payment.service';
+import { PhotoStorageService } from '../photo/photo-storage.service';
 import { OrderPickupDto } from './dto/order-pickup.dto';
 
 @Injectable()
@@ -36,6 +43,7 @@ export class OrderService {
     private readonly catalogService: CatalogService,
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
+    @Optional() private readonly photoStorage?: PhotoStorageService,
   ) {}
 
   async createOrder(dto: CreateOrderDto, employeeId: string, storeId: string) {
@@ -138,6 +146,46 @@ export class OrderService {
         }
       }
 
+      // 3.5 Photo requirement validation
+      const isWalkIn = dto.pickupType === PickupType.STORE_PICKUP;
+      let totalPieces = 0;
+      let isWeightBased = false;
+
+      for (const item of dto.items) {
+        totalPieces += item.quantity;
+        const garment = garmentMap.get(item.garmentCatalogId);
+        const service = serviceMap.get(item.serviceTypeId);
+        if (
+          garment?.category === GarmentCategory.WEIGHT_BASED ||
+          service?.category === ServiceCategory.WEIGHT_BASED
+        ) {
+          isWeightBased = true;
+        }
+      }
+
+      const photosRequired = isPhotoRequiredForOrder({
+        isWalkIn,
+        totalPieces,
+        isWeightBased,
+      });
+
+      if (photosRequired) {
+        for (const item of dto.items) {
+          const garment = garmentMap.get(item.garmentCatalogId);
+          const garmentName = garment ? garment.name : item.garmentCatalogId;
+
+          for (let u = 1; u <= item.quantity; u++) {
+            const pieceData = item.pieces?.find((p) => p.unitNumber === u);
+            const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
+            if (photoCount < 1) {
+              throw new BadRequestException(
+                `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
+              );
+            }
+          }
+        }
+      }
+
       // Calculate Totals (B5 canonical pricing + B7 express surcharge)
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: dto.isExpress,
@@ -169,7 +217,7 @@ export class OrderService {
         systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
       }
 
-      const itemsForStatus = orderItemsData.map((item) => ({
+      const itemsForStatus = orderItemsData.map((_item) => ({
         status: ItemStatus.RECEIVED,
       }));
       const orderStatus = deriveOrderStatus({
@@ -209,6 +257,10 @@ export class OrderService {
             include: {
               garmentCatalog: true,
               serviceType: true,
+              physicalGarments: {
+                include: { photos: true },
+                orderBy: { unitNumber: 'asc' },
+              },
             },
           },
           customer: true,
@@ -216,13 +268,62 @@ export class OrderService {
         },
       });
 
+      let hasDirectPhotos = false;
+      for (const createdItem of order.items) {
+        const inputItem = dto.items.find(
+          (i) =>
+            i.garmentCatalogId === createdItem.garmentCatalogId &&
+            i.serviceTypeId === createdItem.serviceTypeId,
+        );
+        if (!inputItem?.pieces) continue;
+
+        for (const pg of createdItem.physicalGarments) {
+          const pieceInput = inputItem.pieces.find((p) => p.unitNumber === pg.unitNumber);
+          if (pieceInput?.photos && pieceInput.photos.length > 0) {
+            hasDirectPhotos = true;
+            for (const url of pieceInput.photos) {
+              await tx.orderPhoto.create({
+                data: {
+                  orderId: order.id,
+                  orderItemId: createdItem.id,
+                  physicalGarmentId: pg.id,
+                  type: PhotoType.FRONT,
+                  url,
+                },
+              });
+            }
+          }
+        }
+      }
+
+      if (hasDirectPhotos) {
+        const refreshedOrder = await tx.order.findUnique({
+          where: { id: order.id },
+          include: {
+            items: {
+              include: {
+                garmentCatalog: true,
+                serviceType: true,
+                physicalGarments: {
+                  include: { photos: true },
+                  orderBy: { unitNumber: 'asc' },
+                },
+              },
+            },
+            customer: true,
+            createdBy: true,
+          },
+        });
+        return this.mapToDetailDto(refreshedOrder || order);
+      }
+
       return this.mapToDetailDto(order);
     });
 
     // C6: Trigger ORDER_CREATED notification outside transaction
-    if (result && result.customerPhone) {
-      this.notificationService
-        .createNotificationEvent(
+    if (result && result.customerPhone && this.notificationService?.createNotificationEvent) {
+      Promise.resolve(
+        this.notificationService.createNotificationEvent(
           storeId,
           NotificationEventType.ORDER_CREATED,
           NotificationChannel.SMS,
@@ -230,13 +331,13 @@ export class OrderService {
           result.id,
           result.customerId,
           { orderNumber: result.orderNumber, totalAmount: result.totalAmount },
-        )
-        .catch((err) => {
-          // Swallow any unhandled promises just in case
-        });
+        ),
+      ).catch(() => {
+        // Swallow any unhandled promises just in case
+      });
     }
 
-    return result;
+    return await this.resolveOrderPhotoUrls(result);
   }
 
   async findOrderById(id: string, storeId?: string) {
@@ -276,7 +377,8 @@ export class OrderService {
       throw new NotFoundException(`Order with ID "${id}" not found`);
     }
 
-    return this.mapToDetailDto(order);
+    const dto = this.mapToDetailDto(order);
+    return await this.resolveOrderPhotoUrls(dto);
   }
 
   async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
@@ -769,6 +871,7 @@ export class OrderService {
               physicalGarments: true,
             },
           },
+          adjustments: true,
         },
       });
 
@@ -851,12 +954,12 @@ export class OrderService {
         expressSurchargePercent: store?.expressSurchargePercent ?? undefined,
       });
 
-      const newAmountDue = Number((totals.totalAmount - order.amountPaid).toFixed(2));
-      const newPaymentStatus = derivePaymentStatus(
-        order.amountPaid,
-        totals.totalAmount,
-        order.paymentStatus as unknown as any,
-      );
+      const financialState = this.paymentService.calculateOrderFinancialState({
+        totalAmount: totals.totalAmount,
+        amountPaid: order.amountPaid,
+        paymentStatus: order.paymentStatus,
+        adjustments: (order as any).adjustments,
+      });
 
       // 9. Derive canonical order status
       const itemsForStatus = order.items.map((i: any) => ({
@@ -877,8 +980,8 @@ export class OrderService {
           expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
-          amountDue: newAmountDue,
-          paymentStatus: newPaymentStatus as unknown as any,
+          amountDue: financialState.amountDue,
+          paymentStatus: financialState.paymentStatus,
         },
       });
     });
@@ -976,29 +1079,9 @@ export class OrderService {
         expressSurchargePercent: store?.expressSurchargePercent ?? undefined,
       });
 
-      // Compute existing adjustments and current effective paid
-      const existingRefunds = Number(
-        (order.adjustments || [])
-          .filter(
-            (a: any) => a.status === AdjustmentStatus.COMPLETED && a.type === AdjustmentType.REFUND,
-          )
-          .reduce((sum: number, a: any) => sum + a.amount, 0)
-          .toFixed(2),
-      );
-      const existingStoreCredits = Number(
-        (order.adjustments || [])
-          .filter(
-            (a: any) =>
-              a.status === AdjustmentStatus.COMPLETED && a.type === AdjustmentType.STORE_CREDIT,
-          )
-          .reduce((sum: number, a: any) => sum + a.amount, 0)
-          .toFixed(2),
-      );
-      const existingAdjustmentsTotal = Number((existingRefunds + existingStoreCredits).toFixed(2));
-      const currentEffectivePaid = Number((order.amountPaid - existingAdjustmentsTotal).toFixed(2));
-
-      let newRefunds = existingRefunds;
-      let newStoreCredits = existingStoreCredits;
+      // Compute existing adjustments and current effective paid via authoritative PaymentService
+      const currentFinancial = this.paymentService.calculateOrderFinancialState(order);
+      const currentEffectivePaid = currentFinancial.effectivePaid;
 
       if (totals.totalAmount < currentEffectivePaid) {
         const excess = Number((currentEffectivePaid - totals.totalAmount).toFixed(2));
@@ -1055,12 +1138,6 @@ export class OrderService {
             createdById: employeeId || order.createdById,
           },
         });
-
-        if (adjustmentDto.type === AdjustmentType.REFUND) {
-          newRefunds = Number((existingRefunds + adjustmentDto.amount).toFixed(2));
-        } else {
-          newStoreCredits = Number((existingStoreCredits + adjustmentDto.amount).toFixed(2));
-        }
       }
 
       // 9. Soft-cancel the physical garment
@@ -1095,22 +1172,29 @@ export class OrderService {
       });
 
       // 11. Recalculate order totals and derive canonical order status
-      const newAdjustmentsTotal = Number((newRefunds + newStoreCredits).toFixed(2));
-      const newEffectivePaid = Number((order.amountPaid - newAdjustmentsTotal).toFixed(2));
-      const newAmountDue = Math.max(0, Number((totals.totalAmount - newEffectivePaid).toFixed(2)));
+      const allAdjustments = await tx.financialAdjustment.findMany({
+        where: { orderId },
+      });
+      const updatedAdjustments =
+        allAdjustments && allAdjustments.length > 0
+          ? allAdjustments
+          : adjustmentDto
+            ? [
+                ...(order.adjustments || []),
+                {
+                  amount: adjustmentDto.amount,
+                  type: adjustmentDto.type,
+                  status: AdjustmentStatus.COMPLETED,
+                },
+              ]
+            : order.adjustments || [];
 
-      let newPaymentStatus = derivePaymentStatus(
-        newEffectivePaid,
-        totals.totalAmount,
-        order.paymentStatus as unknown as any,
-      );
-
-      if (
-        totals.totalAmount === 0 ||
-        (newEffectivePaid === 0 && order.amountPaid > 0 && newRefunds >= order.amountPaid)
-      ) {
-        newPaymentStatus = PaymentStatus.REFUNDED;
-      }
+      const financialState = this.paymentService.calculateOrderFinancialState({
+        totalAmount: totals.totalAmount,
+        amountPaid: order.amountPaid,
+        paymentStatus: order.paymentStatus,
+        adjustments: updatedAdjustments,
+      });
 
       const itemsForStatus = order.items.map((i: any) => ({
         status: (i.id === itemId ? newItemStatus : i.itemStatus) as ItemStatus,
@@ -1130,8 +1214,8 @@ export class OrderService {
           expressSurcharge: totals.expressSurcharge,
           taxAmount: totals.taxAmount,
           totalAmount: totals.totalAmount,
-          amountDue: newAmountDue,
-          paymentStatus: newPaymentStatus as unknown as any,
+          amountDue: financialState.amountDue,
+          paymentStatus: financialState.paymentStatus,
         },
       });
     });
@@ -1700,5 +1784,41 @@ export class OrderService {
           updatedAt: a.updatedAt.toISOString(),
         })) || [],
     };
+  }
+
+  /**
+   * Resolve time-limited access URLs (such as presigned R2 URLs) for all photos
+   * in an order response concurrently before returning to clients.
+   */
+  private async resolveOrderPhotoUrls<T extends { items?: any[] }>(dto: T): Promise<T> {
+    if (!this.photoStorage || !dto?.items) {
+      return dto;
+    }
+
+    const photoPromises: Promise<void>[] = [];
+
+    for (const item of dto.items) {
+      if (item.physicalGarments) {
+        for (const pg of item.physicalGarments) {
+          if (pg.photos) {
+            for (const photo of pg.photos) {
+              if (photo.url) {
+                photoPromises.push(
+                  this.photoStorage.getAccessUrl(photo.url).then((resolvedUrl) => {
+                    photo.url = resolvedUrl;
+                  }),
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (photoPromises.length > 0) {
+      await Promise.all(photoPromises);
+    }
+
+    return dto;
   }
 }

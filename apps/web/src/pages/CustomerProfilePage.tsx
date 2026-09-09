@@ -243,8 +243,7 @@ export const CustomerProfilePage: React.FC = () => {
   return (
     <div
       style={{
-        height: '100vh',
-        overflowY: 'auto',
+        minHeight: '100vh',
         background: '#F8FAFC',
         paddingBottom: '40px',
       }}

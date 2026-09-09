@@ -13,6 +13,8 @@ export interface PhotoCaptureProps {
   accept?: string;
   /** Optional label */
   label?: string;
+  /** Whether to reset inputs immediately after capture instead of displaying single preview */
+  resetAfterCapture?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   allowCamera = true,
   accept = 'image/*',
   label = 'Add Photo',
+  resetAfterCapture = false,
 }) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -97,11 +100,16 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           (blob) => {
             if (blob) {
               const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
-              setFileName(file.name);
-              const url = URL.createObjectURL(file);
-              setPreview(url);
-              onCapture(file);
-              stopWebcam();
+              if (resetAfterCapture) {
+                onCapture(file);
+                stopWebcam();
+              } else {
+                setFileName(file.name);
+                const url = URL.createObjectURL(file);
+                setPreview(url);
+                onCapture(file);
+                stopWebcam();
+              }
             }
           },
           'image/jpeg',
@@ -114,10 +122,16 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFileName(file.name);
-      const url = URL.createObjectURL(file);
-      setPreview(url);
-      onCapture(file);
+      if (resetAfterCapture) {
+        onCapture(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+      } else {
+        setFileName(file.name);
+        const url = URL.createObjectURL(file);
+        setPreview(url);
+        onCapture(file);
+      }
     }
   };
 
@@ -240,7 +254,13 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       <div style={{ display: 'flex', gap: '10px' }}>
         {allowCamera && (
           <>
-            <Button variant="outline" size="md" icon={<Camera size={18} />} onClick={startWebcam}>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<Camera size={18} />}
+              onClick={startWebcam}
+              style={{ minHeight: '44px' }}
+            >
               Camera
             </Button>
             <input
@@ -258,6 +278,7 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           size="md"
           icon={<Upload size={18} />}
           onClick={() => fileInputRef.current?.click()}
+          style={{ minHeight: '44px' }}
         >
           Gallery
         </Button>

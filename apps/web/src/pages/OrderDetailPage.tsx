@@ -15,6 +15,8 @@ import {
   OrderItemDTO,
   Role,
   AdjustmentType,
+  PhotoType,
+  OrderStatus,
   calculateOrderTotals,
 } from '@growfast/shared-types';
 import { OrderItemEditModal } from '../components/OrderItemEditModal';
@@ -40,6 +42,7 @@ import {
   Ban,
   PackageCheck,
   Printer,
+  X,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -79,6 +82,7 @@ export function OrderDetailPage() {
     AdjustmentType.REFUND,
   );
   const [cancelAdjustmentReason, setCancelAdjustmentReason] = useState<string>('');
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
 
   const [isNotifying, setIsNotifying] = useState(false);
   const [notificationFeedback, setNotificationFeedback] = useState<{
@@ -151,8 +155,8 @@ export function OrderDetailPage() {
         const newTotals = calculateOrderTotals(pricingInputs, {
           isExpress: order.isExpress,
           expressSurchargePercent:
-            (order as any).expressSurcharge > 0 && order.subtotal > 0
-              ? ((order as any).expressSurcharge / order.subtotal) * 100
+            (order.expressSurcharge || 0) > 0 && order.subtotal > 0
+              ? ((order.expressSurcharge || 0) / order.subtotal) * 100
               : undefined,
         });
         const currentEffectivePaid =
@@ -204,7 +208,7 @@ export function OrderDetailPage() {
       const unitNum = garmentToCancel.unitNumber;
       setGarmentToCancel(null);
       setCancelAdjustmentReason('');
-      fetchOrder().catch(() => {});
+      fetchOrder(true).catch(() => {});
       setNotificationFeedback({
         type: 'success',
         message: `Garment #${unitNum} cancelled successfully.`,
@@ -240,7 +244,7 @@ export function OrderDetailPage() {
         },
       );
       if (!res.ok) throw new Error('Failed to update garment readiness');
-      await fetchOrder();
+      await fetchOrder(true);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -288,11 +292,11 @@ export function OrderDetailPage() {
         token!,
         file,
         order!.id,
-        'FRONT' as any, // Defaulting to FRONT for physical garments in this view
+        PhotoType.FRONT,
         activePhotoCapture.itemId,
         activePhotoCapture.garmentId,
       );
-      await fetchOrder(); // Refetch to see the new photo
+      await fetchOrder(true); // Refetch to see the new photo
     } catch (err: any) {
       alert(err.message || 'Failed to upload photo');
     } finally {
@@ -301,8 +305,10 @@ export function OrderDetailPage() {
     }
   };
 
-  const fetchOrder = async () => {
-    setLoading(true);
+  const fetchOrder = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await fetch(`${API_URL}/orders/${id}`, {
@@ -324,7 +330,9 @@ export function OrderDetailPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to load order');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -348,7 +356,7 @@ export function OrderDetailPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{order.orderNumber}</h1>
           <div className="flex gap-2">
-            <StatusChip status={order.status as any} />
+            <StatusChip status={order.status} />
             <span className="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
               {order.paymentStatus}
             </span>
@@ -462,12 +470,10 @@ export function OrderDetailPage() {
               <span className="text-gray-500">Discount</span>
               <span className="font-medium text-green-600">-₹{order.discountAmount}</span>
             </div>
-            {order.isExpress && (order as any).expressSurcharge > 0 && (
+            {order.isExpress && (order.expressSurcharge || 0) > 0 && (
               <div className="flex justify-between">
                 <span className="text-orange-600">⚡ Express Surcharge</span>
-                <span className="font-medium text-orange-600">
-                  ₹{(order as any).expressSurcharge}
-                </span>
+                <span className="font-medium text-orange-600">₹{order.expressSurcharge}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -826,22 +832,83 @@ export function OrderDetailPage() {
                                     ) : null}
                                   </div>
 
-                                  <div className="flex flex-col items-center justify-center p-4 min-h-[140px] bg-gray-100/50">
+                                  <div className="flex flex-col items-center justify-center p-3 min-h-[140px] bg-gray-100/50 space-y-2">
                                     {pg.photos && pg.photos.length > 0 ? (
-                                      <div className="relative group">
-                                        <img
-                                          src={pg.photos[0].url}
-                                          alt={`Garment #${pg.unitNumber}`}
-                                          className="max-h-[120px] max-w-full object-contain rounded"
-                                        />
-                                        <a
-                                          href={pg.photos[0].url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="absolute inset-0 bg-black/40 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                                        >
-                                          <Camera size={24} />
-                                        </a>
+                                      <div className="w-full flex flex-col items-center gap-2">
+                                        <div className="flex items-center justify-between w-full px-1">
+                                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                            {pg.photos.length}{' '}
+                                            {pg.photos.length === 1 ? 'photo' : 'photos'} ✓
+                                          </span>
+                                          {!isCancelled &&
+                                            activePhotoCapture?.garmentId !== pg.id && (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  setActivePhotoCapture({
+                                                    itemId: item.id,
+                                                    garmentId: pg.id,
+                                                  })
+                                                }
+                                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 min-h-[44px] px-2.5 py-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
+                                                title="Add another photo to this piece"
+                                              >
+                                                <Plus size={14} /> Add Photo
+                                              </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2 justify-center max-w-full">
+                                          {pg.photos.map((photo: any, phIdx: number) => (
+                                            <button
+                                              key={photo.id || phIdx}
+                                              type="button"
+                                              onClick={() => setViewingPhotoUrl(photo.url)}
+                                              className="relative group w-20 h-20 bg-gray-200 rounded-lg border border-gray-300 overflow-hidden shrink-0 shadow-2xs hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer p-0 block"
+                                              title={`Click to preview photo ${phIdx + 1}`}
+                                              aria-label={`Preview photo ${phIdx + 1} of Garment #${pg.unitNumber}`}
+                                            >
+                                              <img
+                                                src={photo.url}
+                                                alt={`Garment #${pg.unitNumber} - Photo ${phIdx + 1}`}
+                                                className="w-full h-full object-cover rounded-lg"
+                                              />
+                                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                                                <Camera size={18} />
+                                              </div>
+                                            </button>
+                                          ))}
+                                        </div>
+
+                                        {activePhotoCapture?.garmentId === pg.id && (
+                                          <div className="w-full bg-white border shadow-lg rounded p-3 mt-2">
+                                            <div className="flex justify-between items-center mb-2">
+                                              <span className="text-xs font-semibold text-gray-700">
+                                                Add Photo to Piece #{pg.unitNumber}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                className="text-xs text-gray-500 hover:text-gray-900 font-semibold min-h-[36px] px-2 cursor-pointer"
+                                                onClick={() => setActivePhotoCapture(null)}
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
+                                            {uploadingPhoto ? (
+                                              <span className="text-sm text-gray-500 flex items-center gap-2 justify-center py-2">
+                                                <Loader2 className="animate-spin" size={16} />{' '}
+                                                Uploading...
+                                              </span>
+                                            ) : (
+                                              <PhotoCapture
+                                                onCapture={handlePhotoCapture}
+                                                allowCamera={true}
+                                                accept="image/jpeg,image/png,image/webp"
+                                                label=""
+                                              />
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     ) : isCancelled ? (
                                       <span className="text-xs text-gray-400 italic">
@@ -856,7 +923,7 @@ export function OrderDetailPage() {
                                       ) : (
                                         <div className="absolute z-10 bg-white border shadow-lg rounded p-3 w-64 max-w-full mt-10">
                                           <button
-                                            className="text-xs text-gray-500 hover:text-gray-900 mb-2 font-semibold"
+                                            className="text-xs text-gray-500 hover:text-gray-900 mb-2 font-semibold min-h-[36px] px-2 cursor-pointer"
                                             onClick={() => setActivePhotoCapture(null)}
                                           >
                                             Cancel
@@ -871,7 +938,7 @@ export function OrderDetailPage() {
                                       )
                                     ) : (
                                       <button
-                                        className="text-gray-400 hover:text-blue-600 flex flex-col items-center gap-1 p-2 transition-colors min-h-[44px] justify-center"
+                                        className="text-gray-400 hover:text-blue-600 flex flex-col items-center gap-1 p-2 transition-colors min-h-[44px] justify-center cursor-pointer"
                                         onClick={() =>
                                           setActivePhotoCapture({
                                             itemId: item.id,
@@ -1083,8 +1150,8 @@ export function OrderDetailPage() {
             const newTotals = calculateOrderTotals(pricingInputs, {
               isExpress: order.isExpress,
               expressSurchargePercent:
-                (order as any).expressSurcharge > 0 && order.subtotal > 0
-                  ? ((order as any).expressSurcharge / order.subtotal) * 100
+                (order.expressSurcharge || 0) > 0 && order.subtotal > 0
+                  ? ((order.expressSurcharge || 0) / order.subtotal) * 100
                   : undefined,
             });
             const currentEffectivePaid =
@@ -1255,6 +1322,45 @@ export function OrderDetailPage() {
           onClose={() => setShowReceiptModal(false)}
           order={order}
         />
+      )}
+
+      {/* Lightbox Modal for Photo Preview */}
+      {viewingPhotoUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4 backdrop-blur-xs"
+          onClick={() => setViewingPhotoUrl(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="relative max-w-2xl w-full bg-white rounded-xl overflow-hidden shadow-2xl p-4 flex flex-col items-center gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex justify-between items-center border-b pb-2">
+              <span className="text-sm font-bold text-slate-800">Photo Preview</span>
+              <button
+                type="button"
+                onClick={() => setViewingPhotoUrl(null)}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close photo preview"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <img
+              src={viewingPhotoUrl}
+              alt="Enlarged photo preview"
+              className="max-h-[70vh] w-auto object-contain rounded-lg border border-slate-200"
+            />
+            <button
+              type="button"
+              onClick={() => setViewingPhotoUrl(null)}
+              className="min-h-[44px] px-6 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

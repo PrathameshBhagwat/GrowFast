@@ -646,5 +646,46 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
         expect(screen.getByRole('button', { name: /Thermal \(80mm\)/i })).toBeInTheDocument();
       });
     });
+
+    it('renders multiple photo thumbnails and photo badge for physical garments with captured photos', async () => {
+      const orderWithPhotos = {
+        ...mockOrderWithPhysicalGarments,
+        items: [
+          {
+            ...mockOrderWithPhysicalGarments.items[0],
+            physicalGarments: [
+              {
+                id: 'garment-1',
+                orderItemId: 'item-1',
+                unitNumber: 1,
+                isReady: true,
+                isCancelled: false,
+                photos: [
+                  { id: 'p1', url: 'https://img.test/front.jpg' },
+                  { id: 'p2', url: 'https://img.test/back.jpg' },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      (global.fetch as any).mockImplementation(async (url: string) => {
+        if (url.includes('/api/orders/order-photos-test')) {
+          return { ok: true, json: async () => ({ data: orderWithPhotos }) };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      renderWithRouter('order-photos-test');
+
+      await waitFor(() => {
+        expect(screen.getByText('2 photos ✓')).toBeInTheDocument();
+        const imgs = screen.getAllByRole('img', { name: /Garment #1 - Photo/i });
+        expect(imgs).toHaveLength(2);
+        expect(imgs[0]).toHaveAttribute('src', 'https://img.test/front.jpg');
+        expect(imgs[1]).toHaveAttribute('src', 'https://img.test/back.jpg');
+      });
+    });
   });
 });
