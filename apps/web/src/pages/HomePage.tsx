@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button, Card, LoadingState, EmptyState, ErrorState } from '@growfast/ui';
 import { MembershipTier, type CustomerDTO, type PaginatedResponse } from '@growfast/shared-types';
 import { CustomerCreateModal } from '../components/CustomerCreateModal';
+import { apiFetch, ApiError, friendlyErrorMessage } from '../services/api';
 import {
   LogOut,
   Shirt,
@@ -23,8 +24,6 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const MOCK_CUSTOMERS: CustomerDTO[] = [
   {
@@ -181,27 +180,18 @@ export const HomePage: React.FC = () => {
         queryParams.set('page', String(currentPage));
         queryParams.set('pageSize', String(pageSize));
 
-        const res = await fetch(`${API_URL}/customers/search?${queryParams.toString()}`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (res.ok) {
-          const responseData: PaginatedResponse<CustomerDTO> = await res.json();
-          setCustomers(responseData.data || []);
-          setTotalCount(responseData.total || 0);
-        } else if (res.status === 401) {
+        const responseData = await apiFetch<PaginatedResponse<CustomerDTO>>(
+          `/customers/search?${queryParams.toString()}`,
+          { token, retries: 2, retryDelay: 1000 },
+        );
+        setCustomers(responseData.data || []);
+        setTotalCount(responseData.total || 0);
+      } catch (err: any) {
+        if (err instanceof ApiError && err.code === 'UNAUTHORIZED') {
           logout();
           return;
-        } else {
-          const errBody = await res.json().catch(() => ({}));
-          throw new Error(errBody.message || `Failed to fetch customers (HTTP ${res.status})`);
         }
-      } catch (err: any) {
-        setError(err.message || 'Failed to search customers. Check backend connection.');
+        setError(friendlyErrorMessage(err));
         setCustomers([]);
         setTotalCount(0);
       } finally {
@@ -229,8 +219,7 @@ export const HomePage: React.FC = () => {
   return (
     <div
       style={{
-        height: '100vh',
-        overflowY: 'auto',
+        minHeight: '100vh',
         background: '#F8FAFC',
         fontFamily: "'Inter', sans-serif",
         color: '#0F172A',
@@ -286,8 +275,10 @@ export const HomePage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '40px',
-                height: '40px',
+                width: '44px',
+                height: '44px',
+                minWidth: '44px',
+                minHeight: '44px',
                 borderRadius: '12px',
                 background: `linear-gradient(135deg, ${config.color} 0%, ${config.color}CC 100%)`,
                 display: 'flex',
@@ -451,13 +442,17 @@ export const HomePage: React.FC = () => {
                   aria-label="Clear search input"
                   style={{
                     position: 'absolute',
-                    right: '12px',
+                    right: '4px',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    padding: '4px',
+                    width: '44px',
+                    height: '44px',
+                    minWidth: '44px',
+                    minHeight: '44px',
+                    padding: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -495,6 +490,11 @@ export const HomePage: React.FC = () => {
                   cursor: 'pointer',
                   fontWeight: 600,
                   padding: '4px 8px',
+                  minHeight: '44px',
+                  minWidth: '44px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 Clear Filter
@@ -630,10 +630,15 @@ export const HomePage: React.FC = () => {
                               color: '#1D4ED8',
                               border: 'none',
                               borderRadius: '6px',
-                              padding: '4px 10px',
+                              padding: '8px 12px',
                               fontSize: '0.75rem',
                               fontWeight: 600,
                               cursor: 'pointer',
+                              minHeight: '44px',
+                              minWidth: '44px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                             }}
                           >
                             View Profile
@@ -733,8 +738,10 @@ export const HomePage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div
                   style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '44px',
+                    height: '44px',
+                    minWidth: '44px',
+                    minHeight: '44px',
                     borderRadius: '50%',
                     background: '#DBEAFE',
                     display: 'flex',

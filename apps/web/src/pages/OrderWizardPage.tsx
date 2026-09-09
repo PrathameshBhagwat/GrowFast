@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { PhotoCapture } from '@growfast/ui';
 import { useAuth } from '../contexts/AuthContext';
-import { CustomerDTO, PhotoType } from '@growfast/shared-types';
+import { CustomerDTO, PhotoType, isPhotoRequiredForOrder } from '@growfast/shared-types';
 import { CustomerSelector } from '../components/CustomerSelector';
 import { ItemSelector } from '../components/ItemSelector';
 import { uploadPhoto } from '../services/photo.api';
@@ -41,6 +41,7 @@ export function OrderWizardPage() {
 
   // Active item detail configuration modal
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
 
   const [items, setItems] = useState<any[]>([]);
   const [garments, setGarments] = useState<any[]>([]);
@@ -133,14 +134,27 @@ export function OrderWizardPage() {
           i.serviceTypeId === serviceId &&
           !i.defectNotes &&
           !i.brand &&
-          !i.photoFile,
+          (!i.pieces || i.pieces.every((p: any) => !p.photos || p.photos.length === 0)),
       );
 
       if (existingIdx >= 0) {
         const updated = [...prev];
+        const cur = updated[existingIdx];
+        const newQty = cur.quantity + 1;
+        const currentPieces = cur.pieces || [];
+        const updatedPieces = [];
+        for (let u = 1; u <= newQty; u++) {
+          const existing = currentPieces.find((p: any) => p.unitNumber === u);
+          if (existing) {
+            updatedPieces.push(existing);
+          } else {
+            updatedPieces.push({ unitNumber: u, photos: [] });
+          }
+        }
         updated[existingIdx] = {
-          ...updated[existingIdx],
-          quantity: updated[existingIdx].quantity + 1,
+          ...cur,
+          quantity: newQty,
+          pieces: updatedPieces,
         };
         return updated;
       }
@@ -157,6 +171,12 @@ export function OrderWizardPage() {
         defectNotes: '',
         colorTags: [],
         photoFile: null,
+        pieces: [
+          {
+            unitNumber: 1,
+            photos: [] as Array<{ id: string; file: File; previewUrl: string }>,
+          },
+        ],
       };
       return [...prev, newItem];
     });
@@ -171,8 +191,18 @@ export function OrderWizardPage() {
       if (newQty <= 0) {
         return prev.filter((_, i) => i !== index);
       }
+      const currentPieces = current.pieces || [];
+      const updatedPieces = [];
+      for (let u = 1; u <= newQty; u++) {
+        const existing = currentPieces.find((p: any) => p.unitNumber === u);
+        if (existing) {
+          updatedPieces.push(existing);
+        } else {
+          updatedPieces.push({ unitNumber: u, photos: [] });
+        }
+      }
       const updated = [...prev];
-      updated[index] = { ...current, quantity: newQty };
+      updated[index] = { ...current, quantity: newQty, pieces: updatedPieces };
       return updated;
     });
   };
@@ -204,9 +234,130 @@ export function OrderWizardPage() {
     return items.reduce((sum, item) => sum + item.quantity, 0);
   }, [items]);
 
+  // Canonical weight-based check (reuses GarmentCategory and ServiceCategory WEIGHT_BASED)
+  const isOrderWeightBased = useMemo(() => {
+    return items.some((item) => {
+      const garment = garments.find((g) => g.id === item.garmentCatalogId);
+      const service = services.find((s) => s.id === item.serviceTypeId);
+      return garment?.category === 'WEIGHT_BASED' || service?.category === 'WEIGHT_BASED';
+    });
+  }, [items, garments, services]);
+
+  // Photo requirement derived using canonical shared-types logic
+  const isPhotoRequired = useMemo(() => {
+    return isPhotoRequiredForOrder({
+      isWalkIn: true,
+      totalPieces: totalGarmentCount,
+      isWeightBased: isOrderWeightBased,
+    });
+  }, [totalGarmentCount, isOrderWeightBased]);
+
+  // Piece-level photo tracking and validation
+  const { coveredPieces, missingPiecesList, allPiecesCovered } = useMemo(() => {
+    let covered = 0;
+    const missing: Array<{ itemIndex: number; garmentName: string; unitNumber: number }> = [];
+
+    items.forEach((item, itemIndex) => {
+      const pieces = item.pieces || [];
+      for (let u = 1; u <= item.quantity; u++) {
+        const piece = pieces.find((p: any) => p.unitNumber === u);
+        const count = piece?.photos?.length || 0;
+        if (count > 0) {
+          covered++;
+        } else {
+          missing.push({
+            itemIndex,
+            garmentName: item.garmentName,
+            unitNumber: u,
+          });
+        }
+      }
+    });
+
+    return {
+      coveredPieces: covered,
+      missingPiecesList: missing,
+      allPiecesCovered: totalGarmentCount > 0 && missing.length === 0,
+    };
+  }, [items, totalGarmentCount]);
+
+  // Total photos count across all pieces
+  const totalPhotosCount = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const pieces = item.pieces || [];
+      return sum + pieces.reduce((pSum: number, p: any) => pSum + (p.photos?.length || 0), 0);
+    }, 0);
+  }, [items]);
+
+  // Formatted validation message for missing photos
+  const missingPiecesMessage = useMemo(() => {
+    if (missingPiecesList.length === 0) return '';
+    if (missingPiecesList.length === 1) {
+      const m = missingPiecesList[0];
+      return `Add at least one photo for Piece ${m.unitNumber} (${m.garmentName}).`;
+    }
+    const last = missingPiecesList[missingPiecesList.length - 1];
+    const rest = missingPiecesList.slice(0, -1);
+    const piecesListStr =
+      rest.map((m) => `Piece ${m.unitNumber} (${m.garmentName})`).join(', ') +
+      ` and Piece ${last.unitNumber} (${last.garmentName})`;
+    return `Add at least one photo for ${piecesListStr}.`;
+  }, [missingPiecesList]);
+
+  const handleAddPhotoToPiece = (itemIndex: number, unitNumber: number, file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    const photoId = `photo-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    setItems((prev) => {
+      const updated = [...prev];
+      const targetItem = { ...updated[itemIndex] };
+      const pieces = [...(targetItem.pieces || [])];
+      const pieceIdx = pieces.findIndex((p: any) => p.unitNumber === unitNumber);
+
+      if (pieceIdx >= 0) {
+        pieces[pieceIdx] = {
+          ...pieces[pieceIdx],
+          photos: [...(pieces[pieceIdx].photos || []), { id: photoId, file, previewUrl }],
+        };
+      } else {
+        pieces.push({
+          unitNumber,
+          photos: [{ id: photoId, file, previewUrl }],
+        });
+      }
+
+      targetItem.pieces = pieces;
+      targetItem.photoFile = pieces[0]?.photos[0]?.file || null;
+      updated[itemIndex] = targetItem;
+      return updated;
+    });
+  };
+
+  const handleRemovePhotoFromPiece = (itemIndex: number, unitNumber: number, photoId: string) => {
+    setItems((prev) => {
+      const updated = [...prev];
+      const targetItem = { ...updated[itemIndex] };
+      const pieces = [...(targetItem.pieces || [])];
+      const pieceIdx = pieces.findIndex((p: any) => p.unitNumber === unitNumber);
+
+      if (pieceIdx >= 0) {
+        pieces[pieceIdx] = {
+          ...pieces[pieceIdx],
+          photos: pieces[pieceIdx].photos.filter((p: any) => p.id !== photoId),
+        };
+      }
+
+      targetItem.pieces = pieces;
+      targetItem.photoFile = pieces[0]?.photos[0]?.file || null;
+      updated[itemIndex] = targetItem;
+      return updated;
+    });
+  };
+
   // Order Submission
   const handleCreateOrder = async () => {
     if (!selectedCustomerId || items.length === 0) return;
+    if (isPhotoRequired && !allPiecesCovered) return;
 
     setIsSubmitting(true);
     try {
@@ -218,6 +369,10 @@ export function OrderWizardPage() {
           garmentCatalogId: item.garmentCatalogId,
           serviceTypeId: item.serviceTypeId,
           quantity: item.quantity,
+          pieces: (item.pieces || []).map((p: any) => ({
+            unitNumber: p.unitNumber,
+            photoCount: p.photos?.length || 0,
+          })),
         })),
         notes: generalNote.trim() || 'Created via POS terminal',
       };
@@ -232,28 +387,43 @@ export function OrderWizardPage() {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to create order (${res.status})`);
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.message || `Failed to create order (${res.status})`);
       }
 
       const body = await res.json();
       const createdOrder = body.data;
 
-      // Handle async photo uploads for any items with photoFile
+      // Handle async photo uploads for any pieces with photos
       try {
-        const uploadPromises = items.map(async (item, index) => {
-          if (!item.photoFile) return;
+        const uploadPromises: Promise<any>[] = [];
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const createdItem = createdOrder.items?.[i];
+          if (!createdItem || !item.pieces) continue;
 
-          const createdItem = createdOrder.items[index];
-          if (!createdItem) return;
-
-          await uploadPhoto(
-            token!,
-            item.photoFile,
-            createdOrder.id,
-            'FRONT' as PhotoType,
-            createdItem.id,
-          );
-        });
+          for (const piece of item.pieces) {
+            if (!piece.photos || piece.photos.length === 0) continue;
+            // Match physical garment by unitNumber
+            const pg = createdItem.physicalGarments?.find(
+              (g: any) => g.unitNumber === piece.unitNumber,
+            );
+            for (const photo of piece.photos) {
+              if (photo.file) {
+                uploadPromises.push(
+                  uploadPhoto(
+                    token!,
+                    photo.file,
+                    createdOrder.id,
+                    'FRONT' as PhotoType,
+                    createdItem.id,
+                    pg?.id,
+                  ),
+                );
+              }
+            }
+          }
+        }
         await Promise.all(uploadPromises);
       } catch (uploadErr) {
         console.error('Photo upload failed but order was created:', uploadErr);
@@ -287,8 +457,10 @@ export function OrderWizardPage() {
             type="button"
             onClick={() => navigate(-1)}
             style={{
-              width: '40px',
-              height: '40px',
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
+              minHeight: '44px',
               borderRadius: '8px',
               border: '1px solid #e2e8f0',
               background: '#ffffff',
@@ -567,8 +739,11 @@ export function OrderWizardPage() {
             ) : (
               items.map((item, idx) => {
                 const itemTotal = item.unitPrice * item.quantity;
+                const coveredItemPieces = (item.pieces || []).filter(
+                  (p: any) => p.photos && p.photos.length > 0,
+                ).length;
                 const hasDetails =
-                  item.defectNotes || item.brand || item.topUpService || item.photoFile;
+                  item.defectNotes || item.brand || item.topUpService || coveredItemPieces > 0;
 
                 return (
                   <div
@@ -620,11 +795,28 @@ export function OrderWizardPage() {
                                 ⚠️ {item.defectNotes}
                               </span>
                             )}
-                            {item.photoFile && (
-                              <span className="bg-blue-50 text-blue-800 border border-blue-100 px-2 py-0.5 rounded">
-                                📷 Photo
+                            <button
+                              type="button"
+                              onClick={() => setEditingItemIndex(idx)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
+                                coveredItemPieces === item.quantity
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                  : isPhotoRequired
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                    : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                              }`}
+                              title="Click to view/add piece photos"
+                            >
+                              <Camera size={12} />
+                              <span>
+                                {coveredItemPieces}/{item.quantity} photographed{' '}
+                                {coveredItemPieces === item.quantity
+                                  ? '✓'
+                                  : isPhotoRequired
+                                    ? '⚠'
+                                    : ''}
                               </span>
-                            )}
+                            </button>
                           </div>
                         )}
 
@@ -653,21 +845,25 @@ export function OrderWizardPage() {
                             </button>
                           </div>
 
-                          {/* Action Buttons: [ Notes ] [ Delete ] on same row */}
+                          {/* Action Buttons: [ Photos & Notes ] [ Delete ] on same row */}
                           <div className="flex items-center gap-2 shrink-0">
-                            {/* Notes Button: 44px touch target */}
+                            {/* Photos & Notes Button: 44px touch target */}
                             <button
                               type="button"
                               onClick={() => setEditingItemIndex(idx)}
-                              className={`h-[44px] min-h-[44px] px-3.5 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                                hasDetails
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                              className={`h-[44px] min-h-[44px] px-3 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                coveredItemPieces === item.quantity
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                  : isPhotoRequired && coveredItemPieces < item.quantity
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                    : hasDetails
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                               }`}
-                              title="Add defect notes or brand"
+                              title="Add piece photos or defect notes"
                             >
-                              <FileText size={15} className="text-slate-600" />
-                              <span>Notes</span>
+                              <Camera size={15} />
+                              <span>Photos & Notes</span>
                             </button>
 
                             {/* Delete Button: 44px touch target, destructive styling */}
@@ -739,6 +935,75 @@ export function OrderWizardPage() {
 
           {/* 4. Totals Breakdown, Highlighted Total & Proceed Button */}
           <div className="px-4 pt-3 pb-4 space-y-3 shrink-0">
+            {/* Photos Progress Card & Compliance Indicators */}
+            {items.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-700 flex items-center gap-1.5">
+                    <Camera size={15} className="text-[#2563eb]" />
+                    Photos Progress
+                  </span>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span
+                      className={`font-mono px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        allPiecesCovered
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : isPhotoRequired
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                            : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      Photos: {coveredPieces} / {totalGarmentCount} pieces covered{' '}
+                      {allPiecesCovered ? '✓' : ''}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium font-mono">
+                      {totalPhotosCount} total photo{totalPhotosCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-2 transition-all duration-300 ${
+                      allPiecesCovered ? 'bg-emerald-500' : 'bg-[#2563eb]'
+                    }`}
+                    style={{
+                      width: `${totalGarmentCount > 0 ? (coveredPieces / totalGarmentCount) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+
+                {/* Status Guidance */}
+                {isPhotoRequired && !allPiecesCovered && (
+                  <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-1.5 leading-tight">
+                    <span className="shrink-0 text-amber-600 font-bold">⚠</span>
+                    <div>
+                      <span className="font-semibold">Photos required for all pieces.</span> Click
+                      Photos & Notes to capture at least 1 photo for each piece.
+                      {missingPiecesMessage && (
+                        <div className="text-amber-800 mt-1 font-semibold">
+                          {missingPiecesMessage}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!isPhotoRequired && totalGarmentCount >= 50 && !isOrderWeightBased && (
+                  <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded p-2 leading-tight">
+                    ℹ️ Photos are optional for bulk orders.
+                  </div>
+                )}
+
+                {isOrderWeightBased && (
+                  <div className="text-[11px] text-indigo-800 bg-indigo-50 border border-indigo-200 rounded p-2 leading-tight">
+                    ⚖️ Weight-based order: Photos required for all pieces.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Totals Breakdown */}
             <div className="space-y-2 pt-1">
               <div className="flex justify-between items-center text-xs text-slate-600">
@@ -799,9 +1064,17 @@ export function OrderWizardPage() {
             <button
               type="button"
               onClick={handleCreateOrder}
-              disabled={isSubmitting || items.length === 0 || !selectedCustomerId}
+              disabled={
+                isSubmitting ||
+                items.length === 0 ||
+                !selectedCustomerId ||
+                (isPhotoRequired && !allPiecesCovered)
+              }
               className={`w-full min-h-[48px] h-[48px] py-3.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
-                isSubmitting || items.length === 0 || !selectedCustomerId
+                isSubmitting ||
+                items.length === 0 ||
+                !selectedCustomerId ||
+                (isPhotoRequired && !allPiecesCovered)
                   ? 'bg-[#bfdbfe] text-white cursor-not-allowed opacity-90'
                   : 'bg-[#2563eb] hover:bg-blue-700 text-white cursor-pointer shadow-xs active:scale-[0.99]'
               }`}
@@ -810,7 +1083,9 @@ export function OrderWizardPage() {
                   ? 'Please select a customer first'
                   : items.length === 0
                     ? 'Add at least one item to proceed'
-                    : 'Proceed to Review'
+                    : isPhotoRequired && !allPiecesCovered
+                      ? `Photos required: Please capture photos for all ${totalGarmentCount} pieces (${coveredPieces}/${totalGarmentCount} covered)`
+                      : 'Proceed to Review'
               }
             >
               {isSubmitting ? (
@@ -854,7 +1129,7 @@ export function OrderWizardPage() {
       {/* ─── 4. ITEM DETAILS / PHOTO MODAL ───────────────── */}
       {editingItemIndex !== null && items[editingItemIndex] && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-[6px] shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white border border-slate-200 rounded-[6px] shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
               <div>
                 <h3 className="font-bold text-sm text-slate-900">Item Details & Defect Notes</h3>
@@ -938,25 +1213,132 @@ export function OrderWizardPage() {
                 />
               </div>
 
-              <div className="pt-2 border-t border-slate-100">
-                <PhotoCapture
-                  label="Garment Photo (Optional)"
-                  allowCamera={true}
-                  onCapture={(file) => {
-                    setItems((prev) => {
-                      const updated = [...prev];
-                      updated[editingItemIndex] = { ...updated[editingItemIndex], photoFile: file };
-                      return updated;
-                    });
-                  }}
-                  onRemove={() => {
-                    setItems((prev) => {
-                      const updated = [...prev];
-                      updated[editingItemIndex] = { ...updated[editingItemIndex], photoFile: null };
-                      return updated;
-                    });
-                  }}
-                />
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Camera size={15} className="text-[#2563eb]" />
+                      Piece Photos {isPhotoRequired ? '(Required)' : '(Optional)'}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {isPhotoRequired
+                        ? 'Every individual physical piece must have at least 1 photo before order creation.'
+                        : totalGarmentCount >= 50 && !isOrderWeightBased
+                          ? 'Photos are optional for bulk orders.'
+                          : 'Photos help track piece conditions and defect history.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {Array.from({ length: items[editingItemIndex].quantity }, (_, pIdx) => {
+                    const unitNum = pIdx + 1;
+                    const piece = (items[editingItemIndex].pieces || []).find(
+                      (p: any) => p.unitNumber === unitNum,
+                    );
+                    const piecePhotos = piece?.photos || [];
+                    const isCovered = piecePhotos.length > 0;
+
+                    return (
+                      <div
+                        key={unitNum}
+                        className={`border rounded-lg p-3 space-y-2.5 transition-colors ${
+                          isCovered
+                            ? 'border-emerald-200 bg-emerald-50/30'
+                            : isPhotoRequired
+                              ? 'border-amber-200 bg-amber-50/40'
+                              : 'border-slate-200 bg-slate-50/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900">
+                            Piece {unitNum} of {items[editingItemIndex].quantity}
+                          </span>
+                          {isCovered ? (
+                            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded flex items-center gap-1">
+                              {piecePhotos.length} photo{piecePhotos.length > 1 ? 's' : ''} ✓
+                            </span>
+                          ) : isPhotoRequired ? (
+                            <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded flex items-center gap-1">
+                              0 photos ⚠ Required
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                              0 photos (Optional)
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Existing thumbnails / previews */}
+                        {piecePhotos.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <div className="text-[11px] font-medium text-slate-600">
+                              Captured Photos ({piecePhotos.length}):
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              {piecePhotos.map((photo: any, phIdx: number) => (
+                                <div
+                                  key={photo.id || phIdx}
+                                  className="flex flex-col items-center gap-1 shrink-0 bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingPhotoUrl(photo.previewUrl)}
+                                    className="w-20 h-20 rounded-md border border-slate-200 overflow-hidden bg-slate-100 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer block p-0"
+                                    title={`Click to preview Photo ${phIdx + 1}`}
+                                    aria-label={`Preview Photo ${phIdx + 1} of Piece ${unitNum}`}
+                                  >
+                                    <img
+                                      src={photo.previewUrl}
+                                      alt={`Piece ${unitNum} - Photo ${phIdx + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </button>
+                                  <div className="flex items-center justify-between w-full px-0.5 text-[10px] text-slate-600">
+                                    <span className="font-medium">Photo {phIdx + 1}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleRemovePhotoFromPiece(
+                                          editingItemIndex,
+                                          unitNum,
+                                          photo.id,
+                                        )
+                                      }
+                                      className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                      title={`Remove photo ${phIdx + 1}`}
+                                      aria-label={`Remove photo ${phIdx + 1} from Piece ${unitNum}`}
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Photo capture action */}
+                        <div className="pt-1">
+                          <PhotoCapture
+                            label={
+                              piecePhotos.length === 0
+                                ? isPhotoRequired
+                                  ? `Capture Photo for Piece #${unitNum}`
+                                  : `Capture Photo for Piece #${unitNum} (Optional)`
+                                : `+ Add Photo`
+                            }
+                            allowCamera={true}
+                            resetAfterCapture={true}
+                            onCapture={(file) =>
+                              handleAddPhotoToPiece(editingItemIndex, unitNum, file)
+                            }
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -964,11 +1346,50 @@ export function OrderWizardPage() {
               <button
                 type="button"
                 onClick={() => setEditingItemIndex(null)}
-                className="px-4 py-1.5 bg-[#2563eb] text-white font-bold text-xs rounded-[3px] hover:bg-blue-700 transition-colors shadow-2xs"
+                className="px-6 py-2.5 bg-[#2563eb] text-white font-bold text-xs rounded-lg hover:bg-blue-700 transition-colors shadow-2xs min-h-[44px]"
               >
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal for Photo Preview */}
+      {viewingPhotoUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-60 flex items-center justify-center p-4 backdrop-blur-xs"
+          onClick={() => setViewingPhotoUrl(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="relative max-w-2xl w-full bg-white rounded-xl overflow-hidden shadow-2xl p-4 flex flex-col items-center gap-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex justify-between items-center border-b pb-2">
+              <span className="text-sm font-bold text-slate-800">Photo Preview</span>
+              <button
+                type="button"
+                onClick={() => setViewingPhotoUrl(null)}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Close photo preview"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <img
+              src={viewingPhotoUrl}
+              alt="Enlarged photo preview"
+              className="max-h-[70vh] w-auto object-contain rounded-lg border border-slate-200"
+            />
+            <button
+              type="button"
+              onClick={() => setViewingPhotoUrl(null)}
+              className="min-h-[44px] px-6 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

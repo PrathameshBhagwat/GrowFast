@@ -9,7 +9,28 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { CreateOrderRequest, CreateOrderItemRequest, PickupType } from '@growfast/shared-types';
+import {
+  CreateOrderRequest,
+  CreateOrderItemRequest,
+  CreateOrderPieceRequest,
+  PickupType,
+} from '@growfast/shared-types';
+
+export class CreateOrderPieceDto implements CreateOrderPieceRequest {
+  @IsInt()
+  @Min(1)
+  unitNumber!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  photoCount?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  photos?: string[];
+}
 
 export class CreateOrderItemDto implements CreateOrderItemRequest {
   @IsString()
@@ -30,6 +51,12 @@ export class CreateOrderItemDto implements CreateOrderItemRequest {
   @IsOptional()
   @IsString()
   defectNotes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderPieceDto)
+  pieces?: CreateOrderPieceDto[];
 }
 
 export class CreateOrderDto implements CreateOrderRequest {

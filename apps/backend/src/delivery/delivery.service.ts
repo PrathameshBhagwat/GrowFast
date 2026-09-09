@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -16,6 +18,7 @@ import {
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
+import { PhotoStorageService } from '../photo/photo-storage.service';
 
 /**
  * Delivery State Machine — valid transitions.
@@ -37,10 +40,13 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class DeliveryService {
+  private readonly logger = new Logger(DeliveryService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
+    @Optional() private readonly photoStorage?: PhotoStorageService,
   ) {}
 
   /**
@@ -79,7 +85,7 @@ export class DeliveryService {
         },
       });
 
-      return this.mapToDto(delivery);
+      return await this.mapToDto(delivery);
     });
   }
 
@@ -140,7 +146,7 @@ export class DeliveryService {
         },
       });
 
-      return this.mapToDto(updated);
+      return await this.mapToDto(updated);
     });
   }
 
@@ -176,7 +182,7 @@ export class DeliveryService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return deliveries.map((d) => this.mapToDto(d));
+    return Promise.all(deliveries.map((d) => this.mapToDto(d)));
   }
 
   /**
@@ -208,7 +214,7 @@ export class DeliveryService {
       throw new ForbiddenException(`You can only view your own deliveries`);
     }
 
-    return this.mapToDto(delivery);
+    return await this.mapToDto(delivery);
   }
 
   /**
@@ -293,7 +299,7 @@ export class DeliveryService {
         });
       }
 
-      return this.mapToDto(updated);
+      return await this.mapToDto(updated);
     });
 
     // C6: Trigger ORDER_OUT_FOR_DELIVERY notification outside transaction
@@ -500,7 +506,7 @@ export class DeliveryService {
         },
       });
 
-      return this.mapToDto(finalDelivery!);
+      return await this.mapToDto(finalDelivery!);
     });
 
     // C6: Trigger ORDER_DELIVERED notification outside transaction
@@ -525,8 +531,29 @@ export class DeliveryService {
     return finalDelivery;
   }
 
-  /** Map Prisma DeliveryRecord to shared DTO */
-  private mapToDto(delivery: any) {
+  /**
+   * Map Prisma DeliveryRecord to shared DTO.
+   *
+   * Resolves proofPhotoUrl through PhotoStorageService.getAccessUrl()
+   * so R2 object keys are converted to time-limited presigned URLs.
+   * Legacy http/https URLs pass through unchanged.
+   */
+  private async mapToDto(delivery: any) {
+    let resolvedProofPhotoUrl: string | null = delivery.proofPhotoUrl || null;
+
+    if (resolvedProofPhotoUrl && this.photoStorage) {
+      try {
+        resolvedProofPhotoUrl = await this.photoStorage.getAccessUrl(resolvedProofPhotoUrl);
+      } catch (error) {
+        this.logger.error(
+          `Failed to resolve proof photo URL for delivery ${delivery.id}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        // Do not expose raw R2 key to API consumers on failure
+        resolvedProofPhotoUrl = null;
+      }
+    }
+
     return {
       id: delivery.id,
       orderId: delivery.orderId,
@@ -538,7 +565,7 @@ export class DeliveryService {
       status: delivery.status,
       scheduledAt: delivery.scheduledAt?.toISOString() || null,
       completedAt: delivery.completedAt?.toISOString() || null,
-      proofPhotoUrl: delivery.proofPhotoUrl,
+      proofPhotoUrl: resolvedProofPhotoUrl,
       notes: delivery.notes,
       items: delivery.order?.items
         ? delivery.order.items.map((i: any) => ({

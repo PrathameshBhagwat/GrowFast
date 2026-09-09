@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { type EmployeeSummary } from '@growfast/shared-types';
+import { apiFetch, ApiError, friendlyErrorMessage } from '../services/api';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -18,8 +19,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = 'growfast_token';
 const EMPLOYEE_KEY = 'growfast_employee';
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
@@ -40,19 +39,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const employee = JSON.parse(employeeStr) as EmployeeSummary;
 
         // Verify token with backend
-        fetch(`${API_URL}/auth/me`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}` },
-        })
-          .then((res) => {
-            if (res.ok) {
-              setState({
-                isAuthenticated: true,
-                token,
-                employee,
-                isLoading: false,
-              });
-            } else if (res.status === 401 || res.status === 403) {
+        apiFetch('/auth/me', { token, retries: 1 })
+          .then(() => {
+            setState({
+              isAuthenticated: true,
+              token,
+              employee,
+              isLoading: false,
+            });
+          })
+          .catch((err) => {
+            if (
+              err instanceof ApiError &&
+              (err.code === 'UNAUTHORIZED' || err.code === 'FORBIDDEN')
+            ) {
               // Token actually invalid or expired — clear storage
               localStorage.removeItem(TOKEN_KEY);
               localStorage.removeItem(EMPLOYEE_KEY);
@@ -63,8 +63,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isLoading: false,
               });
             } else {
-              // Server returned 500 or other error, but token might still be valid.
-              // Don't log them out aggressively. Just assume authenticated for now or show error state.
+              // Server returned 500, or backend is offline/unreachable.
+              // Do NOT aggressively destroy the session here, otherwise a hard
+              // refresh while backend is booting will log them out!
               setState({
                 isAuthenticated: true, // Optimistically keep them logged in
                 token,
@@ -72,16 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isLoading: false,
               });
             }
-          })
-          .catch(() => {
-            // Network or server unreachable (e.g. backend restarting).
-            // Do NOT aggressively destroy the session here, otherwise a hard refresh while backend is booting will log them out!
-            setState({
-              isAuthenticated: true, // Optimistically keep them logged in
-              token,
-              employee,
-              isLoading: false,
-            });
           });
       } catch {
         localStorage.removeItem(TOKEN_KEY);
@@ -96,32 +87,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (employeeId: string, pin: string) => {
     setError(null);
     try {
-      let data: { accessToken: string; employee: EmployeeSummary };
-
-      try {
-        let res: Response | null = null;
-        try {
-          res = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ employeeId, pin }),
-          });
-        } catch {
-          res = null;
-        }
-
-        if (res && res.ok) {
-          data = await res.json();
-        } else if (res && res.status >= 400 && res.status < 500) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.message || 'Invalid credentials');
-        } else {
-          // Server offline, HTTP 500 (DB offline), or network unreachable
-          throw new Error('Server unreachable. Please check backend connection.');
-        }
-      } catch (fetchErr: any) {
-        throw fetchErr;
-      }
+      const data = await apiFetch<{ accessToken: string; employee: EmployeeSummary }>(
+        '/auth/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ employeeId, pin }),
+          noAuth: true,
+          retries: 1,
+          retryDelay: 500,
+        },
+      );
 
       localStorage.setItem(TOKEN_KEY, data.accessToken);
       localStorage.setItem(EMPLOYEE_KEY, JSON.stringify(data.employee));
@@ -133,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Login failed';
+      const msg = friendlyErrorMessage(err);
       setError(msg);
       throw err;
     }

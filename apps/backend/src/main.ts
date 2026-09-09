@@ -2,6 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
+// Ensure root .env is loaded into process.env
+try {
+  (process as any).loadEnvFile?.();
+} catch {
+  try {
+    (process as any).loadEnvFile?.('../../.env');
+  } catch {
+    // Ignore if not present or unsupported
+  }
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 

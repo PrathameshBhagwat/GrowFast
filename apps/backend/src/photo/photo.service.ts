@@ -106,7 +106,13 @@ export class PhotoService {
 
     // ── 4. Generate secure object key ─────────────────────────────
     const extension = this.extractExtension(file.originalname, file.mimetype);
-    const objectKey = this.generateObjectKey(dto.orderId, dto.type, extension);
+    const objectKey = this.generateObjectKey(
+      storeId,
+      dto.orderId,
+      dto.type,
+      extension,
+      dto.physicalGarmentId,
+    );
 
     // ── 5. Store file ─────────────────────────────────────────────
     let storedUrl: string;
@@ -129,7 +135,9 @@ export class PhotoService {
         },
       });
 
-      return this.mapToDto(photo);
+      const resultDto = this.mapToDto(photo);
+      resultDto.url = await this.storage.getAccessUrl(photo.url);
+      return resultDto;
     } catch (error) {
       // Storage succeeded but DB failed — attempt cleanup
       this.logger.error(
@@ -219,18 +227,32 @@ export class PhotoService {
   }
 
   /**
-   * Generate a secure, unpredictable object key.
+   * Generate a deterministic, tenant-safe, unpredictable object key.
    *
-   * Format: <orderId-prefix>/<uuid>.<ext>
-   *
-   * The orderId prefix (first 8 chars) aids debugging/grouping
-   * without exposing the full ID. The UUID portion ensures
-   * unpredictability.
+   * Formats:
+   * - Garment piece photo: stores/{storeId}/orders/{orderId}/garments/{physicalGarmentId}/{type}_{uuid}.{ext}
+   * - Delivery proof photo: stores/{storeId}/orders/{orderId}/delivery/{type}_{uuid}.{ext}
+   * - Order photo: stores/{storeId}/orders/{orderId}/{type}_{uuid}.{ext}
    */
-  private generateObjectKey(orderId: string, type: string, extension: string): string {
-    const uniqueId = crypto.randomUUID();
-    const orderPrefix = orderId.substring(0, 8);
-    return `${orderPrefix}/${type.toLowerCase()}_${uniqueId}${extension}`;
+  generateObjectKey(
+    storeId: string,
+    orderId: string,
+    type: string,
+    extension: string,
+    physicalGarmentId?: string | null,
+  ): string {
+    const photoId = crypto.randomUUID();
+    const safeExt = extension.startsWith('.') ? extension : `.${extension}`;
+
+    if (physicalGarmentId) {
+      return `stores/${storeId}/orders/${orderId}/garments/${physicalGarmentId}/${type.toLowerCase()}_${photoId}${safeExt}`;
+    }
+
+    if (type === 'DELIVERY_PROOF') {
+      return `stores/${storeId}/orders/${orderId}/delivery/${type.toLowerCase()}_${photoId}${safeExt}`;
+    }
+
+    return `stores/${storeId}/orders/${orderId}/${type.toLowerCase()}_${photoId}${safeExt}`;
   }
 
   /**
