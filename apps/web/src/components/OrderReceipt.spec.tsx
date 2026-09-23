@@ -333,4 +333,145 @@ describe('OrderReceipt Component & Modal (Phase 4E)', () => {
     expect(closeBtn?.style.minHeight).toBe('44px');
     expect(printBtn.style.minHeight).toBe('44px');
   });
+
+  it('23. Full payment receipt correctly renders zero balance due and PAID status', () => {
+    const fullyPaidOrder: OrderDetailDTO = {
+      ...baseOrder,
+      amountPaid: 650,
+      amountDue: 0,
+      paymentStatus: PaymentStatus.PAID,
+    };
+
+    render(<OrderReceipt order={fullyPaidOrder} />);
+    expect(screen.getByText('PAID')).toBeInTheDocument();
+    expect(screen.getByText('₹0.00')).toBeInTheDocument();
+  });
+
+  it('24. Receipt correctly renders GST, Discount, and Express Surcharge when present', () => {
+    const taxAndExpressOrder: OrderDetailDTO = {
+      ...baseOrder,
+      isExpress: true,
+      subtotal: 1000,
+      discountAmount: 100,
+      expressSurcharge: 250,
+      taxAmount: 207,
+      totalAmount: 1357,
+      amountPaid: 1357,
+      amountDue: 0,
+      paymentStatus: PaymentStatus.PAID,
+    };
+
+    render(<OrderReceipt order={taxAndExpressOrder} />);
+    expect(screen.getByText('EXPRESS DELIVERY')).toBeInTheDocument();
+    expect(screen.getByText('-₹100.00')).toBeInTheDocument();
+    expect(screen.getByText('+₹250.00')).toBeInTheDocument();
+    expect(screen.getByText('+₹207.00')).toBeInTheDocument();
+    expect(screen.getAllByText('₹1357.00').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('25. Thermal 80mm receipt renders 3-column table and clean POS layout', () => {
+    render(<OrderReceipt order={baseOrder} format="thermal" />);
+    // Check 3-column headers
+    expect(screen.getByText('Item')).toBeInTheDocument();
+    expect(screen.getByText('Qty')).toBeInTheDocument();
+    expect(screen.getByText('Amount')).toBeInTheDocument();
+    // Check items rendered
+    expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
+    expect(screen.getByText('Trouser')).toBeInTheDocument();
+    // Check payment mode
+    expect(screen.getByText(/Payment Mode:/i)).toBeInTheDocument();
+    expect(screen.getByText('UPI')).toBeInTheDocument();
+  });
+
+  it('26. Long content and layout resilience: long customer names and order IDs do not throw or break', () => {
+    const longContentOrder: OrderDetailDTO = {
+      ...baseOrder,
+      orderNumber: 'ORD-2026-LONG-HEX-998877665544332211',
+      customerName: 'Shri Rajendrakumar Parameshwaranathan Venkatasubramanian Jr.',
+      items: [
+        {
+          ...baseOrder.items[0],
+          garmentName:
+            'Extremely Delicate Embroidered Hand-Woven Silk Sherwani with Gold Zari Work',
+        },
+      ],
+    };
+
+    const { container } = render(<OrderReceipt order={longContentOrder} />);
+    expect(screen.getByText(/#ORD-2026-LONG-HEX-998877665544332211/)).toBeInTheDocument();
+    expect(screen.getByText(/Shri Rajendrakumar Parameshwaranathan/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Extremely Delicate Embroidered Hand-Woven Silk Sherwani/),
+    ).toBeInTheDocument();
+    expect(container.querySelector('#printable-receipt')).toBeInTheDocument();
+  });
+
+  it('27. Standard layout renders weight-based item with weight, rate/kg, and correct quantity column', () => {
+    const weightOrder: OrderDetailDTO = {
+      ...baseOrder,
+      items: [
+        {
+          id: 'item-w1',
+          garmentName: 'Bulk Laundry (Weight)',
+          garmentCategory: GarmentCategory.WEIGHT_BASED,
+          serviceType: ServiceCategory.WASH_IRON,
+          quantity: 1,
+          weight: 5.5,
+          unitPrice: 80,
+          lineTotal: 440,
+          colorTags: [],
+          defectNotes: null,
+          itemStatus: ItemStatus.PROCESSING,
+          deliveredQuantity: 0,
+          itemDueDate: null,
+          physicalGarments: [],
+        },
+      ],
+      subtotal: 440,
+      totalAmount: 440,
+      amountPaid: 440,
+      amountDue: 0,
+    };
+
+    render(<OrderReceipt order={weightOrder} format="standard" />);
+    expect(screen.getByText('Bulk Laundry (Weight)')).toBeInTheDocument();
+    expect(screen.getByText('Weight: 5.5 kg @ ₹80/kg')).toBeInTheDocument();
+    expect(screen.getByText('5.5 kg')).toBeInTheDocument();
+    expect(screen.getByText('₹80.00/kg')).toBeInTheDocument();
+    expect(screen.getAllByText('₹440.00').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('28. Thermal layout renders weight-based item with weight calculation breakdown and weight qty', () => {
+    const weightOrder: OrderDetailDTO = {
+      ...baseOrder,
+      items: [
+        {
+          id: 'item-w1',
+          garmentName: 'Bulk Laundry (Weight)',
+          garmentCategory: GarmentCategory.WEIGHT_BASED,
+          serviceType: ServiceCategory.WASH_IRON,
+          quantity: 1,
+          weight: 5.5,
+          unitPrice: 80,
+          lineTotal: 440,
+          colorTags: [],
+          defectNotes: null,
+          itemStatus: ItemStatus.PROCESSING,
+          deliveredQuantity: 0,
+          itemDueDate: null,
+          physicalGarments: [],
+        },
+      ],
+      subtotal: 440,
+      totalAmount: 440,
+      amountPaid: 440,
+      amountDue: 0,
+    };
+
+    render(<OrderReceipt order={weightOrder} format="thermal" />);
+    expect(screen.getByText('Bulk Laundry (Weight)')).toBeInTheDocument();
+    expect(screen.getByText('5.5 kg × ₹80/kg')).toBeInTheDocument();
+    expect(screen.getByText('5.5 kg')).toBeInTheDocument();
+    expect(screen.getAllByText('₹440.00').length).toBeGreaterThanOrEqual(1);
+  });
 });

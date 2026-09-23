@@ -9,6 +9,7 @@ import { ItemStatus } from './enums';
 export interface PricingItemInput {
   quantity: number;
   unitPrice: number;
+  weight?: number | null;
 }
 
 export interface PricingTotals {
@@ -30,8 +31,9 @@ export function calculateOrderTotals(
   let subtotal = 0;
 
   for (const item of items) {
-    // lineTotal = unitPrice * quantity
-    subtotal += item.unitPrice * item.quantity;
+    // For weight-based items, multiplier is weight; otherwise quantity
+    const multiplier = item.weight != null && item.weight > 0 ? item.weight : item.quantity;
+    subtotal += Math.round(item.unitPrice * multiplier * 100) / 100;
   }
 
   // 1. Discount (V1: forced to 0 by default)

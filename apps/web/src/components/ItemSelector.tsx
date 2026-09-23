@@ -362,6 +362,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                         }}
                       >
                         ₹{Number(price).toFixed(0)}
+                        {garment.category === 'WEIGHT_BASED' || selectedCategory === 'WEIGHT_BASED'
+                          ? '/kg'
+                          : ''}
                       </span>
                     ) : (
                       <span

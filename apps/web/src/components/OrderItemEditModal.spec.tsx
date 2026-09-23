@@ -188,4 +188,132 @@ describe('OrderItemEditModal', () => {
     expect(onSuccess).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('Weight-based item: renders Weight input with rate/kg, live line total preview, and submits payload.weight', async () => {
+    const weightItem = {
+      ...baseItem,
+      id: 'weight-item-1',
+      garmentName: 'Bulk Laundry (Weight)',
+      garmentCategory: GarmentCategory.WEIGHT_BASED,
+      serviceType: ServiceCategory.WASH_IRON,
+      unitPrice: 80,
+      weight: 5.5,
+      lineTotal: 440,
+      physicalGarments: [],
+    };
+
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <OrderItemEditModal
+        open={true}
+        onClose={onClose}
+        orderId="order-1"
+        item={weightItem as any}
+        onSuccess={onSuccess}
+      />,
+    );
+
+    // Quantity input should NOT be present; Weight (kg) input should be present
+    expect(screen.queryByLabelText(/^Quantity$/i)).not.toBeInTheDocument();
+    const weightInput = screen.getByLabelText(/Weight \(kg\)/i);
+    expect(weightInput).toBeInTheDocument();
+    expect(weightInput).toHaveValue(5.5);
+    expect(screen.getByText(/Rate: ₹80\/kg/i)).toBeInTheDocument();
+    expect(screen.getByText(/New Total: ₹440.00/i)).toBeInTheDocument();
+
+    // Change weight to 6.25
+    fireEvent.change(weightInput, { target: { value: '6.25' } });
+    expect(screen.getByText(/New Total: ₹500.00/i)).toBeInTheDocument();
+
+    const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const callArgs = (global.fetch as any).mock.calls[0];
+    const sentPayload = JSON.parse(callArgs[1].body);
+    expect(sentPayload.weight).toBe(6.25);
+    expect(onSuccess).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('Weight-based item: rejects 0 or negative weight with validation message', async () => {
+    const weightItem = {
+      ...baseItem,
+      id: 'weight-item-1',
+      garmentName: 'Bulk Laundry (Weight)',
+      garmentCategory: GarmentCategory.WEIGHT_BASED,
+      serviceType: ServiceCategory.WASH_IRON,
+      unitPrice: 80,
+      weight: 5.5,
+      lineTotal: 440,
+      physicalGarments: [],
+    };
+
+    render(
+      <OrderItemEditModal
+        open={true}
+        onClose={vi.fn()}
+        orderId="order-1"
+        item={weightItem as any}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    const weightInput = screen.getByLabelText(/Weight \(kg\)/i);
+    fireEvent.change(weightInput, { target: { value: '0' } });
+
+    const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveButton);
+
+    expect(await screen.findByText('Weight must be greater than 0 kg')).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('Weight-based item: displays backend safety error when weight reduction is rejected', async () => {
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        message: 'Cannot reduce item weight: new total ₹320 is less than amount already paid ₹440',
+      }),
+    });
+
+    const weightItem = {
+      ...baseItem,
+      id: 'weight-item-1',
+      garmentName: 'Bulk Laundry (Weight)',
+      garmentCategory: GarmentCategory.WEIGHT_BASED,
+      serviceType: ServiceCategory.WASH_IRON,
+      unitPrice: 80,
+      weight: 5.5,
+      lineTotal: 440,
+      physicalGarments: [],
+    };
+
+    render(
+      <OrderItemEditModal
+        open={true}
+        onClose={vi.fn()}
+        orderId="order-1"
+        item={weightItem as any}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    const weightInput = screen.getByLabelText(/Weight \(kg\)/i);
+    fireEvent.change(weightInput, { target: { value: '4' } });
+
+    const saveButton = screen.getByRole('button', { name: /Save Changes/i });
+    fireEvent.click(saveButton);
+
+    expect(
+      await screen.findByText(
+        'Cannot reduce item weight: new total ₹320 is less than amount already paid ₹440',
+      ),
+    ).toBeInTheDocument();
+  });
 });
