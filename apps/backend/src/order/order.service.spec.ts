@@ -864,6 +864,106 @@ describe('OrderService', () => {
         }),
       );
     });
+
+    it('should update weight for weight-based item and recalculate line total', async () => {
+      const weightOrder = {
+        ...mockOrder,
+        items: [
+          {
+            id: 'item-w',
+            quantity: 1,
+            weight: 5.0,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.PROCESSING,
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-weight',
+            unitPrice: 80,
+            lineTotal: 400,
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(weightOrder);
+      mockPrismaService.physicalGarment.count.mockResolvedValue(0);
+      mockPrismaService.serviceGarmentPrice.findFirst.mockResolvedValue({ price: 80 });
+      jest.spyOn(service, 'findOrderById').mockResolvedValue(weightOrder as any);
+
+      await service.updateOrderItem('o1', 'item-w', { weight: 6.5 }, 'store1');
+
+      expect(mockPrismaService.orderItem.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'item-w' },
+          data: expect.objectContaining({
+            weight: 6.5,
+            lineTotal: 520, // 6.5 * 80
+          }),
+        }),
+      );
+    });
+
+    it('should reject invalid non-positive weight on update', async () => {
+      const weightOrder = {
+        ...mockOrder,
+        items: [
+          {
+            id: 'item-w',
+            quantity: 1,
+            weight: 5.0,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.PROCESSING,
+            unitPrice: 80,
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(weightOrder);
+      mockPrismaService.physicalGarment.count.mockResolvedValue(0);
+
+      await expect(
+        service.updateOrderItem('o1', 'item-w', { weight: 0 }, 'store1'),
+      ).rejects.toThrow(new BadRequestException('Weight in kg must be greater than 0.'));
+    });
+
+    it('should reject reducing weight if new total is less than amount already paid', async () => {
+      const paidOrder = {
+        ...mockOrder,
+        amountPaid: 440,
+        refundAmount: 0,
+        storeCreditAmount: 0,
+        items: [
+          {
+            id: 'item-w',
+            quantity: 1,
+            weight: 5.5,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.PROCESSING,
+            unitPrice: 80,
+            lineTotal: 440,
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockImplementation((args: any) => {
+        if (args.include?.adjustments) {
+          return Promise.resolve({
+            ...paidOrder,
+            items: [
+              {
+                ...paidOrder.items[0],
+                weight: 3.0,
+                unitPrice: 80,
+                quantity: 1,
+              },
+            ],
+            adjustments: [],
+          });
+        }
+        return Promise.resolve(paidOrder);
+      });
+      mockPrismaService.physicalGarment.count.mockResolvedValue(0);
+      mockPrismaService.serviceGarmentPrice.findFirst.mockResolvedValue({ price: 80 });
+
+      await expect(
+        service.updateOrderItem('o1', 'item-w', { weight: 3.0 }, 'store1'),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('updateDueDate', () => {
@@ -3124,24 +3224,40 @@ describe('OrderService', () => {
       isWeightGarment?: boolean;
       isWeightService?: boolean;
       price?: number;
+      garments?: any[];
+      services?: any[];
+      prices?: any[];
     }) {
       mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomer);
       mockPrismaService.store.findUnique.mockResolvedValue(mockStore);
 
-      const garments = [options?.isWeightGarment ? mockGarmentWeightBased : mockGarmentRegular];
-      const services = [options?.isWeightService ? mockServiceWeightBased : mockServiceRegular];
+      const garments = options?.garments || [
+        options?.isWeightGarment ? mockGarmentWeightBased : mockGarmentRegular,
+      ];
+      const services = options?.services || [
+        options?.isWeightService ? mockServiceWeightBased : mockServiceRegular,
+      ];
 
       mockPrismaService.garmentCatalog.findMany.mockResolvedValue(garments);
       mockPrismaService.serviceType.findMany.mockResolvedValue(services);
 
       const unitPrice = options?.price ?? 100;
-      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+      const prices = options?.prices || [
         {
           garmentCatalogId: garments[0].id,
           serviceTypeId: services[0].id,
           price: unitPrice,
         },
-      ]);
+      ];
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue(prices);
+      mockPrismaService.serviceGarmentPrice.findFirst.mockImplementation((args: any) => {
+        const found = prices.find(
+          (p: any) =>
+            p.garmentCatalogId === args?.where?.garmentCatalogId &&
+            p.serviceTypeId === args?.where?.serviceTypeId,
+        );
+        return Promise.resolve(found || prices[0] || null);
+      });
 
       mockPrismaService.order.count.mockResolvedValue(0);
 
@@ -3149,24 +3265,27 @@ describe('OrderService', () => {
         const orderId = 'order-created-123';
         const items = (args.data.items.create || []).map((it: any, itemIdx: number) => {
           const itemId = `item-${itemIdx + 1}`;
-          const physicalGarments = Array.from({ length: it.quantity }, (_, pIdx) => ({
-            id: `pg-${itemId}-${pIdx + 1}`,
-            orderItemId: itemId,
-            unitNumber: pIdx + 1,
-            isReady: false,
-            isCancelled: false,
-            isDelivered: false,
-            deliveredAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            photos: [],
-          }));
+          const physicalGarments = it.physicalGarments?.create
+            ? it.physicalGarments.create.map((pg: any, _pIdx: number) => ({
+                id: `pg-${itemId}-${pg.unitNumber}`,
+                orderItemId: itemId,
+                unitNumber: pg.unitNumber,
+                isReady: pg.isReady || false,
+                isCancelled: false,
+                isDelivered: false,
+                deliveredAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                photos: [],
+              }))
+            : [];
           return {
             id: itemId,
             orderId,
             garmentCatalogId: it.garmentCatalogId,
             serviceTypeId: it.serviceTypeId,
             quantity: it.quantity,
+            weight: it.weight ?? null,
             unitPrice: it.unitPrice,
             lineTotal: it.lineTotal,
             colorTags: it.colorTags || [],
@@ -3174,6 +3293,7 @@ describe('OrderService', () => {
             itemStatus: 'RECEIVED',
             deliveredQuantity: 0,
             itemDueDate: new Date(),
+            photos: [],
             garmentCatalog: garments.find((g) => g.id === it.garmentCatalogId) || garments[0],
             serviceType: services.find((s) => s.id === it.serviceTypeId) || services[0],
             physicalGarments,
@@ -3184,27 +3304,30 @@ describe('OrderService', () => {
           id: orderId,
           orderNumber: 'GF-000001',
           customerId: args.data.customerId,
-          storeId: args.data.storeId,
-          orderDate: new Date(),
-          effectiveDueDate: new Date(),
-          systemDueDate: new Date(),
+          orderDate: args.data.orderDate || new Date(),
+          systemDueDate: args.data.systemDueDate || new Date(),
+          effectiveDueDate: args.data.effectiveDueDate || new Date(),
           dueDateOverrideReason: null,
           dueDateOverriddenBy: null,
-          isExpress: args.data.isExpress,
-          priority: args.data.priority,
-          status: 'RECEIVED',
-          subtotal: args.data.subtotal,
-          discountAmount: args.data.discountAmount,
-          taxAmount: args.data.taxAmount,
-          totalAmount: args.data.totalAmount,
-          expressSurcharge: args.data.expressSurcharge,
+          isExpress: args.data.isExpress || false,
+          serviceSummary: args.data.serviceSummary || '',
+          status: args.data.status || 'RECEIVED',
+          subtotal: args.data.subtotal || 0,
+          discountAmount: args.data.discountAmount || 0,
+          expressSurcharge: args.data.expressSurcharge || 0,
+          taxAmount: args.data.taxAmount || 0,
+          totalAmount: args.data.totalAmount || 0,
           amountPaid: 0,
+          amountDue: args.data.amountDue || args.data.totalAmount || 0,
+          paymentStatus: 'PENDING',
           pickupType: args.data.pickupType,
-          deliveredAt: null,
-          notes: args.data.notes,
+          priority: args.data.priority || 'STANDARD',
+          notes: args.data.notes || null,
+          storeId: args.data.storeId,
           createdById: args.data.createdById,
-          createdBy: { id: employeeId, name: 'Staff' },
           customer: mockCustomer,
+          createdBy: { id: employeeId, name: 'Test Employee' },
+          store: mockStore,
           items,
           payments: [],
           adjustments: [],
@@ -3462,6 +3585,7 @@ describe('OrderService', () => {
             garmentCatalogId: 'g-weight',
             serviceTypeId: 's-regular',
             quantity: 1,
+            weight: 5.5,
             pieces: [],
           },
         ],
@@ -3482,6 +3606,7 @@ describe('OrderService', () => {
             garmentCatalogId: 'g-regular',
             serviceTypeId: 's-weight',
             quantity: 55,
+            weight: 55,
             pieces: [],
           },
         ],
@@ -3491,13 +3616,9 @@ describe('OrderService', () => {
       );
     });
 
-    // 10. Weight-based order with every required piece photographed => succeeds.
-    it('Scenario 10: Weight-based order with every required piece photographed => succeeds', async () => {
-      setupMocks({ isWeightGarment: true });
-      const pieces = Array.from({ length: 50 }, (_, i) => ({
-        unitNumber: i + 1,
-        photoCount: 1,
-      }));
+    // 10. Weight-based order with required photo => succeeds without physical garments.
+    it('Scenario 10: Weight-based order with required photo => succeeds without physical garments', async () => {
+      setupMocks({ isWeightGarment: true, price: 80 });
       const dto: any = {
         customerId,
         pickupType: PickupType.STORE_PICKUP,
@@ -3505,14 +3626,54 @@ describe('OrderService', () => {
           {
             garmentCatalogId: 'g-weight',
             serviceTypeId: 's-regular',
-            quantity: 50,
-            pieces,
+            quantity: 1,
+            weight: 5.5,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
           },
         ],
       };
       const result = await service.createOrder(dto, employeeId, storeId);
       expect(result).toBeDefined();
-      expect(result.itemCount).toBe(50);
+      expect(result.items[0].weight).toBe(5.5);
+      expect(result.items[0].unitPrice).toBe(80);
+      expect(result.items[0].lineTotal).toBe(440); // 5.5 * 80
+      expect(result.items[0].physicalGarments).toHaveLength(0); // No physical garments fabricated
+    });
+
+    it('Scenario 10b: Rejects weight-based order with 0 kg, negative weight, or missing weight', async () => {
+      setupMocks({ isWeightGarment: true, price: 80 });
+      const zeroDto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            weight: 0,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+      await expect(service.createOrder(zeroDto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      const negDto: any = {
+        ...zeroDto,
+        items: [{ ...zeroDto.items[0], weight: -2.5 }],
+      };
+      await expect(service.createOrder(negDto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      const missingWeightDto: any = {
+        ...zeroDto,
+        items: [{ ...zeroDto.items[0], weight: undefined }],
+      };
+      await expect(service.createOrder(missingWeightDto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     // 11. Captured photos are visible immediately after order creation.
@@ -3777,6 +3938,124 @@ describe('OrderService', () => {
       await expect(
         service.createOrder(dto, employeeId, 'different-unauthorized-store'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    // 16. Mixed normal + weight-based order
+    it('Scenario 16: Mixed normal and weight-based items in single order', async () => {
+      setupMocks({
+        garments: [mockGarmentRegular, mockGarmentWeightBased],
+        prices: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            price: 100,
+          },
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            price: 80,
+          },
+        ],
+      });
+
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 2,
+            pieces: [
+              { unitNumber: 1, photoCount: 1 },
+              { unitNumber: 2, photoCount: 1 },
+            ],
+          },
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            weight: 5.5,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.items).toHaveLength(2);
+
+      // Normal item: 2 * 100 = 200, 2 physical garments
+      expect(result.items[0].quantity).toBe(2);
+      expect(result.items[0].lineTotal).toBe(200);
+      expect(result.items[0].physicalGarments).toHaveLength(2);
+
+      // Weight item: 5.5 * 80 = 440, 0 physical garments
+      expect(result.items[1].weight).toBe(5.5);
+      expect(result.items[1].lineTotal).toBe(440);
+      expect(result.items[1].physicalGarments).toHaveLength(0);
+
+      // Total before tax/discount = 640
+      expect(result.subtotal).toBe(640);
+    });
+
+    // 17. Multiple weight-based items in one order
+    it('Scenario 17: Multiple weight-based items each retain their own weight, rate, and line total', async () => {
+      const mockGarmentWeight2 = {
+        ...mockGarmentWeightBased,
+        id: 'g-weight-2',
+        name: 'Bulk Dry Clean (Weight)',
+      };
+      setupMocks({
+        garments: [mockGarmentWeightBased, mockGarmentWeight2],
+        prices: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            price: 80,
+          },
+          {
+            garmentCatalogId: 'g-weight-2',
+            serviceTypeId: 's-regular',
+            price: 120,
+          },
+        ],
+      });
+
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            weight: 5.0,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+          {
+            garmentCatalogId: 'g-weight-2',
+            serviceTypeId: 's-regular',
+            quantity: 1,
+            weight: 2.5,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.items).toHaveLength(2);
+
+      expect(result.items[0].weight).toBe(5.0);
+      expect(result.items[0].unitPrice).toBe(80);
+      expect(result.items[0].lineTotal).toBe(400);
+
+      expect(result.items[1].weight).toBe(2.5);
+      expect(result.items[1].unitPrice).toBe(120);
+      expect(result.items[1].lineTotal).toBe(300);
+
+      expect(result.subtotal).toBe(700);
     });
   });
 });

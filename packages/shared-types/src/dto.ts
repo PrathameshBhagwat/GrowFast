@@ -174,6 +174,7 @@ export interface OrderItemDTO {
   garmentCategory: GarmentCategory;
   serviceType: ServiceCategory;
   quantity: number;
+  weight?: number | null;
   unitPrice: number;
   lineTotal: number;
   colorTags: string[] | null;
@@ -181,6 +182,7 @@ export interface OrderItemDTO {
   itemStatus: ItemStatus;
   deliveredQuantity: number;
   itemDueDate: string | null;
+  photos?: OrderPhotoDTO[];
   physicalGarments?: PhysicalGarmentDTO[];
 }
 
@@ -215,6 +217,7 @@ export interface CreateOrderItemRequest {
   garmentCatalogId: string;
   serviceTypeId: string;
   quantity: number;
+  weight?: number;
   colorTags?: string[];
   defectNotes?: string;
   pieces?: CreateOrderPieceRequest[];
@@ -229,6 +232,7 @@ export interface UpdateOrderItemRequest {
   garmentCatalogId?: string;
   serviceTypeId?: string;
   quantity?: number;
+  weight?: number | null;
   colorTags?: string[];
   defectNotes?: string | null;
   itemStatus?: ItemStatus;

@@ -181,11 +181,23 @@
     border: none !important;
   }
 
+  #printable-receipt.receipt-standard {
+    max-width: 190mm !important;
+    margin: 0 auto !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   #printable-receipt.receipt-thermal {
     width: 76mm !important;
     max-width: 76mm !important;
-    padding: 0 !important;
+    margin: 0 auto !important;
+    padding: 2mm 0 !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
     font-size: 11px !important;
+    line-height: 1.25 !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
   .no-print,

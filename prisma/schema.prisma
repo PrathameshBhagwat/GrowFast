@@ -282,6 +282,7 @@ model OrderItem {
   garmentCatalogId  String     @map("garment_catalog_id")
   serviceTypeId     String     @map("service_type_id")
   quantity          Int        @default(1)
+  weight            Float?
   unitPrice         Float      @map("unit_price")
   lineTotal         Float      @map("line_total")
   colorTags         String[]   @default([]) @map("color_tags")

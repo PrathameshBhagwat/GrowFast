@@ -18,7 +18,12 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ open, onCl
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Customer Receipt">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Customer Receipt"
+      width={format === 'thermal' ? '440px' : '680px'}
+    >
       <div className="space-y-4">
         {/* ─── Controls (Hidden when printing via no-print class) ───────── */}
         <div className="no-print flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">

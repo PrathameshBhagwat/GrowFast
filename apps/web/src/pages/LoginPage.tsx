@@ -80,7 +80,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex items-center justify-center relative font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-slate-50/80 flex items-center justify-center relative font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
       {/* ── Background Decorative Elements ── */}
       {/* Top Left Shape */}
       <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-blue-100/60 rounded-full blur-3xl pointer-events-none" />

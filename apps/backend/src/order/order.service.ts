@@ -113,32 +113,54 @@ export class OrderService {
           throw new BadRequestException(`Service type "${service.name}" is not active`);
         }
 
+        const isWeightBased =
+          garment.category === GarmentCategory.WEIGHT_BASED ||
+          service.category === ServiceCategory.WEIGHT_BASED;
+
+        if (isWeightBased) {
+          if (item.weight == null || isNaN(item.weight) || item.weight <= 0) {
+            throw new BadRequestException(
+              `Weight in kg is required and must be greater than 0 for weight-based item "${garment.name}".`,
+            );
+          }
+        }
+
         const priceKey = `${garment.id}_${service.id}`;
         const unitPrice = priceMap.get(priceKey) ?? 0;
-        const lineTotal = unitPrice * item.quantity;
+        const lineTotal = isWeightBased
+          ? Math.round(unitPrice * item.weight! * 100) / 100
+          : Math.round(unitPrice * item.quantity * 100) / 100;
 
         // For summary
         serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
 
-        orderItemsData.push({
+        const orderItemData: any = {
           garmentCatalogId: garment.id,
           serviceTypeId: service.id,
           quantity: item.quantity,
+          weight: isWeightBased ? item.weight : null,
           unitPrice,
           lineTotal,
           colorTags: item.colorTags || [],
           defectNotes: item.defectNotes,
-          physicalGarments: {
+        };
+
+        // Weight-based items represent bulk laundry and do not fabricate individual physical piece garments
+        if (!isWeightBased) {
+          orderItemData.physicalGarments = {
             create: Array.from({ length: item.quantity }, (_, i) => ({
               unitNumber: i + 1,
               isReady: false,
             })),
-          },
-        });
+          };
+        }
+
+        orderItemsData.push(orderItemData);
 
         pricingInputs.push({
           unitPrice,
           quantity: item.quantity,
+          weight: isWeightBased ? item.weight : null,
         });
 
         if (service.estimatedDays > maxEstimatedDays) {
@@ -149,7 +171,7 @@ export class OrderService {
       // 3.5 Photo requirement validation
       const isWalkIn = dto.pickupType === PickupType.STORE_PICKUP;
       let totalPieces = 0;
-      let isWeightBased = false;
+      let isWeightBasedOrder = false;
 
       for (const item of dto.items) {
         totalPieces += item.quantity;
@@ -159,28 +181,43 @@ export class OrderService {
           garment?.category === GarmentCategory.WEIGHT_BASED ||
           service?.category === ServiceCategory.WEIGHT_BASED
         ) {
-          isWeightBased = true;
+          isWeightBasedOrder = true;
         }
       }
 
       const photosRequired = isPhotoRequiredForOrder({
         isWalkIn,
         totalPieces,
-        isWeightBased,
+        isWeightBased: isWeightBasedOrder,
       });
 
       if (photosRequired) {
         for (const item of dto.items) {
           const garment = garmentMap.get(item.garmentCatalogId);
+          const service = serviceMap.get(item.serviceTypeId);
           const garmentName = garment ? garment.name : item.garmentCatalogId;
+          const isItemWeightBased =
+            garment?.category === GarmentCategory.WEIGHT_BASED ||
+            service?.category === ServiceCategory.WEIGHT_BASED;
 
-          for (let u = 1; u <= item.quantity; u++) {
-            const pieceData = item.pieces?.find((p) => p.unitNumber === u);
-            const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
+          if (isItemWeightBased) {
+            // Weight-based batch requires at least 1 photo for the laundry item
+            const firstPiece = item.pieces?.[0];
+            const photoCount = firstPiece?.photoCount ?? firstPiece?.photos?.length ?? 0;
             if (photoCount < 1) {
               throw new BadRequestException(
-                `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
+                `Photos are required for all pieces in this order. Item "${garmentName}" is missing photos.`,
               );
+            }
+          } else {
+            for (let u = 1; u <= item.quantity; u++) {
+              const pieceData = item.pieces?.find((p) => p.unitNumber === u);
+              const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
+              if (photoCount < 1) {
+                throw new BadRequestException(
+                  `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
+                );
+              }
             }
           }
         }
@@ -257,6 +294,7 @@ export class OrderService {
             include: {
               garmentCatalog: true,
               serviceType: true,
+              photos: true,
               physicalGarments: {
                 include: { photos: true },
                 orderBy: { unitNumber: 'asc' },
@@ -277,20 +315,39 @@ export class OrderService {
         );
         if (!inputItem?.pieces) continue;
 
-        for (const pg of createdItem.physicalGarments) {
-          const pieceInput = inputItem.pieces.find((p) => p.unitNumber === pg.unitNumber);
-          if (pieceInput?.photos && pieceInput.photos.length > 0) {
-            hasDirectPhotos = true;
-            for (const url of pieceInput.photos) {
-              await tx.orderPhoto.create({
-                data: {
-                  orderId: order.id,
-                  orderItemId: createdItem.id,
-                  physicalGarmentId: pg.id,
-                  type: PhotoType.FRONT,
-                  url,
-                },
-              });
+        if (createdItem.physicalGarments && createdItem.physicalGarments.length > 0) {
+          for (const pg of createdItem.physicalGarments) {
+            const pieceInput = inputItem.pieces.find((p) => p.unitNumber === pg.unitNumber);
+            if (pieceInput?.photos && pieceInput.photos.length > 0) {
+              hasDirectPhotos = true;
+              for (const url of pieceInput.photos) {
+                await tx.orderPhoto.create({
+                  data: {
+                    orderId: order.id,
+                    orderItemId: createdItem.id,
+                    physicalGarmentId: pg.id,
+                    type: PhotoType.FRONT,
+                    url,
+                  },
+                });
+              }
+            }
+          }
+        } else {
+          // Weight-based item: attach photos directly to the order item
+          for (const pieceInput of inputItem.pieces) {
+            if (pieceInput?.photos && pieceInput.photos.length > 0) {
+              hasDirectPhotos = true;
+              for (const url of pieceInput.photos) {
+                await tx.orderPhoto.create({
+                  data: {
+                    orderId: order.id,
+                    orderItemId: createdItem.id,
+                    type: PhotoType.FRONT,
+                    url,
+                  },
+                });
+              }
             }
           }
         }
@@ -304,6 +361,7 @@ export class OrderService {
               include: {
                 garmentCatalog: true,
                 serviceType: true,
+                photos: true,
                 physicalGarments: {
                   include: { photos: true },
                   orderBy: { unitNumber: 'asc' },
@@ -348,6 +406,7 @@ export class OrderService {
           include: {
             garmentCatalog: true,
             serviceType: true,
+            photos: true,
             physicalGarments: {
               include: { photos: true },
               orderBy: { unitNumber: 'asc' },
@@ -517,7 +576,18 @@ export class OrderService {
         },
       });
       const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
-      const lineTotal = unitPrice * newQuantity;
+
+      const newWeight = dto.weight !== undefined ? dto.weight : orderItem.weight;
+      if (newWeight !== null && newWeight !== undefined) {
+        if (isNaN(newWeight) || newWeight <= 0) {
+          throw new BadRequestException('Weight in kg must be greater than 0.');
+        }
+      }
+
+      const lineTotal =
+        newWeight != null
+          ? Math.round(unitPrice * newWeight * 100) / 100
+          : Math.round(unitPrice * newQuantity * 100) / 100;
 
       // 6. Update OrderItem
       const updatedItemStatus = hasPhysicalGarments
@@ -534,6 +604,7 @@ export class OrderService {
           garmentCatalogId: dto.garmentCatalogId,
           serviceTypeId: dto.serviceTypeId,
           quantity: dto.quantity,
+          weight: newWeight,
           unitPrice,
           lineTotal,
           colorTags: dto.colorTags,
@@ -560,10 +631,34 @@ export class OrderService {
       const pricingInputs = updatedOrder!.items.map((i) => ({
         unitPrice: i.unitPrice,
         quantity: i.quantity,
+        weight: i.weight,
       }));
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: updatedOrder!.isExpress,
         expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+      });
+
+      // Check payment safety: do not allow silent reduction of total below amount already paid
+      const effectivePaid =
+        updatedOrder!.amountPaid -
+        ((updatedOrder as any).adjustments || []).reduce((acc: number, adj: any) => {
+          if (adj.status === 'COMPLETED') {
+            return acc + (adj.amount || 0);
+          }
+          return acc;
+        }, 0);
+
+      if (totals.totalAmount < effectivePaid) {
+        throw new BadRequestException(
+          `Cannot reduce order item total below the amount already paid (₹${effectivePaid}). Please use the Financial Adjustment workflow (Refund/Store Credit) for adjustments.`,
+        );
+      }
+
+      const financialState = this.paymentService.calculateOrderFinancialState({
+        totalAmount: totals.totalAmount,
+        amountPaid: updatedOrder!.amountPaid,
+        paymentStatus: updatedOrder!.paymentStatus as any,
+        adjustments: (updatedOrder as any).adjustments,
       });
 
       const itemsForStatus = updatedOrder!.items.map((i: any) => ({
@@ -1731,6 +1826,7 @@ export class OrderService {
         garmentCategory: item.garmentCatalog.category,
         serviceType: item.serviceType.category,
         quantity: item.quantity,
+        weight: item.weight ?? null,
         unitPrice: item.unitPrice,
         lineTotal: item.lineTotal,
         colorTags: item.colorTags,
@@ -1738,6 +1834,14 @@ export class OrderService {
         itemStatus: item.itemStatus,
         deliveredQuantity: item.deliveredQuantity,
         itemDueDate: item.itemDueDate?.toISOString() || null,
+        photos: item.photos?.map((photo: any) => ({
+          id: photo.id,
+          orderItemId: photo.orderItemId,
+          physicalGarmentId: photo.physicalGarmentId,
+          type: photo.type as any,
+          url: photo.url,
+          uploadedAt: photo.uploadedAt.toISOString(),
+        })),
         physicalGarments: item.physicalGarments?.map((pg: any) => ({
           id: pg.id,
           orderItemId: pg.orderItemId,
@@ -1798,6 +1902,17 @@ export class OrderService {
     const photoPromises: Promise<void>[] = [];
 
     for (const item of dto.items) {
+      if (item.photos) {
+        for (const photo of item.photos) {
+          if (photo.url) {
+            photoPromises.push(
+              this.photoStorage.getAccessUrl(photo.url).then((resolvedUrl) => {
+                photo.url = resolvedUrl;
+              }),
+            );
+          }
+        }
+      }
       if (item.physicalGarments) {
         for (const pg of item.physicalGarments) {
           if (pg.photos) {

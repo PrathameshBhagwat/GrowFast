@@ -154,12 +154,88 @@ describe('OrderWizardPage', () => {
 
     // Photos progress and required banner should appear
     await waitFor(() => {
-      expect(screen.getByText(/Photos: 0 \/ 1 pieces covered/i)).toBeInTheDocument();
+      expect(screen.getByText(/Photos: 0 \/ 1 pieces/i)).toBeInTheDocument();
       expect(screen.getByText(/Photos required for all pieces/i)).toBeInTheDocument();
     });
 
     // Proceed button should be disabled
     const proceedBtn = screen.getByRole('button', { name: /Proceed to Review/i });
     expect(proceedBtn).toBeDisabled();
+  });
+
+  it('renders compact General Notes textarea that is optional and interactive', async () => {
+    renderWithRouter('/orders/new?customerId=cust-003');
+
+    await waitFor(() => {
+      expect(screen.getByText(/General Notes/i)).toBeInTheDocument();
+      expect(screen.getByText(/\(Optional\)/i)).toBeInTheDocument();
+    });
+
+    const notesTextarea = screen.getByPlaceholderText(/Optional — add any special instructions/i);
+    expect(notesTextarea).toBeInTheDocument();
+    expect(notesTextarea.tagName).toBe('TEXTAREA');
+
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(notesTextarea, { target: { value: 'Handle with delicate care' } });
+    expect(notesTextarea).toHaveValue('Handle with delicate care');
+    expect(notesTextarea).toHaveClass('min-h-[44px]');
+  });
+
+  it('satisfies compact visual footprint and touch target requirements for notes and photo progress', async () => {
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/customers/cust-003')) {
+        return { ok: true, json: async () => ({ data: mockCustomer }) };
+      }
+      if (url.includes('/pricing')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ garmentCatalogId: 'g1', serviceTypeId: 's1', price: 100 }],
+          }),
+        };
+      }
+      if (url.includes('/garments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ id: 'g1', name: 'Shirt', category: 'MEN', isActive: true }],
+          }),
+        };
+      }
+      if (url.includes('/services')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ id: 's1', name: 'Wash', category: 'WASH', isActive: true, estimatedDays: 2 }],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const { fireEvent } = await import('@testing-library/react');
+    renderWithRouter('/orders/new?customerId=cust-003');
+
+    await waitFor(() => {
+      expect(screen.getByText('Shirt')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Wash'));
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/i }));
+
+    await waitFor(() => {
+      const photoBadge = screen.getByText(/Photos: 0 \/ 1 pieces/i);
+      expect(photoBadge).toBeInTheDocument();
+      // Ensure photo badge is rendered with compact typography
+      expect(photoBadge).toHaveClass('text-xs');
+    });
+
+    // Verify General Notes textarea is present with >=44px touch target
+    const notesTextarea = screen.getByPlaceholderText(/Optional — add any special instructions/i);
+    expect(notesTextarea).toHaveClass('min-h-[44px]');
+    expect(notesTextarea).toHaveClass('w-full');
   });
 });

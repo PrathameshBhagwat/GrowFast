@@ -647,7 +647,7 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
       });
     });
 
-    it('renders multiple photo thumbnails and photo badge for physical garments with captured photos', async () => {
+    it('renders first photo preview and photo badge for physical garments with captured photos', async () => {
       const orderWithPhotos = {
         ...mockOrderWithPhysicalGarments,
         items: [
@@ -661,8 +661,16 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
                 isReady: true,
                 isCancelled: false,
                 photos: [
-                  { id: 'p1', url: 'https://img.test/front.jpg' },
-                  { id: 'p2', url: 'https://img.test/back.jpg' },
+                  {
+                    id: 'p1',
+                    url: 'https://img.test/front.jpg',
+                    uploadedAt: '2026-09-01T10:00:00Z',
+                  },
+                  {
+                    id: 'p2',
+                    url: 'https://img.test/back.jpg',
+                    uploadedAt: '2026-09-01T11:00:00Z',
+                  },
                 ],
               },
             ],
@@ -681,11 +689,325 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
 
       await waitFor(() => {
         expect(screen.getByText('2 photos ✓')).toBeInTheDocument();
+        // Only 1 preview image shown (the first photo by uploadedAt)
         const imgs = screen.getAllByRole('img', { name: /Garment #1 - Photo/i });
-        expect(imgs).toHaveLength(2);
+        expect(imgs).toHaveLength(1);
         expect(imgs[0]).toHaveAttribute('src', 'https://img.test/front.jpg');
-        expect(imgs[1]).toHaveAttribute('src', 'https://img.test/back.jpg');
+        // +1 badge for remaining photos
+        expect(screen.getByText('+1')).toBeInTheDocument();
+        // View All button to access all photos
+        expect(screen.getByText('View All')).toBeInTheDocument();
       });
+    });
+
+    it('21. Print Receipt button is available in header and opens OrderReceiptModal', async () => {
+      (global.fetch as any).mockImplementation(async (url: string) => {
+        if (url.includes('/api/orders/order-receipt-test')) {
+          return { ok: true, json: async () => ({ data: mockOrderWithPhysicalGarments }) };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      renderWithRouter('order-receipt-test');
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /print receipt/i })).toBeInTheDocument();
+      });
+
+      // Click Print Receipt in header
+      fireEvent.click(screen.getByRole('button', { name: /print receipt/i }));
+
+      // Receipt modal should open
+      await waitFor(() => {
+        expect(screen.getByText('Customer Receipt')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /standard \(a4\)/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /thermal \(80mm\)/i })).toBeInTheDocument();
+      });
+    });
+
+    it('22. Receipt remains accessible after page refresh with authoritative order data', async () => {
+      (global.fetch as any).mockImplementation(async (url: string) => {
+        if (url.includes('/api/orders/order-refreshed-test')) {
+          return {
+            ok: true,
+            json: async () => ({
+              data: {
+                ...mockOrderWithPhysicalGarments,
+                id: 'order-refreshed-test',
+                amountPaid: 105,
+                amountDue: 0,
+                paymentStatus: PaymentStatus.PAID,
+              },
+            }),
+          };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+
+      // Render as if page was refreshed
+      renderWithRouter('order-refreshed-test');
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /print receipt/i })).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /print receipt/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Customer Receipt')).toBeInTheDocument();
+        expect(screen.getAllByText('PAID').length).toBeGreaterThanOrEqual(1);
+      });
+    });
+  });
+
+  describe('Photo Preview — First Photo Per Garment', () => {
+    const makeOrderWithPhotos = (
+      photos: Array<{ id: string; url: string; uploadedAt: string }>,
+    ) => ({
+      ...mockOrderWithPhysicalGarments,
+      id: 'order-photo-test',
+      items: [
+        {
+          ...mockOrderWithPhysicalGarments.items[0],
+          quantity: 1,
+          physicalGarments: [
+            {
+              id: 'garment-photo-1',
+              orderItemId: 'item-1',
+              unitNumber: 1,
+              isReady: false,
+              isCancelled: false,
+              photos,
+            },
+          ],
+        },
+      ],
+    });
+
+    it('23. Garment with 0 photos shows Add Photo button, no preview', async () => {
+      const orderNoPhotos = makeOrderWithPhotos([]);
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: orderNoPhotos }),
+      }));
+
+      renderWithRouter('order-photo-test');
+
+      await waitFor(() => {
+        expect(screen.getByText('Add Photo')).toBeInTheDocument();
+      });
+
+      // No photo count badge
+      expect(screen.queryByText(/photo.*✓/)).not.toBeInTheDocument();
+      // No View All
+      expect(screen.queryByText('View All')).not.toBeInTheDocument();
+    });
+
+    it('24. Garment with 1 photo shows single preview, no +N badge, no View All', async () => {
+      const orderOnePhoto = makeOrderWithPhotos([
+        {
+          id: 'photo-a',
+          url: 'https://r2.example.com/photo-a.jpg',
+          uploadedAt: '2026-09-01T10:00:00Z',
+        },
+      ]);
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: orderOnePhoto }),
+      }));
+
+      renderWithRouter('order-photo-test');
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Garment #1 - Photo 1')).toBeInTheDocument();
+      });
+
+      // Shows "1 photo ✓"
+      expect(screen.getByText(/1 photo ✓/)).toBeInTheDocument();
+      // No "+N" badge (only one photo)
+      expect(screen.queryByText(/^\+\d+$/)).not.toBeInTheDocument();
+      // No "View All" button (only one photo)
+      expect(screen.queryByText('View All')).not.toBeInTheDocument();
+    });
+
+    it('25. Garment with 2 photos shows first as preview, +1 badge, and View All', async () => {
+      const orderTwoPhotos = makeOrderWithPhotos([
+        {
+          id: 'photo-b',
+          url: 'https://r2.example.com/photo-b.jpg',
+          uploadedAt: '2026-09-01T11:00:00Z',
+        },
+        {
+          id: 'photo-a',
+          url: 'https://r2.example.com/photo-a.jpg',
+          uploadedAt: '2026-09-01T10:00:00Z',
+        },
+      ]);
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: orderTwoPhotos }),
+      }));
+
+      renderWithRouter('order-photo-test');
+
+      await waitFor(() => {
+        // First photo by uploadedAt is photo-a
+        expect(screen.getByAltText('Garment #1 - Photo 1')).toBeInTheDocument();
+      });
+
+      const previewImg = screen.getByAltText('Garment #1 - Photo 1');
+      expect(previewImg).toHaveAttribute('src', 'https://r2.example.com/photo-a.jpg');
+
+      // Shows "2 photos ✓"
+      expect(screen.getByText(/2 photos ✓/)).toBeInTheDocument();
+      // Shows "+1" badge
+      expect(screen.getByText('+1')).toBeInTheDocument();
+      // Shows "View All" button
+      expect(screen.getByText('View All')).toBeInTheDocument();
+    });
+
+    it('26. Garment with 5+ photos shows first as preview with +4 badge', async () => {
+      const photos = Array.from({ length: 5 }, (_, i) => ({
+        id: `photo-${i}`,
+        url: `https://r2.example.com/photo-${i}.jpg`,
+        uploadedAt: `2026-09-01T1${i}:00:00Z`,
+      }));
+      const orderFivePhotos = makeOrderWithPhotos(photos);
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: orderFivePhotos }),
+      }));
+
+      renderWithRouter('order-photo-test');
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Garment #1 - Photo 1')).toBeInTheDocument();
+      });
+
+      // First photo is photo-0 (earliest by uploadedAt)
+      expect(screen.getByAltText('Garment #1 - Photo 1')).toHaveAttribute(
+        'src',
+        'https://r2.example.com/photo-0.jpg',
+      );
+
+      // Shows "5 photos ✓"
+      expect(screen.getByText(/5 photos ✓/)).toBeInTheDocument();
+      // Shows "+4" badge
+      expect(screen.getByText('+4')).toBeInTheDocument();
+      // Shows "View All" button
+      expect(screen.getByText('View All')).toBeInTheDocument();
+    });
+
+    it('27. Clicking preview opens gallery with all photos and nav controls', async () => {
+      const photos = [
+        {
+          id: 'photo-first',
+          url: 'https://r2.example.com/photo-first.jpg',
+          uploadedAt: '2026-09-01T10:00:00Z',
+        },
+        {
+          id: 'photo-second',
+          url: 'https://r2.example.com/photo-second.jpg',
+          uploadedAt: '2026-09-01T11:00:00Z',
+        },
+        {
+          id: 'photo-third',
+          url: 'https://r2.example.com/photo-third.jpg',
+          uploadedAt: '2026-09-01T12:00:00Z',
+        },
+      ];
+      const orderThreePhotos = makeOrderWithPhotos(photos);
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: orderThreePhotos }),
+      }));
+
+      renderWithRouter('order-photo-test');
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Garment #1 - Photo 1')).toBeInTheDocument();
+      });
+
+      // Click "View All" to open gallery
+      fireEvent.click(screen.getByRole('button', { name: /view all 3 photos/i }));
+
+      await waitFor(() => {
+        // Gallery shows "Photo 1 of 3"
+        expect(screen.getByText(/Photo 1 of 3/)).toBeInTheDocument();
+        // Has navigation controls
+        expect(screen.getByRole('button', { name: /next photo/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /previous photo/i })).toBeInTheDocument();
+      });
+
+      // Click Next
+      fireEvent.click(screen.getByRole('button', { name: /next photo/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Photo 2 of 3/)).toBeInTheDocument();
+      });
+
+      // Click Next again
+      fireEvent.click(screen.getByRole('button', { name: /next photo/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Photo 3 of 3/)).toBeInTheDocument();
+      });
+
+      // Click Previous
+      fireEvent.click(screen.getByRole('button', { name: /previous photo/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Photo 2 of 3/)).toBeInTheDocument();
+      });
+
+      // Has thumbnail strip with 3 thumbnails
+      const thumbnails = screen.getAllByRole('button', { name: /go to photo/i });
+      expect(thumbnails).toHaveLength(3);
+
+      // Click Close button
+      fireEvent.click(screen.getByRole('button', { name: /close photo preview/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Photo \d+ of 3/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('28. Clicking the preview photo directly opens the photo gallery', async () => {
+      const photos = [
+        {
+          id: 'photo-alpha',
+          url: 'https://r2.example.com/photo-alpha.jpg',
+          uploadedAt: '2026-09-01T10:00:00Z',
+        },
+        {
+          id: 'photo-beta',
+          url: 'https://r2.example.com/photo-beta.jpg',
+          uploadedAt: '2026-09-01T11:00:00Z',
+        },
+      ];
+      const orderTwo = makeOrderWithPhotos(photos);
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: orderTwo }),
+      }));
+
+      renderWithRouter('order-photo-test');
+
+      await waitFor(() => {
+        expect(screen.getByAltText('Garment #1 - Photo 1')).toBeInTheDocument();
+      });
+
+      // Click the preview image directly
+      fireEvent.click(screen.getByAltText('Garment #1 - Photo 1'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Photo 1 of 2/)).toBeInTheDocument();
+      });
+
+      // Verify both the card preview and gallery lightbox show the first photo
+      const imgs = screen.getAllByAltText('Garment #1 - Photo 1');
+      expect(imgs).toHaveLength(2);
+      expect(screen.getByRole('dialog', { name: /photo gallery/i })).toBeInTheDocument();
     });
   });
 });
