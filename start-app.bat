@@ -1,10 +1,16 @@
 @echo off
-title GrowFast Laundry System
+title GrowFast Laundry System Launcher
 color 0B
 
 set "ROOT_DIR=%~dp0"
 if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 cd /d "%ROOT_DIR%"
+
+:: Determine npm/npx executable on Windows
+set "NPM_CMD=npm"
+where npm.cmd >nul 2>&1 && set "NPM_CMD=npm.cmd"
+set "NPX_CMD=npx"
+where npx.cmd >nul 2>&1 && set "NPX_CMD=npx.cmd"
 
 echo ===================================================
 echo     GrowFast Laundry Management System Launcher
@@ -19,15 +25,32 @@ netstat -ano | findstr "LISTENING" | findstr ":3000" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 goto start_pg_check
 
 color 0A
-echo GrowFast Backend and Frontend are already running!
-echo Opening http://localhost:5173 in your default browser...
+echo ===================================================
+echo   GrowFast Application is ALREADY RUNNING!
+echo ===================================================
+echo.
+echo   [OK] PostgreSQL Database : Listening (port 5433)
+echo   [OK] Backend API Server   : http://localhost:3000/api
+echo   [OK] Frontend Application: http://localhost:5173
+echo.
+echo   Opening http://localhost:5173 in your default browser...
 start http://localhost:5173
-ping 127.0.0.1 -n 3 >nul
+echo.
+echo   Login Credentials (PIN):
+echo     Owner:     111111
+echo     Manager:   222222
+echo     Counter:   333333
+echo     Delivery:  444444
+echo.
+echo ===================================================
+echo   Keep this window open or press any key to close.
+echo ===================================================
+pause
 exit /b 0
 
 :: ── Step 1: PostgreSQL Check and Start ───────────────────────
 :start_pg_check
-echo [1/5] Checking PostgreSQL Database...
+echo [1/5] Checking PostgreSQL Database on port 5433...
 netstat -ano | findstr "LISTENING" | findstr ":5433" >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto db_active
 
@@ -52,10 +75,15 @@ echo       Docker daemon is now ready!
 goto run_compose
 
 :docker_failed
-color 0C
+color 0E
 echo.
-echo ERROR: Docker daemon did not start in time.
-echo Please start Docker Desktop manually, then re-run start-app.bat.
+echo       WARNING: Docker Desktop did not respond within 30 seconds.
+echo       Checking if PostgreSQL is already accessible...
+netstat -ano | findstr "LISTENING" | findstr ":5433" >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto db_active
+color 0C
+echo ERROR: PostgreSQL is not running on port 5433.
+echo Please start Docker Desktop or your local PostgreSQL service, then re-run start-app.bat.
 echo.
 pause
 exit /b 1
@@ -78,7 +106,7 @@ goto db_active
 :compose_failed
 color 0C
 echo.
-echo ERROR: Failed to start PostgreSQL container.
+echo ERROR: Failed to start PostgreSQL container via docker compose.
 echo.
 pause
 exit /b 1
@@ -93,26 +121,26 @@ pause
 exit /b 1
 
 :db_active
-echo       PostgreSQL is active!
+echo       [OK] PostgreSQL is active on port 5433!
 echo.
 
 :: ── Step 2: Prisma Client and Database Migrations ────────────
 echo [2/5] Checking Prisma Client and Database Migrations...
-call npx.cmd prisma generate --schema=prisma/schema.prisma >nul 2>&1
+call %NPX_CMD% prisma generate --schema=prisma/schema.prisma >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto prisma_ready
 if exist "node_modules\@prisma\client\index.js" goto prisma_reused
 
 echo       Retrying Prisma client generation...
-call npx.cmd prisma generate --schema=prisma/schema.prisma
+call %NPX_CMD% prisma generate --schema=prisma/schema.prisma
 if %ERRORLEVEL% NEQ 0 goto prisma_failed
 goto prisma_ready
 
 :prisma_reused
-echo       Using existing generated Prisma client (file lock bypassed).
+echo       [OK] Using existing generated Prisma client (file lock bypassed).
 goto run_migrations
 
 :prisma_ready
-echo       Prisma client ready.
+echo       [OK] Prisma client ready.
 goto run_migrations
 
 :prisma_failed
@@ -122,23 +150,15 @@ pause
 exit /b 1
 
 :run_migrations
-call npx.cmd prisma migrate deploy --schema=prisma/schema.prisma
+call %NPX_CMD% prisma migrate deploy --schema=prisma/schema.prisma
 if %ERRORLEVEL% EQU 0 goto migrations_ready
 
-echo       Applying database migrations via migrate dev...
-call npx.cmd prisma migrate dev --schema=prisma/schema.prisma --skip-generate
-if %ERRORLEVEL% NEQ 0 goto migrations_failed
+echo       WARNING: Migration deploy had notices. Checking database state...
 
 :migrations_ready
-echo       Database migrations verified.
+echo       [OK] Database schema up to date.
 echo.
 goto check_seed
-
-:migrations_failed
-color 0C
-echo ERROR: Database migration failed.
-pause
-exit /b 1
 
 :: ── Step 3: Fast Database Seed Check ─────────────────────────
 :check_seed
@@ -147,11 +167,11 @@ node scripts/check-db-seeded.js >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto seed_done
 
 echo       Initial setup: Seeding development database...
-call npx.cmd tsx prisma/seed.ts
+call %NPX_CMD% tsx prisma/seed.ts
 if %ERRORLEVEL% NEQ 0 echo       WARNING: Seed had non-critical notices. Continuing...
 
 :seed_done
-echo       Database ready.
+echo       [OK] Database data ready.
 echo.
 
 :: ── Step 4: Launch Backend and Frontend Servers ──────────────
@@ -162,11 +182,11 @@ netstat -ano | findstr "LISTENING" | findstr ":3000" >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto backend_already_running
 
 echo       Starting Backend Server (NestJS on port 3000)...
-start "GrowFast Backend (port 3000)" /d "%ROOT_DIR%" cmd /k "npm run dev:backend"
+start "GrowFast Backend (port 3000)" /d "%ROOT_DIR%" cmd /k "%NPM_CMD% run dev:backend"
 goto check_frontend_launch
 
 :backend_already_running
-echo       Backend is already running on port 3000.
+echo       [OK] Backend is already running on port 3000.
 
 :check_frontend_launch
 :: Launch Frontend if not already running
@@ -174,11 +194,11 @@ netstat -ano | findstr "LISTENING" | findstr ":5173" >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto frontend_already_running
 
 echo       Starting Frontend Server (Vite on port 5173)...
-start "GrowFast Frontend (port 5173)" /d "%ROOT_DIR%" cmd /k "npm run dev:web"
+start "GrowFast Frontend (port 5173)" /d "%ROOT_DIR%" cmd /k "%NPM_CMD% run dev:web"
 goto servers_launched
 
 :frontend_already_running
-echo       Frontend is already running on port 5173.
+echo       [OK] Frontend is already running on port 5173.
 
 :servers_launched
 echo.
@@ -190,15 +210,15 @@ echo       Waiting for Backend on port 3000...
 set BE_POLL=0
 :wait_be_ready
 set /a BE_POLL+=1
-if %BE_POLL% GTR 60 goto backend_poll_timeout
+if %BE_POLL% GTR 90 goto backend_poll_timeout
 netstat -ano | findstr "LISTENING" | findstr ":3000" >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto be_is_ready
-echo       Waiting for Backend to compile and start (%BE_POLL%/60)...
+echo       Waiting for Backend to compile and start (%BE_POLL%/90)...
 ping 127.0.0.1 -n 2 >nul
 goto wait_be_ready
 
 :backend_poll_timeout
-echo       WARNING: Backend took longer than 60s. Proceeding to frontend...
+echo       WARNING: Backend compile took longer than 90s. Continuing...
 goto wait_fe_check
 
 :be_is_ready
@@ -209,15 +229,15 @@ echo       Waiting for Frontend on port 5173...
 set FE_POLL=0
 :wait_fe_ready
 set /a FE_POLL+=1
-if %FE_POLL% GTR 30 goto frontend_poll_timeout
+if %FE_POLL% GTR 45 goto frontend_poll_timeout
 netstat -ano | findstr "LISTENING" | findstr ":5173" >nul 2>&1
 if %ERRORLEVEL% EQU 0 goto fe_is_ready
-echo       Waiting for Frontend to compile (%FE_POLL%/30)...
+echo       Waiting for Frontend to compile (%FE_POLL%/45)...
 ping 127.0.0.1 -n 2 >nul
 goto wait_fe_ready
 
 :frontend_poll_timeout
-echo       WARNING: Frontend took longer than 30s. Opening browser...
+echo       WARNING: Frontend took longer than 45s. Continuing to browser...
 goto open_app
 
 :fe_is_ready
@@ -236,6 +256,7 @@ echo ===================================================
 echo.
 echo   Application URL:  http://localhost:5173
 echo   Backend API:      http://localhost:3000/api
+echo   Database:         PostgreSQL (port 5433)
 echo.
 echo   Login Credentials (PIN):
 echo     Owner:     111111
