@@ -285,6 +285,7 @@ export class PaymentService {
             order.id,
             order.customer.id,
             {
+              orderNumber: order.orderNumber,
               amountPaid: dto.amount,
               totalAmount: order.totalAmount,
               amountDue: order.amountDue,

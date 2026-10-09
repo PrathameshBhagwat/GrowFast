@@ -33,16 +33,22 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         width: '64px',
         height: '64px',
         borderRadius: '50%',
-        background: '#FEF2F2',
+        background: 'var(--danger-bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <AlertTriangle size={32} color="#EF4444" />
+      <AlertTriangle size={32} color="var(--danger-text)" />
     </div>
-    <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#334155' }}>{title}</h3>
-    <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748B', maxWidth: '400px' }}>{message}</p>
+    <h3
+      style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-secondary)' }}
+    >
+      {title}
+    </h3>
+    <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: '400px' }}>
+      {message}
+    </p>
     {onRetry && (
       <Button variant="outline" size="md" onClick={onRetry} icon={<RefreshCw size={16} />}>
         Try Again

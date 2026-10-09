@@ -48,7 +48,11 @@ export const WizardShell: React.FC<WizardShellProps> = ({
     >
       {/* Step indicator */}
       <div
-        style={{ padding: '16px 24px', borderBottom: '1px solid #E2E8F0', background: '#FFFFFF' }}
+        style={{
+          padding: '16px 24px',
+          borderBottom: '1px solid var(--border, #E2E8F0)',
+          background: 'var(--bg-surface, #FFFFFF)',
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
           {steps.map((step, i) => (
@@ -63,8 +67,12 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                   justifyContent: 'center',
                   fontSize: '0.75rem',
                   fontWeight: 700,
-                  background: i <= currentStep ? '#2563EB' : '#E2E8F0',
-                  color: i <= currentStep ? '#FFFFFF' : '#64748B',
+                  background:
+                    i <= currentStep ? 'var(--accent, #2563EB)' : 'var(--border, #E2E8F0)',
+                  color:
+                    i <= currentStep
+                      ? 'var(--accent-foreground, #FFFFFF)'
+                      : 'var(--text-muted, #64748B)',
                   transition: 'all 300ms ease',
                 }}
               >
@@ -75,7 +83,8 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                   style={{
                     flex: 1,
                     height: '2px',
-                    background: i < currentStep ? '#2563EB' : '#E2E8F0',
+                    background:
+                      i < currentStep ? 'var(--accent, #2563EB)' : 'var(--border, #E2E8F0)',
                     borderRadius: '1px',
                     transition: 'background 300ms ease',
                   }}
@@ -86,11 +95,24 @@ export const WizardShell: React.FC<WizardShellProps> = ({
         </div>
         {currentStepInfo && (
           <div>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: '1rem',
+                fontWeight: 700,
+                color: 'var(--text-primary, #0F172A)',
+              }}
+            >
               {currentStepInfo.title}
             </h3>
             {currentStepInfo.description && (
-              <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748B' }}>
+              <p
+                style={{
+                  margin: '4px 0 0',
+                  fontSize: '0.84rem',
+                  color: 'var(--text-muted, #64748B)',
+                }}
+              >
                 {currentStepInfo.description}
               </p>
             )}
@@ -108,8 +130,8 @@ export const WizardShell: React.FC<WizardShellProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '16px 24px',
-          borderTop: '1px solid #E2E8F0',
-          background: '#FFFFFF',
+          borderTop: '1px solid var(--border, #E2E8F0)',
+          background: 'var(--bg-surface, #FFFFFF)',
         }}
       >
         <Button

@@ -56,8 +56,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
         >
           🔒
         </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A' }}>Access Denied</h2>
-        <p style={{ fontSize: '0.9rem', color: '#64748B', maxWidth: '400px' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary, #0F172A)' }}>
+          Access Denied
+        </h2>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted, #64748B)', maxWidth: '400px' }}>
           Your role ({employee.role}) does not have permission to view this page.
         </p>
       </div>

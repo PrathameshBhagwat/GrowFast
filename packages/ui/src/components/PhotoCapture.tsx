@@ -154,14 +154,22 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     return (
       <div style={containerStyle}>
         {label && (
-          <span style={{ fontSize: '0.84rem', fontWeight: 500, color: '#334155' }}>{label}</span>
+          <span
+            style={{
+              fontSize: '0.84rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary, #334155)',
+            }}
+          >
+            {label}
+          </span>
         )}
         <div
           style={{
             position: 'relative',
             borderRadius: '12px',
             overflow: 'hidden',
-            border: '1px solid #E2E8F0',
+            border: '1px solid var(--border, #E2E8F0)',
             backgroundColor: '#000',
           }}
         >
@@ -197,14 +205,22 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     return (
       <div style={containerStyle}>
         {label && (
-          <span style={{ fontSize: '0.84rem', fontWeight: 500, color: '#334155' }}>{label}</span>
+          <span
+            style={{
+              fontSize: '0.84rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary, #334155)',
+            }}
+          >
+            {label}
+          </span>
         )}
         <div
           style={{
             position: 'relative',
             borderRadius: '12px',
             overflow: 'hidden',
-            border: '1px solid #E2E8F0',
+            border: '1px solid var(--border, #E2E8F0)',
           }}
         >
           <img
@@ -234,7 +250,11 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             </Button>
           </div>
         </div>
-        {fileName && <span style={{ fontSize: '0.75rem', color: '#64748B' }}>{fileName}</span>}
+        {fileName && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748B)' }}>
+            {fileName}
+          </span>
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -249,7 +269,11 @@ export const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   return (
     <div style={containerStyle}>
       {label && (
-        <span style={{ fontSize: '0.84rem', fontWeight: 500, color: '#334155' }}>{label}</span>
+        <span
+          style={{ fontSize: '0.84rem', fontWeight: 500, color: 'var(--text-secondary, #334155)' }}
+        >
+          {label}
+        </span>
       )}
       <div style={{ display: 'flex', gap: '10px' }}>
         {allowCamera && (

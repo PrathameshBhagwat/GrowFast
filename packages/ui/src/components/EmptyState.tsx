@@ -29,9 +29,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       fontFamily: "'Inter', sans-serif",
     }}
   >
-    <div style={{ color: '#CBD5E1' }}>{icon || <Inbox size={56} strokeWidth={1.5} />}</div>
-    <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#334155' }}>{title}</h3>
-    <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748B', maxWidth: '360px' }}>{message}</p>
+    <div style={{ color: 'var(--text-placeholder)' }}>
+      {icon || <Inbox size={56} strokeWidth={1.5} />}
+    </div>
+    <h3
+      style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-secondary)' }}
+    >
+      {title}
+    </h3>
+    <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: '360px' }}>
+      {message}
+    </p>
     {action && <div style={{ marginTop: '8px' }}>{action}</div>}
   </div>
 );

@@ -43,7 +43,7 @@ export const Modal: React.FC<ModalProps> = ({
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.5)',
+    background: 'var(--overlay)',
     backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
@@ -54,13 +54,14 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const dialogStyle: React.CSSProperties = {
-    background: '#FFFFFF',
+    background: 'var(--bg-surface-elevated)',
     borderRadius: '16px',
     width: '100%',
     maxWidth: width,
     maxHeight: '90vh',
     overflow: 'auto',
-    boxShadow: '0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05)',
+    border: '1px solid var(--border)',
+    boxShadow: `0 20px 25px -5px var(--shadow-lg), 0 8px 10px -6px var(--shadow-color)`,
     animation: 'slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1)',
   };
 
@@ -88,7 +89,7 @@ export const Modal: React.FC<ModalProps> = ({
                   margin: 0,
                   fontSize: '1.125rem',
                   fontWeight: 700,
-                  color: '#0F172A',
+                  color: 'var(--text-primary)',
                   fontFamily: "'Inter', sans-serif",
                 }}
               >
@@ -100,7 +101,7 @@ export const Modal: React.FC<ModalProps> = ({
                 onClick={onClose}
                 aria-label="Close"
                 style={{
-                  background: '#F1F5F9',
+                  background: 'var(--bg-surface-muted)',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '8px',
@@ -108,7 +109,7 @@ export const Modal: React.FC<ModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#475569',
+                  color: 'var(--text-muted)',
                 }}
               >
                 <X size={18} />

@@ -101,3 +101,15 @@ export {
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
 } from './catalog';
+
+// Tag Template & Designer Contract (Phase T4)
+export { DEFAULT_TAG_DESIGN, sanitizeTagDesign } from './tag-template';
+export type {
+  TagFieldKey,
+  TagTextAlign,
+  TagFieldConfig,
+  TagContainerPadding,
+  TagDesignConfig,
+  TagTemplateDTO,
+  UpdateTagDesignRequest,
+} from './tag-template';

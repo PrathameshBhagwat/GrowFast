@@ -15,15 +15,15 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   primary: {
-    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-    color: '#FFFFFF',
+    background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+    color: 'var(--accent-foreground)',
     border: 'none',
     boxShadow: '0 1px 3px rgba(37, 99, 235, 0.3)',
   },
   secondary: {
-    background: '#F1F5F9',
-    color: '#334155',
-    border: '1px solid #E2E8F0',
+    background: 'var(--btn-secondary-bg)',
+    color: 'var(--btn-secondary-text)',
+    border: '1px solid var(--btn-secondary-border)',
   },
   danger: {
     background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
@@ -33,13 +33,13 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   },
   ghost: {
     background: 'transparent',
-    color: '#475569',
+    color: 'var(--btn-ghost-text)',
     border: 'none',
   },
   outline: {
     background: 'transparent',
-    color: '#2563EB',
-    border: '1px solid #2563EB',
+    color: 'var(--accent)',
+    border: '1px solid var(--accent)',
   },
 };
 

@@ -18,12 +18,17 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ open, onCl
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Customer Receipt">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Customer Receipt"
+      width={format === 'thermal' ? '440px' : '680px'}
+    >
       <div className="space-y-4">
         {/* ─── Controls (Hidden when printing via no-print class) ───────── */}
-        <div className="no-print flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="no-print flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-slate-900/50 rounded-lg border border-gray-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-700">Format:</span>
+            <span className="text-xs font-semibold text-gray-700 dark:text-slate-300">Format:</span>
             <div className="inline-flex rounded-md shadow-sm">
               <button
                 type="button"
@@ -32,7 +37,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ open, onCl
                 className={`px-3 py-2 text-xs font-semibold rounded-l-md border min-h-[44px] transition-colors ${
                   format === 'standard'
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-750'
                 }`}
               >
                 Standard (A4)
@@ -44,7 +49,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ open, onCl
                 className={`px-3 py-2 text-xs font-semibold rounded-r-md border border-l-0 min-h-[44px] transition-colors ${
                   format === 'thermal'
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-750'
                 }`}
               >
                 Thermal (80mm)
@@ -77,7 +82,7 @@ export const OrderReceiptModal: React.FC<OrderReceiptModalProps> = ({ open, onCl
         </div>
 
         {/* ─── Scrollable Printable Receipt Container ──────────────────── */}
-        <div className="max-h-[70vh] overflow-y-auto p-2 bg-gray-100 rounded-lg">
+        <div className="max-h-[70vh] overflow-y-auto p-2 bg-gray-100 dark:bg-slate-950/60 rounded-lg">
           <OrderReceipt order={order} format={format} id="printable-receipt" />
         </div>
       </div>

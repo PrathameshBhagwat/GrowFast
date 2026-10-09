@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Input, Select, Button } from '@growfast/ui';
 import {
   MembershipTier,
-  RegistrationSource,
   type CustomerDTO,
   type UpdateCustomerRequest,
   type ApiResponse,
@@ -26,34 +25,6 @@ const MEMBERSHIP_OPTIONS = [
   { value: MembershipTier.PLATINUM, label: 'Platinum (15% Discount)' },
 ];
 
-const REGISTRATION_SOURCE_OPTIONS = [
-  { value: RegistrationSource.WALK_IN, label: 'Walk-In Store' },
-  { value: RegistrationSource.PHONE, label: 'Phone Inquiry' },
-  { value: RegistrationSource.WEBSITE, label: 'Website' },
-  { value: RegistrationSource.REFERRAL, label: 'Customer Referral' },
-  { value: RegistrationSource.APP, label: 'Mobile App' },
-];
-
-const FRAGRANCE_OPTIONS = [
-  { value: 'none', label: 'No Fragrance' },
-  { value: 'lavender', label: 'Lavender' },
-  { value: 'jasmine', label: 'Jasmine' },
-  { value: 'fresh_linen', label: 'Fresh Linen' },
-];
-
-const STARCH_OPTIONS = [
-  { value: 'none', label: 'No Starch' },
-  { value: 'light', label: 'Light Starch' },
-  { value: 'medium', label: 'Medium Starch' },
-  { value: 'heavy', label: 'Heavy Crisp Starch' },
-];
-
-const FOLD_OPTIONS = [
-  { value: 'standard_fold', label: 'Standard Fold' },
-  { value: 'hanger', label: 'On Hanger' },
-  { value: 'flat_pack', label: 'Flat Box Pack' },
-];
-
 export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   open,
   customer,
@@ -62,24 +33,15 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 }) => {
   const { token } = useAuth();
 
-  // Form Field States
+  // Active form field states
   const [name, setName] = useState(customer.name);
   const [phone, setPhone] = useState(customer.phone);
-  const [email, setEmail] = useState(customer.email || '');
   const [address, setAddress] = useState(customer.address || '');
   const [pincode, setPincode] = useState(customer.pincode || '');
   const [membership, setMembership] = useState<string>(customer.membership || MembershipTier.NONE);
   const [discountPercent, setDiscountPercent] = useState<string>(
     String(customer.discountPercent ?? 0),
   );
-  const [registrationSource, setRegistrationSource] = useState<string>(
-    customer.registrationSource || RegistrationSource.WALK_IN,
-  );
-
-  // Preference fields
-  const [fragrance, setFragrance] = useState<string>(customer.preferences?.fragrance || 'none');
-  const [starch, setStarch] = useState<string>(customer.preferences?.starch || 'none');
-  const [fold, setFold] = useState<string>(customer.preferences?.fold || 'standard_fold');
 
   // Validation & Error states
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -91,15 +53,10 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
     if (open && customer) {
       setName(customer.name);
       setPhone(customer.phone);
-      setEmail(customer.email || '');
       setAddress(customer.address || '');
       setPincode(customer.pincode || '');
       setMembership(customer.membership || MembershipTier.NONE);
       setDiscountPercent(String(customer.discountPercent ?? 0));
-      setRegistrationSource(customer.registrationSource || RegistrationSource.WALK_IN);
-      setFragrance(customer.preferences?.fragrance || 'none');
-      setStarch(customer.preferences?.starch || 'none');
-      setFold(customer.preferences?.fold || 'standard_fold');
       setErrors({});
       setApiError(null);
       setIsSubmitting(false);
@@ -127,13 +84,9 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 
     const trimmedPhone = phone.trim().replace(/[\s\-()]/g, '');
     if (!trimmedPhone) {
-      newErrors.phone = 'Phone number is required';
+      newErrors.phone = 'WhatsApp number is required';
     } else if (!/^\+?[0-9]{10,15}$/.test(trimmedPhone)) {
-      newErrors.phone = 'Enter a valid 10 to 15-digit phone number';
-    }
-
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      newErrors.email = 'Enter a valid email address';
+      newErrors.phone = 'Enter a valid 10 to 15-digit WhatsApp number';
     }
 
     if (pincode.trim() && !/^[A-Za-z0-9\s\-]{3,10}$/.test(pincode.trim())) {
@@ -159,23 +112,14 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
 
     try {
       const cleanPhone = phone.trim().replace(/[\s\-()]/g, '');
-      const preferencesObj: Record<string, string> = {
-        ...customer.preferences, // Preserve any existing extra preference keys
-        fragrance,
-        starch,
-        fold,
-      };
 
       const payload: UpdateCustomerRequest = {
         name: name.trim(),
         phone: cleanPhone,
-        email: email.trim() || null,
         address: address.trim() || null,
         pincode: pincode.trim() || null,
         membership: membership as MembershipTier,
         discountPercent: parseFloat(discountPercent) || 0,
-        preferences: preferencesObj,
-        registrationSource,
       };
 
       let updatedResult: CustomerDTO;
@@ -200,7 +144,8 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           updatedResult = data.data;
         } else if (res && res.status === 409) {
           const data = await res.json().catch(() => ({}));
-          const msg = data.message || `A customer with phone number ${cleanPhone} already exists.`;
+          const msg =
+            data.message || `A customer with WhatsApp number ${cleanPhone} already exists.`;
           setErrors((prev) => ({
             ...prev,
             phone: msg,
@@ -214,13 +159,6 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           updatedResult = {
             ...customer,
             ...payload,
-            email: payload.email ?? null,
-            address: payload.address ?? null,
-            pincode: payload.pincode ?? null,
-            membership: payload.membership || customer.membership,
-            discountPercent: payload.discountPercent ?? customer.discountPercent,
-            preferences: payload.preferences ?? customer.preferences,
-            registrationSource: payload.registrationSource || customer.registrationSource,
             updatedAt: new Date().toISOString(),
           };
         }
@@ -229,13 +167,6 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
         updatedResult = {
           ...customer,
           ...payload,
-          email: payload.email ?? null,
-          address: payload.address ?? null,
-          pincode: payload.pincode ?? null,
-          membership: payload.membership || customer.membership,
-          discountPercent: payload.discountPercent ?? customer.discountPercent,
-          preferences: payload.preferences ?? customer.preferences,
-          registrationSource: payload.registrationSource || customer.registrationSource,
           updatedAt: new Date().toISOString(),
         };
       }
@@ -250,7 +181,7 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={`Edit Customer (${customer.id})`} width="560px">
+    <Modal open={open} onClose={onClose} title={`Edit Customer (${customer.id})`} width="520px">
       <form
         onSubmit={handleSubmit}
         style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
@@ -274,40 +205,47 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           </div>
         )}
 
-        {/* Required Fields Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <Input
-            id="edit-customer-name"
-            label="Full Name *"
-            placeholder="e.g. Rahul Sharma"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            error={errors.name}
-            disabled={isSubmitting}
-            autoFocus
-          />
+        {/* Customer Name */}
+        <Input
+          id="edit-customer-name"
+          label="Customer Name *"
+          placeholder="e.g. Rahul Sharma"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (errors.name) {
+              setErrors((prev) => ({ ...prev, name: '' }));
+            }
+          }}
+          error={errors.name}
+          disabled={isSubmitting}
+          autoFocus
+        />
 
-          <Input
-            id="edit-customer-phone"
-            label="Phone Number *"
-            placeholder="e.g. 9876543210"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            error={errors.phone}
-            disabled={isSubmitting}
-          />
-        </div>
+        {/* WhatsApp Number (Single primary contact field) */}
+        <Input
+          id="edit-customer-whatsapp"
+          label="WhatsApp Number *"
+          placeholder="e.g. 9876543210"
+          value={phone}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            if (errors.phone) {
+              setErrors((prev) => ({ ...prev, phone: '' }));
+            }
+          }}
+          error={errors.phone}
+          disabled={isSubmitting}
+        />
 
-        {/* Contact & Address Section */}
+        {/* Address and Pincode */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
           <Input
-            id="edit-customer-email"
-            label="Email Address"
-            placeholder="e.g. rahul@example.com"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
+            id="edit-customer-address"
+            label="Address"
+            placeholder="e.g. Flat 402, Rohan Vasanta, Baner Road, Pune"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
             disabled={isSubmitting}
           />
 
@@ -321,15 +259,6 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
             disabled={isSubmitting}
           />
         </div>
-
-        <Input
-          id="edit-customer-address"
-          label="Address"
-          placeholder="e.g. Flat 402, Rohan Vasanta, Baner Road, Pune"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          disabled={isSubmitting}
-        />
 
         {/* Membership & Discount Section */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -355,58 +284,6 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
           />
         </div>
 
-        {/* Registration Source & Customer Preferences */}
-        <Select
-          id="edit-customer-source"
-          label="Registration Source"
-          options={REGISTRATION_SOURCE_OPTIONS}
-          value={registrationSource}
-          onChange={(e) => setRegistrationSource(e.target.value)}
-          disabled={isSubmitting}
-        />
-
-        <div
-          style={{
-            background: '#F8FAFC',
-            padding: '14px',
-            borderRadius: '10px',
-            border: '1px solid #E2E8F0',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-            Garment Processing Preferences
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-            <Select
-              id="edit-pref-fragrance"
-              label="Fragrance"
-              options={FRAGRANCE_OPTIONS}
-              value={fragrance}
-              onChange={(e) => setFragrance(e.target.value)}
-              disabled={isSubmitting}
-            />
-            <Select
-              id="edit-pref-starch"
-              label="Starch"
-              options={STARCH_OPTIONS}
-              value={starch}
-              onChange={(e) => setStarch(e.target.value)}
-              disabled={isSubmitting}
-            />
-            <Select
-              id="edit-pref-fold"
-              label="Fold Type"
-              options={FOLD_OPTIONS}
-              value={fold}
-              onChange={(e) => setFold(e.target.value)}
-              disabled={isSubmitting}
-            />
-          </div>
-        </div>
-
         {/* Modal Actions */}
         <div
           style={{
@@ -415,8 +292,8 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
             justifyContent: 'flex-end',
             gap: '12px',
             marginTop: '8px',
-            paddingTop: '12px',
-            borderTop: '1px solid #E2E8F0',
+            paddingTop: '16px',
+            borderTop: '1px solid var(--border)',
           }}
         >
           <Button
@@ -425,16 +302,19 @@ export const CustomerEditModal: React.FC<CustomerEditModalProps> = ({
             size="md"
             onClick={onClose}
             disabled={isSubmitting}
+            style={{ minHeight: '44px', minWidth: '88px' }}
           >
             Cancel
           </Button>
           <Button
+            id="edit-customer-submit"
             type="submit"
             variant="primary"
             size="md"
             loading={isSubmitting}
             disabled={isSubmitting}
             icon={<Edit3 size={18} />}
+            style={{ minHeight: '44px', minWidth: '150px' }}
           >
             Save Changes
           </Button>

@@ -1,4 +1,13 @@
-import { IsOptional, IsString, IsInt, Min, IsArray, IsEnum, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  IsNumber,
+  Min,
+  IsArray,
+  IsEnum,
+  MaxLength,
+} from 'class-validator';
 import { ItemStatus, UpdateOrderItemRequest } from '@growfast/shared-types';
 
 export class UpdateOrderItemDto implements UpdateOrderItemRequest {
@@ -14,6 +23,11 @@ export class UpdateOrderItemDto implements UpdateOrderItemRequest {
   @IsInt()
   @Min(1)
   quantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  weight?: number;
 
   @IsOptional()
   @IsArray()

@@ -27,7 +27,10 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
 }) => {
   const { token } = useAuth();
 
+  const isWeightBased = item.weight != null && item.weight > 0;
+
   const [quantity, setQuantity] = useState<number>(item.quantity);
+  const [weight, setWeight] = useState<number | undefined>(item.weight ?? undefined);
   const [deliveredQuantity, setDeliveredQuantity] = useState<number>(item.deliveredQuantity);
   const [itemStatus, setItemStatus] = useState<ItemStatus>(item.itemStatus);
   const [defectNotes, setDefectNotes] = useState<string>(item.defectNotes || '');
@@ -42,6 +45,7 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
   useEffect(() => {
     if (open) {
       setQuantity(item.quantity);
+      setWeight(item.weight ?? undefined);
       setDeliveredQuantity(item.deliveredQuantity);
       setItemStatus(item.itemStatus);
       setDefectNotes(item.defectNotes || '');
@@ -54,6 +58,14 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
     setSaving(true);
     setError(null);
     try {
+      if (isWeightBased) {
+        if (weight == null || isNaN(weight) || weight <= 0) {
+          setError('Weight must be greater than 0 kg');
+          setSaving(false);
+          return;
+        }
+      }
+
       const colorTags = colorTagsStr
         .split(',')
         .map((t) => t.trim())
@@ -65,6 +77,10 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
         defectNotes,
         colorTags,
       };
+
+      if (isWeightBased) {
+        payload.weight = Number(weight);
+      }
 
       if (!hasPhysicalGarments) {
         payload.itemStatus = itemStatus;
@@ -97,29 +113,63 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
     <Modal open={open} onClose={onClose} title={`Edit Item: ${item.garmentName}`}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="item-quantity" className="block text-sm font-medium text-gray-700 mb-1">
-              Quantity
-            </label>
-            <input
-              id="item-quantity"
-              type="number"
-              min="1"
-              value={quantity}
-              disabled={hasPhysicalGarments}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              className="w-full rounded-md border border-gray-300 p-2 min-h-[44px] disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-            />
-            {hasPhysicalGarments && (
-              <span className="text-xs text-gray-500 mt-1 block">Fixed by physical garments</span>
-            )}
-          </div>
+          {isWeightBased ? (
+            <div>
+              <label htmlFor="item-weight" className="block text-sm font-medium text-gray-700 mb-1">
+                Weight (kg)
+              </label>
+              <div className="relative">
+                <input
+                  id="item-weight"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={weight ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                    setWeight(val);
+                  }}
+                  className="w-full rounded-md border border-gray-300 p-2 pr-10 min-h-[44px]"
+                />
+                <span className="absolute right-3 top-2.5 text-xs text-gray-500 font-semibold pointer-events-none">
+                  kg
+                </span>
+              </div>
+              <div className="mt-1 flex flex-col text-xs text-gray-600">
+                <span>Rate: ₹{item.unitPrice}/kg</span>
+                <span className="font-semibold text-gray-900">
+                  New Total: ₹{((weight ?? 0) * item.unitPrice).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label
+                htmlFor="item-quantity"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Quantity
+              </label>
+              <input
+                id="item-quantity"
+                type="number"
+                min="1"
+                value={quantity}
+                disabled={hasPhysicalGarments}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="w-full rounded-md border border-gray-300 p-2 min-h-[44px] disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+              />
+              {hasPhysicalGarments && (
+                <span className="text-xs text-gray-500 mt-1 block">Fixed by physical garments</span>
+              )}
+            </div>
+          )}
           <div>
             <label
               htmlFor="item-delivered-quantity"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Delivered Quantity
+              {isWeightBased ? 'Delivered Batch' : 'Delivered Quantity'}
             </label>
             <input
               id="item-delivered-quantity"
@@ -130,6 +180,9 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
               onChange={(e) => setDeliveredQuantity(Number(e.target.value))}
               className="w-full rounded-md border border-gray-300 p-2 min-h-[44px]"
             />
+            {isWeightBased && (
+              <span className="text-xs text-gray-500 mt-1 block">1 = full batch delivered</span>
+            )}
           </div>
         </div>
 

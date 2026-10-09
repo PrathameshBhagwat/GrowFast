@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -42,6 +43,11 @@ export class CreateOrderItemDto implements CreateOrderItemRequest {
   @IsInt()
   @Min(1)
   quantity!: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  weight?: number;
 
   @IsOptional()
   @IsArray()
