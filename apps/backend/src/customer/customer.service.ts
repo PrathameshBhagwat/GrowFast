@@ -3,23 +3,29 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BusinessSequenceService } from '../prisma/business-sequence.service';
 import type {
   CustomerDTO,
   CreateCustomerRequest,
   UpdateCustomerRequest,
   PaginatedResponse,
 } from '@growfast/shared-types';
-import { MembershipTier, RegistrationSource } from '@growfast/shared-types';
+import { MembershipTier } from '@growfast/shared-types';
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly businessSequenceService?: BusinessSequenceService,
+  ) {}
 
   /**
    * Create a new customer record.
    * Performs server-side validation, normalization, duplicate check, and persistence.
+   * Uses WhatsApp Number as the primary contact number (stored in phone column).
    */
   async createCustomer(dto: CreateCustomerRequest): Promise<CustomerDTO> {
     if (!dto) {
@@ -32,31 +38,25 @@ export class CustomerService {
       throw new BadRequestException('Customer name is required.');
     }
 
-    // ── 2. Validate Phone ──────────────────────────────────────────────
+    // ── 2. Validate WhatsApp Number ────────────────────────────────────
     const phone = dto.phone?.trim();
     if (!phone) {
-      throw new BadRequestException('Customer phone number is required.');
+      throw new BadRequestException('Customer WhatsApp number is required.');
     }
 
     // Conservative phone validation: 10-15 digits, allowing optional leading +
     const cleanPhoneDigits = phone.replace(/[\s\-()]/g, '');
     if (!/^\+?[0-9]{10,15}$/.test(cleanPhoneDigits)) {
-      throw new BadRequestException('Invalid phone number format. Must contain 10-15 digits.');
+      throw new BadRequestException('Invalid WhatsApp number format. Must contain 10-15 digits.');
     }
 
-    // ── 3. Validate Email (Optional) ───────────────────────────────────
-    const email = dto.email?.trim() || null;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new BadRequestException('Invalid email address format.');
-    }
-
-    // ── 4. Validate Pincode (Optional) ────────────────────────────────
+    // ── 3. Validate Pincode (Optional) ────────────────────────────────
     const pincode = dto.pincode?.trim() || null;
     if (pincode && !/^[A-Za-z0-9\s\-]{3,10}$/.test(pincode)) {
       throw new BadRequestException('Invalid pincode format.');
     }
 
-    // ── 5. Validate Membership Tier (Optional) ────────────────────────
+    // ── 4. Validate Membership Tier (Optional) ────────────────────────
     let membership = MembershipTier.NONE;
     if (dto.membership) {
       if (!Object.values(MembershipTier).includes(dto.membership as MembershipTier)) {
@@ -67,20 +67,7 @@ export class CustomerService {
       membership = dto.membership as MembershipTier;
     }
 
-    // ── 6. Validate Registration Source (Optional) ────────────────────
-    let registrationSource = 'WALK_IN';
-    if (dto.registrationSource) {
-      if (
-        !Object.values(RegistrationSource).includes(dto.registrationSource as RegistrationSource)
-      ) {
-        throw new BadRequestException(
-          `Invalid registration source. Allowed values: ${Object.values(RegistrationSource).join(', ')}`,
-        );
-      }
-      registrationSource = dto.registrationSource;
-    }
-
-    // ── 7. Validate Discount Percent (Optional) ───────────────────────
+    // ── 5. Validate Discount Percent (Optional) ───────────────────────
     let discountPercent = 0;
     if (dto.discountPercent !== undefined && dto.discountPercent !== null) {
       if (
@@ -94,16 +81,7 @@ export class CustomerService {
       discountPercent = dto.discountPercent;
     }
 
-    // ── 8. Validate Preferences (Optional) ────────────────────────────
-    if (
-      dto.preferences !== undefined &&
-      dto.preferences !== null &&
-      (typeof dto.preferences !== 'object' || Array.isArray(dto.preferences))
-    ) {
-      throw new BadRequestException('Preferences must be a valid key-value object.');
-    }
-
-    // ── 9. Duplicate Phone Check ──────────────────────────────────────
+    // ── 6. Duplicate Contact Check ────────────────────────────────────
     const existing = await this.prisma.customer.findUnique({
       where: { phone: cleanPhoneDigits },
     });
@@ -114,19 +92,28 @@ export class CustomerService {
       );
     }
 
-    // ── 10. Persistence ───────────────────────────────────────────────
+    // ── 7. Generate Business ID & Persistence ─────────────────────────
     try {
+      let customerCode: string | undefined;
+      if (this.businessSequenceService) {
+        customerCode = await this.businessSequenceService.nextCustomerCode();
+      } else {
+        const count = await this.prisma.customer.count();
+        customerCode = `CUS-${String(count + 1).padStart(6, '0')}`;
+      }
+
       const customer = await this.prisma.customer.create({
         data: {
           name,
           phone: cleanPhoneDigits,
-          email,
+          customerCode,
+          email: null,
           address: dto.address?.trim() || null,
           pincode,
           membership,
           discountPercent,
-          preferences: dto.preferences ?? undefined,
-          registrationSource,
+          preferences: undefined,
+          registrationSource: 'WALK_IN',
         },
       });
 
@@ -177,6 +164,7 @@ export class CustomerService {
         OR: [
           { phone: { contains: trimmedQuery, mode: 'insensitive' } },
           { name: { contains: trimmedQuery, mode: 'insensitive' } },
+          { customerCode: { contains: trimmedQuery, mode: 'insensitive' } },
           { id: { equals: trimmedQuery } },
         ],
       };
@@ -204,12 +192,18 @@ export class CustomerService {
   }
 
   /**
-   * Get a single customer by ID.
+   * Get a single customer by technical ID or business customerCode.
    */
   async getCustomerById(id: string): Promise<CustomerDTO | null> {
-    const customer = await this.prisma.customer.findUnique({
+    let customer = await this.prisma.customer.findUnique({
       where: { id },
     });
+
+    if (!customer && typeof this.prisma.customer.findFirst === 'function') {
+      customer = await this.prisma.customer.findFirst({
+        where: { customerCode: id },
+      });
+    }
 
     if (!customer) {
       return null;
@@ -219,7 +213,7 @@ export class CustomerService {
   }
 
   /**
-   * Update an existing customer record by ID.
+   * Update an existing customer record by ID or customerCode.
    * Performs partial validation, duplicate phone checking (excluding self), and persistence.
    */
   async updateCustomer(id: string, dto: UpdateCustomerRequest): Promise<CustomerDTO> {
@@ -227,9 +221,15 @@ export class CustomerService {
       throw new BadRequestException('Customer ID is required for update.');
     }
 
-    const existingCustomer = await this.prisma.customer.findUnique({
+    let existingCustomer = await this.prisma.customer.findUnique({
       where: { id },
     });
+
+    if (!existingCustomer && typeof this.prisma.customer.findFirst === 'function') {
+      existingCustomer = await this.prisma.customer.findFirst({
+        where: { customerCode: id },
+      });
+    }
 
     if (!existingCustomer) {
       throw new NotFoundException(`Customer with ID '${id}' not found.`);
@@ -250,19 +250,19 @@ export class CustomerService {
       updateData.name = name;
     }
 
-    // ── 2. Validate Phone ──────────────────────────────────────────────
+    // ── 2. Validate WhatsApp Number ───────────────────────────────────
     if (dto.phone !== undefined) {
       const phone = dto.phone.trim();
       if (!phone) {
-        throw new BadRequestException('Customer phone number cannot be empty.');
+        throw new BadRequestException('Customer WhatsApp number cannot be empty.');
       }
 
       const cleanPhoneDigits = phone.replace(/[\s\-()]/g, '');
       if (!/^\+?[0-9]{10,15}$/.test(cleanPhoneDigits)) {
-        throw new BadRequestException('Invalid phone number format. Must contain 10-15 digits.');
+        throw new BadRequestException('Invalid WhatsApp number format. Must contain 10-15 digits.');
       }
 
-      // Duplicate phone check if phone number is changing
+      // Duplicate contact check if phone number is changing
       if (cleanPhoneDigits !== existingCustomer.phone) {
         const phoneConflict = await this.prisma.customer.findUnique({
           where: { phone: cleanPhoneDigits },
@@ -310,19 +310,7 @@ export class CustomerService {
       updateData.membership = dto.membership;
     }
 
-    // ── 7. Validate Registration Source (Optional) ────────────────────
-    if (dto.registrationSource !== undefined) {
-      if (
-        !Object.values(RegistrationSource).includes(dto.registrationSource as RegistrationSource)
-      ) {
-        throw new BadRequestException(
-          `Invalid registration source. Allowed values: ${Object.values(RegistrationSource).join(', ')}`,
-        );
-      }
-      updateData.registrationSource = dto.registrationSource;
-    }
-
-    // ── 8. Validate Discount Percent (Optional) ───────────────────────
+    // ── 7. Validate Discount Percent (Optional) ───────────────────────
     if (dto.discountPercent !== undefined) {
       if (
         typeof dto.discountPercent !== 'number' ||
@@ -333,17 +321,6 @@ export class CustomerService {
         throw new BadRequestException('Discount percent must be a number between 0 and 100.');
       }
       updateData.discountPercent = dto.discountPercent;
-    }
-
-    // ── 9. Validate Preferences (Optional) ────────────────────────────
-    if (dto.preferences !== undefined) {
-      if (
-        dto.preferences !== null &&
-        (typeof dto.preferences !== 'object' || Array.isArray(dto.preferences))
-      ) {
-        throw new BadRequestException('Preferences must be a valid key-value object.');
-      }
-      updateData.preferences = dto.preferences;
     }
 
     try {
@@ -369,6 +346,7 @@ export class CustomerService {
   private mapToDTO(c: any): CustomerDTO {
     return {
       id: c.id,
+      customerCode: c.customerCode || `CUS-${c.id.slice(-6).toUpperCase()}`,
       name: c.name,
       phone: c.phone,
       email: c.email ?? null,

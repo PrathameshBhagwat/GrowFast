@@ -115,6 +115,12 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
               {order.customerName}
             </span>
           </div>
+          {order.customerCode && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Customer ID:</span>
+              <span className="font-mono">{order.customerCode}</span>
+            </div>
+          )}
           {order.customerPhone && (
             <div className="flex justify-between">
               <span className="text-gray-600">Phone:</span>
@@ -360,6 +366,14 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
                 {order.customerName}
               </span>
             </div>
+            {order.customerCode && (
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500">Customer ID:</span>
+                <span className="font-mono font-medium text-gray-800 text-right">
+                  {order.customerCode}
+                </span>
+              </div>
+            )}
             {order.customerPhone && (
               <div className="flex justify-between gap-2">
                 <span className="text-gray-500">Phone:</span>

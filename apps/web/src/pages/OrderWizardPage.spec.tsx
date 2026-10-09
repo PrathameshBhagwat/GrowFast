@@ -163,8 +163,16 @@ describe('OrderWizardPage', () => {
     expect(proceedBtn).toBeDisabled();
   });
 
-  it('renders compact General Notes textarea that is optional and interactive', async () => {
+  it('renders compact General Notes button that is optional, collapsible, and interactive', async () => {
+    const { fireEvent } = await import('@testing-library/react');
     renderWithRouter('/orders/new?customerId=cust-003');
+
+    // Initially collapsed with tiny button
+    const addNoteBtn = await screen.findByRole('button', { name: /\+ Add order note/i });
+    expect(addNoteBtn).toBeInTheDocument();
+
+    // Click to expand note input
+    fireEvent.click(addNoteBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/General Notes/i)).toBeInTheDocument();
@@ -175,10 +183,14 @@ describe('OrderWizardPage', () => {
     expect(notesTextarea).toBeInTheDocument();
     expect(notesTextarea.tagName).toBe('TEXTAREA');
 
-    const { fireEvent } = await import('@testing-library/react');
     fireEvent.change(notesTextarea, { target: { value: 'Handle with delicate care' } });
     expect(notesTextarea).toHaveValue('Handle with delicate care');
     expect(notesTextarea).toHaveClass('min-h-[44px]');
+
+    // Click Done to collapse into compact preview
+    const doneBtn = screen.getByRole('button', { name: /Done/i });
+    fireEvent.click(doneBtn);
+    expect(screen.getByText('Handle with delicate care')).toBeInTheDocument();
   });
 
   it('satisfies compact visual footprint and touch target requirements for notes and photo progress', async () => {
@@ -233,7 +245,11 @@ describe('OrderWizardPage', () => {
       expect(photoBadge).toHaveClass('text-xs');
     });
 
-    // Verify General Notes textarea is present with >=44px touch target
+    // Verify collapsible note button is present, and when opened textarea has >=44px touch target
+    const addNoteBtn = screen.getByRole('button', { name: /\+ Add order note/i });
+    expect(addNoteBtn).toBeInTheDocument();
+    fireEvent.click(addNoteBtn);
+
     const notesTextarea = screen.getByPlaceholderText(/Optional — add any special instructions/i);
     expect(notesTextarea).toHaveClass('min-h-[44px]');
     expect(notesTextarea).toHaveClass('w-full');

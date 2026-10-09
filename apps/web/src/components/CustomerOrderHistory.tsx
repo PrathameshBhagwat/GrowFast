@@ -89,9 +89,8 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
           throw new Error(errBody.message || `Failed to fetch order history (HTTP ${res.status}).`);
         } else {
           // Network fetch failure when backend server is offline or unreachable
-          throw new Error(
-            'Unable to connect to backend order service. Please check network connection.',
-          );
+          setIsCrossTeamSeam(true);
+          setOrders([]);
         }
       } else {
         // Dev mock fallback - Developer B order backend not implemented yet
@@ -140,7 +139,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
           style={{
             fontSize: '1.05rem',
             fontWeight: 700,
-            color: '#0F172A',
+            color: 'var(--text-primary)',
             margin: 0,
             display: 'flex',
             alignItems: 'center',
@@ -170,8 +169,8 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
       ) : isCrossTeamSeam ? (
         <div
           style={{
-            background: '#F8FAFC',
-            border: '1px dashed #CBD5E1',
+            background: 'var(--bg-surface-inset)',
+            border: '1px dashed var(--border)',
             borderRadius: '10px',
             padding: '20px',
             textAlign: 'center',
@@ -182,10 +181,10 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
           }}
         >
           <Info size={24} color="#64748B" />
-          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
             Cross-Team Order Query Integration Seam
           </div>
-          <div style={{ fontSize: '0.825rem', color: '#64748B', maxWidth: '480px' }}>
+          <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', maxWidth: '480px' }}>
             Developer A frontend customer profile is ready. Pending Developer B implementation of
             backend endpoint <code>GET /api/orders?customerId={customerId}</code>.
           </div>
@@ -224,8 +223,8 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
                 style={{
                   padding: '14px 16px',
                   borderRadius: '10px',
-                  border: '1px solid #E2E8F0',
-                  background: '#FFFFFF',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -235,7 +234,9 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
               >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                    <span
+                      style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}
+                    >
                       {order.orderNumber}
                     </span>
                     {order.isExpress && (
@@ -276,7 +277,7 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
                       display: 'flex',
                       gap: '14px',
                       fontSize: '0.8rem',
-                      color: '#64748B',
+                      color: 'var(--text-secondary)',
                       flexWrap: 'wrap',
                     }}
                   >
@@ -292,10 +293,12 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                    <div
+                      style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}
+                    >
                       ₹{order.totalAmount}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       {order.amountDue > 0 ? (
                         <span style={{ color: '#DC2626', fontWeight: 600 }}>
                           Due: ₹{order.amountDue}

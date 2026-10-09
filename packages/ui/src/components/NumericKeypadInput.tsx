@@ -93,7 +93,7 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
     fontSize: '2rem',
     fontFamily: "'JetBrains Mono', monospace",
     fontWeight: 600,
-    color: '#0F172A',
+    color: 'var(--text-primary, #0F172A)',
     letterSpacing: '0.5em',
     textAlign: 'center',
     minHeight: '48px',
@@ -116,10 +116,15 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
     fontSize: key === 'clear' || key === 'del' ? '0.8rem' : '1.25rem',
     fontWeight: 600,
     fontFamily: "'Inter', sans-serif",
-    border: '1px solid #E2E8F0',
+    border: '1px solid var(--border, #E2E8F0)',
     borderRadius: '12px',
-    background: key === 'clear' ? '#FEF2F2' : key === 'del' ? '#F1F5F9' : '#FFFFFF',
-    color: key === 'clear' ? '#991B1B' : '#0F172A',
+    background:
+      key === 'clear'
+        ? 'var(--keypad-clear-bg, #FEF2F2)'
+        : key === 'del'
+          ? 'var(--keypad-del-bg, #F1F5F9)'
+          : 'var(--keypad-key-bg, #FFFFFF)',
+    color: key === 'clear' ? 'var(--keypad-clear-text, #991B1B)' : 'var(--text-primary, #0F172A)',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -135,7 +140,7 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
           style={{
             fontSize: '0.84rem',
             fontWeight: 500,
-            color: '#475569',
+            color: 'var(--text-muted, #475569)',
             fontFamily: "'Inter', sans-serif",
           }}
         >
@@ -152,7 +157,8 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
               width: '14px',
               height: '14px',
               borderRadius: '50%',
-              background: i < value.length ? '#2563EB' : '#E2E8F0',
+              background:
+                i < value.length ? 'var(--accent, #2563EB)' : 'var(--keypad-dot-inactive, #E2E8F0)',
               transition: 'background 150ms ease',
             }}
           />
@@ -164,7 +170,7 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
           style={{
             fontSize: '1.25rem',
             fontFamily: "'JetBrains Mono', monospace",
-            color: '#334155',
+            color: 'var(--text-secondary, #334155)',
           }}
         >
           {displayValue}
@@ -199,13 +205,14 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
             fontSize: '1rem',
             fontWeight: 700,
             fontFamily: "'Inter', sans-serif",
-            background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-            color: '#FFFFFF',
+            background:
+              'linear-gradient(135deg, var(--accent, #2563EB) 0%, var(--accent-hover, #1D4ED8) 100%)',
+            color: 'var(--accent-foreground, #FFFFFF)',
             border: 'none',
             borderRadius: '12px',
             cursor: 'pointer',
             minHeight: '52px',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+            boxShadow: '0 4px 12px var(--shadow-lg, rgba(37, 99, 235, 0.3))',
           }}
         >
           Unlock

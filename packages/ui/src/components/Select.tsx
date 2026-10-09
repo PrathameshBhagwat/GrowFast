@@ -35,11 +35,11 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       padding: '10px 14px',
       fontSize: '0.925rem',
       fontFamily: "'Inter', sans-serif",
-      border: `1px solid ${error ? '#EF4444' : '#E2E8F0'}`,
+      border: `1px solid ${error ? 'var(--danger-text)' : 'var(--border-input)'}`,
       borderRadius: '8px',
       outline: 'none',
-      background: '#FFFFFF',
-      color: '#0F172A',
+      background: 'var(--bg-input)',
+      color: 'var(--text-primary)',
       minHeight: '44px',
       width: '100%',
       boxSizing: 'border-box',
@@ -60,7 +60,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             style={{
               fontSize: '0.84rem',
               fontWeight: 500,
-              color: '#334155',
+              color: 'var(--text-secondary)',
               fontFamily: "'Inter', sans-serif",
             }}
           >
@@ -81,7 +81,11 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         </select>
         {error && (
           <span
-            style={{ fontSize: '0.75rem', color: '#EF4444', fontFamily: "'Inter', sans-serif" }}
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--danger-text)',
+              fontFamily: "'Inter', sans-serif",
+            }}
           >
             {error}
           </span>

@@ -5,7 +5,9 @@ import {
   ForbiddenException,
   Optional,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { BusinessSequenceService } from '../prisma/business-sequence.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
@@ -38,12 +40,28 @@ import { OrderPickupDto } from './dto/order-pickup.dto';
 
 @Injectable()
 export class OrderService {
+  /**
+   * Phase T1 — Tag System Foundation
+   * Generates a stable, unique, machine tag identifier.
+   * Format: GF-XXXXXX (e.g. GF-7K9M2P)
+   * Independent of piece count, pricing, or customer data.
+   */
+  generateTagId(): string {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let code = '';
+    const bytes = crypto.randomBytes(6);
+    for (let i = 0; i < 6; i++) {
+      code += chars[bytes[i] % chars.length];
+    }
+    return `GF-${code}`;
+  }
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalogService: CatalogService,
     private readonly notificationService: NotificationService,
     private readonly paymentService: PaymentService,
     @Optional() private readonly photoStorage?: PhotoStorageService,
+    @Optional() private readonly businessSequenceService?: BusinessSequenceService,
   ) {}
 
   async createOrder(dto: CreateOrderDto, employeeId: string, storeId: string) {
@@ -150,6 +168,7 @@ export class OrderService {
           orderItemData.physicalGarments = {
             create: Array.from({ length: item.quantity }, (_, i) => ({
               unitNumber: i + 1,
+              tagId: this.generateTagId(),
               isReady: false,
             })),
           };
@@ -232,11 +251,14 @@ export class OrderService {
       // 4. Due date placeholder (Deferred to B6)
       const orderDate = new Date();
 
-      // 5. Generate Order Number (Concurrency-safe placeholder until sequence table is implemented)
-      const randomPart = Math.floor(Math.random() * 10000)
-        .toString()
-        .padStart(4, '0');
-      const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${randomPart}`;
+      // 5. Generate Order Number (Sequential short business ID)
+      let orderNumber: string;
+      if (this.businessSequenceService) {
+        orderNumber = await this.businessSequenceService.nextOrderNumber();
+      } else {
+        const count = await tx.order.count();
+        orderNumber = `ORD-${String(count + 1).padStart(6, '0')}`;
+      }
 
       // 6. Build summary string
       const serviceSummaryParts = [];
@@ -399,7 +421,7 @@ export class OrderService {
   }
 
   async findOrderById(id: string, storeId?: string) {
-    const order = await this.prisma.order.findUnique({
+    let order = await this.prisma.order.findUnique({
       where: { id },
       include: {
         items: {
@@ -428,6 +450,37 @@ export class OrderService {
       },
     });
 
+    if (!order && typeof this.prisma.order.findFirst === 'function') {
+      order = await this.prisma.order.findFirst({
+        where: { orderNumber: id },
+        include: {
+          items: {
+            include: {
+              garmentCatalog: true,
+              serviceType: true,
+              photos: true,
+              physicalGarments: {
+                include: { photos: true },
+                orderBy: { unitNumber: 'asc' },
+              },
+            },
+          },
+          customer: true,
+          createdBy: true,
+          deliveredBy: true,
+          store: true,
+          payments: {
+            include: { receivedBy: true },
+            orderBy: { createdAt: 'desc' },
+          },
+          adjustments: {
+            include: { createdBy: true },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+    }
+
     if (!order) {
       throw new NotFoundException(`Order with ID "${id}" not found`);
     }
@@ -441,13 +494,33 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
-    const { customerId, status, paymentStatus, page = 1, pageSize = 10 } = query;
+    const { customerId, status, paymentStatus, page = 1, pageSize = 10, search } = query;
     const skip = (page - 1) * pageSize;
 
     const where: any = { storeId };
     if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (search?.trim()) {
+      const s = search.trim();
+      where.OR = [
+        { orderNumber: { contains: s, mode: 'insensitive' } },
+        { customer: { phone: { contains: s, mode: 'insensitive' } } },
+        { customer: { name: { contains: s, mode: 'insensitive' } } },
+        { customer: { customerCode: { contains: s, mode: 'insensitive' } } },
+        {
+          items: {
+            some: {
+              physicalGarments: {
+                some: {
+                  tagId: { contains: s, mode: 'insensitive' },
+                },
+              },
+            },
+          },
+        },
+      ];
+    }
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -468,6 +541,67 @@ export class OrderService {
       total,
       page,
       pageSize,
+    };
+  }
+
+  /**
+   * Counter Home Page Operational Action:
+   * Returns orders due today for the authenticated store, excluding DELIVERED and CANCELLED orders.
+   * Supports lightweight countOnly for fast badge calculation without fetching all order rows.
+   */
+  async findDueTodayOrders(
+    storeId: string,
+    options?: { countOnly?: boolean; date?: string; timezone?: string },
+  ) {
+    const timeZone = options?.timezone || 'Asia/Kolkata';
+    let targetDateStr = options?.date;
+    if (!targetDateStr) {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      targetDateStr = formatter.format(new Date());
+    }
+
+    // Determine local day boundaries in the store's timezone
+    const tempDate = new Date(`${targetDateStr}T12:00:00Z`);
+    const invDate = new Date(tempDate.toLocaleString('en-US', { timeZone }));
+    const diffMs = tempDate.getTime() - invDate.getTime();
+    const dayStart = new Date(new Date(`${targetDateStr}T00:00:00.000Z`).getTime() + diffMs);
+    const dayEnd = new Date(new Date(`${targetDateStr}T23:59:59.999Z`).getTime() + diffMs);
+
+    const where: any = {
+      storeId,
+      effectiveDueDate: {
+        gte: dayStart,
+        lte: dayEnd,
+      },
+      status: {
+        notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+      },
+    };
+
+    if (options?.countOnly) {
+      const count = await this.prisma.order.count({ where });
+      return { count, date: targetDateStr };
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where,
+      include: {
+        customer: true,
+        items: true,
+        adjustments: true,
+      },
+      orderBy: [{ priority: 'desc' }, { effectiveDueDate: 'asc' }, { orderNumber: 'asc' }],
+    });
+
+    return {
+      data: orders.map((o) => this.mapToSummaryDto(o)),
+      total: orders.length,
+      date: targetDateStr,
     };
   }
 
@@ -1010,11 +1144,12 @@ export class OrderService {
       const maxUnitNumber = existingGarments.reduce((max, g) => Math.max(max, g.unitNumber), 0);
       const nextUnitNumber = maxUnitNumber + 1;
 
-      // 5. Create new PhysicalGarment
+      // 5. Create new PhysicalGarment with a new unique tag identity
       await tx.physicalGarment.create({
         data: {
           orderItemId: itemId,
           unitNumber: nextUnitNumber,
+          tagId: this.generateTagId(),
           isReady: false,
           isCancelled: false,
         },
@@ -1778,8 +1913,9 @@ export class OrderService {
       id: order.id,
       orderNumber: order.orderNumber,
       customerId: order.customerId,
-      customerName: order.customer.name,
-      customerPhone: order.customer.phone,
+      customerCode: order.customer?.customerCode || undefined,
+      customerName: order.customer ? order.customer.name : '',
+      customerPhone: order.customer ? order.customer.phone : '',
       orderDate: order.orderDate.toISOString(),
       effectiveDueDate: order.effectiveDueDate.toISOString(),
       isExpress: order.isExpress,
@@ -1846,6 +1982,7 @@ export class OrderService {
           id: pg.id,
           orderItemId: pg.orderItemId,
           unitNumber: pg.unitNumber,
+          tagId: pg.tagId || null,
           isReady: pg.isReady,
           isCancelled: pg.isCancelled ?? false,
           isDelivered: pg.isDelivered ?? false,

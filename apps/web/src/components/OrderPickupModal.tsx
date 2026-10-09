@@ -328,13 +328,16 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
           </div>
 
           {order.amountDue === 0 ? (
-            <div className="text-xs text-green-700 font-semibold flex items-center gap-1.5 pt-1">
-              <CheckCircle2 size={15} className="text-green-600" />
+            <div className="text-xs text-green-700 dark:text-emerald-400 font-semibold flex items-center gap-1.5 pt-1">
+              <CheckCircle2 size={15} className="text-green-600 dark:text-emerald-400" />
               Order fully settled — No handover payment required.
             </div>
           ) : (
-            <div className="text-xs text-amber-800 bg-amber-50/80 p-2 rounded border border-amber-200 flex items-start gap-1.5">
-              <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 p-2 rounded border border-amber-200 dark:border-amber-900/50 flex items-start gap-1.5">
+              <AlertTriangle
+                size={15}
+                className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
+              />
               <span>
                 Outstanding balance of <strong>₹{order.amountDue}</strong>. Full settlement is
                 mandatory before completing final order handover.
@@ -344,17 +347,17 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
         </div>
 
         {/* 2. Selection Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-blue-50/60 border border-blue-200 rounded-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl">
           <div>
-            <div className="text-xs text-blue-800 font-semibold uppercase tracking-wider">
+            <div className="text-xs text-blue-800 dark:text-blue-300 font-semibold uppercase tracking-wider">
               Handover Selection
             </div>
-            <div className="text-sm font-bold text-gray-900 mt-0.5">
-              <span id="selected-handover-count" className="text-blue-700">
+            <div className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">
+              <span id="selected-handover-count" className="text-blue-700 dark:text-blue-400">
                 {totalSelectedCount} selected
               </span>{' '}
               <span className="text-gray-400 font-normal">/</span>{' '}
-              <span id="remaining-handover-count" className="text-gray-600">
+              <span id="remaining-handover-count" className="text-gray-600 dark:text-slate-400">
                 {remainingAfterHandover} remaining
               </span>
             </div>
@@ -367,7 +370,7 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
                   type="button"
                   onClick={handleSelectAllReady}
                   disabled={isSubmitting}
-                  className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-white border border-blue-300 hover:bg-blue-50 rounded-lg min-h-[44px] flex items-center gap-1 transition-colors"
+                  className="px-3 py-1.5 text-xs font-bold text-blue-700 dark:text-blue-300 bg-white dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/60 rounded-lg min-h-[44px] flex items-center gap-1 transition-colors"
                   id="select-all-ready-btn"
                 >
                   <Sparkles size={14} /> Select All Ready
@@ -377,7 +380,7 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
                     type="button"
                     onClick={handleDeselectAll}
                     disabled={isSubmitting}
-                    className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg min-h-[44px] flex items-center transition-colors"
+                    className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg min-h-[44px] flex items-center transition-colors"
                     id="deselect-all-btn"
                   >
                     Clear
@@ -588,8 +591,8 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
             id="final-handover-banner"
             className={`p-3.5 rounded-xl border text-sm ${
               order.amountDue > 0
-                ? 'bg-amber-50 border-amber-300 text-amber-900'
-                : 'bg-green-50 border-green-300 text-green-900'
+                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                : 'bg-green-50 dark:bg-emerald-950/40 border-green-300 dark:border-emerald-800 text-green-900 dark:text-emerald-200'
             }`}
           >
             <div className="font-bold flex items-center gap-1.5 mb-1">

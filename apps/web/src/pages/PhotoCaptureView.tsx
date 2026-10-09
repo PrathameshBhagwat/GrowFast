@@ -6,6 +6,7 @@ import { PhotoType } from '@growfast/shared-types';
 import type { OrderPhotoDTO } from '@growfast/shared-types';
 import { uploadPhoto, getOrderPhotos } from '../services/photo.api';
 import { ArrowLeft, Camera, CheckCircle, SkipForward, AlertCircle, ImageIcon } from 'lucide-react';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 // ── Photo category configuration ────────────────────────────────────
 
@@ -216,6 +217,7 @@ export const PhotoCaptureView: React.FC = () => {
           <h1 style={styles.headerTitle}>Order Photos</h1>
           <p style={styles.headerSubtitle}>Order: {orderId.substring(0, 8)}…</p>
         </div>
+        <ThemeToggle size="sm" />
         <div style={styles.headerIcon}>
           <Camera size={24} />
         </div>
@@ -493,7 +495,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     minHeight: '100vh',
-    background: '#F8FAFC',
+    background: 'var(--bg-app, #F8FAFC)',
     fontFamily: "'Inter', sans-serif",
     paddingBottom: '40px',
   },
@@ -504,22 +506,23 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '16px 20px',
-    background: '#FFFFFF',
-    borderBottom: '1px solid #E2E8F0',
+    background: 'var(--bg-surface, #FFFFFF)',
+    borderBottom: '1px solid var(--border, #E2E8F0)',
     position: 'sticky',
     top: 0,
     zIndex: 10,
+    transition: 'background-color 0.2s ease, border-color 0.2s ease',
   },
   headerTitle: {
     fontSize: '1.125rem',
     fontWeight: 800,
-    color: '#0F172A',
+    color: 'var(--text-primary, #0F172A)',
     margin: 0,
     lineHeight: 1.3,
   },
   headerSubtitle: {
     fontSize: '0.8rem',
-    color: '#64748B',
+    color: 'var(--text-muted, #64748B)',
     margin: 0,
     lineHeight: 1.3,
   },
@@ -542,12 +545,12 @@ const styles: Record<string, React.CSSProperties> = {
   sectionTitle: {
     fontSize: '1rem',
     fontWeight: 700,
-    color: '#0F172A',
+    color: 'var(--text-primary, #0F172A)',
     margin: '0 0 4px',
   },
   sectionSubtitle: {
     fontSize: '0.84rem',
-    color: '#64748B',
+    color: 'var(--text-muted, #64748B)',
     margin: '0 0 16px',
   },
 
@@ -578,7 +581,7 @@ const styles: Record<string, React.CSSProperties> = {
   categoryLabel: {
     fontSize: '0.95rem',
     fontWeight: 700,
-    color: '#0F172A',
+    color: 'var(--text-primary, #0F172A)',
   },
   requiredBadge: {
     display: 'inline-flex',
@@ -587,8 +590,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '9999px',
     fontSize: '0.68rem',
     fontWeight: 600,
-    background: '#FEF2F2',
-    color: '#DC2626',
+    background: 'var(--danger-bg, #FEF2F2)',
+    color: 'var(--danger-text, #DC2626)',
     letterSpacing: '0.03em',
     textTransform: 'uppercase' as const,
   },
@@ -599,14 +602,14 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '9999px',
     fontSize: '0.68rem',
     fontWeight: 600,
-    background: '#F0FDF4',
-    color: '#059669',
+    background: 'var(--success-bg, #F0FDF4)',
+    color: 'var(--success-text, #059669)',
     letterSpacing: '0.03em',
     textTransform: 'uppercase' as const,
   },
   categoryDescription: {
     fontSize: '0.8rem',
-    color: '#64748B',
+    color: 'var(--text-muted, #64748B)',
     margin: 0,
     lineHeight: 1.4,
   },
@@ -666,7 +669,7 @@ const styles: Record<string, React.CSSProperties> = {
     objectFit: 'cover' as const,
     borderRadius: '8px',
     marginTop: '12px',
-    border: '1px solid #E2E8F0',
+    border: '1px solid var(--border, #E2E8F0)',
   },
 
   // ── Gallery ────────────────────────────────────────────────────
@@ -679,7 +682,7 @@ const styles: Record<string, React.CSSProperties> = {
   galleryGroupTitle: {
     fontSize: '0.88rem',
     fontWeight: 700,
-    color: '#334155',
+    color: 'var(--text-secondary, #334155)',
     margin: '0 0 10px',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.04em',
@@ -692,8 +695,8 @@ const styles: Record<string, React.CSSProperties> = {
   galleryImageWrapper: {
     borderRadius: '10px',
     overflow: 'hidden',
-    border: '1px solid #E2E8F0',
-    background: '#FFFFFF',
+    border: '1px solid var(--border, #E2E8F0)',
+    background: 'var(--bg-surface, #FFFFFF)',
   },
   galleryImage: {
     width: '100%',
@@ -703,7 +706,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   galleryImageMeta: {
     padding: '6px 8px',
-    borderTop: '1px solid #F1F5F9',
+    borderTop: '1px solid var(--border-subtle, #F1F5F9)',
   },
   brokenImage: {
     width: '100%',
@@ -713,8 +716,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '6px',
-    background: '#F8FAFC',
+    background: 'var(--bg-surface-inset, #F8FAFC)',
     borderRadius: '10px',
-    border: '1px solid #E2E8F0',
+    border: '1px solid var(--border, #E2E8F0)',
   },
 };

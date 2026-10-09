@@ -5,21 +5,8 @@ import { Button, Card, LoadingState, EmptyState, ErrorState } from '@growfast/ui
 import { MembershipTier, type CustomerDTO, type ApiResponse } from '@growfast/shared-types';
 import { CustomerEditModal } from '../components/CustomerEditModal';
 import { CustomerOrderHistory } from '../components/CustomerOrderHistory';
-import {
-  ArrowLeft,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  Sparkles,
-  Shield,
-  Calendar,
-  Tag,
-  ArrowRight,
-  Edit3,
-  Shirt,
-  Info,
-} from 'lucide-react';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { ArrowLeft, Phone, MapPin, Shield, Tag, ArrowRight, Edit3, Info } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -28,12 +15,12 @@ const MOCK_CUSTOMERS: CustomerDTO[] = [
     id: 'cust-001',
     name: 'Rahul Patil',
     phone: '+919876543210',
-    email: 'rahul.patil@example.com',
+    email: null,
     address: 'Flat 402, Rohan Vasanta, Baner Road, Pune',
     pincode: '411045',
     membership: MembershipTier.GOLD,
     discountPercent: 10,
-    preferences: { fragrance: 'lavender', starch: 'medium', fold: 'hanger' },
+    preferences: null,
     registrationSource: 'WALK_IN',
     createdAt: new Date('2026-01-10').toISOString(),
     updatedAt: new Date('2026-01-10').toISOString(),
@@ -42,13 +29,13 @@ const MOCK_CUSTOMERS: CustomerDTO[] = [
     id: 'cust-002',
     name: 'Sneha Kulkarni',
     phone: '+919823456789',
-    email: 'sneha.k@outlook.com',
+    email: null,
     address: 'B-12, Hermes Nest, Koregaon Park, Pune',
     pincode: '411001',
     membership: MembershipTier.SILVER,
     discountPercent: 5,
-    preferences: { fragrance: 'jasmine', starch: 'light', fold: 'standard_fold' },
-    registrationSource: 'PHONE',
+    preferences: null,
+    registrationSource: 'WALK_IN',
     createdAt: new Date('2026-01-15').toISOString(),
     updatedAt: new Date('2026-01-15').toISOString(),
   },
@@ -56,7 +43,7 @@ const MOCK_CUSTOMERS: CustomerDTO[] = [
     id: 'cust-003',
     name: 'Amit Shah',
     phone: '+919811122334',
-    email: 'amit.shah@techcorp.in',
+    email: null,
     address: 'Villa 7, Pride World City, Charholi, Pune',
     pincode: '412105',
     membership: MembershipTier.NONE,
@@ -70,13 +57,13 @@ const MOCK_CUSTOMERS: CustomerDTO[] = [
     id: 'cust-004',
     name: 'Priya Joshi',
     phone: '+919855566778',
-    email: 'priya.j@example.com',
+    email: null,
     address: 'Flat 801, Marvel Bounty, Hadapsar, Pune',
     pincode: '411028',
     membership: MembershipTier.NONE,
     discountPercent: 0,
     preferences: null,
-    registrationSource: 'REFERRAL',
+    registrationSource: 'WALK_IN',
     createdAt: new Date('2026-02-01').toISOString(),
     updatedAt: new Date('2026-02-01').toISOString(),
   },
@@ -84,43 +71,30 @@ const MOCK_CUSTOMERS: CustomerDTO[] = [
     id: 'cust-005',
     name: 'Neha Deshmukh',
     phone: '+919766654321',
-    email: 'neha.d@example.com',
+    email: null,
     address: 'Rowhouse 4, Green Acres, Viman Nagar, Pune',
     pincode: '411014',
     membership: MembershipTier.PLATINUM,
     discountPercent: 15,
-    preferences: { fragrance: 'fresh_linen', starch: 'heavy', fold: 'flat_pack' },
-    registrationSource: 'WEBSITE',
+    preferences: null,
+    registrationSource: 'WALK_IN',
     createdAt: new Date('2026-02-05').toISOString(),
     updatedAt: new Date('2026-02-05').toISOString(),
   },
 ];
 
-const MEMBERSHIP_BADGE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
-  NONE: { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' },
-  SILVER: { bg: '#F1F5F9', text: '#334155', border: '#94A3B8' },
-  GOLD: { bg: '#FEF3C7', text: '#92400E', border: '#F59E0B' },
-  PLATINUM: { bg: '#F3E8FF', text: '#6B21A8', border: '#A855F7' },
-};
-
-const PREFERENCE_LABELS: Record<string, Record<string, string>> = {
-  fragrance: {
-    none: 'No Fragrance',
-    lavender: 'Lavender',
-    jasmine: 'Jasmine',
-    fresh_linen: 'Fresh Linen',
-  },
-  starch: {
-    none: 'No Starch',
-    light: 'Light Starch',
-    medium: 'Medium Starch',
-    heavy: 'Heavy Crisp Starch',
-  },
-  fold: {
-    standard_fold: 'Standard Fold',
-    hanger: 'On Hanger',
-    flat_pack: 'Flat Box Pack',
-  },
+const getMembershipBadgeClass = (tier: string) => {
+  switch (tier) {
+    case 'GOLD':
+      return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/60';
+    case 'PLATINUM':
+      return 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-700/60';
+    case 'SILVER':
+      return 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700';
+    case 'NONE':
+    default:
+      return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700';
+  }
 };
 
 export const CustomerProfilePage: React.FC = () => {
@@ -159,13 +133,23 @@ export const CustomerProfilePage: React.FC = () => {
         const body: ApiResponse<CustomerDTO> = await res.json();
         setCustomer(body.data);
       } else if (res.status === 404) {
-        setIsNotFound(true);
+        const mock = MOCK_CUSTOMERS.find((c) => c.id === customerId);
+        if (mock) {
+          setCustomer(mock);
+        } else {
+          setIsNotFound(true);
+        }
       } else {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody.message || `Failed to load customer (HTTP ${res.status})`);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to connect to server.');
+      const mock = MOCK_CUSTOMERS.find((c) => c.id === customerId);
+      if (mock) {
+        setCustomer(mock);
+      } else {
+        setError(err.message || 'Failed to connect to server.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -188,64 +172,14 @@ export const CustomerProfilePage: React.FC = () => {
     }
   };
 
-  // Helper to format preferences safely
-  const renderPreferences = (prefs: Record<string, any> | null | undefined) => {
-    if (!prefs || typeof prefs !== 'object' || Object.keys(prefs).length === 0) {
-      return (
-        <span style={{ fontSize: '0.875rem', color: '#94A3B8', fontStyle: 'italic' }}>
-          No custom garment preferences configured.
-        </span>
-      );
-    }
-
-    return (
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-          gap: '12px',
-        }}
-      >
-        {Object.entries(prefs).map(([key, val]) => {
-          const readableCategory = key.charAt(0).toUpperCase() + key.slice(1);
-          const readableVal = PREFERENCE_LABELS[key]?.[String(val)] || String(val);
-
-          return (
-            <div
-              key={key}
-              style={{
-                background: '#F8FAFC',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-                {readableCategory}
-              </div>
-              <div
-                style={{
-                  fontSize: '0.875rem',
-                  color: '#1E293B',
-                  fontWeight: 600,
-                  marginTop: '2px',
-                }}
-              >
-                {readableVal}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: '#F8FAFC',
+        background: 'var(--bg-app, #F8FAFC)',
+        color: 'var(--text-primary, #0F172A)',
         paddingBottom: '40px',
+        transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
       {/* Toast Notice Banner */}
@@ -256,11 +190,12 @@ export const CustomerProfilePage: React.FC = () => {
             top: '20px',
             right: '20px',
             zIndex: 9999,
-            background: '#1E293B',
-            color: '#FFFFFF',
+            background: 'var(--bg-surface-elevated, #1E293B)',
+            color: 'var(--text-primary, #FFFFFF)',
             padding: '12px 20px',
             borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            border: '1px solid var(--border, #334155)',
             fontSize: '0.9rem',
             display: 'flex',
             alignItems: 'center',
@@ -275,8 +210,8 @@ export const CustomerProfilePage: React.FC = () => {
       {/* Header Bar */}
       <header
         style={{
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
+          background: 'var(--bg-surface, #FFFFFF)',
+          borderBottom: '1px solid var(--border, #E2E8F0)',
           padding: '16px 24px',
           display: 'flex',
           alignItems: 'center',
@@ -284,6 +219,7 @@ export const CustomerProfilePage: React.FC = () => {
           position: 'sticky',
           top: 0,
           zIndex: 10,
+          transition: 'background-color 0.2s ease, border-color 0.2s ease',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -297,39 +233,49 @@ export const CustomerProfilePage: React.FC = () => {
             Back to Search
           </Button>
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+            <h1
+              style={{
+                fontSize: '1.25rem',
+                fontWeight: 700,
+                margin: 0,
+                color: 'var(--text-primary, #0F172A)',
+              }}
+            >
               Customer Profile
             </h1>
             {customer && (
-              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                ID: <strong>{customer.id}</strong>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748B)' }}>
+                Customer ID: <strong>{customer.customerCode || customer.id}</strong>
               </span>
             )}
           </div>
         </div>
 
-        {customer && (
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Button
-              variant="outline"
-              size="md"
-              icon={<Edit3 size={16} />}
-              onClick={() => setIsEditModalOpen(true)}
-              aria-label="Edit Customer Profile"
-            >
-              Edit Customer
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              icon={<ArrowRight size={16} />}
-              onClick={() => navigate(`/orders/new?customerId=${customer.id}`)}
-              aria-label="Create Order for Customer"
-            >
-              Create Order
-            </Button>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <ThemeToggle size="sm" />
+          {customer && (
+            <>
+              <Button
+                variant="outline"
+                size="md"
+                icon={<Edit3 size={16} />}
+                onClick={() => setIsEditModalOpen(true)}
+                aria-label="Edit Customer Profile"
+              >
+                Edit Customer
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                icon={<ArrowRight size={16} />}
+                onClick={() => navigate(`/orders/new?customerId=${customer.id}`)}
+                aria-label="Create Order for Customer"
+              >
+                Create Order
+              </Button>
+            </>
+          )}
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -383,35 +329,25 @@ export const CustomerProfilePage: React.FC = () => {
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}
                   >
                     <h2
-                      style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: '#0F172A' }}
+                      style={{
+                        fontSize: '1.5rem',
+                        fontWeight: 700,
+                        margin: 0,
+                        color: 'var(--text-primary, #0F172A)',
+                      }}
                     >
                       {customer.name}
                     </h2>
 
                     {/* Membership Badge */}
-                    {(() => {
-                      const tierStyle =
-                        MEMBERSHIP_BADGE_STYLE[customer.membership] || MEMBERSHIP_BADGE_STYLE.NONE!;
-                      return (
-                        <span
-                          style={{
-                            padding: '4px 12px',
-                            borderRadius: '16px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            background: tierStyle.bg,
-                            color: tierStyle.text,
-                            border: `1px solid ${tierStyle.border}`,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                          }}
-                        >
-                          <Shield size={12} />
-                          {customer.membership} MEMBER ({customer.discountPercent}% OFF)
-                        </span>
-                      );
-                    })()}
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 transition-colors ${getMembershipBadgeClass(
+                        customer.membership,
+                      )}`}
+                    >
+                      <Shield size={12} />
+                      {customer.membership} MEMBER ({customer.discountPercent}% OFF)
+                    </span>
                   </div>
 
                   <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
@@ -420,25 +356,12 @@ export const CustomerProfilePage: React.FC = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        color: '#475569',
+                        color: 'var(--text-secondary, #475569)',
                         fontSize: '0.9rem',
                       }}
                     >
-                      <Phone size={16} color="#2563EB" />
+                      <Phone size={16} color="var(--accent, #2563EB)" />
                       <span>{customer.phone}</span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        color: '#475569',
-                        fontSize: '0.9rem',
-                      }}
-                    >
-                      <Mail size={16} color="#2563EB" />
-                      <span>{customer.email || 'No email provided'}</span>
                     </div>
                   </div>
                 </div>
@@ -459,26 +382,55 @@ export const CustomerProfilePage: React.FC = () => {
                   style={{
                     fontSize: '1rem',
                     fontWeight: 700,
-                    color: '#0F172A',
+                    color: 'var(--text-primary, #0F172A)',
                     margin: '0 0 16px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                   }}
                 >
-                  <MapPin size={18} color="#2563EB" />
+                  <MapPin size={18} color="var(--accent, #2563EB)" />
                   Contact & Address
                 </h3>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
-                      Phone Number
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted, #64748B)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Customer ID
                     </div>
                     <div
                       style={{
                         fontSize: '0.95rem',
-                        color: '#1E293B',
+                        color: 'var(--text-primary, #1E293B)',
+                        fontWeight: 700,
+                        fontFamily: 'monospace',
+                        marginTop: '2px',
+                      }}
+                    >
+                      {customer.customerCode || customer.id}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted, #64748B)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      WhatsApp Number
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.95rem',
+                        color: 'var(--text-primary, #1E293B)',
                         fontWeight: 600,
                         marginTop: '2px',
                       }}
@@ -488,115 +440,120 @@ export const CustomerProfilePage: React.FC = () => {
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
-                      Email Address
-                    </div>
-                    <div style={{ fontSize: '0.95rem', color: '#1E293B', marginTop: '2px' }}>
-                      {customer.email || (
-                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted, #64748B)',
+                        fontWeight: 600,
+                      }}
+                    >
                       Postal Address
                     </div>
                     <div
                       style={{
                         fontSize: '0.95rem',
-                        color: '#1E293B',
+                        color: 'var(--text-primary, #1E293B)',
                         marginTop: '2px',
                         lineHeight: '1.4',
                       }}
                     >
                       {customer.address || (
-                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>
+                        <span
+                          style={{ color: 'var(--text-placeholder, #94A3B8)', fontStyle: 'italic' }}
+                        >
+                          Not provided
+                        </span>
                       )}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted, #64748B)',
+                        fontWeight: 600,
+                      }}
+                    >
                       Pincode
                     </div>
-                    <div style={{ fontSize: '0.95rem', color: '#1E293B', marginTop: '2px' }}>
+                    <div
+                      style={{
+                        fontSize: '0.95rem',
+                        color: 'var(--text-primary, #1E293B)',
+                        marginTop: '2px',
+                      }}
+                    >
                       {customer.pincode || (
-                        <span style={{ color: '#94A3B8', fontStyle: 'italic' }}>Not provided</span>
+                        <span
+                          style={{ color: 'var(--text-placeholder, #94A3B8)', fontStyle: 'italic' }}
+                        >
+                          Not provided
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
               </Card>
 
-              {/* Membership & Preferences Card */}
+              {/* Membership & Account Details Card */}
               <Card style={{ padding: '20px' }}>
                 <h3
                   style={{
                     fontSize: '1rem',
                     fontWeight: 700,
-                    color: '#0F172A',
+                    color: 'var(--text-primary, #0F172A)',
                     margin: '0 0 16px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                   }}
                 >
-                  <Sparkles size={18} color="#D97706" />
-                  Garment Processing Preferences
+                  <Tag size={18} color="#059669" />
+                  Membership & Account
                 </h3>
 
-                {renderPreferences(customer.preferences)}
-
-                <div
-                  style={{
-                    marginTop: '20px',
-                    paddingTop: '16px',
-                    borderTop: '1px solid #E2E8F0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                  }}
-                >
-                  <h3
-                    style={{
-                      fontSize: '1rem',
-                      fontWeight: 700,
-                      color: '#0F172A',
-                      margin: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <Tag size={18} color="#059669" />
-                    Account Details
-                  </h3>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
-                        Registration Source
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '0.9rem',
-                          color: '#1E293B',
-                          fontWeight: 600,
-                          marginTop: '2px',
-                        }}
-                      >
-                        {customer.registrationSource || 'WALK_IN'}
-                      </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted, #64748B)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Membership Tier
                     </div>
+                    <div
+                      style={{
+                        fontSize: '0.95rem',
+                        color: 'var(--text-primary, #1E293B)',
+                        fontWeight: 600,
+                        marginTop: '2px',
+                      }}
+                    >
+                      {customer.membership} ({customer.discountPercent}% Discount)
+                    </div>
+                  </div>
 
-                    <div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
-                        Member Since
-                      </div>
-                      <div style={{ fontSize: '0.9rem', color: '#1E293B', marginTop: '2px' }}>
-                        {formatDate(customer.createdAt)}
-                      </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted, #64748B)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Member Since
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.95rem',
+                        color: 'var(--text-primary, #1E293B)',
+                        marginTop: '2px',
+                      }}
+                    >
+                      {formatDate(customer.createdAt)}
                     </div>
                   </div>
                 </div>

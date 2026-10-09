@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, User, Lock, ArrowRight, Check } from 'lucide-react';
 import { Dropdown, DropdownOption } from '@growfast/ui';
 import { apiFetch } from '../services/api';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export const LoginPage: React.FC = () => {
   const { login, error } = useAuth();
@@ -80,22 +81,31 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex items-center justify-center relative font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50/80 dark:bg-[#0f1115] flex items-center justify-center relative font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden transition-colors">
+      {/* ── Theme Toggle in Corner ── */}
+      <div className="absolute top-6 left-6 z-50">
+        <ThemeToggle />
+      </div>
+
       {/* ── Background Decorative Elements ── */}
       {/* Top Left Shape */}
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-blue-100/60 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-0 left-0 w-[40vw] h-[40vh] pointer-events-none opacity-20">
-        <svg viewBox="0 0 400 400" className="w-full h-full text-blue-300" fill="currentColor">
+      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-blue-100/60 dark:bg-blue-950/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-0 w-[40vw] h-[40vh] pointer-events-none opacity-20 dark:opacity-5">
+        <svg
+          viewBox="0 0 400 400"
+          className="w-full h-full text-blue-300 dark:text-blue-800"
+          fill="currentColor"
+        >
           <path d="M0 0 L 400 0 C 200 0 0 200 0 400 Z" />
         </svg>
       </div>
 
       {/* Bottom Right Shape */}
-      <div className="absolute -bottom-60 -right-40 w-[800px] h-[800px] bg-blue-50/80 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[50vw] h-[50vh] pointer-events-none opacity-20">
+      <div className="absolute -bottom-60 -right-40 w-[800px] h-[800px] bg-blue-50/80 dark:bg-slate-900/40 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[50vw] h-[50vh] pointer-events-none opacity-20 dark:opacity-5">
         <svg
           viewBox="0 0 400 400"
-          className="w-full h-full text-blue-300"
+          className="w-full h-full text-blue-300 dark:text-blue-800"
           fill="none"
           stroke="currentColor"
           strokeWidth="1"
@@ -108,7 +118,7 @@ export const LoginPage: React.FC = () => {
 
       {/* ── Creative Laundry & Employee Floating Illustrations ── */}
       {/* Hanging Shirt - Top Right */}
-      <div className="absolute top-24 right-10 md:right-32 text-blue-500/20 pointer-events-none rotate-12 transform scale-150">
+      <div className="absolute top-24 right-10 md:right-32 text-blue-500/20 dark:text-blue-400/10 pointer-events-none rotate-12 transform scale-150">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="64"
@@ -125,7 +135,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Washing Machine - Bottom Left */}
-      <div className="absolute bottom-32 left-10 md:left-32 text-blue-500/20 pointer-events-none -rotate-6 transform scale-150">
+      <div className="absolute bottom-32 left-10 md:left-32 text-blue-500/20 dark:text-blue-400/10 pointer-events-none -rotate-6 transform scale-150">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="64"
@@ -147,7 +157,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Hanger - Top Left Center */}
-      <div className="absolute top-32 left-1/4 text-blue-500/15 pointer-events-none -rotate-12 transform scale-125">
+      <div className="absolute top-32 left-1/4 text-blue-500/15 dark:text-blue-400/10 pointer-events-none -rotate-12 transform scale-125">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="48"
@@ -166,7 +176,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Shop / Storefront - Center Right */}
-      <div className="absolute top-1/2 right-1/4 text-blue-500/10 pointer-events-none rotate-6 transform scale-[2] -translate-y-1/2">
+      <div className="absolute top-1/2 right-1/4 text-blue-500/10 dark:text-blue-400/5 pointer-events-none rotate-6 transform scale-[2] -translate-y-1/2">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="48"
@@ -184,7 +194,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Tag/Receipt - Bottom Right */}
-      <div className="absolute bottom-20 right-1/3 text-blue-500/15 pointer-events-none rotate-12 transform scale-[1.5]">
+      <div className="absolute bottom-20 right-1/3 text-blue-500/15 dark:text-blue-400/10 pointer-events-none rotate-12 transform scale-[1.5]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="48"
@@ -196,35 +206,41 @@ export const LoginPage: React.FC = () => {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
+          <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z" />
           <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
           <path d="M12 17V7" />
         </svg>
       </div>
 
       {/* ── Top Right Pill ── */}
-      <div className="absolute top-6 right-6 hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 backdrop-blur-sm border border-slate-200/60 rounded-full">
+      <div className="absolute top-6 right-6 hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 dark:bg-[#1b202a] backdrop-blur-sm border border-slate-200/60 dark:border-[#2a313d] rounded-full">
         <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-        <span className="text-xs font-medium text-slate-500">Employee Login</span>
+        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          Employee Login
+        </span>
       </div>
 
       {/* ── Bottom Left Branding ── */}
       <div className="absolute bottom-10 left-10 hidden lg:flex items-center gap-4 pointer-events-none">
         <div className="w-0.5 h-12 bg-blue-500 rounded-full" />
         <div className="flex flex-col">
-          <span className="text-sm font-semibold text-slate-600">Clean spaces.</span>
-          <span className="text-sm font-semibold text-slate-500">Happier people.</span>
+          <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+            Clean spaces.
+          </span>
+          <span className="text-sm font-semibold text-slate-500 dark:text-slate-500">
+            Happier people.
+          </span>
         </div>
       </div>
 
       {/* ── Bottom Right Branding ── */}
       <div className="absolute bottom-10 right-12 hidden lg:flex items-center gap-3 pointer-events-none">
         <div className="flex flex-col text-right">
-          <span className="text-sm font-semibold text-slate-500">Better</span>
-          <span className="text-sm font-semibold text-slate-500">Faster</span>
-          <span className="text-sm font-semibold text-slate-600">Cleaner</span>
+          <span className="text-sm font-semibold text-slate-500 dark:text-slate-500">Better</span>
+          <span className="text-sm font-semibold text-slate-500 dark:text-slate-500">Faster</span>
+          <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Cleaner</span>
         </div>
-        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -241,20 +257,24 @@ export const LoginPage: React.FC = () => {
 
       {/* ── Main Login Card ── */}
       <div className="relative z-10 w-full max-w-[620px] px-4 sm:px-6">
-        <div className="bg-white rounded-[32px] shadow-[0_28px_80px_-24px_rgba(15,23,42,0.20)] px-6 py-10 sm:px-12 sm:py-12 md:px-16 md:py-14 border border-slate-100 relative">
+        <div className="bg-white dark:bg-[#151922] rounded-[32px] shadow-[0_28px_80px_-24px_rgba(15,23,42,0.20)] dark:shadow-[0_28px_80px_-24px_rgba(0,0,0,0.5)] px-6 py-10 sm:px-12 sm:py-12 md:px-16 md:py-14 border border-slate-100 dark:border-[#2a313d] relative transition-colors">
           {/* Header */}
           <div className="text-center mb-10">
-            <h1 className="text-[2.75rem] font-bold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-1">
+            <h1 className="text-[2.75rem] font-bold tracking-tight text-slate-900 dark:text-slate-100 mb-1 flex items-center justify-center gap-1">
               <span>Grow</span>
-              <span className="text-blue-600">Fast</span>
+              <span className="text-blue-600 dark:text-blue-400">Fast</span>
             </h1>
-            <p className="text-sm font-medium text-slate-400">
+            <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
               Simpler Operations. Cleaner Tomorrow.
             </p>
-            <div className="w-[72px] h-px bg-slate-200 mx-auto mt-6" />
+            <div className="w-[72px] h-px bg-slate-200 dark:bg-slate-700 mx-auto mt-6" />
 
-            <h2 className="text-[1.875rem] font-bold text-slate-900 mt-8 mb-2">Staff Portal</h2>
-            <p className="text-[0.95rem] text-slate-500">Sign in to access the system</p>
+            <h2 className="text-[1.875rem] font-bold text-slate-900 dark:text-slate-100 mt-8 mb-2">
+              Staff Portal
+            </h2>
+            <p className="text-[0.95rem] text-slate-500 dark:text-slate-400">
+              Sign in to access the system
+            </p>
           </div>
 
           {/* Form */}
@@ -263,7 +283,7 @@ export const LoginPage: React.FC = () => {
             <div className="max-w-[420px] mx-auto w-full flex flex-col gap-6">
               {/* Global Error/Lockout State */}
               {(error || lockoutUntil) && (
-                <div className="bg-red-50/80 border border-red-100 text-red-600 text-sm font-medium p-4 rounded-xl text-center">
+                <div className="bg-red-50/80 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 text-sm font-medium p-4 rounded-xl text-center">
                   {lockoutUntil
                     ? `Too many failed attempts. Try again in ${timeLeft}s.`
                     : `${error} (Attempt ${failedAttempts}/5)`}
@@ -272,17 +292,20 @@ export const LoginPage: React.FC = () => {
 
               {/* Username / Employee Dropdown */}
               <div className="flex flex-col gap-2">
-                <label htmlFor="employeeId" className="text-[0.95rem] font-bold text-slate-800">
+                <label
+                  htmlFor="employeeId"
+                  className="text-[0.95rem] font-bold text-slate-800 dark:text-slate-200"
+                >
                   Role of You
                 </label>
                 {isFetchingDirectory ? (
-                  <div className="relative flex items-center h-[52px] rounded-2xl border border-slate-200 bg-slate-50/80 px-[18px] gap-3">
+                  <div className="relative flex items-center h-[52px] rounded-2xl border border-slate-200 dark:border-[#2a313d] bg-slate-50/80 dark:bg-[#11151c] px-[18px] gap-3">
                     <User
                       size={20}
                       strokeWidth={2.5}
                       className="text-blue-400 shrink-0 pointer-events-none"
                     />
-                    <div className="flex-1 text-[0.95rem] text-slate-400">
+                    <div className="flex-1 text-[0.95rem] text-slate-400 dark:text-slate-500">
                       Loading staff directory...
                     </div>
                   </div>
@@ -308,14 +331,17 @@ export const LoginPage: React.FC = () => {
 
               {/* Password / PIN Input */}
               <div className="flex flex-col gap-2">
-                <label htmlFor="password" className="text-[0.95rem] font-bold text-slate-800">
+                <label
+                  htmlFor="password"
+                  className="text-[0.95rem] font-bold text-slate-800 dark:text-slate-200"
+                >
                   PIN
                 </label>
                 <div
                   className={`relative flex items-center h-[52px] rounded-2xl border px-[18px] gap-3 transition-all duration-200 ${
                     isFocusedPin
-                      ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white'
-                      : 'border-slate-200 bg-slate-50/80 hover:bg-slate-50 hover:border-slate-300'
+                      ? 'border-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.1)] bg-white dark:bg-[#11151c]'
+                      : 'border-slate-200 dark:border-[#2a313d] bg-slate-50/80 dark:bg-[#11151c] hover:bg-slate-50 dark:hover:bg-[#151922] hover:border-slate-300 dark:hover:border-[#3a4250]'
                   } ${lockoutUntil ? 'opacity-60 pointer-events-none' : ''}`}
                 >
                   <Lock
@@ -333,14 +359,14 @@ export const LoginPage: React.FC = () => {
                     onBlur={() => setIsFocusedPin(false)}
                     disabled={!!lockoutUntil}
                     placeholder="Enter your PIN"
-                    className="flex-1 h-full bg-transparent outline-none text-[0.95rem] font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-medium placeholder:tracking-normal tracking-widest"
+                    className="flex-1 h-full bg-transparent outline-none text-[0.95rem] font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-medium placeholder:tracking-normal tracking-widest"
                   />
 
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={!!lockoutUntil}
-                    className="shrink-0 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer outline-none focus-visible:text-blue-600 rounded-lg"
+                    className="shrink-0 w-10 h-10 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer outline-none focus-visible:text-blue-600 rounded-lg"
                     aria-label={showPassword ? 'Hide PIN' : 'Show PIN'}
                   >
                     {showPassword ? (
@@ -358,7 +384,7 @@ export const LoginPage: React.FC = () => {
                 disabled={isLoggingIn || !!lockoutUntil}
                 className={`group mt-2 w-full h-[52px] rounded-2xl flex items-center justify-center gap-2.5 text-[1.05rem] font-bold text-white transition-all duration-200 shadow-sm ${
                   isLoggingIn || !!lockoutUntil
-                    ? 'bg-blue-400 cursor-not-allowed'
+                    ? 'bg-blue-400 dark:bg-blue-600/50 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/25 cursor-pointer active:scale-[0.99]'
                 }`}
               >
@@ -380,11 +406,11 @@ export const LoginPage: React.FC = () => {
 
           {/* Footer Security Label */}
           <div className="mt-10 max-w-[420px] mx-auto w-full flex items-center justify-center gap-4 opacity-70">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <span className="text-[0.8rem] font-semibold text-slate-400 tracking-wider uppercase whitespace-nowrap">
+            <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+            <span className="text-[0.8rem] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase whitespace-nowrap">
               Secure Staff Portal
             </span>
-            <div className="h-px bg-slate-200 flex-1"></div>
+            <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
           </div>
         </div>
       </div>

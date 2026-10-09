@@ -96,13 +96,15 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by phone or name..."
+            placeholder="Search by WhatsApp number, name, or customer ID..."
             aria-label="Search Customers"
             style={{
               width: '100%',
               padding: '12px 40px 12px 44px',
               fontSize: '0.95rem',
-              border: '1px solid #CBD5E1',
+              border: '1px solid var(--border-input, #CBD5E1)',
+              background: 'var(--bg-input, #ffffff)',
+              color: 'var(--text-primary, #0f172a)',
               borderRadius: '10px',
               outline: 'none',
               minHeight: '44px',
@@ -119,7 +121,7 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#64748B',
+                color: 'var(--text-muted, #64748B)',
               }}
             >
               <X size={18} />
@@ -152,8 +154,8 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                 style={{
                   padding: '16px',
                   borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  background: '#FFFFFF',
+                  border: '1px solid var(--border, #E2E8F0)',
+                  background: 'var(--bg-surface, #FFFFFF)',
                   cursor: 'pointer',
                   transition: 'all 200ms ease',
                   display: 'flex',
@@ -165,7 +167,13 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0F172A' }}>
+                    <span
+                      style={{
+                        fontSize: '1.05rem',
+                        fontWeight: 700,
+                        color: 'var(--text-primary, #0F172A)',
+                      }}
+                    >
                       {c.name}
                     </span>
                     <span
@@ -181,6 +189,22 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                     >
                       {c.membership} TIER
                     </span>
+                    {(c.customerCode || c.id) && (
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          background: '#EFF6FF',
+                          color: '#2563EB',
+                          border: '1px solid #BFDBFE',
+                        }}
+                      >
+                        {c.customerCode || c.id}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div
@@ -189,16 +213,16 @@ export const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect }) 
                     flexWrap: 'wrap',
                     gap: '16px',
                     fontSize: '0.85rem',
-                    color: '#475569',
+                    color: 'var(--text-secondary, #475569)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Phone size={14} color="#64748B" />
-                    <strong style={{ color: '#0F172A' }}>{c.phone}</strong>
+                    <Phone size={14} color="var(--text-muted, #64748B)" />
+                    <strong style={{ color: 'var(--text-primary, #0F172A)' }}>{c.phone}</strong>
                   </div>
                   {c.email && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Mail size={14} color="#64748B" />
+                      <Mail size={14} color="var(--text-muted, #64748B)" />
                       <span>{c.email}</span>
                     </div>
                   )}

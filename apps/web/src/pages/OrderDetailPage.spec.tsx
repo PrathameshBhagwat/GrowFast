@@ -48,6 +48,7 @@ const mockOrderWithPhysicalGarments = {
           id: 'garment-1',
           orderItemId: 'item-1',
           unitNumber: 1,
+          tagId: 'GF-TAG-001',
           isReady: true,
           isCancelled: false,
           photos: [],
@@ -56,6 +57,7 @@ const mockOrderWithPhysicalGarments = {
           id: 'garment-2',
           orderItemId: 'item-1',
           unitNumber: 2,
+          tagId: 'GF-TAG-002',
           isReady: false,
           isCancelled: false,
           photos: [],
@@ -403,7 +405,7 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
     renderWithRouter('order-103');
 
     await waitFor(() => {
-      expect(screen.getByText('CANCELLED')).toBeInTheDocument();
+      expect(screen.getAllByText('CANCELLED').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Garment #1')).toBeInTheDocument();
       expect(screen.getByText('Piece Cancelled')).toBeInTheDocument();
     });
@@ -1008,6 +1010,62 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
       const imgs = screen.getAllByAltText('Garment #1 - Photo 1');
       expect(imgs).toHaveLength(2);
       expect(screen.getByRole('dialog', { name: /photo gallery/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Phase T1: Tag System Foundation - Order Detail Piece & Tag Display', () => {
+    it('renders piece positions (e.g. Piece 1/2, Piece 2/2) and tag badges (Tag: GF-TAG-001)', async () => {
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: mockOrderWithPhysicalGarments }),
+      }));
+
+      renderWithRouter('order-101');
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Shirt').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText(/Piece 1\/2/).length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText(/Piece 2\/2/).length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('Tag: GF-TAG-001')).toBeInTheDocument();
+        expect(screen.getByText('Tag: GF-TAG-002')).toBeInTheDocument();
+      });
+    });
+
+    it('preserves piece position and tag badge on cancelled physical garments', async () => {
+      (global.fetch as any).mockImplementation(async () => ({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            ...mockOrderWithCancelledGarment,
+            items: [
+              {
+                ...mockOrderWithCancelledGarment.items[0],
+                physicalGarments: [
+                  {
+                    id: 'garment-c1',
+                    orderItemId: 'item-3',
+                    unitNumber: 1,
+                    tagId: 'GF-TAG-CANCELLED',
+                    isReady: false,
+                    isCancelled: true,
+                    photos: [],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      }));
+
+      renderWithRouter('order-103');
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Shirt').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText(/Piece 1\/1/).length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('Tag: GF-TAG-CANCELLED')).toBeInTheDocument();
+        expect(screen.getAllByText('CANCELLED').length).toBeGreaterThanOrEqual(1);
+      });
     });
   });
 });

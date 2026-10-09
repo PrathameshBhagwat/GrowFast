@@ -13,6 +13,7 @@ import { OrderWizardPage } from './pages/OrderWizardPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
 import { DeliveryPage } from './pages/DeliveryPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { TagDesignerPage } from './pages/TagDesignerPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -114,6 +115,16 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      {/* Developer C — Admin Tag Designer (Phase T4) */}
+      <Route
+        path="/admin/tag-designer"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER']}>
+            <TagDesignerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/tag-designer" element={<Navigate to="/admin/tag-designer" replace />} />
       {/* Catch all — redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

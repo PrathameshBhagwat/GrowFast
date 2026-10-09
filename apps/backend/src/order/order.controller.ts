@@ -47,6 +47,28 @@ export class OrderController {
     };
   }
 
+  @Get('due-today')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'MANAGER', 'COUNTER', 'DELIVERY')
+  async getDueToday(
+    @Request() req: any,
+    @Query('countOnly') countOnly?: string,
+    @Query('date') date?: string,
+    @Query('timezone') timezone?: string,
+  ) {
+    const storeId = req.user.storeId;
+    const isCountOnly = countOnly === 'true' || countOnly === '1';
+    const result = await this.orderService.findDueTodayOrders(storeId, {
+      countOnly: isCountOnly,
+      date,
+      timezone,
+    });
+    return {
+      success: true,
+      ...result,
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string, @Request() req: any) {

@@ -11,6 +11,11 @@ describe('StoreService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    tagTemplate: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      updateMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -69,6 +74,134 @@ describe('StoreService', () => {
         data: { expressSurchargePercent: 30 },
         select: { id: true, name: true, expressSurchargePercent: true },
       });
+    });
+  });
+
+  describe('getTagDesign', () => {
+    it('should return existing active tag design if found', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      mockPrisma.tagTemplate.findFirst.mockResolvedValue({
+        id: 'tmpl-1',
+        storeId: 'store-1',
+        name: 'Custom Tag',
+        version: 2,
+        isActive: true,
+        layout: {
+          version: 2,
+          name: 'Custom Tag',
+          fields: [
+            { field: 'tagId', enabled: true, fontSize: 16, alignment: 'center' },
+            { field: 'customerName', enabled: true, fontSize: 10, alignment: 'left' },
+          ],
+          containerPaddingMm: { top: 2, right: 2, bottom: 2, left: 2 },
+          borderStyle: 'solid',
+        },
+        createdAt: new Date('2026-10-08T10:00:00.000Z'),
+        updatedAt: new Date('2026-10-08T10:00:00.000Z'),
+      });
+
+      const result = await service.getTagDesign('store-1');
+      expect(result.id).toBe('tmpl-1');
+      expect(result.version).toBe(2);
+      expect(result.name).toBe('Custom Tag');
+      expect(result.layout.borderStyle).toBe('solid');
+      expect(result.layout.fields.find((f) => f.field === 'tagId')?.alignment).toBe('center');
+    });
+
+    it('should return default template baseline if none exists in database', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      mockPrisma.tagTemplate.findFirst.mockResolvedValue(null);
+
+      const result = await service.getTagDesign('store-1');
+      expect(result.id).toBe('default');
+      expect(result.storeId).toBe('store-1');
+      expect(result.version).toBe(1);
+      expect(result.layout.fields.length).toBe(7);
+      expect(result.layout.fields.find((f) => f.field === 'orderNumber')?.fontSize).toBe(15);
+    });
+
+    it('should throw NotFoundException if store does not exist', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue(null);
+      await expect(service.getTagDesign('store-non-existent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateTagDesign', () => {
+    it('should deactivate old templates and create new version', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      mockPrisma.tagTemplate.findFirst.mockResolvedValue({ version: 1 });
+      mockPrisma.tagTemplate.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.tagTemplate.create.mockResolvedValue({
+        id: 'tmpl-new',
+        storeId: 'store-1',
+        name: 'Brand New Design',
+        version: 2,
+        isActive: true,
+        layout: {},
+        createdAt: new Date('2026-10-08T12:00:00.000Z'),
+        updatedAt: new Date('2026-10-08T12:00:00.000Z'),
+      });
+
+      const result = await service.updateTagDesign('store-1', {
+        name: 'Brand New Design',
+        layout: {
+          version: 1,
+          name: 'Brand New Design',
+          fields: [
+            { field: 'tagId', enabled: true, fontSize: 16, alignment: 'center' },
+            { field: 'customerName', enabled: false, fontSize: 9, alignment: 'left' },
+          ],
+          containerPaddingMm: { top: 3, right: 3, bottom: 3, left: 3 },
+          borderStyle: 'solid',
+        },
+      });
+
+      expect(mockPrisma.tagTemplate.updateMany).toHaveBeenCalledWith({
+        where: { storeId: 'store-1', isActive: true },
+        data: { isActive: false },
+      });
+      expect(mockPrisma.tagTemplate.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            storeId: 'store-1',
+            version: 2,
+            isActive: true,
+          }),
+        }),
+      );
+      expect(result.id).toBe('tmpl-new');
+      expect(result.version).toBe(2);
+    });
+  });
+
+  describe('resetTagDesign', () => {
+    it('should reset store layout back to default template', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      mockPrisma.tagTemplate.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.tagTemplate.create.mockResolvedValue({
+        id: 'tmpl-reset',
+        storeId: 'store-1',
+        name: 'Standard 40×40 mm Washable Cloth Tag',
+        version: 1,
+        isActive: true,
+        layout: {},
+        createdAt: new Date('2026-10-08T14:00:00.000Z'),
+        updatedAt: new Date('2026-10-08T14:00:00.000Z'),
+      });
+
+      const result = await service.resetTagDesign('store-1');
+      expect(mockPrisma.tagTemplate.updateMany).toHaveBeenCalled();
+      expect(mockPrisma.tagTemplate.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            storeId: 'store-1',
+            name: expect.stringContaining('40×40 mm'),
+            isActive: true,
+          }),
+        }),
+      );
+      expect(result.id).toBe('tmpl-reset');
+      expect(result.layout.borderStyle).toBe('dashed');
     });
   });
 });

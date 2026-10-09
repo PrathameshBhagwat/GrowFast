@@ -27,8 +27,12 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
  * Uses the ORDER_STATUS_COLORS from shared-types as the single source of truth.
  */
 export const StatusChip: React.FC<StatusChipProps> = ({ status, size = 'md', style }) => {
-  const colors = ORDER_STATUS_COLORS[status];
-  const label = STATUS_LABELS[status] || status;
+  const colors = ORDER_STATUS_COLORS[status] || {
+    bg: 'var(--bg-surface-muted, #F3F4F6)',
+    text: 'var(--text-secondary, #374151)',
+    border: 'var(--border, #E5E7EB)',
+  };
+  const label = STATUS_LABELS[status] || (status ? String(status).replace('_', ' ') : 'Unknown');
 
   const chipStyle: React.CSSProperties = {
     display: 'inline-flex',
