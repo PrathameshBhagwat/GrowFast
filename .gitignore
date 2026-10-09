@@ -46,3 +46,7 @@ uploads/
 
 # Baileys WhatsApp Auth
 baileys_auth/
+
+# Temporary scratch and testing directories
+scratch/
+r2-test/

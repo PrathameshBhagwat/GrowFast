@@ -123,8 +123,8 @@ export function FinancialAdjustmentModal({
               onClick={() => setType(AdjustmentType.REFUND)}
               className={`py-2 px-3 text-sm font-semibold rounded-md border min-h-[44px] transition-colors ${
                 type === AdjustmentType.REFUND
-                  ? 'bg-blue-50 border-blue-500 text-blue-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
             >
               Refund (Cash / Bank)
@@ -134,8 +134,8 @@ export function FinancialAdjustmentModal({
               onClick={() => setType(AdjustmentType.STORE_CREDIT)}
               className={`py-2 px-3 text-sm font-semibold rounded-md border min-h-[44px] transition-colors ${
                 type === AdjustmentType.STORE_CREDIT
-                  ? 'bg-blue-50 border-blue-500 text-blue-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
             >
               Store Credit

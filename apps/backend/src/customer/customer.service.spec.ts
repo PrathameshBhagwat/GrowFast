@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { MembershipTier, RegistrationSource } from '@growfast/shared-types';
+import { MembershipTier } from '@growfast/shared-types';
 
 describe('CustomerService', () => {
   let service: CustomerService;
@@ -117,17 +117,7 @@ describe('CustomerService', () => {
       );
     });
 
-    it('5. should throw BadRequestException if email format is invalid', async () => {
-      await expect(
-        service.createCustomer({
-          name: 'Aarav Kumar',
-          phone: '9876512345',
-          email: 'not-an-email',
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('6. should throw ConflictException if phone number already exists', async () => {
+    it('5. should throw ConflictException if phone/WhatsApp number already exists', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(mockCustomers[0]);
 
       await expect(
@@ -138,19 +128,19 @@ describe('CustomerService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('7. should create customer with all optional fields', async () => {
+    it('6. should create customer with name, WhatsApp number, and address', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(null);
       mockPrismaService.customer.create.mockResolvedValue({
         id: 'cust-101',
         name: 'Neha Gupta',
         phone: '9876543211',
-        email: 'neha@example.com',
+        email: null,
         address: '101 Lotus Colony',
         pincode: '411038',
         membership: 'GOLD',
         discountPercent: 10,
-        preferences: { fragrance: 'jasmine', starch: 'medium' },
-        registrationSource: 'REFERRAL',
+        preferences: null,
+        registrationSource: 'WALK_IN',
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -158,19 +148,61 @@ describe('CustomerService', () => {
       const result = await service.createCustomer({
         name: 'Neha Gupta',
         phone: '9876543211',
-        email: 'neha@example.com',
         address: '101 Lotus Colony',
         pincode: '411038',
         membership: MembershipTier.GOLD,
         discountPercent: 10,
-        preferences: { fragrance: 'jasmine', starch: 'medium' },
-        registrationSource: RegistrationSource.REFERRAL,
       });
 
       expect(result.id).toBe('cust-101');
+      expect(result.name).toBe('Neha Gupta');
+      expect(result.phone).toBe('9876543211');
+      expect(result.address).toBe('101 Lotus Colony');
       expect(result.membership).toBe(MembershipTier.GOLD);
-      expect(result.preferences).toEqual({ fragrance: 'jasmine', starch: 'medium' });
-      expect(result.registrationSource).toBe('REFERRAL');
+      expect(result.registrationSource).toBe('WALK_IN');
+      expect(mockPrismaService.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: 'Neha Gupta',
+            phone: '9876543211',
+            email: null,
+            address: '101 Lotus Colony',
+            registrationSource: 'WALK_IN',
+          }),
+        }),
+      );
+    });
+
+    it('7. should verify email is not required during customer creation', async () => {
+      mockPrismaService.customer.findUnique.mockResolvedValue(null);
+      mockPrismaService.customer.create.mockResolvedValue({
+        id: 'cust-102',
+        name: 'No Email Customer',
+        phone: '9876599999',
+        email: null,
+        address: null,
+        pincode: null,
+        membership: 'NONE',
+        discountPercent: 0,
+        preferences: null,
+        registrationSource: 'WALK_IN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.createCustomer({
+        name: 'No Email Customer',
+        phone: '9876599999',
+      });
+
+      expect(result.email).toBeNull();
+      expect(mockPrismaService.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            email: null,
+          }),
+        }),
+      );
     });
 
     it('8. should throw BadRequestException for invalid membership tier', async () => {
@@ -214,16 +246,6 @@ describe('CustomerService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
-
-    it('11. should throw BadRequestException for invalid preferences payload', async () => {
-      await expect(
-        service.createCustomer({
-          name: 'Preferences Test',
-          phone: '9876512345',
-          preferences: 'not-an-object' as any,
-        }),
-      ).rejects.toThrow(BadRequestException);
-    });
   });
 
   describe('searchCustomers', () => {
@@ -244,6 +266,7 @@ describe('CustomerService', () => {
             OR: [
               { phone: { contains: '9876543210', mode: 'insensitive' } },
               { name: { contains: '9876543210', mode: 'insensitive' } },
+              { customerCode: { contains: '9876543210', mode: 'insensitive' } },
               { id: { equals: '9876543210' } },
             ],
           },
@@ -276,6 +299,7 @@ describe('CustomerService', () => {
             OR: [
               { phone: { contains: 'rahul', mode: 'insensitive' } },
               { name: { contains: 'rahul', mode: 'insensitive' } },
+              { customerCode: { contains: 'rahul', mode: 'insensitive' } },
               { id: { equals: 'rahul' } },
             ],
           },
@@ -283,11 +307,11 @@ describe('CustomerService', () => {
       );
     });
 
-    it('4. should search by customer ID', async () => {
+    it('4. should search by customer business code or ID', async () => {
       mockPrismaService.customer.findMany.mockResolvedValue([mockCustomers[1]]);
       mockPrismaService.customer.count.mockResolvedValue(1);
 
-      const result = await service.searchCustomers('cust-002', 1, 10);
+      const result = await service.searchCustomers('CUS-000002', 1, 10);
 
       expect(result.success).toBe(true);
       expect(result.data[0].id).toBe('cust-002');

@@ -108,28 +108,28 @@ export function PaymentModal({
             <h3 className="text-xl font-bold text-gray-900">Payment Confirmed</h3>
             {isFullyPaid ? (
               <div className="mt-2 space-y-1">
-                <p className="text-base font-semibold text-green-700 font-mono">
+                <p className="text-base font-semibold text-green-700 dark:text-green-400 font-mono">
                   ₹{paymentSuccess.amountReceived.toFixed(2)} received
                 </p>
-                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 dark:bg-emerald-950/60 text-green-800 dark:text-emerald-300 border border-green-200 dark:border-emerald-800">
                   Order Fully Paid
                 </span>
               </div>
             ) : (
-              <div className="mt-3 space-y-1.5 bg-gray-50 border border-gray-200 rounded-lg p-3 max-w-xs mx-auto text-left text-xs sm:text-sm">
+              <div className="mt-3 space-y-1.5 bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-800 rounded-lg p-3 max-w-xs mx-auto text-left text-xs sm:text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 font-medium">Paid:</span>
-                  <span className="font-bold text-gray-900 font-mono">
+                  <span className="text-gray-600 dark:text-slate-400 font-medium">Paid:</span>
+                  <span className="font-bold text-gray-900 dark:text-white font-mono">
                     ₹{paymentSuccess.amountReceived.toFixed(2)}
                   </span>
                 </div>
-                <div className="flex justify-between text-amber-700">
+                <div className="flex justify-between text-amber-700 dark:text-amber-400">
                   <span className="font-medium">Remaining:</span>
                   <span className="font-bold font-mono">₹{order.amountDue.toFixed(2)}</span>
                 </div>
-                <div className="pt-1.5 border-t border-gray-200 flex justify-between text-xs">
-                  <span className="text-gray-500 font-medium">Status:</span>
-                  <span className="font-bold text-yellow-800 bg-yellow-100 px-2 py-0.5 rounded">
+                <div className="pt-1.5 border-t border-gray-200 dark:border-slate-800 flex justify-between text-xs">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Status:</span>
+                  <span className="font-bold text-yellow-800 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-950/60 border border-yellow-200 dark:border-yellow-900/50 px-2 py-0.5 rounded">
                     PARTIAL
                   </span>
                 </div>
@@ -231,24 +231,26 @@ export function PaymentModal({
         </div>
 
         {numAmount > 0 && numAmount <= order.amountDue && (
-          <Card className="bg-blue-50/50 border-blue-100">
-            <h4 className="text-sm font-semibold text-blue-900 mb-2">Simulated After Payment</h4>
+          <Card className="bg-blue-50/50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/60">
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
+              Simulated After Payment
+            </h4>
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
-                <span className="text-blue-700">New Paid Amount</span>
-                <span className="font-medium text-blue-900 font-mono">
+                <span className="text-blue-700 dark:text-blue-300">New Paid Amount</span>
+                <span className="font-medium text-blue-900 dark:text-blue-100 font-mono">
                   ₹{totalPaidAfter.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-blue-700">New Balance</span>
-                <span className="font-medium text-blue-900 font-mono">
+                <span className="text-blue-700 dark:text-blue-300">New Balance</span>
+                <span className="font-medium text-blue-900 dark:text-blue-100 font-mono">
                   ₹{remainingAfterPayment.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-xs pt-1 border-t border-blue-100 mt-1">
-                <span className="text-blue-700">Status</span>
-                <span className="font-bold text-blue-900">{newStatus}</span>
+              <div className="flex justify-between text-xs pt-1 border-t border-blue-100 dark:border-blue-900/40 mt-1">
+                <span className="text-blue-700 dark:text-blue-300">Status</span>
+                <span className="font-bold text-blue-900 dark:text-blue-200">{newStatus}</span>
               </div>
             </div>
           </Card>

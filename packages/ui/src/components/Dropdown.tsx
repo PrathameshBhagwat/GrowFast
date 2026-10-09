@@ -138,7 +138,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
     const labelStyle: React.CSSProperties = {
       fontSize: '0.875rem',
       fontWeight: 600,
-      color: '#1e293b',
+      color: 'var(--text-secondary, #1e293b)',
       fontFamily: "'Inter', sans-serif",
     };
 
@@ -152,13 +152,23 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
       fontSize: '0.95rem',
       fontWeight: 500,
       fontFamily: "'Inter', sans-serif",
-      color: value ? '#0f172a' : '#94a3b8',
-      backgroundColor: disabled ? '#f1f5f9' : isOpen ? '#ffffff' : '#f8fafc',
-      border: `1px solid ${error ? '#ef4444' : isOpen ? '#3b82f6' : disabled ? '#e2e8f0' : '#e2e8f0'}`,
+      color: value ? 'var(--text-primary, #0f172a)' : 'var(--text-placeholder, #94a3b8)',
+      backgroundColor: disabled
+        ? 'var(--dropdown-bg-disabled, #f1f5f9)'
+        : isOpen
+          ? 'var(--dropdown-bg-open, #ffffff)'
+          : 'var(--dropdown-bg, #f8fafc)',
+      border: `1px solid ${
+        error
+          ? 'var(--danger-border, #ef4444)'
+          : isOpen
+            ? 'var(--accent, #3b82f6)'
+            : 'var(--border-input, #e2e8f0)'
+      }`,
       borderRadius: '16px',
       cursor: disabled ? 'not-allowed' : 'pointer',
       outline: 'none',
-      boxShadow: isOpen ? '0 0 0 4px rgba(59, 130, 246, 0.1)' : 'none',
+      boxShadow: isOpen ? '0 0 0 4px var(--accent-muted, rgba(59, 130, 246, 0.1))' : 'none',
       transition: 'all 150ms ease',
       boxSizing: 'border-box',
       position: 'relative',
@@ -169,7 +179,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
       width: '20px',
       height: '20px',
       flexShrink: 0,
-      color: '#3b82f6',
+      color: 'var(--accent, #3b82f6)',
       transition: 'transform 150ms ease',
       transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
       marginLeft: '12px',
@@ -181,10 +191,11 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
       left: 0,
       right: 0,
       marginTop: '6px',
-      backgroundColor: '#ffffff',
-      border: '1px solid #e2e8f0',
+      backgroundColor: 'var(--bg-surface-elevated, #ffffff)',
+      border: '1px solid var(--border, #e2e8f0)',
       borderRadius: '12px',
-      boxShadow: '0 10px 40px -10px rgba(15, 23, 42, 0.15), 0 4px 20px -4px rgba(15, 23, 42, 0.08)',
+      boxShadow:
+        '0 10px 40px -10px var(--shadow-color, rgba(15, 23, 42, 0.15)), 0 4px 20px -4px var(--shadow-color, rgba(15, 23, 42, 0.08))',
       maxHeight: '280px',
       overflowY: 'auto',
       zIndex: 50,
@@ -202,7 +213,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
       fontSize: '0.95rem',
       fontWeight: 500,
       fontFamily: "'Inter', sans-serif",
-      color: '#1e293b',
+      color: 'var(--text-primary, #1e293b)',
       cursor: 'pointer',
       transition: 'background-color 100ms ease',
       borderRadius: '8px',
@@ -289,8 +300,14 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
                     onMouseEnter={() => !option.disabled && setHighlightedIndex(enabledIndex)}
                     style={{
                       ...optionStyle,
-                      backgroundColor: isHighlighted ? '#eff6ff' : 'transparent',
-                      color: option.disabled ? '#94a3b8' : isSelected ? '#3b82f6' : '#1e293b',
+                      backgroundColor: isHighlighted
+                        ? 'var(--dropdown-highlight, #eff6ff)'
+                        : 'transparent',
+                      color: option.disabled
+                        ? 'var(--text-placeholder, #94a3b8)'
+                        : isSelected
+                          ? 'var(--accent, #3b82f6)'
+                          : 'var(--text-primary, #1e293b)',
                       fontWeight: isSelected ? 600 : 500,
                     }}
                   >
@@ -305,7 +322,11 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
                         strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        style={{ marginLeft: 'auto', color: '#3b82f6', flexShrink: 0 }}
+                        style={{
+                          marginLeft: 'auto',
+                          color: 'var(--accent, #3b82f6)',
+                          flexShrink: 0,
+                        }}
                       >
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
@@ -318,7 +339,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
                   style={{
                     padding: '16px',
                     textAlign: 'center',
-                    color: '#94a3b8',
+                    color: 'var(--text-muted, #94a3b8)',
                     fontSize: '0.9rem',
                   }}
                 >
@@ -332,7 +353,7 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
           <span
             style={{
               fontSize: '0.75rem',
-              color: '#ef4444',
+              color: 'var(--danger-text, #ef4444)',
               fontFamily: "'Inter', sans-serif",
               marginTop: '2px',
             }}

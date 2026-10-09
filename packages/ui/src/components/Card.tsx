@@ -29,13 +29,13 @@ export const Card: React.FC<CardProps> = ({
   className,
 }) => {
   const cardStyle: React.CSSProperties = {
-    background: '#FFFFFF',
+    background: 'var(--bg-surface)',
     borderRadius: '12px',
-    border: '1px solid #E2E8F0',
+    border: '1px solid var(--border)',
     padding: paddingMap[padding],
     boxShadow: elevated
-      ? '0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06)'
-      : '0 1px 2px 0 rgba(15, 23, 42, 0.04)',
+      ? `0 4px 6px -1px var(--shadow-color), 0 2px 4px -2px var(--shadow-color)`
+      : `0 1px 2px 0 var(--shadow-color)`,
     transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
     cursor: onClick ? 'pointer' : 'default',
     ...style,

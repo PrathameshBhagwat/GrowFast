@@ -140,7 +140,10 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 min-h-0 select-none overflow-hidden">
+    <div
+      className="flex flex-col h-full min-h-0 select-none overflow-hidden"
+      style={{ background: 'var(--bg-surface-inset)' }}
+    >
       {/* ─── CATALOG NAV & FILTERS (SERVICE + CATEGORY + SEARCH) ── */}
       <div
         className="shrink-0"
@@ -167,7 +170,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
             <div className="flex items-center gap-3">
               {/* Sort: Dropdown */}
               <div className="flex items-center gap-1.5">
-                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Sort:</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Sort:
+                </span>
                 <div style={{ position: 'relative' }}>
                   <select
                     value={sortBy}
@@ -175,13 +180,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     aria-label="Sort garments"
                     style={{
                       appearance: 'none',
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
                       borderRadius: '3px',
                       padding: '5px 24px 5px 8px',
                       fontSize: '12px',
                       fontWeight: 500,
-                      color: '#334155',
+                      color: 'var(--text-primary)',
                       cursor: 'pointer',
                       boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)',
                       outline: 'none',
@@ -199,7 +204,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                       right: '7px',
                       top: '50%',
                       transform: 'translateY(-50%)',
-                      color: '#64748b',
+                      color: 'var(--text-secondary)',
                       pointerEvents: 'none',
                     }}
                   />
@@ -214,7 +219,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   gap: '6px',
                   fontSize: '12px',
                   fontWeight: 600,
-                  color: '#1e293b',
+                  color: 'var(--text-primary)',
                   cursor: 'pointer',
                   userSelect: 'none',
                 }}
@@ -297,14 +302,14 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
               <div
                 key={garment.id}
                 onClick={() => handleGarmentClick(garment)}
-                className={`border rounded-[3px] bg-white p-2 flex flex-col justify-between group transition-all shadow-2xs cursor-pointer ${
+                className={`border rounded-[3px] p-2 flex flex-col justify-between group transition-all shadow-2xs cursor-pointer ${
                   isSelected
-                    ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-50/20 shadow-xs'
-                    : 'border-slate-200 hover:border-blue-300 hover:shadow-xs'
+                    ? 'ring-2 ring-blue-500 border-blue-500 shadow-xs'
+                    : 'hover:border-blue-300 hover:shadow-xs'
                 }`}
                 style={{
-                  background: isSelected ? '#f8faff' : '#ffffff',
-                  border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                  background: isSelected ? 'var(--bg-surface-hover)' : 'var(--bg-surface)',
+                  border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--border)',
                   borderRadius: '3px',
                   padding: '8px 8px',
                   display: 'flex',
@@ -312,6 +317,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   justifyContent: 'space-between',
                   minHeight: '180px',
                   boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
                 {/* Top Row: SKU + Price Badge */}
@@ -326,11 +332,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   }}
                 >
                   <span
-                    className="text-[10px] font-mono text-slate-400 font-medium tracking-wide select-none"
+                    className="text-[10px] font-mono font-medium tracking-wide select-none"
                     style={{
                       fontSize: '10px',
                       fontFamily: 'monospace',
-                      color: '#94a3b8',
+                      color: 'var(--text-muted)',
                       fontWeight: 500,
                       userSelect: 'none',
                     }}
@@ -348,15 +354,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   >
                     {hasPrice ? (
                       <span
-                        className="bg-[#eff6ff] text-[#2563eb] font-bold text-xs px-1.5 py-0.5 rounded-[2px] border border-[#bfdbfe] whitespace-nowrap shrink-0"
+                        className="font-bold text-xs px-1.5 py-0.5 rounded-[2px] whitespace-nowrap shrink-0"
                         style={{
-                          background: '#eff6ff',
-                          color: '#2563eb',
+                          background: 'var(--color-primary-light, #eff6ff)',
+                          color: 'var(--color-primary, #2563eb)',
                           fontWeight: 700,
                           fontSize: '11px',
                           padding: '1px 6px',
                           borderRadius: '2px',
-                          border: '1px solid #bfdbfe',
+                          border: '1px solid var(--border)',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -368,15 +374,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                       </span>
                     ) : (
                       <span
-                        className="bg-slate-50 text-slate-400 text-[10px] font-medium px-1.5 py-0.5 rounded-[2px] border border-slate-200 whitespace-nowrap shrink-0"
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-[2px] whitespace-nowrap shrink-0"
                         style={{
-                          background: '#f8fafc',
-                          color: '#94a3b8',
+                          background: 'var(--bg-surface-inset)',
+                          color: 'var(--text-muted)',
                           fontSize: '10px',
                           fontWeight: 500,
                           padding: '1px 5px',
                           borderRadius: '2px',
-                          border: '1px solid #e2e8f0',
+                          border: '1px solid var(--border)',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -389,7 +395,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
                 {/* Center Icon Box */}
                 <div
-                  className="w-11 h-11 min-w-[44px] min-h-[44px] mx-auto rounded-[3px] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50/60 transition-colors my-1 shrink-0"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] mx-auto rounded-[3px] flex items-center justify-center group-hover:text-blue-600 transition-colors my-1 shrink-0"
                   style={{
                     width: '44px',
                     height: '44px',
@@ -397,12 +403,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     minHeight: '44px',
                     margin: '4px auto',
                     borderRadius: '3px',
-                    background: '#f8fafc',
-                    border: '1px solid #f1f5f9',
+                    background: 'var(--bg-surface-inset)',
+                    border: '1px solid var(--border)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#64748b',
+                    color: 'var(--text-secondary)',
                     flexShrink: 0,
                   }}
                 >
@@ -415,11 +421,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   style={{ textAlign: 'center', width: '100%', marginBottom: '4px' }}
                 >
                   <h3
-                    className="text-xs font-bold text-slate-900 truncate leading-tight"
+                    className="text-xs font-bold truncate leading-tight"
                     style={{
                       fontSize: '11.5px',
                       fontWeight: 700,
-                      color: '#0f172a',
+                      color: 'var(--text-primary)',
                       lineHeight: 1.25,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -430,10 +436,10 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     {garment.name}
                   </h3>
                   <p
-                    className="text-[10px] text-slate-400 truncate mt-0.5"
+                    className="text-[10px] truncate mt-0.5"
                     style={{
                       fontSize: '10px',
-                      color: '#94a3b8',
+                      color: 'var(--text-secondary)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -452,12 +458,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     e.stopPropagation();
                     handleGarmentClick(garment);
                   }}
-                  className="w-full mt-1.5 py-1 px-2 rounded-[2px] border border-blue-600 bg-blue-50 text-blue-700 hover:bg-[#2563eb] hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs active:scale-[0.98]"
+                  className="w-full mt-1.5 py-1 px-2 rounded-[2px] border text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs active:scale-[0.98]"
                   style={{
                     height: '28px',
                     minHeight: '28px',
                     borderRadius: '2px',
                     fontSize: '11.5px',
+                    border: '1px solid var(--color-primary)',
+                    background: 'var(--color-primary-light, #eff6ff)',
+                    color: 'var(--color-primary, #2563eb)',
                   }}
                 >
                   <Plus size={13} strokeWidth={2.5} />
@@ -469,14 +478,17 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
         </div>
 
         {filteredGarments.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-sm">
+          <div
+            className="flex flex-col items-center justify-center h-48 text-sm"
+            style={{ color: 'var(--text-secondary)' }}
+          >
             <Shirt size={40} strokeWidth={1} className="mb-2 opacity-40" />
-            <p className="font-medium text-slate-600">
+            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
               {searchQuery
                 ? `No garments matching "${searchQuery}"`
                 : 'No garments found in this category.'}
             </p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               Try another category or clear your search.
             </p>
           </div>

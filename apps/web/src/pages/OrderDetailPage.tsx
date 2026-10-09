@@ -27,6 +27,8 @@ import { PaymentModal } from '../components/PaymentModal';
 import { FinancialAdjustmentModal } from '../components/FinancialAdjustmentModal';
 import { OrderPickupModal } from '../components/OrderPickupModal';
 import { OrderReceiptModal } from '../components/OrderReceiptModal';
+import { OrderTagsSection } from '../components/OrderTagsSection';
+import { ThemeToggle } from '../components/ThemeToggle';
 import {
   ArrowLeft,
   Edit2,
@@ -422,6 +424,7 @@ export function OrderDetailPage() {
           >
             Print Receipt
           </Button>
+          <ThemeToggle size="sm" />
         </div>
       </div>
 
@@ -457,6 +460,12 @@ export function OrderDetailPage() {
             <div className="flex justify-between">
               <span className="text-gray-500">Name</span>
               <span className="font-medium text-gray-900">{order.customerName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Customer ID</span>
+              <span className="font-semibold font-mono text-blue-600 dark:text-blue-400">
+                {order.customerCode || '—'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Phone</span>
@@ -868,11 +877,24 @@ export function OrderDetailPage() {
                                   }`}
                                 >
                                   <div className="flex justify-between items-center p-3 border-b bg-gray-50/50">
-                                    <span
-                                      className={`font-bold ${isCancelled ? 'text-gray-500' : isDelivered ? 'text-green-900' : 'text-gray-700'}`}
-                                    >
-                                      Garment #{pg.unitNumber}
-                                    </span>
+                                    <div className="flex flex-col">
+                                      <span
+                                        className={`font-bold ${isCancelled ? 'text-gray-500' : isDelivered ? 'text-green-900' : 'text-gray-700'}`}
+                                      >
+                                        Garment #{pg.unitNumber}
+                                        <span className="text-xs text-gray-500 font-normal ml-1">
+                                          (Piece {pg.unitNumber}/{item.quantity})
+                                        </span>
+                                      </span>
+                                      {pg.tagId && (
+                                        <span
+                                          id={`tag-badge-${pg.id}`}
+                                          className="text-[11px] font-mono font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded mt-0.5 w-fit"
+                                        >
+                                          Tag: {pg.tagId}
+                                        </span>
+                                      )}
+                                    </div>
                                     {isCancelled ? (
                                       <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
                                         CANCELLED
@@ -1141,6 +1163,21 @@ export function OrderDetailPage() {
           </table>
         </div>
       </Card>
+
+      {/* ─── Physical Garment Tags Section (Phase T2) ────────────────── */}
+      <OrderTagsSection
+        order={order}
+        onViewPhotos={(photos, currentIndex, label) =>
+          setViewingPhotos({
+            photos,
+            currentIndex,
+            garmentLabel: label,
+          })
+        }
+        onOpenDesigner={
+          employee?.role === Role.OWNER ? () => navigate('/admin/tag-designer') : undefined
+        }
+      />
 
       <Card>
         <div className="flex justify-between items-center mb-4">

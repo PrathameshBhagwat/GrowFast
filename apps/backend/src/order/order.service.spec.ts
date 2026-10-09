@@ -1455,6 +1455,7 @@ describe('OrderService', () => {
           unitNumber: 3,
           isReady: false,
           isCancelled: false,
+          tagId: expect.any(String),
         },
       });
 
@@ -4056,6 +4057,131 @@ describe('OrderService', () => {
       expect(result.items[1].lineTotal).toBe(300);
 
       expect(result.subtotal).toBe(700);
+    });
+  });
+
+  describe('findDueTodayOrders', () => {
+    const storeId = 'store-test-101';
+    const createMockOrder = (overrides: any = {}) => ({
+      id: 'ord-101',
+      orderNumber: 'ORD-101',
+      customerId: 'cust-101',
+      customer: { name: 'Rahul Patil', phone: '+919876543210' },
+      orderDate: new Date('2026-10-07T10:00:00.000Z'),
+      effectiveDueDate: new Date('2026-10-07T17:30:00.000Z'),
+      systemDueDate: new Date('2026-10-07T17:30:00.000Z'),
+      isExpress: false,
+      priority: OrderPriority.STANDARD,
+      status: OrderStatus.PROCESSING,
+      subtotal: 500,
+      discountAmount: 0,
+      expressSurcharge: 0,
+      taxAmount: 90,
+      totalAmount: 590,
+      amountPaid: 200,
+      amountDue: 390,
+      paymentStatus: PaymentStatus.PARTIAL,
+      pickupType: PickupType.HOME_DELIVERY,
+      deliveredAt: null,
+      items: [
+        {
+          id: 'item-1',
+          quantity: 2,
+          unitPrice: 250,
+          itemStatus: ItemStatus.PROCESSING,
+          physicalGarments: [],
+        },
+      ],
+      adjustments: [],
+      storeId,
+      ...overrides,
+    });
+
+    it('should query orders with storeId, effectiveDueDate in bounds, and exclude DELIVERED and CANCELLED', async () => {
+      const mockOrder = createMockOrder();
+      mockPrismaService.order.findMany.mockResolvedValueOnce([mockOrder]);
+
+      const result = await service.findDueTodayOrders(storeId, {
+        date: '2026-10-07',
+        timezone: 'Asia/Kolkata',
+      });
+
+      expect(mockPrismaService.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            storeId,
+            effectiveDueDate: expect.objectContaining({
+              gte: expect.any(Date),
+              lte: expect.any(Date),
+            }),
+            status: {
+              notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+            },
+          }),
+          orderBy: [{ priority: 'desc' }, { effectiveDueDate: 'asc' }, { orderNumber: 'asc' }],
+        }),
+      );
+
+      expect((result as any).data).toHaveLength(1);
+      expect((result as any).data[0].orderNumber).toBe('ORD-101');
+      expect((result as any).data[0].customerName).toBe('Rahul Patil');
+      expect((result as any).data[0].status).toBe(OrderStatus.PROCESSING);
+      expect((result as any).data[0].amountDue).toBe(390);
+      expect((result as any).total).toBe(1);
+    });
+
+    it('should return lightweight count only when countOnly is true without calling findMany', async () => {
+      mockPrismaService.order.count.mockResolvedValueOnce(7);
+
+      const result = await service.findDueTodayOrders(storeId, { countOnly: true });
+
+      expect(mockPrismaService.order.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            storeId,
+            status: {
+              notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+            },
+          }),
+        }),
+      );
+      expect(result).toEqual({ count: 7, date: expect.any(String) });
+    });
+
+    it('should enforce strict store isolation by passing storeId to prisma query', async () => {
+      mockPrismaService.order.findMany.mockResolvedValueOnce([]);
+
+      await service.findDueTodayOrders('store-isolated-42');
+
+      expect(mockPrismaService.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            storeId: 'store-isolated-42',
+          }),
+        }),
+      );
+    });
+
+    it('should support weight-based items and legacy items without error', async () => {
+      const weightOrder = createMockOrder({
+        id: 'ord-weight-1',
+        orderNumber: 'ORD-WEIGHT-1',
+        items: [
+          {
+            id: 'item-w',
+            quantity: 1,
+            weight: 3.5,
+            unitPrice: 100,
+            itemStatus: ItemStatus.READY,
+            physicalGarments: [],
+          },
+        ],
+      });
+      mockPrismaService.order.findMany.mockResolvedValueOnce([weightOrder]);
+
+      const result = await service.findDueTodayOrders(storeId, { date: '2026-10-07' });
+      expect((result as any).data[0].orderNumber).toBe('ORD-WEIGHT-1');
+      expect((result as any).data[0].itemCount).toBe(1);
     });
   });
 });

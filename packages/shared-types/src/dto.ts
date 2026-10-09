@@ -79,6 +79,7 @@ export interface UpdateEmployeeRequest {
 
 export interface CustomerDTO {
   id: string;
+  customerCode?: string;
   name: string;
   phone: string;
   email: string | null;
@@ -94,26 +95,21 @@ export interface CustomerDTO {
 
 export interface CreateCustomerRequest {
   name: string;
-  phone: string;
-  email?: string;
+  phone: string; // Primary contact WhatsApp number
   address?: string;
   pincode?: string;
   membership?: MembershipTier;
   discountPercent?: number;
-  preferences?: Record<string, string>;
-  registrationSource?: string;
 }
 
 export interface UpdateCustomerRequest {
   name?: string;
-  phone?: string;
+  phone?: string; // Primary contact WhatsApp number
   email?: string | null;
   address?: string | null;
   pincode?: string | null;
   membership?: MembershipTier;
   discountPercent?: number;
-  preferences?: Record<string, string> | null;
-  registrationSource?: string;
 }
 
 // ─── Order DTOs ─────────────────────────────────────────────────────
@@ -122,6 +118,7 @@ export interface OrderSummaryDTO {
   id: string;
   orderNumber: string;
   customerId: string;
+  customerCode?: string;
   customerName: string;
   customerPhone: string;
   orderDate: string;
@@ -190,6 +187,7 @@ export interface PhysicalGarmentDTO {
   id: string;
   orderItemId: string;
   unitNumber: number;
+  tagId?: string | null;
   isReady: boolean;
   isCancelled?: boolean;
   isDelivered?: boolean;

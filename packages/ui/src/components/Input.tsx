@@ -25,7 +25,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const labelStyle: React.CSSProperties = {
       fontSize: '0.84rem',
       fontWeight: 500,
-      color: '#334155',
+      color: 'var(--text-secondary)',
       fontFamily: "'Inter', sans-serif",
     };
 
@@ -33,12 +33,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       padding: '10px 14px',
       fontSize: '0.925rem',
       fontFamily: "'Inter', sans-serif",
-      border: `1px solid ${error ? '#EF4444' : '#E2E8F0'}`,
+      border: `1px solid ${error ? 'var(--danger-text)' : 'var(--border-input)'}`,
       borderRadius: '8px',
       outline: 'none',
       transition: 'border-color 200ms ease',
-      background: '#FFFFFF',
-      color: '#0F172A',
+      background: 'var(--bg-input)',
+      color: 'var(--text-primary)',
       minHeight: '44px',
       width: '100%',
       boxSizing: 'border-box',
@@ -47,7 +47,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
     const helperStyle: React.CSSProperties = {
       fontSize: '0.75rem',
-      color: error ? '#EF4444' : '#64748B',
+      color: error ? 'var(--danger-text)' : 'var(--text-muted)',
       fontFamily: "'Inter', sans-serif",
     };
 

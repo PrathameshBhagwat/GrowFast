@@ -16,6 +16,7 @@ const mockOrderService = {
   addPhysicalGarment: jest.fn(),
   cancelPhysicalGarment: jest.fn(),
   recordPickup: jest.fn(),
+  findDueTodayOrders: jest.fn(),
 };
 
 describe('OrderController', () => {
@@ -208,6 +209,40 @@ describe('OrderController', () => {
       expect(roles).toContain('COUNTER');
       expect(roles).not.toContain('MANAGER');
       expect(roles).not.toContain('DELIVERY');
+    });
+  });
+
+  describe('getDueToday', () => {
+    it('should call OrderService.findDueTodayOrders with storeId and options', async () => {
+      mockOrderService.findDueTodayOrders.mockResolvedValue({ data: [], total: 0 });
+      const req = { user: { storeId: 'store-101' } };
+      const response = await controller.getDueToday(req, 'false', '2026-10-07', 'Asia/Kolkata');
+
+      expect(mockOrderService.findDueTodayOrders).toHaveBeenCalledWith('store-101', {
+        countOnly: false,
+        date: '2026-10-07',
+        timezone: 'Asia/Kolkata',
+      });
+      expect(response).toEqual({ success: true, data: [], total: 0 });
+    });
+
+    it('should pass countOnly true when requested', async () => {
+      mockOrderService.findDueTodayOrders.mockResolvedValue({ count: 5 });
+      const req = { user: { storeId: 'store-101' } };
+      const response = await controller.getDueToday(req, 'true');
+
+      expect(mockOrderService.findDueTodayOrders).toHaveBeenCalledWith('store-101', {
+        countOnly: true,
+        date: undefined,
+        timezone: undefined,
+      });
+      expect(response).toEqual({ success: true, count: 5 });
+    });
+
+    it('should enforce OWNER, MANAGER, COUNTER, and DELIVERY roles', () => {
+      const reflector = new Reflector();
+      const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.getDueToday);
+      expect(roles).toEqual(['OWNER', 'MANAGER', 'COUNTER', 'DELIVERY']);
     });
   });
 });
