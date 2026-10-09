@@ -6,6 +6,7 @@ import {
   GarmentCategory,
   Role,
   filterServicesForCategory,
+  formatCatalogServiceName,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
 } from '@growfast/shared-types';
@@ -650,7 +651,7 @@ export const CatalogSettingsPage: React.FC = () => {
         sku,
         `"${g.name.replace(/"/g, '""')}"`,
         CATEGORY_LABELS[g.category] || g.category,
-        currentActiveService?.name || 'Standard',
+        formatCatalogServiceName(currentActiveService?.name || 'Standard'),
         price !== null ? price : 'N/A',
         g.isActive ? 'Active' : 'Inactive',
       ].join(',');
@@ -714,7 +715,11 @@ export const CatalogSettingsPage: React.FC = () => {
 
   // Sorted services for Garment Tab matching Stitch design
   const sortedGarmentServices = useMemo(() => {
-    return [...visibleGarmentServices].sort((a, b) => a.name.localeCompare(b.name));
+    return [...visibleGarmentServices].sort((a, b) => {
+      const nameA = formatCatalogServiceName(a.name);
+      const nameB = formatCatalogServiceName(b.name);
+      return nameA.localeCompare(nameB);
+    });
   }, [visibleGarmentServices]);
 
   const visiblePricingServices = useMemo(() => {
@@ -1680,7 +1685,7 @@ export const CatalogSettingsPage: React.FC = () => {
                             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                             <span>
                               {pricingConfiguredCount}/{pricingFilteredGarments.length} configured
-                              for {currentPricingService?.name || 'Selected Service'}
+                              for {formatCatalogServiceName(currentPricingService?.name || 'Selected Service')}
                             </span>
                           </div>
 
@@ -1768,7 +1773,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                   <th className="py-3.5 px-4">Base Price</th>
                                   <th className="py-3.5 px-4 min-w-[190px]">
                                     Configure Price (
-                                    {currentPricingService?.name?.toUpperCase() || 'SERVICE'} ₹)
+                                    {formatCatalogServiceName(currentPricingService?.name || 'SERVICE').toUpperCase()} ₹)
                                   </th>
                                   <th className="py-3.5 px-4">Services Status</th>
                                   <th className="py-3.5 px-4 text-right pr-6">Action</th>
@@ -2194,7 +2199,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${getServiceDotColor(svc.name)}`}
                                 ></span>
                                 <span className="text-xs font-medium text-slate-800">
-                                  {svc.name}
+                                  {formatCatalogServiceName(svc.name)}
                                 </span>
                                 {isPromo && (
                                   <span
@@ -2503,7 +2508,7 @@ export const CatalogSettingsPage: React.FC = () => {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-semibold text-slate-800">
-                                    {svc.name}
+                                    {formatCatalogServiceName(svc.name)}
                                   </span>
                                   {isPromo && (
                                     <span
@@ -2624,7 +2629,7 @@ export const CatalogSettingsPage: React.FC = () => {
               <div className="text-slate-500">
                 Service:{' '}
                 <span className="font-semibold text-primary-700">
-                  {currentActiveService?.name || 'Selected Service'}
+                  {formatCatalogServiceName(currentActiveService?.name || 'Selected Service')}
                 </span>
               </div>
             </div>

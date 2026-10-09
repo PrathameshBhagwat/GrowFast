@@ -9,6 +9,7 @@ import {
   calculateOrderTotals,
   GarmentCategory,
   ServiceCategory,
+  formatCatalogServiceName,
 } from '@growfast/shared-types';
 import { CustomerSelector } from '../components/CustomerSelector';
 import { ItemSelector } from '../components/ItemSelector';
@@ -144,7 +145,7 @@ export function OrderWizardPage() {
   // Add Item to Order (directly from garment card "+ Add")
   const handleAddItem = (garment: any, serviceId: string, unitPrice: number) => {
     const service = services.find((s) => s.id === serviceId);
-    const serviceName = service ? service.name : 'Unknown';
+    const serviceName = service ? formatCatalogServiceName(service.name) : 'Unknown';
     const isWeightBased =
       garment.category === 'WEIGHT_BASED' ||
       garment.category === GarmentCategory.WEIGHT_BASED ||
@@ -232,7 +233,7 @@ export function OrderWizardPage() {
     const roundedWeight = Math.round(num * 100) / 100;
     const { garment, serviceId, unitPrice, existingItemIndex } = weightModalData;
     const service = services.find((s) => s.id === serviceId);
-    const serviceName = service ? service.name : 'Unknown';
+    const serviceName = service ? formatCatalogServiceName(service.name) : 'Unknown';
 
     if (existingItemIndex !== undefined && existingItemIndex >= 0) {
       setItems((prev) => {

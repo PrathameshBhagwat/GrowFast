@@ -20,6 +20,7 @@ import {
   OrderStatus,
   ItemStatus,
   calculateOrderTotals,
+  formatCatalogServiceName,
 } from '@growfast/shared-types';
 import { OrderItemEditModal } from '../components/OrderItemEditModal';
 import { DueDateEditModal } from '../components/DueDateEditModal';
@@ -741,7 +742,9 @@ export function OrderDetailPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-gray-600">{item.serviceType}</td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {formatCatalogServiceName(item.serviceType)}
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
                           {item.itemStatus}

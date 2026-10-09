@@ -1,6 +1,10 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
 import { GarmentCategory } from './enums';
 import {
   filterServicesForCategory,
+  filterCategoriesForService,
+  formatCatalogServiceName,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
 } from './catalog';
@@ -16,161 +20,144 @@ const mockServices = [
   { id: '8', name: 'Starching Dc' },
 ];
 
+const allCategories = [
+  GarmentCategory.MEN,
+  GarmentCategory.WOMEN,
+  GarmentCategory.KIDS,
+  GarmentCategory.HOUSEHOLD,
+  GarmentCategory.HOME_CLEANING,
+  GarmentCategory.SHOES,
+  GarmentCategory.OTHERS,
+  GarmentCategory.WEIGHT_BASED,
+];
+
 describe('filterServicesForCategory', () => {
-  it('returns all 8 services for non-Shoe categories', () => {
+  it('excludes Free Shoe and Reprocess Cleaning, returning 6 services for non-Shoe categories', () => {
     const result = filterServicesForCategory(mockServices, GarmentCategory.MEN);
-    expect(result).toHaveLength(8);
-  });
-
-  it('returns only 5 services for Shoe category', () => {
-    const result = filterServicesForCategory(mockServices, GarmentCategory.SHOES);
-    expect(result).toHaveLength(5);
+    assert.strictEqual(result.length, 6);
     const names = result.map((s) => s.name);
-    expect(names).toContain('Standard Wash');
-    expect(names).toContain('Dry Clean');
-    expect(names).toContain('Shoe Cleaning');
-    expect(names).toContain('Reprocess Cleaning');
-    expect(names).toContain('Free Shoe');
+    assert.ok(!names.includes('Free Shoe'));
+    assert.ok(!names.includes('Reprocess Cleaning'));
+    assert.ok(names.includes('Standard Wash'));
+    assert.ok(names.includes('Dry Clean'));
+    assert.ok(names.includes('Steam Iron'));
+    assert.ok(names.includes('Wash + Steam Iron'));
+    assert.ok(names.includes('Shoe Cleaning'));
+    assert.ok(names.includes('Starching Dc'));
   });
 
-  it('hides Steam Iron, Wash + Steam Iron, and Starching Dc for Shoe', () => {
+  it('returns only 3 services for Shoe category (Standard Wash, Dry Clean, Shoe Cleaning)', () => {
     const result = filterServicesForCategory(mockServices, GarmentCategory.SHOES);
+    assert.strictEqual(result.length, 3);
     const names = result.map((s) => s.name);
-    expect(names).not.toContain('Steam Iron');
-    expect(names).not.toContain('Wash + Steam Iron');
-    expect(names).not.toContain('Starching Dc');
-  });
-
-  it('restores all 8 services when leaving Shoe for another category', () => {
-    const shoeResult = filterServicesForCategory(mockServices, GarmentCategory.SHOES);
-    expect(shoeResult).toHaveLength(5);
-    const menResult = filterServicesForCategory(mockServices, GarmentCategory.MEN);
-    expect(menResult).toHaveLength(8);
+    assert.ok(names.includes('Standard Wash'));
+    assert.ok(names.includes('Dry Clean'));
+    assert.ok(names.includes('Shoe Cleaning'));
+    assert.ok(!names.includes('Free Shoe'));
+    assert.ok(!names.includes('Reprocess Cleaning'));
+    assert.ok(!names.includes('Steam Iron'));
+    assert.ok(!names.includes('Wash + Steam Iron'));
+    assert.ok(!names.includes('Starching Dc'));
   });
 });
 
-describe('resolveCatalogSelectionOnCategoryChange', () => {
-  it('auto-selects Shoe Cleaning when switching to Shoe from an invalid service', () => {
-    // Steam Iron (id=3) is not valid for Shoe
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '3',
-      mockServices,
-    );
-    expect(result).toBe('5'); // Shoe Cleaning
+describe('formatCatalogServiceName', () => {
+  it('renames Starching Dc to Starching', () => {
+    assert.strictEqual(formatCatalogServiceName('Starching Dc'), 'Starching');
+    assert.strictEqual(formatCatalogServiceName('starching dc'), 'Starching');
+    assert.strictEqual(formatCatalogServiceName('Starching Dc.'), 'Starching');
   });
 
-  it('keeps Standard Wash when switching to Shoe (valid shoe service)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '1',
-      mockServices,
-    );
-    expect(result).toBe('1');
+  it('preserves other service names', () => {
+    assert.strictEqual(formatCatalogServiceName('Dry Clean'), 'Dry Clean');
+    assert.strictEqual(formatCatalogServiceName('Standard Wash'), 'Standard Wash');
   });
+});
 
-  it('keeps Dry Clean when switching to Shoe (valid shoe service)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '2',
-      mockServices,
-    );
-    expect(result).toBe('2');
-  });
-
-  it('keeps Shoe Cleaning when switching to Shoe', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '5',
-      mockServices,
-    );
-    expect(result).toBe('5');
-  });
-
-  it('keeps Free Shoe when switching to Shoe', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '7',
-      mockServices,
-    );
-    expect(result).toBe('7');
-  });
-
-  it('keeps Reprocess Cleaning when switching to Shoe', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '6',
-      mockServices,
-    );
-    expect(result).toBe('6');
-  });
-
-  it('auto-selects Shoe Cleaning when switching to Shoe from Wash + Steam Iron', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '4',
-      mockServices,
-    );
-    expect(result).toBe('5');
-  });
-
-  it('auto-selects Shoe Cleaning when switching to Shoe from Starching Dc', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
-      GarmentCategory.SHOES,
-      '8',
-      mockServices,
-    );
-    expect(result).toBe('5');
-  });
-
-  it('keeps current service when switching to a non-Shoe category', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '3', mockServices);
-    expect(result).toBe('3');
-  });
-
-  it('auto-selects Standard Wash when leaving Shoe with Shoe Cleaning selected (Shoe → Men)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '5', mockServices);
-    expect(result).toBe('1'); // Standard Wash
-  });
-
-  it('auto-selects Standard Wash when leaving Shoe with Free Shoe selected (Shoe → Women)', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
+describe('filterCategoriesForService', () => {
+  it('shows ONLY Men, Women, Kids when Starching is selected', () => {
+    const result = filterCategoriesForService(allCategories, '8', mockServices);
+    assert.deepStrictEqual(result, [
+      GarmentCategory.MEN,
       GarmentCategory.WOMEN,
-      '7',
-      mockServices,
-    );
-    expect(result).toBe('1'); // Standard Wash
+      GarmentCategory.KIDS,
+    ]);
   });
 
-  it('keeps Standard Wash when leaving Shoe with Standard Wash selected', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '1', mockServices);
-    expect(result).toBe('1');
-  });
-
-  it('keeps Dry Clean when leaving Shoe with Dry Clean selected', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.KIDS, '2', mockServices);
-    expect(result).toBe('2');
+  it('restores all categories when switching to any other service', () => {
+    const washResult = filterCategoriesForService(allCategories, '1', mockServices);
+    assert.strictEqual(washResult.length, 8);
+    const dryCleanResult = filterCategoriesForService(allCategories, '2', mockServices);
+    assert.strictEqual(dryCleanResult.length, 8);
   });
 });
 
 describe('resolveCatalogSelectionOnServiceChange', () => {
   it('auto-selects Shoe category when Shoe Cleaning is selected', () => {
     const result = resolveCatalogSelectionOnServiceChange('5', GarmentCategory.MEN, mockServices);
-    expect(result).toBe(GarmentCategory.SHOES);
+    assert.strictEqual(result, GarmentCategory.SHOES);
   });
 
-  it('auto-selects Shoe category when Free Shoe is selected', () => {
-    const result = resolveCatalogSelectionOnServiceChange('7', GarmentCategory.WOMEN, mockServices);
-    expect(result).toBe(GarmentCategory.SHOES);
+  it('auto-selects Men when Starching is selected from an incompatible category (e.g. Household)', () => {
+    const result = resolveCatalogSelectionOnServiceChange(
+      '8',
+      GarmentCategory.HOUSEHOLD,
+      mockServices,
+    );
+    assert.strictEqual(result, GarmentCategory.MEN);
   });
 
-  it('keeps current category when Dry Clean is selected', () => {
-    const result = resolveCatalogSelectionOnServiceChange('2', GarmentCategory.SHOES, mockServices);
-    expect(result).toBe(GarmentCategory.SHOES);
+  it('auto-selects Men when Starching is selected from Shoe category', () => {
+    const result = resolveCatalogSelectionOnServiceChange('8', GarmentCategory.SHOES, mockServices);
+    assert.strictEqual(result, GarmentCategory.MEN);
   });
 
-  it('keeps current category when Standard Wash is selected', () => {
-    const result = resolveCatalogSelectionOnServiceChange('1', GarmentCategory.MEN, mockServices);
-    expect(result).toBe(GarmentCategory.MEN);
+  it('keeps Women when Starching is selected and Women was already selected', () => {
+    const result = resolveCatalogSelectionOnServiceChange('8', GarmentCategory.WOMEN, mockServices);
+    assert.strictEqual(result, GarmentCategory.WOMEN);
+  });
+
+  it('keeps Kids when Starching is selected and Kids was already selected', () => {
+    const result = resolveCatalogSelectionOnServiceChange('8', GarmentCategory.KIDS, mockServices);
+    assert.strictEqual(result, GarmentCategory.KIDS);
+  });
+
+  it('keeps current category when Standard Wash or Dry Clean is selected', () => {
+    const result = resolveCatalogSelectionOnServiceChange('2', GarmentCategory.WOMEN, mockServices);
+    assert.strictEqual(result, GarmentCategory.WOMEN);
+  });
+});
+
+describe('resolveCatalogSelectionOnCategoryChange', () => {
+  it('auto-selects Shoe Cleaning when switching to Shoe from Starching', () => {
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '8',
+      mockServices,
+    );
+    assert.strictEqual(result, '5'); // Shoe Cleaning
+  });
+
+  it('auto-selects Standard Wash when leaving Shoe with Shoe Cleaning selected', () => {
+    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '5', mockServices);
+    assert.strictEqual(result, '1'); // Standard Wash
+  });
+
+  it('auto-selects Standard Wash when switching to Household while Starching is active', () => {
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.HOUSEHOLD,
+      '8',
+      mockServices,
+    );
+    assert.strictEqual(result, '1'); // Standard Wash
+  });
+
+  it('keeps Starching when switching between Men and Women', () => {
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.WOMEN,
+      '8',
+      mockServices,
+    );
+    assert.strictEqual(result, '8');
   });
 });

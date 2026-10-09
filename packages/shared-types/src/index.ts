@@ -98,6 +98,10 @@ export { calculateOrderTotals, calculateFulfillmentBreakdown } from './pricing';
 export type { PricingItemInput, PricingTotals, FulfillmentBreakdown } from './pricing';
 export {
   filterServicesForCategory,
+  filterCategoriesForService,
+  formatCatalogServiceName,
+  isStarchingService,
+  STARCHING_ALLOWED_CATEGORIES,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
 } from './catalog';
