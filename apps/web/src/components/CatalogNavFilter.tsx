@@ -1,6 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Search, Sparkles, Layers } from 'lucide-react';
-import { GarmentCategory } from '@growfast/shared-types';
+import {
+  GarmentCategory,
+  filterCategoriesForService,
+  filterServicesForCategory,
+  formatCatalogServiceName,
+} from '@growfast/shared-types';
 
 export interface CatalogServiceItem {
   id: string;
@@ -29,6 +34,49 @@ export const DEFAULT_CATEGORY_LABELS: Record<string, string> = {
   OTHERS: 'Other',
   WEIGHT_BASED: 'Weight Based',
 };
+
+export type CatalogSortOption = 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
+
+export interface CatalogSortOptionItem {
+  value: CatalogSortOption;
+  label: string;
+}
+
+export const CATALOG_SORT_OPTIONS: CatalogSortOptionItem[] = [
+  { value: 'name-asc', label: 'Name (A to Z)' },
+  { value: 'name-desc', label: 'Name (Z to A)' },
+  { value: 'price-asc', label: 'Price (Low to High)' },
+  { value: 'price-desc', label: 'Price (High to Low)' },
+];
+
+/**
+ * Shared sorting logic for catalog garments across Create Order and Outer Catalog view
+ */
+export function sortCatalogGarments<T extends { id: string; name: string }>(
+  garments: T[],
+  sortBy: string,
+  getPrice: (garmentId: string) => number | null | undefined,
+): T[] {
+  return [...garments].sort((a, b) => {
+    if (sortBy === 'name-asc' || sortBy === 'name_asc') {
+      return a.name.localeCompare(b.name);
+    }
+    if (sortBy === 'name-desc' || sortBy === 'name_desc') {
+      return b.name.localeCompare(a.name);
+    }
+    if (
+      sortBy === 'price-asc' ||
+      sortBy === 'price_asc' ||
+      sortBy === 'price-desc' ||
+      sortBy === 'price_desc'
+    ) {
+      const priceA = getPrice(a.id) ?? 0;
+      const priceB = getPrice(b.id) ?? 0;
+      return sortBy.includes('asc') ? priceA - priceB : priceB - priceA;
+    }
+    return 0;
+  });
+}
 
 export interface CatalogNavFilterProps {
   services: CatalogServiceItem[];
@@ -68,13 +116,30 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
     searchPlaceholder ||
     `Search in ${currentCategoryLabel} by name, SKU or barcode (e.g. Kurta, Coat, Dhoti)...`;
 
-  const navScrollRef = useRef<HTMLDivElement>(null);
+  const serviceScrollRef = useRef<HTMLDivElement>(null);
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (navScrollRef.current && e.deltaY !== 0 && !e.deltaX) {
-      navScrollRef.current.scrollLeft += e.deltaY;
+  const handleServiceWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (serviceScrollRef.current && e.deltaY !== 0 && !e.deltaX) {
+      serviceScrollRef.current.scrollLeft += e.deltaY;
     }
   };
+
+  const handleCategoryWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (categoryScrollRef.current && e.deltaY !== 0 && !e.deltaX) {
+      categoryScrollRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  // Filter visible services: excludes Free Shoe, Reprocess Cleaning, and shoe-hidden services
+  const visibleServices = useMemo(() => {
+    return filterServicesForCategory(services, activeCategory);
+  }, [services, activeCategory]);
+
+  // When "Starching" is selected, show ONLY Men, Women, Kids
+  const visibleCategories = useMemo(() => {
+    return filterCategoriesForService(categories, activeServiceId, services);
+  }, [categories, activeServiceId, services]);
 
   return (
     <div
@@ -87,17 +152,17 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
         ...style,
       }}
     >
-      {/* ─── UNIFIED SCENIC NAVIGATION BAR ─── */}
+      {/* ─── 1. SERVICE ROW (TOP) ─── */}
       <div
-        ref={navScrollRef}
-        onWheel={handleWheel}
+        ref={serviceScrollRef}
+        onWheel={handleServiceWheel}
         className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border)',
-          borderRadius: '10px',
+          borderRadius: '8px',
           padding: '4px 6px',
-          boxShadow: '0 1px 3px 0 var(--shadow-color)',
+          boxShadow: '0 1px 2px 0 var(--shadow-color)',
           width: '100%',
           display: 'flex',
           alignItems: 'center',
@@ -108,10 +173,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
           transition: 'background-color 0.2s ease, border-color 0.2s ease',
         }}
       >
-        {/* ── 1. SERVICE LABEL ── */}
+        {/* Service Label Badge */}
         <div
-          className="flex items-center gap-1 shrink-0 px-2 py-1 rounded-md"
+          className="flex items-center justify-center gap-1.5 shrink-0 px-2.5 py-1 rounded-md select-none"
           style={{
+            width: '94px',
+            minWidth: '94px',
+            height: '34px',
             background: 'var(--bg-surface-inset)',
             border: '1px solid var(--border)',
             transition: 'background-color 0.2s ease, border-color 0.2s ease',
@@ -126,11 +194,11 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
           </span>
         </div>
 
-        {/* ── SERVICE PILLS ── */}
+        {/* Service Pills */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {services.map((service) => {
+          {visibleServices.map((service) => {
             const isActive = activeServiceId === service.id;
-            const isPromo = service.name.toLowerCase().includes('free');
+            const displayName = formatCatalogServiceName(service.name);
 
             return (
               <button
@@ -139,8 +207,8 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
                 onClick={() => onServiceChange(service.id)}
                 className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97]"
                 style={{
-                  height: '36px',
-                  minHeight: '36px',
+                  height: '34px',
+                  minHeight: '34px',
                   paddingLeft: '12px',
                   paddingRight: '12px',
                   borderRadius: '8px',
@@ -159,46 +227,41 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
                   flexShrink: 0,
                 }}
               >
-                <span>{service.name}</span>
-                {isPromo && (
-                  <span
-                    style={{
-                      marginLeft: '5px',
-                      fontSize: '9px',
-                      fontWeight: 700,
-                      letterSpacing: '0.04em',
-                      padding: '1px 4px',
-                      borderRadius: '3px',
-                      background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'var(--warning-bg)',
-                      color: isActive ? '#ffffff' : 'var(--warning-text)',
-                      border: isActive
-                        ? '1px solid rgba(255, 255, 255, 0.3)'
-                        : '1px solid var(--warning-border)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    PROMO
-                  </span>
-                )}
+                <span>{displayName}</span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* ── SCENIC SEPARATOR ── */}
+      {/* ─── 2. CATEGORY ROW (DIRECTLY BELOW) ─── */}
+      <div
+        ref={categoryScrollRef}
+        onWheel={handleCategoryWheel}
+        className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
+        style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '8px',
+          padding: '4px 6px',
+          boxShadow: '0 1px 2px 0 var(--shadow-color)',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          whiteSpace: 'nowrap',
+          transition: 'background-color 0.2s ease, border-color 0.2s ease',
+        }}
+      >
+        {/* Category Label Badge */}
         <div
-          className="h-5 w-[1.5px] shrink-0 mx-1.5 rounded-full"
+          className="flex items-center justify-center gap-1.5 shrink-0 px-2.5 py-1 rounded-md select-none"
           style={{
-            background: 'var(--border)',
-            transition: 'background-color 0.2s ease',
-          }}
-          aria-hidden="true"
-        />
-
-        {/* ── 2. CATEGORY LABEL ── */}
-        <div
-          className="flex items-center gap-1 shrink-0 px-2 py-1 rounded-md"
-          style={{
+            width: '94px',
+            minWidth: '94px',
+            height: '34px',
             background: 'var(--bg-surface-inset)',
             border: '1px solid var(--border)',
             transition: 'background-color 0.2s ease, border-color 0.2s ease',
@@ -213,9 +276,9 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
           </span>
         </div>
 
-        {/* ── CATEGORY PILLS ── */}
+        {/* Category Pills */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {categories.map((cat) => {
+          {visibleCategories.map((cat) => {
             const isActive = activeCategory === cat;
             const label = categoryLabels[cat] || cat;
 
@@ -226,8 +289,8 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
                 onClick={() => onCategoryChange(cat)}
                 className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97]"
                 style={{
-                  height: '36px',
-                  minHeight: '36px',
+                  height: '34px',
+                  minHeight: '34px',
                   paddingLeft: '12px',
                   paddingRight: '12px',
                   borderRadius: '8px',
