@@ -36,6 +36,7 @@ import {
   Scale,
   Sparkles,
   AlertTriangle,
+  Shirt,
 } from 'lucide-react';
 import { renderStitchGarmentIcon } from '../components/GarmentIcon';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -93,6 +94,16 @@ export function OrderWizardPage() {
   } | null>(null);
   const [measuredWeightInput, setMeasuredWeightInput] = useState<string>('');
   const [weightError, setWeightError] = useState<string | null>(null);
+
+  // Weight piece exception modal state (CHANGE 5: Per Pieces workflow weight-based exception)
+  const [pieceExceptionModalData, setPieceExceptionModalData] = useState<{
+    garment: any;
+    serviceId: string;
+    unitPrice: number;
+    quantity: number;
+    defectNotes: string;
+    brand: string;
+  } | null>(null);
 
   const [items, setItems] = useState<any[]>([]);
   const [garments, setGarments] = useState<any[]>([]);
@@ -278,7 +289,29 @@ export function OrderWizardPage() {
   const handleAddItem = (garment: any, serviceId: string, unitPrice: number) => {
     const service = services.find((s) => s.id === serviceId);
     const serviceName = service ? formatCatalogServiceName(service.name) : 'Unknown';
-    // Weight-based processing (including weight-based exceptions in dry cleaning)
+
+    // CHANGE 5: Weight-based exception in Per Pieces (DRY_CLEANING) workflow
+    // Strictly a per-piece pricing exception, NOT a per-kg calculation.
+    const isWeightPieceException =
+      activeWorkflow === 'DRY_CLEANING' &&
+      (garment.category === 'WEIGHT_BASED' ||
+        garment.category === GarmentCategory.WEIGHT_BASED ||
+        service?.category === 'WEIGHT_BASED' ||
+        service?.category === ServiceCategory.WEIGHT_BASED);
+
+    if (isWeightPieceException) {
+      setPieceExceptionModalData({
+        garment,
+        serviceId,
+        unitPrice: unitPrice > 0 ? unitPrice : 40,
+        quantity: 3,
+        defectNotes: '',
+        brand: '',
+      });
+      return;
+    }
+
+    // Weight-based processing (in Laundry workflow)
     const isWeightBased =
       garment.category === 'WEIGHT_BASED' ||
       garment.category === GarmentCategory.WEIGHT_BASED ||
@@ -403,6 +436,43 @@ export function OrderWizardPage() {
     setWeightModalData(null);
     setMeasuredWeightInput('');
     setWeightError(null);
+  };
+
+  const handleConfirmPieceException = () => {
+    if (!pieceExceptionModalData) return;
+    const { garment, serviceId, unitPrice, quantity, defectNotes, brand } = pieceExceptionModalData;
+    const service = services.find((s) => s.id === serviceId);
+    const serviceName = service ? formatCatalogServiceName(service.name) : 'Dry Clean';
+    const validQty = Math.max(1, Math.round(quantity || 1));
+    const validPrice = Math.max(0, unitPrice || 0);
+
+    setItems((prev) => [
+      ...prev,
+      {
+        garmentCatalogId: garment.id,
+        serviceTypeId: serviceId,
+        garmentName: garment.name || 'Weight Based',
+        serviceName,
+        unitPrice: validPrice,
+        quantity: validQty,
+        weight: null,
+        isWeightBased: false,
+        lineTotal: validQty * validPrice,
+        topUpService: '',
+        brand: brand?.trim() || '',
+        defectNotes: defectNotes?.trim() || '',
+        colorTags: [],
+        photoFile: null,
+        pieces: Array.from({ length: validQty }, (_, idx) => ({
+          unitNumber: idx + 1,
+          photos: [],
+        })),
+        batchPhotos: [],
+        addOns: [],
+      },
+    ]);
+
+    setPieceExceptionModalData(null);
   };
 
   // Quantity adjustments
@@ -680,6 +750,7 @@ export function OrderWizardPage() {
             serviceTypeId: item.serviceTypeId,
             quantity: isWb ? item.garmentsCount || item.quantity || 1 : item.quantity || 1,
             weight: isWb ? item.weight : undefined,
+            unitPrice: item.unitPrice,
             pieces: isWb
               ? item.batchPhotos && item.batchPhotos.length > 0
                 ? [{ unitNumber: 1, photoCount: item.batchPhotos.length }]
@@ -1098,6 +1169,7 @@ export function OrderWizardPage() {
             onRemoveBatchPhotoFromItem={handleRemoveBatchPhoto}
             isSubmitting={isSubmitting}
             pendingPickupsCount={164}
+            topUpServices={storeConfig?.topUpServices}
           />
         </div>
       ) : (
@@ -2088,6 +2160,250 @@ export function OrderWizardPage() {
                 className="px-6 py-2.5 bg-[#2563eb] text-white font-bold text-xs rounded-lg hover:bg-blue-700 transition-colors shadow-2xs min-h-[44px]"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 4b. PIECE WEIGHT EXCEPTION MODAL (CHANGE 5) ──────── */}
+      {pieceExceptionModalData && (
+        <div
+          className="fixed inset-0 z-50 backdrop-blur-xs flex items-center justify-center p-4 modal-backdrop"
+          style={{ background: 'var(--overlay)' }}
+        >
+          <div
+            className="rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] modal-panel"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-5 py-3.5"
+              style={{
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--bg-surface-muted)',
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                  <Shirt size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Weight Based — Per Piece Entry
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {pieceExceptionModalData.garment.name} •{' '}
+                    {services.find((s) => s.id === pieceExceptionModalData.serviceId)?.name ||
+                      'Dry Clean'}{' '}
+                    • Per Piece Exception
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="close-piece-exception-modal-btn"
+                onClick={() => setPieceExceptionModalData(null)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                aria-label="Close piece entry modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2.5 text-xs">
+                <span className="font-semibold">Notice:</span> Strictly per-piece pricing exception.
+                No kilograms will be measured or billed.
+              </div>
+
+              {/* 1. Quantity / Number of Pieces */}
+              <div>
+                <label
+                  htmlFor="piece-exception-qty-input"
+                  className="block text-xs font-bold text-slate-800 mb-1.5"
+                >
+                  Quantity / Number of Pieces <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="piece-exception-qty-input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={pieceExceptionModalData.quantity}
+                  onChange={(e) =>
+                    setPieceExceptionModalData((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            quantity: Math.max(1, parseInt(e.target.value, 10) || 1),
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full text-base font-bold font-mono px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {/* Presets */}
+                <div className="flex gap-1.5 mt-2">
+                  {[1, 2, 3, 5, 10].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() =>
+                        setPieceExceptionModalData((prev) =>
+                          prev ? { ...prev, quantity: preset } : null,
+                        )
+                      }
+                      className={`px-3 py-1.5 text-xs font-bold rounded border cursor-pointer ${
+                        pieceExceptionModalData.quantity === preset
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {preset} pcs
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Price Per Piece */}
+              <div>
+                <label
+                  htmlFor="piece-exception-price-input"
+                  className="block text-xs font-bold text-slate-800 mb-1.5"
+                >
+                  Price Per Piece (₹) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="piece-exception-price-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={pieceExceptionModalData.unitPrice}
+                  onChange={(e) =>
+                    setPieceExceptionModalData((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            unitPrice: Math.max(0, parseFloat(e.target.value) || 0),
+                          }
+                        : null,
+                    )
+                  }
+                  className="w-full text-base font-bold font-mono px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {/* Presets */}
+                <div className="flex gap-1.5 mt-2">
+                  {[30, 40, 50, 60, 80].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() =>
+                        setPieceExceptionModalData((prev) =>
+                          prev ? { ...prev, unitPrice: preset } : null,
+                        )
+                      }
+                      className={`px-2.5 py-1.5 text-xs font-bold rounded border cursor-pointer ${
+                        pieceExceptionModalData.unitPrice === preset
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      ₹{preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Calculated Total */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-1">
+                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                  Calculated Total
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-600 font-medium">
+                    {pieceExceptionModalData.quantity} × ₹{pieceExceptionModalData.unitPrice} =
+                  </span>
+                  <span
+                    id="piece-exception-calculated-total"
+                    className="font-mono font-bold text-lg text-blue-600"
+                  >
+                    ₹
+                    {(pieceExceptionModalData.quantity * pieceExceptionModalData.unitPrice).toFixed(
+                      0,
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* 4. Applicable Item-Detail Controls */}
+              <div>
+                <label
+                  htmlFor="piece-exception-defect-notes"
+                  className="block text-xs font-bold text-slate-800 mb-1"
+                >
+                  Defect / Item Notes (Optional)
+                </label>
+                <input
+                  id="piece-exception-defect-notes"
+                  type="text"
+                  placeholder="e.g. Stains on collar, torn hem, missing buttons"
+                  value={pieceExceptionModalData.defectNotes}
+                  onChange={(e) =>
+                    setPieceExceptionModalData((prev) =>
+                      prev ? { ...prev, defectNotes: e.target.value } : null,
+                    )
+                  }
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="piece-exception-brand"
+                  className="block text-xs font-bold text-slate-800 mb-1"
+                >
+                  Brand / Tag / Remarks (Optional)
+                </label>
+                <input
+                  id="piece-exception-brand"
+                  type="text"
+                  placeholder="e.g. Raymond, Zara, Blue linen"
+                  value={pieceExceptionModalData.brand}
+                  onChange={(e) =>
+                    setPieceExceptionModalData((prev) =>
+                      prev ? { ...prev, brand: e.target.value } : null,
+                    )
+                  }
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              className="px-5 py-3.5 flex items-center justify-end gap-2.5"
+              style={{
+                borderTop: '1px solid var(--border)',
+                background: 'var(--bg-surface-muted)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPieceExceptionModalData(null)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-piece-exception-btn"
+                onClick={handleConfirmPieceException}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check size={16} strokeWidth={2.5} />
+                <span>Add to Order</span>
               </button>
             </div>
           </div>

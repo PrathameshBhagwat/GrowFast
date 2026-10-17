@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Plus,
@@ -15,7 +15,8 @@ import {
   Camera,
   Upload,
 } from 'lucide-react';
-import { formatCatalogServiceName } from '@growfast/shared-types';
+import { formatCatalogServiceName, DEFAULT_TOP_UP_SERVICES } from '@growfast/shared-types';
+import type { TopUpServiceItem } from '@growfast/shared-types';
 
 export interface LaundryWeightItem {
   id: string;
@@ -62,24 +63,10 @@ export interface LaundryWeightOrderEntryProps {
   isSubmitting?: boolean;
   pendingPickupsCount?: number;
   className?: string;
+  topUpServices?: TopUpServiceItem[];
 }
 
-export const AVAILABLE_ADDONS = [
-  { id: 'addon-starch', name: 'Starching', price: 30, description: 'Crisp starch finish per kg' },
-  { id: 'addon-stain', name: 'Stain Treatment', price: 50, description: 'Spot stain removal' },
-  {
-    id: 'addon-fragrance',
-    name: 'Fragrance Booster',
-    price: 20,
-    description: 'Long-lasting fresh scent',
-  },
-  {
-    id: 'addon-antiseptic',
-    name: 'Antiseptic Hygiene Wash',
-    price: 25,
-    description: 'Disinfectant sanitization',
-  },
-];
+export const AVAILABLE_ADDONS: TopUpServiceItem[] = DEFAULT_TOP_UP_SERVICES;
 
 export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = ({
   services,
@@ -94,6 +81,7 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
   isSubmitting = false,
   pendingPickupsCount = 164,
   className = '',
+  topUpServices,
 }) => {
   const [showBanner, setShowBanner] = useState(true);
 
@@ -177,6 +165,34 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
     if (name.includes('iron') || name.includes('steam')) return 95;
     return 80;
   }, [prices, activeService, activeWeightGarment]);
+
+  // Dynamic Top Up Services
+  const [availableAddons, setAvailableAddons] = useState<TopUpServiceItem[]>(
+    topUpServices && topUpServices.length > 0 ? topUpServices : DEFAULT_TOP_UP_SERVICES,
+  );
+
+  useEffect(() => {
+    if (topUpServices && topUpServices.length > 0) {
+      setAvailableAddons(topUpServices);
+      return;
+    }
+    const token = localStorage.getItem('token');
+    const apiUrl = import.meta.env.VITE_API_URL || '/api';
+    fetch(`${apiUrl}/store/top-up-services`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+          setAvailableAddons(data.data);
+        } else if (Array.isArray(data) && data.length > 0) {
+          setAvailableAddons(data);
+        }
+      })
+      .catch(() => {
+        // Fallback to default
+      });
+  }, [topUpServices]);
 
   // Form states matching Screenshot 1
   const [weightInput, setWeightInput] = useState<string>('2.00');
@@ -948,7 +964,7 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
             </div>
 
             <div className="p-5 space-y-2.5 max-h-[60vh] overflow-y-auto">
-              {AVAILABLE_ADDONS.map((addon) => {
+              {availableAddons.map((addon) => {
                 const isSelected = selectedAddOns.some((a) => a.id === addon.id);
                 return (
                   <label

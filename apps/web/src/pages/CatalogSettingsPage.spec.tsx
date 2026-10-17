@@ -36,6 +36,11 @@ const mockPrices = [
   { garmentCatalogId: 'g2', serviceTypeId: 'svc-dc', price: 110 },
 ];
 
+const mockTopUpServices = [
+  { id: 'addon-starch', name: 'Starching', price: 30, description: 'Crisp finish' },
+  { id: 'addon-stain', name: 'Stain Treatment', price: 50, description: 'Spot removal' },
+];
+
 global.fetch = vi.fn();
 
 describe('CatalogSettingsPage', () => {
@@ -70,6 +75,19 @@ describe('CatalogSettingsPage', () => {
           return { ok: true, json: async () => ({ success: true, data: { id: 'p-new' } }) };
         }
         return { ok: true, json: async () => ({ success: true, data: mockPrices }) };
+      }
+      if (url.includes('/store/top-up-services')) {
+        return { ok: true, json: async () => ({ success: true, data: mockTopUpServices }) };
+      }
+      if (url.includes('/store/config')) {
+        if (init?.method === 'PATCH') {
+          const body = JSON.parse(init.body || '{}');
+          return { ok: true, json: async () => ({ success: true, ...body }) };
+        }
+        return {
+          ok: true,
+          json: async () => ({ success: true, topUpServices: mockTopUpServices }),
+        };
       }
       return { ok: true, json: async () => ({ success: true, data: [] }) };
     });
@@ -357,5 +375,59 @@ describe('CatalogSettingsPage', () => {
     expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/showing 1–/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/showing \d+–\d+/i)).not.toBeInTheDocument();
+  });
+
+  it('renders Top Up Services tab for OWNER and displays configurable add-on services', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Top Up Services')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Top Up Services'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Top Up & Add-on Services')).toBeInTheDocument();
+      expect(screen.getByText('Configurable Rates')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Starching')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Stain Treatment')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('30')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('50')).toBeInTheDocument();
+    });
+  });
+
+  it('allows OWNER to edit top up service price and save successfully', async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('Top Up Services')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Top Up Services'));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Starching')).toBeInTheDocument();
+    });
+
+    const starchPriceInput = screen.getByDisplayValue('30');
+    fireEvent.change(starchPriceInput, { target: { value: '45' } });
+
+    const saveButton = screen.getByText('Save Changes');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Top up services updated and saved successfully.'),
+      ).toBeInTheDocument();
+    });
+
+    // Verify fetch was called with PATCH and updated payload
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/store/config'),
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.stringContaining('"price":45'),
+      }),
+    );
   });
 });

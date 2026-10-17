@@ -9,8 +9,9 @@ import {
   formatCatalogServiceName,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
+  DEFAULT_TOP_UP_SERVICES,
 } from '@growfast/shared-types';
-import type { GarmentCatalogDTO } from '@growfast/shared-types';
+import type { GarmentCatalogDTO, TopUpServiceItem } from '@growfast/shared-types';
 import { CatalogHeader } from '../components/CatalogHeader';
 import {
   CatalogNavFilter,
@@ -44,6 +45,8 @@ import {
   LayoutGrid,
   Upload,
   Footprints,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -454,7 +457,7 @@ const getServiceDotColor = (name: string): string => {
   return 'bg-slate-400';
 };
 
-type PageTab = 'garments' | 'pricing';
+type PageTab = 'garments' | 'pricing' | 'topup';
 
 export const CatalogSettingsPage: React.FC = () => {
   const { token, employee } = useAuth();
@@ -468,6 +471,14 @@ export const CatalogSettingsPage: React.FC = () => {
   const canConfigurePricing = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
 
   const [activeTab, setActiveTab] = useState<PageTab>('garments');
+
+  // ─── UI State: Top Up Services Tab ─────────────────────
+  const [topUpServices, setTopUpServices] = useState<TopUpServiceItem[]>(DEFAULT_TOP_UP_SERVICES);
+  const [editingTopUpServices, setEditingTopUpServices] =
+    useState<TopUpServiceItem[]>(DEFAULT_TOP_UP_SERVICES);
+  const [savingTopUp, setSavingTopUp] = useState(false);
+  const [topUpSaveSuccess, setTopUpSaveSuccess] = useState<string | null>(null);
+  const [topUpSaveError, setTopUpSaveError] = useState<string | null>(null);
 
   // ─── Data State (Shared) ─────────────────────────────
   const [services, setServices] = useState<any[]>([]);
@@ -557,6 +568,22 @@ export const CatalogSettingsPage: React.FC = () => {
       if (svcList.length > 0) {
         setActiveServiceId((prev) => prev || svcList[0].id);
         setPricingServiceId((prev) => prev || svcList[0].id);
+      }
+
+      // Load configurable top-up services
+      try {
+        const resTopUp = await fetch(`${API_URL}/store/top-up-services`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (resTopUp.ok) {
+          const bodyTopUp = await resTopUp.json();
+          if (Array.isArray(bodyTopUp.data) && bodyTopUp.data.length > 0) {
+            setTopUpServices(bodyTopUp.data);
+            setEditingTopUpServices(bodyTopUp.data);
+          }
+        }
+      } catch {
+        // Fallback gracefully to default top up services
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load catalog data.');
@@ -1197,6 +1224,102 @@ export const CatalogSettingsPage: React.FC = () => {
     }
   };
 
+  // ─── Top Up Services Handlers ─────────────────────────
+  const handleUpdateTopUpField = (
+    index: number,
+    field: keyof TopUpServiceItem,
+    value: string | number,
+  ) => {
+    setEditingTopUpServices((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+    setTopUpSaveSuccess(null);
+    setTopUpSaveError(null);
+  };
+
+  const handleAddTopUpService = () => {
+    const newService: TopUpServiceItem = {
+      id: `addon-${Date.now()}`,
+      name: '',
+      price: 0,
+      description: '',
+    };
+    setEditingTopUpServices((prev) => [...prev, newService]);
+    setTopUpSaveSuccess(null);
+    setTopUpSaveError(null);
+  };
+
+  const handleRemoveTopUpService = (index: number) => {
+    setEditingTopUpServices((prev) => prev.filter((_, i) => i !== index));
+    setTopUpSaveSuccess(null);
+    setTopUpSaveError(null);
+  };
+
+  const handleResetTopUpDefaults = () => {
+    setEditingTopUpServices(DEFAULT_TOP_UP_SERVICES);
+    setTopUpSaveSuccess(null);
+    setTopUpSaveError(null);
+  };
+
+  const handleSaveTopUpServices = async () => {
+    if (!token) return;
+    setSavingTopUp(true);
+    setTopUpSaveError(null);
+    setTopUpSaveSuccess(null);
+
+    // Validate
+    for (const item of editingTopUpServices) {
+      if (!item.name || !item.name.trim()) {
+        setTopUpSaveError('All top up services must have a valid name.');
+        setSavingTopUp(false);
+        return;
+      }
+      const numPrice = Number(item.price);
+      if (isNaN(numPrice) || numPrice < 0) {
+        setTopUpSaveError(`Invalid price for "${item.name}". Price must be non-negative.`);
+        setSavingTopUp(false);
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        topUpServices: editingTopUpServices.map((item) => ({
+          id: item.id || `addon-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          name: item.name.trim(),
+          price: Number(Number(item.price).toFixed(2)),
+          description: item.description?.trim() || undefined,
+        })),
+      };
+
+      const res = await fetch(`${API_URL}/store/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to update top up services.');
+      }
+
+      const resData = await res.json();
+      const updatedList = resData.topUpServices ?? payload.topUpServices;
+      setTopUpServices(updatedList);
+      setEditingTopUpServices(updatedList);
+      setTopUpSaveSuccess('Top up services updated and saved successfully.');
+    } catch (err: any) {
+      setTopUpSaveError(err.message || 'An error occurred while saving.');
+    } finally {
+      setSavingTopUp(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-100 font-sans">
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
@@ -1233,6 +1356,19 @@ export const CatalogSettingsPage: React.FC = () => {
                 >
                   <Tag size={14} />
                   <span>Service Pricing</span>
+                </button>
+                <button
+                  type="button"
+                  id="tab-topup"
+                  onClick={() => setActiveTab('topup')}
+                  className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'topup'
+                      ? 'bg-white text-blue-600 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Sparkles size={14} />
+                  <span>Top Up Services</span>
                 </button>
               </div>
             )}
@@ -2000,6 +2136,183 @@ export const CatalogSettingsPage: React.FC = () => {
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                           Cloud Database Connected
                         </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════ */}
+            {/* ══ TAB 3: TOP UP SERVICES CONFIGURATION (ADMIN) ════ */}
+            {/* ════════════════════════════════════════════════════ */}
+            {activeTab === 'topup' && canConfigurePricing && (
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+                <div
+                  className="flex-1 overflow-y-auto bg-slate-50 min-h-0 flex flex-col justify-between"
+                  style={{ background: '#f8fafc' }}
+                >
+                  <div
+                    className="flex flex-col max-w-[1100px] mx-auto w-full"
+                    style={{
+                      padding: '16px 20px',
+                      maxWidth: '1100px',
+                      margin: '0 auto',
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px',
+                    }}
+                  >
+                    {/* Header info banner */}
+                    <div className="bg-white border border-slate-200 rounded-[3px] p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-bold text-slate-900">
+                            Top Up & Add-on Services
+                          </h2>
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-[3px] uppercase tracking-wide">
+                            Configurable Rates
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Configure add-on service rates (e.g. Starching, Stain Treatment, Fragrance
+                          Booster, Antiseptic Wash) used across Laundry & Dry Cleaning order
+                          workflows.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          id="reset-topup-defaults-btn"
+                          onClick={handleResetTopUpDefaults}
+                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-[3px] text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <RotateCcw size={13} />
+                          <span>Reset Defaults</span>
+                        </button>
+                        <button
+                          type="button"
+                          id="add-topup-service-btn"
+                          onClick={handleAddTopUpService}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-[3px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Plus size={14} />
+                          <span>Add Service</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Alerts */}
+                    {topUpSaveSuccess && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-[3px] flex items-center gap-2">
+                        <Check size={16} className="text-emerald-600 shrink-0" />
+                        <span>{topUpSaveSuccess}</span>
+                      </div>
+                    )}
+                    {topUpSaveError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-[3px] flex items-center gap-2">
+                        <X size={16} className="text-rose-600 shrink-0" />
+                        <span>{topUpSaveError}</span>
+                      </div>
+                    )}
+
+                    {/* Services Table */}
+                    <div className="bg-white border border-slate-200 rounded-[3px] shadow-xs overflow-hidden">
+                      <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 grid grid-cols-12 gap-3 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        <div className="col-span-4 sm:col-span-3">Service Name</div>
+                        <div className="col-span-5 sm:col-span-6">Description / Notes</div>
+                        <div className="col-span-2 text-right">Price (₹)</div>
+                        <div className="col-span-1 text-center">Action</div>
+                      </div>
+
+                      <div className="divide-y divide-slate-100">
+                        {editingTopUpServices.map((service, idx) => (
+                          <div
+                            key={service.id || `idx-${idx}`}
+                            className="px-4 py-3 grid grid-cols-12 gap-3 items-center hover:bg-slate-50/60 transition-colors"
+                          >
+                            <div className="col-span-4 sm:col-span-3">
+                              <input
+                                type="text"
+                                id={`topup-name-${idx}`}
+                                aria-label={`Service Name ${idx + 1}`}
+                                value={service.name}
+                                onChange={(e) =>
+                                  handleUpdateTopUpField(idx, 'name', e.target.value)
+                                }
+                                placeholder="e.g. Starching"
+                                className="w-full text-xs font-semibold text-slate-800 border border-slate-200 rounded-[3px] px-2.5 py-1.5 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div className="col-span-5 sm:col-span-6">
+                              <input
+                                type="text"
+                                id={`topup-desc-${idx}`}
+                                aria-label={`Service Description ${idx + 1}`}
+                                value={service.description || ''}
+                                onChange={(e) =>
+                                  handleUpdateTopUpField(idx, 'description', e.target.value)
+                                }
+                                placeholder="Short description or usage info"
+                                className="w-full text-xs text-slate-600 border border-slate-200 rounded-[3px] px-2.5 py-1.5 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              <div className="relative w-full max-w-[120px]">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                                  ₹
+                                </span>
+                                <input
+                                  type="number"
+                                  id={`topup-price-${idx}`}
+                                  aria-label={`Service Price ${idx + 1}`}
+                                  value={service.price}
+                                  min={0}
+                                  step="any"
+                                  onChange={(e) =>
+                                    handleUpdateTopUpField(
+                                      idx,
+                                      'price',
+                                      parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  className="w-full text-xs font-bold text-slate-900 border border-slate-200 rounded-[3px] pl-6 pr-2 py-1.5 text-right focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                            <div className="col-span-1 flex justify-center">
+                              <button
+                                type="button"
+                                id={`delete-topup-${idx}`}
+                                onClick={() => handleRemoveTopUpService(idx)}
+                                title="Remove Top Up Service"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-[3px] transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer actions */}
+                      <div className="border-t border-slate-200 px-4 py-3 bg-slate-50 flex items-center justify-between">
+                        <span className="text-xs text-slate-500">
+                          {editingTopUpServices.length} configured add-on service
+                          {editingTopUpServices.length === 1 ? '' : 's'}
+                        </span>
+                        <button
+                          type="button"
+                          id="save-topup-services-btn"
+                          onClick={handleSaveTopUpServices}
+                          disabled={savingTopUp}
+                          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 text-white rounded-[3px] text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Save size={14} />
+                          <span>{savingTopUp ? 'Saving...' : 'Save Changes'}</span>
+                        </button>
                       </div>
                     </div>
                   </div>

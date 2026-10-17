@@ -269,8 +269,11 @@ export function filterServicesForCategory<T extends { name: string; category?: s
     (s) => !CATALOG_EXCLUDED_SERVICES.includes(s.name.trim().toLowerCase()),
   );
 
-  // If category is weight-based (exception in dry cleaning or laundry), return wash/weight services
+  // If category is weight-based: in DRY_CLEANING it is a per-piece exception using dry clean services
   if (isWeightBasedCategory(category)) {
+    if (workflow === 'DRY_CLEANING') {
+      return availableServices.filter((s) => isServiceAllowedInWorkflow(s, 'DRY_CLEANING'));
+    }
     return availableServices.filter(
       (s) => s.name.trim().toLowerCase() !== 'dry clean' && s.category !== 'DRY_CLEAN',
     );
@@ -385,7 +388,7 @@ export function resolveCatalogSelectionOnCategoryChange<
   workflow?: OrderWorkflowType,
 ): string {
   const getFallbackService = (): T | undefined => {
-    if (workflow === 'DRY_CLEANING' && !isWeightBasedCategory(newCategory)) {
+    if (workflow === 'DRY_CLEANING') {
       return (
         services.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN') ||
         services.find((s) => isServiceAllowedInWorkflow(s, 'DRY_CLEANING'))
@@ -419,6 +422,14 @@ export function resolveCatalogSelectionOnCategoryChange<
   }
 
   if (isWeightBasedCategory(newCategory)) {
+    if (workflow === 'DRY_CLEANING') {
+      const curSvc = services.find((s) => s.id === currentServiceId);
+      if (curSvc && isServiceAllowedInWorkflow(curSvc, 'DRY_CLEANING')) {
+        return currentServiceId;
+      }
+      const fallback = getFallbackService();
+      if (fallback) return fallback.id;
+    }
     if (isDryCleanService(currentServiceId, services)) {
       const fallback = getFallbackService();
       if (fallback) {
@@ -503,3 +514,93 @@ export function resolveCatalogSelectionOnServiceChange<T extends { id: string; n
 
   return currentCategory;
 }
+
+/**
+ * Notice required on bills and receipts for garment collection deadline.
+ */
+export const GARMENT_COLLECTION_NOTICE =
+  'Please collect your garments within 15 days. We cannot guarantee the safety or availability of garments left uncollected after 15 days.';
+
+/**
+ * Notice required on bills and receipts for stain removal limitations.
+ */
+export const STAIN_REMOVAL_NOTICE =
+  'We make every effort to remove stains; however, 100% stain removal cannot be guaranteed. Results depend on the fabric, stain type, and garment condition.';
+
+/**
+ * Returns the day of the week (0 = Sunday ... 6 = Saturday) for a Date in a specific timezone.
+ */
+export function getDayOfWeekInTimezone(date: Date, timeZone: string = 'Asia/Kolkata'): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'short',
+  });
+  const weekdayStr = formatter.format(date);
+  switch (weekdayStr) {
+    case 'Sun':
+      return 0;
+    case 'Mon':
+      return 1;
+    case 'Tue':
+      return 2;
+    case 'Wed':
+      return 3;
+    case 'Thu':
+      return 4;
+    case 'Fri':
+      return 5;
+    case 'Sat':
+      return 6;
+    default:
+      return date.getDay();
+  }
+}
+
+/**
+ * Adjusts an applicable order due date for the Thursday weekly off day.
+ * If the due date falls on Thursday in the given timezone, moves it to Friday (+1 calendar day).
+ * Other due dates (and subsequent calls on an already adjusted date) remain unchanged.
+ */
+export function adjustDueDateForThursday(
+  date: Date | string,
+  timeZone: string = 'Asia/Kolkata',
+): Date {
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return d;
+  const dayOfWeek = getDayOfWeekInTimezone(d, timeZone);
+  if (dayOfWeek === 4) {
+    // Thursday -> Friday
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+/**
+ * Top Up Service Item contract
+ */
+export interface TopUpServiceItem {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+}
+
+/**
+ * Default Top Up Services seeded / configured for stores
+ */
+export const DEFAULT_TOP_UP_SERVICES: TopUpServiceItem[] = [
+  { id: 'addon-starch', name: 'Starching', price: 30, description: 'Crisp starch finish per kg' },
+  { id: 'addon-stain', name: 'Stain Treatment', price: 50, description: 'Spot stain removal' },
+  {
+    id: 'addon-fragrance',
+    name: 'Fragrance Booster',
+    price: 20,
+    description: 'Long-lasting fresh scent',
+  },
+  {
+    id: 'addon-antiseptic',
+    name: 'Antiseptic Hygiene Wash',
+    price: 25,
+    description: 'Disinfectant sanitization',
+  },
+];

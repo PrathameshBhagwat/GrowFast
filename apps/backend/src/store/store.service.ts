@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateStoreConfigDto } from './dto/update-store-config.dto';
 import { UpdateTagDesignDto } from './dto/update-tag-design.dto';
-import { TagTemplateDTO, DEFAULT_TAG_DESIGN, sanitizeTagDesign } from '@growfast/shared-types';
+import {
+  TagTemplateDTO,
+  DEFAULT_TAG_DESIGN,
+  sanitizeTagDesign,
+  DEFAULT_TOP_UP_SERVICES,
+  TopUpServiceItem,
+} from '@growfast/shared-types';
 
 @Injectable()
 export class StoreService {
@@ -15,6 +21,7 @@ export class StoreService {
         id: true,
         name: true,
         expressSurchargePercent: true,
+        topUpServices: true,
       },
     });
 
@@ -22,7 +29,10 @@ export class StoreService {
       throw new NotFoundException(`Store with ID ${storeId} not found`);
     }
 
-    return store;
+    return {
+      ...store,
+      topUpServices: (store.topUpServices as any) ?? DEFAULT_TOP_UP_SERVICES,
+    };
   }
 
   async updateStoreConfig(storeId: string, updateStoreConfigDto: UpdateStoreConfigDto) {
@@ -34,17 +44,51 @@ export class StoreService {
       throw new NotFoundException(`Store with ID ${storeId} not found`);
     }
 
-    return this.prisma.store.update({
+    const data: any = {};
+    if (updateStoreConfigDto.expressSurchargePercent !== undefined) {
+      data.expressSurchargePercent = updateStoreConfigDto.expressSurchargePercent;
+    }
+
+    if (updateStoreConfigDto.topUpServices !== undefined) {
+      if (!Array.isArray(updateStoreConfigDto.topUpServices)) {
+        throw new BadRequestException('Top up services must be an array');
+      }
+
+      const validated: TopUpServiceItem[] = [];
+      for (const item of updateStoreConfigDto.topUpServices) {
+        if (!item || typeof item.name !== 'string' || item.name.trim().length === 0) {
+          throw new BadRequestException('Each top up service must have a valid name');
+        }
+        if (typeof item.price !== 'number' || isNaN(item.price) || item.price < 0) {
+          throw new BadRequestException(
+            `Invalid price for top up service "${item.name}". Price must be a non-negative number.`,
+          );
+        }
+        validated.push({
+          id: item.id || `addon-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          name: item.name.trim(),
+          price: Number(item.price.toFixed(2)),
+          description: item.description ? String(item.description).trim() : undefined,
+        });
+      }
+      data.topUpServices = validated;
+    }
+
+    const updated = await this.prisma.store.update({
       where: { id: storeId },
-      data: {
-        expressSurchargePercent: updateStoreConfigDto.expressSurchargePercent,
-      },
+      data,
       select: {
         id: true,
         name: true,
         expressSurchargePercent: true,
+        topUpServices: true,
       },
     });
+
+    return {
+      ...updated,
+      topUpServices: (updated.topUpServices as any) ?? DEFAULT_TOP_UP_SERVICES,
+    };
   }
 
   async getTagDesign(storeId: string): Promise<TagTemplateDTO> {

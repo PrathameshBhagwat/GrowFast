@@ -474,4 +474,32 @@ describe('OrderReceipt Component & Modal (Phase 4E)', () => {
     expect(screen.getByText('5.5 kg')).toBeInTheDocument();
     expect(screen.getAllByText('₹440.00').length).toBeGreaterThanOrEqual(1);
   });
+
+  it('29. Standard (A4) layout renders Garment Collection and Stain Removal notices', () => {
+    render(<OrderReceipt order={baseOrder} format="standard" />);
+    expect(
+      screen.getByText(
+        /Please collect your garments within 15 days\. We cannot guarantee the safety or availability of garments left uncollected after 15 days\./i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /We make every effort to remove stains; however, 100% stain removal cannot be guaranteed\. Results depend on the fabric, stain type, and garment condition\./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('30. Thermal (80mm) layout renders Garment Collection and Stain Removal notices', () => {
+    render(<OrderReceipt order={baseOrder} format="thermal" />);
+    expect(
+      screen.getByText(
+        /Please collect your garments within 15 days\. We cannot guarantee the safety or availability of garments left uncollected after 15 days\./i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /We make every effort to remove stains; however, 100% stain removal cannot be guaranteed\. Results depend on the fabric, stain type, and garment condition\./i,
+      ),
+    ).toBeInTheDocument();
+  });
 });

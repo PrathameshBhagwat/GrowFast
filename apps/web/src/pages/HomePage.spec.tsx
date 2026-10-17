@@ -351,4 +351,40 @@ describe('HomePage Component', () => {
     expect(addCustomerBtn).toHaveStyle({ minHeight: '44px' });
     expect(viewDueOrdersBtn).toHaveStyle({ minHeight: '44px' });
   });
+
+  it('10. Find / Edit Order button opens modal and navigates to order details on submit', async () => {
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/orders/ord-1024')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'ord-1024', orderNumber: 'ORD-1024' }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, count: 0, data: [] }),
+      };
+    });
+
+    renderHomePage();
+
+    const findEditBtn = screen.getAllByRole('button', { name: /find \/ edit order/i })[0];
+    fireEvent.click(findEditBtn);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/order id or order number/i)).toBeInTheDocument();
+    });
+
+    const input = screen.getByLabelText(/order id or order number/i);
+    fireEvent.change(input, { target: { value: 'ord-1024' } });
+
+    const submitBtn = screen.getByRole('button', { name: /find & open order/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('order-detail-page')).toBeInTheDocument();
+    });
+  });
 });

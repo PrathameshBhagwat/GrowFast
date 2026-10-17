@@ -11,6 +11,11 @@ import {
   isCategoryAllowedInWorkflow,
   isItemCompatibleWithWorkflow,
   resolveCatalogSelectionOnWorkflowChange,
+  GARMENT_COLLECTION_NOTICE,
+  STAIN_REMOVAL_NOTICE,
+  adjustDueDateForThursday,
+  getDayOfWeekInTimezone,
+  DEFAULT_TOP_UP_SERVICES,
 } from './catalog';
 
 const mockServices = [
@@ -356,5 +361,102 @@ describe('Order Creation Workflows - Laundry vs Dry Cleaning Separation', () => 
       'LAUNDRY',
     );
     assert.strictEqual(laundryResult, '1'); // Standard Wash
+  });
+});
+
+describe('Receipt Notices & Bill Conditions', () => {
+  it('defines the canonical garment collection notice', () => {
+    assert.strictEqual(
+      GARMENT_COLLECTION_NOTICE,
+      'Please collect your garments within 15 days. We cannot guarantee the safety or availability of garments left uncollected after 15 days.',
+    );
+  });
+
+  it('defines the canonical stain removal notice', () => {
+    assert.strictEqual(
+      STAIN_REMOVAL_NOTICE,
+      'We make every effort to remove stains; however, 100% stain removal cannot be guaranteed. Results depend on the fabric, stain type, and garment condition.',
+    );
+  });
+});
+
+describe('Thursday Weekly Off - Due Date Adjustment', () => {
+  it('moves Thursday due dates to Friday', () => {
+    // 2026-10-15 is Thursday
+    const thursdayDate = new Date('2026-10-15T18:00:00.000Z');
+    const adjusted = adjustDueDateForThursday(thursdayDate, 'UTC');
+    // Day of week in UTC: 5 (Friday)
+    assert.strictEqual(adjusted.getUTCDay(), 5);
+    assert.strictEqual(adjusted.getUTCDate(), 16);
+    assert.strictEqual(adjusted.getUTCHours(), 18);
+  });
+
+  it('leaves Friday due dates unchanged', () => {
+    // 2026-10-16 is Friday
+    const fridayDate = new Date('2026-10-16T18:00:00.000Z');
+    const adjusted = adjustDueDateForThursday(fridayDate, 'UTC');
+    assert.strictEqual(adjusted.getUTCDay(), 5);
+    assert.strictEqual(adjusted.getUTCDate(), 16);
+  });
+
+  it('leaves Wednesday due dates unchanged', () => {
+    // 2026-10-14 is Wednesday
+    const wednesdayDate = new Date('2026-10-14T18:00:00.000Z');
+    const adjusted = adjustDueDateForThursday(wednesdayDate, 'UTC');
+    assert.strictEqual(adjusted.getUTCDay(), 3);
+    assert.strictEqual(adjusted.getUTCDate(), 14);
+  });
+
+  it('handles month boundaries (Thursday Oct 29 -> Friday Oct 30)', () => {
+    // 2026-10-29 is Thursday
+    const endOfMonthThursday = new Date('2026-10-29T10:00:00.000Z');
+    const adjusted = adjustDueDateForThursday(endOfMonthThursday, 'UTC');
+    assert.strictEqual(adjusted.getUTCDay(), 5);
+    assert.strictEqual(adjusted.getUTCDate(), 30);
+    assert.strictEqual(adjusted.getUTCMonth(), 9); // October (0-indexed)
+  });
+
+  it('handles year boundaries (Thursday Dec 31, 2026 -> Friday Jan 1, 2027)', () => {
+    // 2026-12-31 is Thursday
+    const yearEndThursday = new Date('2026-12-31T12:00:00.000Z');
+    const adjusted = adjustDueDateForThursday(yearEndThursday, 'UTC');
+    assert.strictEqual(adjusted.getUTCDay(), 5);
+    assert.strictEqual(adjusted.getUTCDate(), 1);
+    assert.strictEqual(adjusted.getUTCMonth(), 0); // January
+    assert.strictEqual(adjusted.getUTCFullYear(), 2027);
+  });
+
+  it('is idempotent: running multiple times does not shift dates repeatedly', () => {
+    const thursdayDate = new Date('2026-10-15T18:00:00.000Z');
+    const firstAdjustment = adjustDueDateForThursday(thursdayDate, 'UTC');
+    const secondAdjustment = adjustDueDateForThursday(firstAdjustment, 'UTC');
+    const thirdAdjustment = adjustDueDateForThursday(secondAdjustment, 'UTC');
+
+    assert.strictEqual(firstAdjustment.getTime(), secondAdjustment.getTime());
+    assert.strictEqual(secondAdjustment.getTime(), thirdAdjustment.getTime());
+  });
+
+  it('respects timezone conventions (Asia/Kolkata)', () => {
+    // 2026-10-15 14:00:00 UTC is 19:30:00 in Asia/Kolkata (Thursday evening)
+    const kolkataThursday = new Date('2026-10-15T14:00:00.000Z');
+    const adjusted = adjustDueDateForThursday(kolkataThursday, 'Asia/Kolkata');
+    const dayOfWeek = getDayOfWeekInTimezone(adjusted, 'Asia/Kolkata');
+    assert.strictEqual(dayOfWeek, 5); // Friday in Asia/Kolkata
+  });
+});
+
+describe('Top Up Service Configuration Defaults', () => {
+  it('provides default top up service configurations with non-negative prices', () => {
+    assert.strictEqual(DEFAULT_TOP_UP_SERVICES.length, 4);
+    const first = DEFAULT_TOP_UP_SERVICES[0]!;
+    assert.strictEqual(first.id, 'addon-starch');
+    assert.strictEqual(first.name, 'Starching');
+    assert.strictEqual(first.price, 30);
+
+    for (const addon of DEFAULT_TOP_UP_SERVICES) {
+      assert.ok(addon.id);
+      assert.ok(addon.name);
+      assert.ok(addon.price >= 0);
+    }
   });
 });

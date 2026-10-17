@@ -112,8 +112,18 @@ export {
   isItemCompatibleWithWorkflow,
   resolveCatalogSelectionOnWorkflowChange,
   isEntryModeAllowedInWorkflow,
+  GARMENT_COLLECTION_NOTICE,
+  STAIN_REMOVAL_NOTICE,
+  getDayOfWeekInTimezone,
+  adjustDueDateForThursday,
+  DEFAULT_TOP_UP_SERVICES,
 } from './catalog';
-export type { OrderWorkflowType, OrderEntryMode, WorkflowOption } from './catalog';
+export type {
+  OrderWorkflowType,
+  OrderEntryMode,
+  WorkflowOption,
+  TopUpServiceItem,
+} from './catalog';
 
 // Tag Template & Designer Contract (Phase T4)
 export { DEFAULT_TAG_DESIGN, sanitizeTagDesign } from './tag-template';

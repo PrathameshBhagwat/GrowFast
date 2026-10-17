@@ -337,10 +337,33 @@ describe('OrderWizardPage', () => {
     const wbTab = await screen.findByRole('button', { name: /Weight Based/i });
     expect(wbTab).toBeInTheDocument();
 
-    // Clicking Weight Based exception category reveals weight-based garments
+    // Clicking Weight Based exception category reveals exactly ONE Weight Based exception card
     fireEvent.click(wbTab);
     await waitFor(() => {
-      expect(screen.getByText('Bulk Laundry')).toBeInTheDocument();
+      expect(screen.getByText('Per Piece Exception')).toBeInTheDocument();
+      expect(screen.getByText('WEI-01')).toBeInTheDocument();
+    });
+
+    // Clicking Add opens the piece exception modal with 3 x 40 = 120
+    const addBtn = screen.getByRole('button', { name: /^Add$/i });
+    fireEvent.click(addBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Weight Based — Per Piece Entry')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Strictly per-piece pricing exception. No kilograms will be measured or billed.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText('₹120')).toBeInTheDocument();
+    });
+
+    // Confirm and add to order
+    const confirmBtn = screen.getByRole('button', { name: /Add to Order/i });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('₹120.00').length).toBeGreaterThan(0);
     });
   });
 

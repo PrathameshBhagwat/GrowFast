@@ -53,6 +53,11 @@ export class CreateOrderItemDto implements CreateOrderItemRequest {
   weight?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   colorTags?: string[];

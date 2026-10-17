@@ -160,6 +160,73 @@ export const HomePage: React.FC = () => {
   // Operational alert dismiss state
   const [isAlertDismissed, setIsAlertDismissed] = useState(false);
 
+  // Find / Edit Order Modal State (CHANGE 2)
+  const [isFindOrderModalOpen, setIsFindOrderModalOpen] = useState(false);
+  const [findOrderQuery, setFindOrderQuery] = useState('');
+  const [isFindingOrder, setIsFindingOrder] = useState(false);
+  const [findOrderError, setFindOrderError] = useState<string | null>(null);
+
+  const handleFindOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = findOrderQuery.trim();
+    if (!query) return;
+
+    setIsFindingOrder(true);
+    setFindOrderError(null);
+
+    try {
+      const cleanQuery = query.replace(/^#/, '');
+
+      // Try direct ID lookup first
+      try {
+        const directRes = await apiFetch<{ id: string }>(
+          `/orders/${encodeURIComponent(cleanQuery)}`,
+          {
+            token,
+          },
+        );
+        if (directRes?.id) {
+          setIsFindOrderModalOpen(false);
+          setFindOrderQuery('');
+          navigate(`/orders/${directRes.id}`);
+          return;
+        }
+      } catch {
+        // Direct ID not found, try search
+      }
+
+      // Try search query lookup
+      const searchRes = await apiFetch<{ success: boolean; data: OrderSummaryDTO[] }>(
+        `/orders?search=${encodeURIComponent(cleanQuery)}&pageSize=5`,
+        { token },
+      );
+
+      const matches = searchRes.data || [];
+      const exactMatch = matches.find(
+        (o) =>
+          o.orderNumber.toUpperCase() === cleanQuery.toUpperCase() ||
+          o.id.toLowerCase() === cleanQuery.toLowerCase(),
+      );
+
+      const targetOrder = exactMatch || matches[0];
+
+      if (targetOrder) {
+        setIsFindOrderModalOpen(false);
+        setFindOrderQuery('');
+        navigate(`/orders/${targetOrder.id}`);
+        return;
+      }
+
+      setFindOrderError(
+        `No order found matching "${query}". Please verify the Order ID or Number.`,
+      );
+    } catch (err: any) {
+      setFindOrderError(err.message || `Failed to search order "${query}".`);
+    } finally {
+      setIsFindingOrder(false);
+    }
+  };
+
   // ─── Today's Due Orders State ─────────────────────────────────────────────
   // IMPORTANT: The actual order list MUST NOT be visible initially.
   // It loads and expands ONLY when the user clicks "View Today's Due Orders".
@@ -511,6 +578,19 @@ export const HomePage: React.FC = () => {
               <span className="hidden sm:inline">Catalog</span>
             </Button>
 
+            <Button
+              id="find-edit-order-btn"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFindOrderModalOpen(true)}
+              icon={<Search size={15} />}
+              aria-label="Find / Edit Order"
+              style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+            >
+              <span className="hidden sm:inline">Find / Edit Order</span>
+              <span className="sm:hidden">Find Order</span>
+            </Button>
+
             <div
               style={{
                 width: '1px',
@@ -660,18 +740,31 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
 
-            {/* Primary Action: + Add New Customer */}
-            <Button
-              id="add-new-customer-btn"
-              variant="primary"
-              size="md"
-              icon={<Plus size={18} />}
-              onClick={() => setIsCreateModalOpen(true)}
-              aria-label="Add New Customer"
-              style={{ minHeight: '44px', fontWeight: 600 }}
-            >
-              Add New Customer
-            </Button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Button
+                id="find-edit-order-action-btn"
+                variant="outline"
+                size="md"
+                icon={<Search size={16} />}
+                onClick={() => setIsFindOrderModalOpen(true)}
+                aria-label="Find / Edit Order"
+                style={{ minHeight: '44px', fontWeight: 600 }}
+              >
+                Find / Edit Order
+              </Button>
+              {/* Primary Action: + Add New Customer */}
+              <Button
+                id="add-new-customer-btn"
+                variant="primary"
+                size="md"
+                icon={<Plus size={18} />}
+                onClick={() => setIsCreateModalOpen(true)}
+                aria-label="Add New Customer"
+                style={{ minHeight: '44px', fontWeight: 600 }}
+              >
+                Add New Customer
+              </Button>
+            </div>
           </div>
 
           {/* Search Controls: [ Search icon ] [ Filter Select ▼ ] [ Search Input... ] [ Clear X ] */}
@@ -919,14 +1012,15 @@ export const HomePage: React.FC = () => {
                           {ord.amountDue > 0 ? `Balance: ₹${ord.amountDue}` : 'Paid'}
                         </span>
                         <Button
+                          id={`find-edit-order-${ord.id}`}
                           variant="outline"
                           size="sm"
                           onClick={() => navigate(`/orders/${ord.id}`)}
                           icon={<ArrowRight size={15} />}
-                          aria-label={`View Order ${ord.orderNumber}`}
+                          aria-label={`Find and edit order ${ord.orderNumber}`}
                           style={{ minHeight: '44px' }}
                         >
-                          View Order
+                          Find / Edit Order
                         </Button>
                       </div>
                     </div>
@@ -1623,6 +1717,119 @@ export const HomePage: React.FC = () => {
           )}
         </Card>
       </main>
+
+      {/* ─── Find / Edit Order Modal (CHANGE 2) ───────────────────────── */}
+      {isFindOrderModalOpen && (
+        <div
+          className="fixed inset-0 z-50 backdrop-blur-xs flex items-center justify-center p-4 modal-backdrop"
+          style={{ background: 'var(--overlay, rgba(0, 0, 0, 0.5))' }}
+        >
+          <div
+            className="rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col modal-panel"
+            style={{
+              background: 'var(--bg-surface, #FFFFFF)',
+              border: '1px solid var(--border, #E2E8F0)',
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-5 py-4"
+              style={{
+                borderBottom: '1px solid var(--border, #E2E8F0)',
+                background: 'var(--bg-surface-muted, #F8FAFC)',
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                  <Search size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Find / Edit Order</h3>
+                  <p className="text-xs text-slate-500">
+                    Lookup an existing order by ID or Order Number to inspect or edit
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="close-find-order-modal-btn"
+                onClick={() => {
+                  setIsFindOrderModalOpen(false);
+                  setFindOrderQuery('');
+                  setFindOrderError(null);
+                }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                aria-label="Close find order modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleFindOrderSubmit} className="p-5 space-y-4">
+              <div>
+                <label
+                  htmlFor="find-order-input"
+                  className="block text-xs font-bold text-slate-800 mb-1.5"
+                >
+                  Order ID or Order Number <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="find-order-input"
+                    type="text"
+                    value={findOrderQuery}
+                    onChange={(e) => {
+                      setFindOrderQuery(e.target.value);
+                      setFindOrderError(null);
+                    }}
+                    placeholder="e.g. ORD-1024, GF-2026-0001, or UUID"
+                    autoFocus
+                    className="w-full text-sm font-semibold px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+                  />
+                </div>
+                {findOrderError && (
+                  <p className="text-xs text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <span>⚠</span> {findOrderError}
+                  </p>
+                )}
+              </div>
+
+              <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200">
+                Opening an order allows authorized staff to edit permitted fields (items, defects,
+                due dates, payments, and financial adjustments) with backend recalculations.
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFindOrderModalOpen(false);
+                    setFindOrderQuery('');
+                    setFindOrderError(null);
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  id="find-order-submit-btn"
+                  disabled={isFindingOrder || !findOrderQuery.trim()}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs min-h-[44px] flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isFindingOrder ? (
+                    <span>Searching...</span>
+                  ) : (
+                    <>
+                      <ArrowRight size={16} strokeWidth={2.5} />
+                      <span>Find &amp; Open Order</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Customer Creation Modal */}
       <CustomerCreateModal

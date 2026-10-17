@@ -37,18 +37,21 @@ describe('StoreService', () => {
   });
 
   describe('getStoreConfig', () => {
-    it('should return store config', async () => {
+    it('should return store config with default top up services if none configured', async () => {
       mockPrisma.store.findUnique.mockResolvedValue({
         id: 'store-1',
         name: 'Store 1',
         expressSurchargePercent: 25,
+        topUpServices: null,
       });
 
       const result = await service.getStoreConfig('store-1');
       expect(result.expressSurchargePercent).toBe(25);
+      expect(result.topUpServices).toBeDefined();
+      expect(result.topUpServices.length).toBe(4);
       expect(mockPrisma.store.findUnique).toHaveBeenCalledWith({
         where: { id: 'store-1' },
-        select: { id: true, name: true, expressSurchargePercent: true },
+        select: { id: true, name: true, expressSurchargePercent: true, topUpServices: true },
       });
     });
 
@@ -65,6 +68,7 @@ describe('StoreService', () => {
         id: 'store-1',
         name: 'Store 1',
         expressSurchargePercent: 30,
+        topUpServices: null,
       });
 
       const result = await service.updateStoreConfig('store-1', { expressSurchargePercent: 30 });
@@ -72,8 +76,38 @@ describe('StoreService', () => {
       expect(mockPrisma.store.update).toHaveBeenCalledWith({
         where: { id: 'store-1' },
         data: { expressSurchargePercent: 30 },
-        select: { id: true, name: true, expressSurchargePercent: true },
+        select: { id: true, name: true, expressSurchargePercent: true, topUpServices: true },
       });
+    });
+
+    it('should update configurable top up services and validate prices', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      const customTopUps = [
+        { id: 'addon-starch', name: 'Custom Starch', price: 45, description: 'Crisp per kg' },
+        { id: 'addon-perfume', name: 'Premium Perfume', price: 35, description: 'Fragrance' },
+      ];
+      mockPrisma.store.update.mockResolvedValue({
+        id: 'store-1',
+        name: 'Store 1',
+        expressSurchargePercent: null,
+        topUpServices: customTopUps,
+      });
+
+      const result = await service.updateStoreConfig('store-1', {
+        topUpServices: customTopUps,
+      });
+      expect(result.topUpServices).toHaveLength(2);
+      expect(result.topUpServices[0].name).toBe('Custom Starch');
+      expect(result.topUpServices[0].price).toBe(45);
+    });
+
+    it('should reject negative price in top up service', async () => {
+      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      await expect(
+        service.updateStoreConfig('store-1', {
+          topUpServices: [{ id: 'addon-1', name: 'Bad Addon', price: -10 }],
+        }),
+      ).rejects.toThrow();
     });
   });
 

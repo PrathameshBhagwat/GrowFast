@@ -219,6 +219,7 @@ export interface CreateOrderItemRequest {
   serviceTypeId: string;
   quantity: number;
   weight?: number;
+  unitPrice?: number;
   colorTags?: string[];
   defectNotes?: string;
   pieces?: CreateOrderPieceRequest[];

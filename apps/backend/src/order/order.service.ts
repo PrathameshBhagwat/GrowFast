@@ -34,6 +34,7 @@ import {
   ServiceCategory,
   isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
+  adjustDueDateForThursday,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
@@ -173,10 +174,18 @@ export class OrderService {
           }
         }
 
+        const isWeightPieceException =
+          garment.category === GarmentCategory.WEIGHT_BASED &&
+          (service.category === ServiceCategory.DRY_CLEAN ||
+            service.name.toLowerCase().includes('dry clean') ||
+            (item.unitPrice !== undefined && item.unitPrice > 0)) &&
+          (item.weight == null || item.weight === undefined);
+
         const isWeightBased =
-          garment.category === GarmentCategory.WEIGHT_BASED ||
-          service.category === ServiceCategory.WEIGHT_BASED ||
-          (item.weight != null && item.weight > 0);
+          (garment.category === GarmentCategory.WEIGHT_BASED ||
+            service.category === ServiceCategory.WEIGHT_BASED ||
+            (item.weight != null && item.weight > 0)) &&
+          !isWeightPieceException;
 
         if (isWeightBased) {
           if (item.weight == null || isNaN(item.weight) || item.weight < 2.0) {
@@ -186,8 +195,21 @@ export class OrderService {
           }
         }
 
+        if (isWeightPieceException) {
+          if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+            throw new BadRequestException('Quantity must be a positive whole number of pieces.');
+          }
+          if (item.unitPrice !== undefined && (isNaN(item.unitPrice) || item.unitPrice <= 0)) {
+            throw new BadRequestException('Price per piece must be greater than zero.');
+          }
+        }
+
         const priceKey = `${garment.id}_${service.id}`;
-        const unitPrice = priceMap.get(priceKey) ?? 0;
+        let unitPrice = priceMap.get(priceKey) ?? 0;
+        if (isWeightPieceException && item.unitPrice !== undefined && item.unitPrice > 0) {
+          unitPrice = item.unitPrice;
+        }
+
         const lineTotal = isWeightBased
           ? Math.round(unitPrice * item.weight! * 100) / 100
           : Math.round(unitPrice * item.quantity * 100) / 100;
@@ -206,8 +228,8 @@ export class OrderService {
           defectNotes: item.defectNotes,
         };
 
-        // Weight-based items represent bulk laundry and do not fabricate individual physical piece garments
-        if (!isWeightBased) {
+        // Weight-based items and weight-based piece exceptions do not fabricate individual physical piece garments
+        if (!isWeightBased && !isWeightPieceException) {
           orderItemData.physicalGarments = {
             create: Array.from({ length: item.quantity }, (_, i) => ({
               unitNumber: i + 1,
@@ -311,13 +333,15 @@ export class OrderService {
       const serviceSummary = serviceSummaryParts.join(', ');
 
       // 7. Calculate Due Date (B6 normal / B7 express)
-      const systemDueDate = new Date(orderDate);
+      const calculatedDue = new Date(orderDate);
       if (dto.isExpress) {
         // B7: Express orders get halved turnaround (rounded up)
-        systemDueDate.setDate(systemDueDate.getDate() + Math.ceil(maxEstimatedDays / 2));
+        calculatedDue.setDate(calculatedDue.getDate() + Math.ceil(maxEstimatedDays / 2));
       } else {
-        systemDueDate.setDate(systemDueDate.getDate() + maxEstimatedDays);
+        calculatedDue.setDate(calculatedDue.getDate() + maxEstimatedDays);
       }
+      // Thursday is weekly off: adjust to Friday
+      const systemDueDate = adjustDueDateForThursday(calculatedDue);
 
       const itemsForStatus = orderItemsData.map((_item) => ({
         status: ItemStatus.RECEIVED,
@@ -996,10 +1020,13 @@ export class OrderService {
         throw new BadRequestException(`Order does not belong to your store`);
       }
 
+      // Thursday is weekly off: adjust to Friday
+      const adjustedEffectiveDueDate = adjustDueDateForThursday(new Date(effectiveDueDate));
+
       await tx.order.update({
         where: { id: orderId },
         data: {
-          effectiveDueDate: new Date(effectiveDueDate),
+          effectiveDueDate: adjustedEffectiveDueDate,
           dueDateOverrideReason: reason,
           dueDateOverriddenBy: employeeId,
         },

@@ -72,6 +72,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   // Preferred service resolver: ensures workflow opens with primary intuitive service
   const getPreferredServiceId = (serviceList: typeof visibleServices, wf?: OrderWorkflowType) => {
     if (serviceList.length === 0) return '';
+    if (wf === 'DRY_CLEANING') {
+      const dc = serviceList.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN');
+      if (dc) return dc.id;
+      return serviceList[0]?.id || '';
+    }
     if (selectedCategory === GarmentCategory.WEIGHT_BASED || selectedCategory === 'WEIGHT_BASED') {
       const preferred = [
         'wash and steam iron',
@@ -83,20 +88,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
       const laundrySvc = serviceList.find((s) => preferred.includes(s.name.trim().toLowerCase()));
       if (laundrySvc) return laundrySvc.id;
     }
-    if (wf === 'DRY_CLEANING') {
-      const dc = serviceList.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN');
-      if (dc) return dc.id;
-    } else {
-      const preferred = [
-        'wash and steam iron',
-        'wash + steam iron',
-        'standard wash',
-        'wash and fold',
-        'premium laundry',
-      ];
-      const laundrySvc = serviceList.find((s) => preferred.includes(s.name.trim().toLowerCase()));
-      if (laundrySvc) return laundrySvc.id;
-    }
+    const preferred = [
+      'wash and steam iron',
+      'wash + steam iron',
+      'standard wash',
+      'wash and fold',
+      'premium laundry',
+    ];
+    const laundrySvc = serviceList.find((s) => preferred.includes(s.name.trim().toLowerCase()));
+    if (laundrySvc) return laundrySvc.id;
     return serviceList[0]?.id || '';
   };
 
@@ -169,6 +169,35 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
   const filteredGarments = useMemo(() => {
     const sourceList = activeOnly ? activeGarments : garments;
+    const isDryCleanWeightCategory =
+      workflow === 'DRY_CLEANING' &&
+      (selectedCategory === 'WEIGHT_BASED' || selectedCategory === GarmentCategory.WEIGHT_BASED);
+
+    // CHANGE 5: In Per Pieces (DRY_CLEANING) workflow under WEIGHT_BASED category, display EXACTLY ONE card
+    if (isDryCleanWeightCategory) {
+      const existing = sourceList.find(
+        (g) => g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED,
+      );
+      const singleItem = {
+        id: existing?.id || 'g-wb-piece-exception',
+        name: 'Weight Based',
+        category: 'WEIGHT_BASED',
+        section: 'Per Piece Exception',
+        isActive: true,
+      };
+
+      const q = searchQuery.toLowerCase().trim();
+      if (
+        q &&
+        !singleItem.name.toLowerCase().includes(q) &&
+        !singleItem.section.toLowerCase().includes(q) &&
+        !'weight based'.includes(q)
+      ) {
+        return [];
+      }
+      return [singleItem];
+    }
+
     const list = sourceList.filter((g) => {
       const matchesCategory = g.category === selectedCategory;
       const matchesSearch =
@@ -192,13 +221,23 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
     sortBy,
     priceMap,
     selectedServiceId,
+    workflow,
   ]);
 
   const handleGarmentClick = (garment: any) => {
-    if (!selectedServiceId) return;
+    const serviceIdToUse = selectedServiceId || visibleServices[0]?.id || activeServices[0]?.id;
+    if (!serviceIdToUse) return;
 
-    const unitPrice = priceMap.get(`${garment.id}:${selectedServiceId}`) ?? 0;
-    onGarmentSelect(garment, selectedServiceId, unitPrice);
+    const isWeightPieceException =
+      workflow === 'DRY_CLEANING' &&
+      (garment.category === 'WEIGHT_BASED' ||
+        garment.category === GarmentCategory.WEIGHT_BASED ||
+        selectedCategory === 'WEIGHT_BASED' ||
+        selectedCategory === GarmentCategory.WEIGHT_BASED);
+
+    const rawPrice = priceMap.get(`${garment.id}:${serviceIdToUse}`);
+    const unitPrice = isWeightPieceException ? (rawPrice ?? 40) : (rawPrice ?? 0);
+    onGarmentSelect(garment, serviceIdToUse, unitPrice);
   };
 
   return (
@@ -349,7 +388,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
         <div className="order-garment-grid w-full">
           {filteredGarments.map((garment, idx) => {
-            const unitPrice = priceMap.get(`${garment.id}:${selectedServiceId}`);
+            const isWeightPieceException =
+              workflow === 'DRY_CLEANING' &&
+              (garment.category === 'WEIGHT_BASED' ||
+                garment.category === GarmentCategory.WEIGHT_BASED ||
+                selectedCategory === 'WEIGHT_BASED' ||
+                selectedCategory === GarmentCategory.WEIGHT_BASED);
+
+            const rawPrice = priceMap.get(`${garment.id}:${selectedServiceId}`);
+            const unitPrice = isWeightPieceException ? (rawPrice ?? 40) : rawPrice;
             const hasPrice = unitPrice !== undefined;
             const price = hasPrice ? unitPrice : null;
             const isSelected = selectedGarmentId === garment.id;
@@ -357,7 +404,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
             const categoryPrefix = (CATEGORY_LABELS[garment.category] || garment.category)
               .substring(0, 3)
               .toUpperCase();
-            const sku = `${categoryPrefix}-${String(idx + 1).padStart(2, '0')}`;
+            const sku = isWeightPieceException
+              ? 'WEI-01'
+              : `${categoryPrefix}-${String(idx + 1).padStart(2, '0')}`;
             const subtitle = garment.section || garment.description || 'Standard Wear';
 
             return (
@@ -430,9 +479,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                         }}
                       >
                         ₹{Number(price).toFixed(0)}
-                        {garment.category === 'WEIGHT_BASED' || selectedCategory === 'WEIGHT_BASED'
-                          ? '/kg'
-                          : ''}
+                        {isWeightPieceException
+                          ? ' / pc'
+                          : garment.category === 'WEIGHT_BASED' ||
+                              selectedCategory === 'WEIGHT_BASED'
+                            ? '/kg'
+                            : ''}
                       </span>
                     ) : (
                       <span

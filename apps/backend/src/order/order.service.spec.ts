@@ -21,6 +21,7 @@ import {
   OrderPickupRequest,
   ServiceCategory,
   GarmentCategory,
+  adjustDueDateForThursday,
 } from '@growfast/shared-types';
 
 const mockPrismaService: any = {
@@ -273,12 +274,12 @@ describe('OrderService', () => {
         }),
       );
 
-      // Normal order: due date = orderDate + 2 days
+      // Normal order: due date = orderDate + 2 days (adjusted if Thursday)
       const callArgs = mockPrismaService.order.create.mock.calls[0][0];
       const orderDate = callArgs.data.orderDate;
       const expectedDue = new Date(orderDate);
       expectedDue.setDate(expectedDue.getDate() + 2);
-      expect(callArgs.data.systemDueDate).toEqual(expectedDue);
+      expect(callArgs.data.systemDueDate).toEqual(adjustDueDateForThursday(expectedDue));
     });
 
     it('should apply B7 express pricing and halved due date for express orders', async () => {
@@ -294,11 +295,11 @@ describe('OrderService', () => {
 
       const callArgs = mockPrismaService.order.create.mock.calls[0][0];
 
-      // B7: Express due date = orderDate + ceil(estimatedDays / 2) = ceil(2/2) = 1
+      // B7: Express due date = orderDate + ceil(estimatedDays / 2) = ceil(2/2) = 1 (adjusted if Thursday)
       const orderDate = callArgs.data.orderDate;
       const expectedExpressDue = new Date(orderDate);
       expectedExpressDue.setDate(expectedExpressDue.getDate() + Math.ceil(2 / 2));
-      expect(callArgs.data.systemDueDate).toEqual(expectedExpressDue);
+      expect(callArgs.data.systemDueDate).toEqual(adjustDueDateForThursday(expectedExpressDue));
 
       // B7: Express surcharge should be 50% of subtotal
       // Items: 2 * 150 = 300 subtotal, express surcharge = 150
@@ -4441,6 +4442,347 @@ describe('OrderService', () => {
       const result = await service.findDueTodayOrders(storeId, { date: '2026-10-07' });
       expect((result as any).data[0].orderNumber).toBe('ORD-WEIGHT-1');
       expect((result as any).data[0].itemCount).toBe(1);
+    });
+  });
+
+  describe('CHANGE 3: Thursday Weekly Off Due Date Adjustments', () => {
+    it('automatically moves Thursday due dates to Friday on createOrder', async () => {
+      // Mock Date to a Tuesday where +2 days = Thursday
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-13T10:00:00.000Z'));
+      try {
+        const createDto: any = {
+          customerId: 'cust-1',
+          isExpress: false,
+          pickupType: PickupType.HOME_DELIVERY,
+          items: [{ garmentCatalogId: 'g-shirt', serviceTypeId: 'svc-standard-wash', quantity: 1 }],
+        };
+        mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+        mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+          { id: 'g-shirt', name: 'Shirt', category: GarmentCategory.MEN, isActive: true },
+        ]);
+        mockPrismaService.serviceType.findMany.mockResolvedValue([
+          {
+            id: 'svc-standard-wash',
+            name: 'Standard Wash',
+            category: ServiceCategory.WASH,
+            estimatedDays: 2,
+            isActive: true,
+          },
+        ]);
+        mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+          { garmentCatalogId: 'g-shirt', serviceTypeId: 'svc-standard-wash', price: 100 },
+        ]);
+        mockPrismaService.store.findUnique.mockResolvedValue({
+          id: 'store-1',
+          expressSurchargePercent: 0,
+        });
+        mockPrismaService.order.create.mockImplementation((args: any) => ({
+          ...args.data,
+          id: 'ord-new',
+          customer: { name: 'Test' },
+          items: [],
+          payments: [],
+          adjustments: [],
+        }));
+
+        await service.createOrder(createDto, 'emp-1', 'store-1');
+        const createdArgs = mockPrismaService.order.create.mock.calls[0][0];
+        // Day of week of systemDueDate should NEVER be Thursday (4)
+        expect(createdArgs.data.systemDueDate.getDay()).not.toBe(4);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('moves Thursday override due date to Friday in updateDueDate', async () => {
+      // 2026-10-15 is Thursday
+      mockPrismaService.order.findUnique.mockResolvedValue({ id: 'ord-1', storeId: 'store-1' });
+      mockPrismaService.order.update.mockResolvedValue({ id: 'ord-1' });
+      jest.spyOn(service, 'findOrderById').mockResolvedValueOnce({ id: 'ord-1' } as any);
+
+      await service.updateDueDate(
+        'ord-1',
+        '2026-10-15T18:00:00.000Z',
+        'Operator delay',
+        'emp-1',
+        'store-1',
+      );
+
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith({
+        where: { id: 'ord-1' },
+        data: expect.objectContaining({
+          effectiveDueDate: expect.any(Date),
+          dueDateOverrideReason: 'Operator delay',
+          dueDateOverriddenBy: 'emp-1',
+        }),
+      });
+
+      const updatedDueDate: Date =
+        mockPrismaService.order.update.mock.calls[0][0].data.effectiveDueDate;
+      // Thursday 2026-10-15 moved to Friday 2026-10-16
+      expect(updatedDueDate.getDay()).toBe(5); // Friday
+    });
+  });
+
+  describe('CHANGE 5: Per Pieces → Weight Based Per-Piece Pricing Exception', () => {
+    it('calculates 3 pieces at ₹40 each to produce ₹120 without requiring kilograms', async () => {
+      const pieceWeightDto: any = {
+        customerId: 'cust-1',
+        isExpress: false,
+        pickupType: PickupType.HOME_DELIVERY,
+        items: [
+          {
+            garmentCatalogId: 'g-weight-exception',
+            serviceTypeId: 'svc-wash-steam',
+            quantity: 3,
+            unitPrice: 40,
+            weight: undefined, // No kg!
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        {
+          id: 'g-weight-exception',
+          name: 'Weight Based',
+          category: GarmentCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 'svc-wash-steam',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+        { garmentCatalogId: 'g-weight-exception', serviceTypeId: 'svc-wash-steam', price: 40 },
+      ]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 0,
+      });
+      mockPrismaService.order.create.mockImplementation((args: any) => ({
+        ...args.data,
+        id: 'ord-weight-piece-1',
+        customer: { name: 'Test' },
+        items: [],
+        payments: [],
+        adjustments: [],
+      }));
+
+      await service.createOrder(pieceWeightDto, 'emp-1', 'store-1');
+      const createCall = mockPrismaService.order.create.mock.calls[0][0];
+
+      // 3 pieces * ₹40 = ₹120 subtotal (₹141.60 with 18% GST)
+      expect(createCall.data.subtotal).toBe(120);
+      expect(createCall.data.totalAmount).toBe(141.6);
+
+      // Does not create fake individual physical garments for weight based entry
+      const createdItem = createCall.data.items.create[0];
+      expect(createdItem.physicalGarments).toBeUndefined();
+      expect(createdItem.quantity).toBe(3);
+      expect(createdItem.unitPrice).toBe(40);
+      expect(createdItem.lineTotal).toBe(120);
+      expect(createdItem.weight).toBeNull();
+    });
+
+    it('updating quantity updates the total (5 pieces at ₹40 = ₹200)', async () => {
+      const pieceWeightDto: any = {
+        customerId: 'cust-1',
+        isExpress: false,
+        pickupType: PickupType.HOME_DELIVERY,
+        items: [
+          {
+            garmentCatalogId: 'g-weight-exception',
+            serviceTypeId: 'svc-wash-steam',
+            quantity: 5,
+            unitPrice: 40,
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        {
+          id: 'g-weight-exception',
+          name: 'Weight Based',
+          category: GarmentCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 'svc-wash-steam',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 0,
+      });
+      mockPrismaService.order.create.mockImplementation((args: any) => ({
+        ...args.data,
+        id: 'ord-weight-piece-2',
+        customer: { name: 'Test' },
+        items: [],
+        payments: [],
+        adjustments: [],
+      }));
+
+      await service.createOrder(pieceWeightDto, 'emp-1', 'store-1');
+      const createCall = mockPrismaService.order.create.mock.calls[0][0];
+      expect(createCall.data.subtotal).toBe(200); // 5 * 40 = 200
+      expect(createCall.data.totalAmount).toBe(236); // 200 + 18% GST = 236
+    });
+
+    it('updating permitted price updates the total (3 pieces at ₹50 = ₹150)', async () => {
+      const pieceWeightDto: any = {
+        customerId: 'cust-1',
+        isExpress: false,
+        pickupType: PickupType.HOME_DELIVERY,
+        items: [
+          {
+            garmentCatalogId: 'g-weight-exception',
+            serviceTypeId: 'svc-wash-steam',
+            quantity: 3,
+            unitPrice: 50,
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        {
+          id: 'g-weight-exception',
+          name: 'Weight Based',
+          category: GarmentCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 'svc-wash-steam',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 0,
+      });
+      mockPrismaService.order.create.mockImplementation((args: any) => ({
+        ...args.data,
+        id: 'ord-weight-piece-3',
+        customer: { name: 'Test' },
+        items: [],
+        payments: [],
+        adjustments: [],
+      }));
+
+      await service.createOrder(pieceWeightDto, 'emp-1', 'store-1');
+      const createCall = mockPrismaService.order.create.mock.calls[0][0];
+      expect(createCall.data.subtotal).toBe(150); // 3 * 50 = 150
+      expect(createCall.data.totalAmount).toBe(177); // 150 + 18% GST = 177
+    });
+
+    it('rejects invalid piece quantity (0 or negative)', async () => {
+      const invalidQtyDto: any = {
+        customerId: 'cust-1',
+        isExpress: false,
+        pickupType: PickupType.HOME_DELIVERY,
+        items: [
+          {
+            garmentCatalogId: 'g-weight-exception',
+            serviceTypeId: 'svc-wash-steam',
+            quantity: 0,
+            unitPrice: 40,
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        {
+          id: 'g-weight-exception',
+          name: 'Weight Based',
+          category: GarmentCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 'svc-wash-steam',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 0,
+      });
+
+      await expect(service.createOrder(invalidQtyDto, 'emp-1', 'store-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('ordinary weight-based orders requiring >= 2.0 kg remain unaffected', async () => {
+      const standardWeightDto: any = {
+        customerId: 'cust-1',
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-weight-exception',
+            serviceTypeId: 'svc-wash-steam',
+            quantity: 1,
+            weight: 1.5, // Less than 2.0 kg!
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        {
+          id: 'g-weight-exception',
+          name: 'Weight Based',
+          category: GarmentCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 'svc-wash-steam',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 0,
+      });
+
+      await expect(service.createOrder(standardWeightDto, 'emp-1', 'store-1')).rejects.toThrow(
+        /Minimum permitted weight is 2\.00 kg/i,
+      );
     });
   });
 });

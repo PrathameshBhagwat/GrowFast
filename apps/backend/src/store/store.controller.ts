@@ -17,8 +17,17 @@ export class StoreController {
     return this.storeService.getStoreConfig(req.user.storeId);
   }
 
+  @Get('top-up-services')
+  async getTopUpServices(@Request() req: any) {
+    const config = await this.storeService.getStoreConfig(req.user.storeId);
+    return {
+      success: true,
+      data: config.topUpServices,
+    };
+  }
+
   @Patch('config')
-  @Roles(Role.OWNER)
+  @Roles(Role.OWNER, Role.MANAGER)
   updateStoreConfig(@Request() req: any, @Body() updateStoreConfigDto: UpdateStoreConfigDto) {
     return this.storeService.updateStoreConfig(req.user.storeId, updateStoreConfigDto);
   }

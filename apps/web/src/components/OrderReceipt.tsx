@@ -1,5 +1,11 @@
 import React from 'react';
-import { OrderDetailDTO, OrderStatus, PaymentStatus } from '@growfast/shared-types';
+import {
+  OrderDetailDTO,
+  OrderStatus,
+  PaymentStatus,
+  GARMENT_COLLECTION_NOTICE,
+  STAIN_REMOVAL_NOTICE,
+} from '@growfast/shared-types';
 
 export interface OrderReceiptProps {
   order: OrderDetailDTO;
@@ -279,6 +285,21 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
               PARTIAL HANDOVER IN PROGRESS ({totalDeliveredPieces}/{totalActivePieces})
             </div>
           ) : null}
+        </div>
+
+        {/* Dashed Separator */}
+        <div className="border-t border-dashed border-gray-400 my-2" />
+
+        {/* Important Customer Notices */}
+        <div className="space-y-1.5 text-[9px] text-gray-700 leading-tight">
+          <div>
+            <span className="font-bold text-gray-900">Garment collection notice: </span>
+            <span>{GARMENT_COLLECTION_NOTICE}</span>
+          </div>
+          <div>
+            <span className="font-bold text-gray-900">Stain removal notice: </span>
+            <span>{STAIN_REMOVAL_NOTICE}</span>
+          </div>
         </div>
 
         {/* Dashed Separator */}
@@ -640,6 +661,18 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* ─── 7.5 Important Notices ────────────────────────────────────── */}
+      <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-md text-xs text-gray-700 space-y-2 mt-4 text-left">
+        <div>
+          <span className="font-bold text-gray-900">Garment collection notice: </span>
+          <span>{GARMENT_COLLECTION_NOTICE}</span>
+        </div>
+        <div>
+          <span className="font-bold text-gray-900">Stain removal notice: </span>
+          <span>{STAIN_REMOVAL_NOTICE}</span>
+        </div>
       </div>
 
       {/* ─── 8. Footer & Terms ────────────────────────────────────────── */}

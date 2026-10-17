@@ -101,5 +101,36 @@ describe('StoreController (Phase T4: Tag Designer)', () => {
       expect(res.success).toBe(true);
       expect(res.data).toEqual(DEFAULT_TAG_DESIGN);
     });
+
+    it('getTopUpServices returns topUpServices from store config', async () => {
+      const mockReq = { user: { id: 'emp-1', storeId: 'store-alpha', role: 'OWNER' } };
+      storeService.getStoreConfig.mockResolvedValue({
+        id: 'store-alpha',
+        name: 'Alpha Store',
+        expressSurchargePercent: 20,
+        topUpServices: [{ id: 'addon-1', name: 'Starching', price: 35 }],
+      });
+
+      const res = await controller.getTopUpServices(mockReq);
+
+      expect(storeService.getStoreConfig).toHaveBeenCalledWith('store-alpha');
+      expect(res.success).toBe(true);
+      expect(res.data).toEqual([{ id: 'addon-1', name: 'Starching', price: 35 }]);
+    });
+
+    it('updateStoreConfig delegates to storeService with req.user.storeId', async () => {
+      const mockReq = { user: { id: 'emp-1', storeId: 'store-alpha', role: 'OWNER' } };
+      const dto = { topUpServices: [{ id: 'addon-1', name: 'Starching', price: 40 }] };
+      storeService.updateStoreConfig.mockResolvedValue({
+        id: 'store-alpha',
+        name: 'Alpha Store',
+        topUpServices: dto.topUpServices,
+      });
+
+      const res = await controller.updateStoreConfig(mockReq, dto as any);
+
+      expect(storeService.updateStoreConfig).toHaveBeenCalledWith('store-alpha', dto);
+      expect(res.topUpServices).toEqual(dto.topUpServices);
+    });
   });
 });
