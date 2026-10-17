@@ -178,16 +178,14 @@ export function isServiceAllowedInWorkflow<T extends { name: string; category?: 
 
 /**
  * Returns whether a garment category is allowed in the given order workflow.
- * - DRY_CLEANING: strictly per-piece; WEIGHT_BASED is not allowed.
+ * - DRY_CLEANING: per-piece workflow, allows piece categories and WEIGHT_BASED as an exception.
  * - LAUNDRY: supports both weight-based and piece categories.
  */
 export function isCategoryAllowedInWorkflow(
   category: string | GarmentCategory,
   workflow: OrderWorkflowType,
 ): boolean {
-  if (workflow === 'DRY_CLEANING') {
-    return !isWeightBasedCategory(category);
-  }
+  // WEIGHT_BASED is allowed in DRY_CLEANING as a weight-based exception category
   return true;
 }
 
@@ -256,9 +254,9 @@ export function isItemCompatibleWithWorkflow(
 /**
  * Filters services based on category, workflow, and catalog visibility rules:
  * - Removes "Free Shoe" and "Reprocess Cleaning" everywhere.
+ * - When category is Weight Based (exception or laundry): returns weight/wash services, excludes Dry Clean.
  * - When workflow is provided: filters to services allowed in that workflow.
  * - Shoe category: hides Steam Iron, Wash + Steam Iron, Starching.
- * - Weight-based category: hides Dry Clean (Dry Cleaning is strictly per-piece).
  * - All other categories: returns all other non-excluded services.
  */
 export function filterServicesForCategory<T extends { name: string; category?: string }>(
@@ -271,6 +269,13 @@ export function filterServicesForCategory<T extends { name: string; category?: s
     (s) => !CATALOG_EXCLUDED_SERVICES.includes(s.name.trim().toLowerCase()),
   );
 
+  // If category is weight-based (exception in dry cleaning or laundry), return wash/weight services
+  if (isWeightBasedCategory(category)) {
+    return availableServices.filter(
+      (s) => s.name.trim().toLowerCase() !== 'dry clean' && s.category !== 'DRY_CLEAN',
+    );
+  }
+
   if (workflow) {
     availableServices = availableServices.filter((s) => isServiceAllowedInWorkflow(s, workflow));
   }
@@ -281,42 +286,28 @@ export function filterServicesForCategory<T extends { name: string; category?: s
     );
   }
 
-  // Weight-based items are exclusively for Laundry — Dry Cleaning is strictly per-piece
-  if (isWeightBasedCategory(category)) {
-    return availableServices.filter((s) => s.name.trim().toLowerCase() !== 'dry clean');
-  }
-
   return availableServices;
 }
 
 /**
  * Filters visible categories based on active service and workflow:
- * - When workflow is Dry Cleaning: hides Weight Based category (strictly per-piece).
  * - When Starching is selected: returns ONLY [Men, Women, Kids].
- * - When Dry Clean is selected: hides Weight Based (Dry Cleaning is strictly per-piece).
+ * - Weight Based is kept available as an exception option in categories.
  * - When other services are selected: returns all categories unchanged.
  */
 export function filterCategoriesForService<T extends string>(
   categories: T[],
   activeServiceId: string,
   services: Array<{ id: string; name: string }>,
-  workflow?: OrderWorkflowType,
+  _workflow?: OrderWorkflowType,
 ): T[] {
   let result = categories;
-
-  if (workflow === 'DRY_CLEANING') {
-    result = result.filter((c) => !isWeightBasedCategory(c));
-  }
 
   if (isStarchingService(activeServiceId, services)) {
     const allowed = [GarmentCategory.MEN, GarmentCategory.WOMEN, GarmentCategory.KIDS].map((c) =>
       String(c).trim().toUpperCase(),
     );
     return result.filter((c) => allowed.includes(String(c).trim().toUpperCase()));
-  }
-
-  if (isDryCleanService(activeServiceId, services)) {
-    return result.filter((c) => String(c).trim().toUpperCase() !== GarmentCategory.WEIGHT_BASED);
   }
 
   return result;
@@ -394,12 +385,23 @@ export function resolveCatalogSelectionOnCategoryChange<
   workflow?: OrderWorkflowType,
 ): string {
   const getFallbackService = (): T | undefined => {
-    if (workflow === 'DRY_CLEANING') {
+    if (workflow === 'DRY_CLEANING' && !isWeightBasedCategory(newCategory)) {
       return (
         services.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN') ||
         services.find((s) => isServiceAllowedInWorkflow(s, 'DRY_CLEANING'))
       );
     }
+    const preferredLaundryNames = [
+      'wash and steam iron',
+      'wash + steam iron',
+      'standard wash',
+      'wash and fold',
+      'premium laundry',
+    ];
+    const laundry = services.find((s) =>
+      preferredLaundryNames.includes(s.name.trim().toLowerCase()),
+    );
+    if (laundry) return laundry;
     const standardWash = services.find((s) => s.name.trim().toLowerCase() === 'standard wash');
     if (standardWash) return standardWash;
     return services.find((s) => isServiceAllowedInWorkflow(s, 'LAUNDRY'));
@@ -418,6 +420,17 @@ export function resolveCatalogSelectionOnCategoryChange<
 
   if (isWeightBasedCategory(newCategory)) {
     if (isDryCleanService(currentServiceId, services)) {
+      const fallback = getFallbackService();
+      if (fallback) {
+        return fallback.id;
+      }
+    }
+  }
+
+  // When switching away from Weight Based (or an incompatible service) in DRY_CLEANING workflow
+  if (workflow === 'DRY_CLEANING' && !isWeightBasedCategory(newCategory)) {
+    const curSvc = services.find((s) => s.id === currentServiceId);
+    if (!curSvc || !isServiceAllowedInWorkflow(curSvc, 'DRY_CLEANING')) {
       const fallback = getFallbackService();
       if (fallback) {
         return fallback.id;

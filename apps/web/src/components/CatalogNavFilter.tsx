@@ -1,5 +1,5 @@
 import React, { useRef, useMemo } from 'react';
-import { Search, Sparkles, Layers } from 'lucide-react';
+import { Search, Sparkles, Layers, Scale } from 'lucide-react';
 import {
   GarmentCategory,
   filterCategoriesForService,
@@ -33,7 +33,7 @@ export const DEFAULT_CATEGORY_LABELS: Record<string, string> = {
   HOME_CLEANING: 'Home Cleaning',
   SHOES: 'Shoe',
   OTHERS: 'Other',
-  WEIGHT_BASED: 'Weight Based',
+  WEIGHT_BASED: 'Weight Based (Exception)',
 };
 
 export type CatalogSortOption = 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
@@ -284,6 +284,8 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
           {visibleCategories.map((cat) => {
             const isActive = activeCategory === cat;
             const label = categoryLabels[cat] || cat;
+            const isWeightException =
+              cat === GarmentCategory.WEIGHT_BASED || cat === 'WEIGHT_BASED';
 
             return (
               <button
@@ -305,14 +307,33 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
                   justifyContent: 'center',
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: isActive ? 'var(--accent)' : 'var(--bg-surface-inset)',
-                  color: isActive ? '#ffffff' : 'var(--text-primary)',
+                  border: isActive
+                    ? '1px solid var(--accent)'
+                    : isWeightException
+                      ? '1px dashed #d97706'
+                      : '1px solid var(--border)',
+                  background: isActive
+                    ? 'var(--accent)'
+                    : isWeightException
+                      ? 'rgba(245, 158, 11, 0.08)'
+                      : 'var(--bg-surface-inset)',
+                  color: isActive
+                    ? '#ffffff'
+                    : isWeightException
+                      ? '#b45309'
+                      : 'var(--text-primary)',
                   boxShadow: isActive ? '0 2px 6px -1px rgba(37, 99, 235, 0.3)' : 'none',
                   flexShrink: 0,
                 }}
               >
-                <span>{label}</span>
+                {isWeightException ? (
+                  <span className="flex items-center gap-1.5">
+                    <Scale size={13} className={isActive ? 'text-white' : 'text-amber-600'} />
+                    <span>{label}</span>
+                  </span>
+                ) : (
+                  <span>{label}</span>
+                )}
               </button>
             );
           })}

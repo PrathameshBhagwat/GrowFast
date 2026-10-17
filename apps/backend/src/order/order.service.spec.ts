@@ -3904,6 +3904,38 @@ describe('OrderService', () => {
       );
     });
 
+    it('Scenario 10e: Allows weight-based items as an exception in Dry Cleaning workflow with min 2.00 kg validation', async () => {
+      setupMocks({ isWeightGarment: true, price: 90 });
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 's-wash-fold',
+          name: 'Wash and Fold',
+          category: ServiceCategory.WASH,
+          isActive: true,
+          estimatedDays: 2,
+        },
+      ]);
+
+      const weightExceptionDto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        workflow: 'DRY_CLEANING',
+        items: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-wash-fold',
+            quantity: 1,
+            weight: 3.5,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      const result = await service.createOrder(weightExceptionDto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.id).toBe('order-created-123');
+    });
+
     // 11. Captured photos are visible immediately after order creation.
     it('Scenario 11: Captured photos are returned with physicalGarments immediately after order creation', async () => {
       setupMocks();

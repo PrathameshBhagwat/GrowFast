@@ -278,13 +278,12 @@ export function OrderWizardPage() {
   const handleAddItem = (garment: any, serviceId: string, unitPrice: number) => {
     const service = services.find((s) => s.id === serviceId);
     const serviceName = service ? formatCatalogServiceName(service.name) : 'Unknown';
-    // Weight-based processing is strictly exclusive to Laundry workflow
+    // Weight-based processing (including weight-based exceptions in dry cleaning)
     const isWeightBased =
-      activeWorkflow === 'LAUNDRY' &&
-      (garment.category === 'WEIGHT_BASED' ||
-        garment.category === GarmentCategory.WEIGHT_BASED ||
-        service?.category === 'WEIGHT_BASED' ||
-        service?.category === ServiceCategory.WEIGHT_BASED);
+      garment.category === 'WEIGHT_BASED' ||
+      garment.category === GarmentCategory.WEIGHT_BASED ||
+      service?.category === 'WEIGHT_BASED' ||
+      service?.category === ServiceCategory.WEIGHT_BASED;
 
     if (isWeightBased) {
       setWeightModalData({
@@ -1112,57 +1111,22 @@ export function OrderWizardPage() {
               transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
           >
-            {/* Inline Laundry / Dry Cleaning Sub-Selector (Per-Piece mode only) */}
+            {/* Per-Piece Dry Cleaning Catalog Header */}
             <div
-              className="shrink-0 px-3 py-2 flex items-center gap-2.5"
+              className="shrink-0 px-3 py-2 flex items-center justify-between"
               style={{
                 background: 'var(--bg-surface-muted, #f8fafc)',
                 borderBottom: '1px solid var(--border)',
               }}
             >
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                Service:
-              </span>
-              <div className="flex items-center gap-1.5" role="tablist">
-                <button
-                  type="button"
-                  id="workflow-dryclean-btn"
-                  role="tab"
-                  aria-selected={activeWorkflow === 'DRY_CLEANING'}
-                  onClick={() => handleRequestWorkflowSwitch('DRY_CLEANING')}
-                  className={`min-h-[34px] px-3 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeWorkflow === 'DRY_CLEANING'
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
-                >
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-purple-700 flex items-center gap-1.5">
                   <Sparkles size={13} />
-                  <span>Dry Cleaning</span>
-                </button>
-                <button
-                  type="button"
-                  id="workflow-laundry-btn"
-                  role="tab"
-                  aria-selected={activeWorkflow === 'LAUNDRY'}
-                  onClick={() => handleRequestWorkflowSwitch('LAUNDRY')}
-                  className={`min-h-[34px] px-3 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeWorkflow === 'LAUNDRY'
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
-                >
-                  <Scale size={13} />
-                  <span>Laundry (Per Piece)</span>
-                </button>
+                  <span>Per-Piece Garments (Dry Cleaning)</span>
+                </span>
               </div>
-              <span
-                className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ml-auto ${
-                  activeWorkflow === 'LAUNDRY'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-purple-100 text-purple-700'
-                }`}
-              >
-                {activeWorkflow === 'LAUNDRY' ? 'Per-piece Laundry' : 'Per-piece Dry Clean'}
+              <span className="text-[10px] text-slate-500 font-medium">
+                Tip: Select "Weight Based (Exception)" category for weight-measured items
               </span>
             </div>
 

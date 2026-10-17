@@ -72,6 +72,17 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   // Preferred service resolver: ensures workflow opens with primary intuitive service
   const getPreferredServiceId = (serviceList: typeof visibleServices, wf?: OrderWorkflowType) => {
     if (serviceList.length === 0) return '';
+    if (selectedCategory === GarmentCategory.WEIGHT_BASED || selectedCategory === 'WEIGHT_BASED') {
+      const preferred = [
+        'wash and steam iron',
+        'wash + steam iron',
+        'standard wash',
+        'wash and fold',
+        'premium laundry',
+      ];
+      const laundrySvc = serviceList.find((s) => preferred.includes(s.name.trim().toLowerCase()));
+      if (laundrySvc) return laundrySvc.id;
+    }
     if (wf === 'DRY_CLEANING') {
       const dc = serviceList.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN');
       if (dc) return dc.id;
@@ -185,11 +196,6 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
   const handleGarmentClick = (garment: any) => {
     if (!selectedServiceId) return;
-
-    // Safety: Dry Cleaning workflow strictly forbids weight-based garments
-    if (workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED) {
-      return;
-    }
 
     const unitPrice = priceMap.get(`${garment.id}:${selectedServiceId}`) ?? 0;
     onGarmentSelect(garment, selectedServiceId, unitPrice);

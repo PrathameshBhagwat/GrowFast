@@ -134,7 +134,10 @@ export class OrderService {
         }
 
         if (dto.workflow) {
-          if (!isServiceAllowedInWorkflow(service, dto.workflow)) {
+          const isWeightException =
+            dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
+
+          if (!isWeightException && !isServiceAllowedInWorkflow(service, dto.workflow)) {
             throw new BadRequestException(
               `Service "${service.name}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
             );

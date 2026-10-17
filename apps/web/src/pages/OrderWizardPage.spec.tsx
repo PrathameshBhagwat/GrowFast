@@ -255,30 +255,19 @@ describe('OrderWizardPage', () => {
     expect(notesTextarea).toHaveClass('w-full');
   });
 
-  it('renders both Laundry and Dry Cleaning workflow choices as visible, accessible, and selectable', async () => {
-    const { fireEvent } = await import('@testing-library/react');
+  it('renders Dry Cleaning as default workflow in per-piece without secondary laundry toggle, and exposes Weight Based exception category', async () => {
     renderWithRouter('/orders/new?customerId=cust-003');
 
-    const laundryBtn = await screen.findByRole('tab', { name: /Laundry/i });
-    const dryCleanBtn = await screen.findByRole('tab', { name: /Dry Cleaning/i });
+    // Secondary laundry sub-selector toggle is removed from per-piece
+    expect(screen.queryByRole('tab', { name: /Laundry \(Per Piece\)/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Per-Piece Garments (Dry Cleaning)')).toBeInTheDocument();
 
-    expect(laundryBtn).toBeInTheDocument();
-    expect(dryCleanBtn).toBeInTheDocument();
-
-    // Dry Cleaning is selected by default for per-piece orders
-    expect(dryCleanBtn).toHaveAttribute('aria-selected', 'true');
-    expect(laundryBtn).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByText('Per-piece Dry Clean')).toBeInTheDocument();
-
-    // Click Laundry button to switch
-    fireEvent.click(laundryBtn);
-
-    expect(laundryBtn).toHaveAttribute('aria-selected', 'true');
-    expect(dryCleanBtn).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByText('Per-piece Laundry')).toBeInTheDocument();
+    // Weight Based exception category is visible with the categories
+    const wbCategoryBtn = await screen.findByRole('button', { name: /Weight Based/i });
+    expect(wbCategoryBtn).toBeInTheDocument();
   });
 
-  it('shows only Dry Cleaning services and excludes WEIGHT_BASED category when Dry Cleaning is selected', async () => {
+  it('shows Dry Clean service and includes Weight Based (Exception) category when per-piece is active', async () => {
     (global.fetch as any).mockImplementation(async (url: string) => {
       if (url.includes('/customers/cust-003')) {
         return { ok: true, json: async () => ({ data: mockCustomer }) };
@@ -290,7 +279,7 @@ describe('OrderWizardPage', () => {
             success: true,
             data: [
               { garmentCatalogId: 'g1', serviceTypeId: 's1', price: 120 },
-              { garmentCatalogId: 'g1', serviceTypeId: 's2', price: 80 },
+              { garmentCatalogId: 'g2', serviceTypeId: 's2', price: 80 },
             ],
           }),
         };
@@ -341,11 +330,18 @@ describe('OrderWizardPage', () => {
       expect(screen.getByText('Dry Clean')).toBeInTheDocument();
     });
 
-    // In Dry Cleaning workflow, Wash and Fold is not shown
+    // In Dry Cleaning workflow on Men, Wash and Fold is not shown
     expect(screen.queryByText('Wash and Fold')).not.toBeInTheDocument();
 
-    // In Dry Cleaning workflow, Weight Based category tab is not rendered
-    expect(screen.queryByText('Weight Based')).not.toBeInTheDocument();
+    // In Dry Cleaning workflow, Weight Based exception category is present with the categories
+    const wbTab = await screen.findByRole('button', { name: /Weight Based/i });
+    expect(wbTab).toBeInTheDocument();
+
+    // Clicking Weight Based exception category reveals weight-based garments
+    fireEvent.click(wbTab);
+    await waitFor(() => {
+      expect(screen.getByText('Bulk Laundry')).toBeInTheDocument();
+    });
   });
 
   it('enforces minimum 2.00 kg weight in Laundry workflow weight modal', async () => {
@@ -395,7 +391,7 @@ describe('OrderWizardPage', () => {
     renderWithRouter('/orders/new?customerId=cust-003&workflow=laundry');
 
     // Switch to Weight Based category
-    const wbTab = await screen.findByText('Weight Based');
+    const wbTab = await screen.findByRole('button', { name: /Weight Based/i });
     fireEvent.click(wbTab);
 
     // Click Add on Bulk Laundry
@@ -492,7 +488,7 @@ describe('OrderWizardPage', () => {
     renderWithRouter('/orders/new?customerId=cust-003&workflow=laundry');
 
     // Add a weight-based laundry item
-    const wbTab = await screen.findByText('Weight Based');
+    const wbTab = await screen.findByRole('button', { name: /Weight Based/i });
     fireEvent.click(wbTab);
 
     const addBtn = await screen.findByRole('button', { name: /^Add$/i });
@@ -507,9 +503,9 @@ describe('OrderWizardPage', () => {
       expect(screen.getByText(/3 kg @/i)).toBeInTheDocument();
     });
 
-    // Now operator tries to switch to Dry Cleaning workflow
-    const dryCleanBtn = screen.getByRole('tab', { name: /Dry Cleaning/i });
-    fireEvent.click(dryCleanBtn);
+    // Now operator tries to switch to Dry Cleaning workflow via top "Create Order Per Piece" button
+    const piecesBtn = screen.getByRole('button', { name: /Create Order Per Piece/i });
+    fireEvent.click(piecesBtn);
 
     // Confirmation modal appears explaining incompatibility
     await waitFor(() => {

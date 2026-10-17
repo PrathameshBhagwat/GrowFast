@@ -100,10 +100,10 @@ describe('filterCategoriesForService', () => {
     ]);
   });
 
-  it('hides Weight Based category when Dry Clean is selected (Dry Clean is strictly per-piece)', () => {
+  it('preserves Weight Based category as an exception when Dry Clean is selected', () => {
     const dryCleanResult = filterCategoriesForService(allCategories, '2', mockServices);
-    assert.strictEqual(dryCleanResult.length, 7);
-    assert.ok(!dryCleanResult.includes(GarmentCategory.WEIGHT_BASED));
+    assert.strictEqual(dryCleanResult.length, 8);
+    assert.ok(dryCleanResult.includes(GarmentCategory.WEIGHT_BASED));
     assert.ok(dryCleanResult.includes(GarmentCategory.MEN));
     assert.ok(dryCleanResult.includes(GarmentCategory.WOMEN));
     assert.ok(dryCleanResult.includes(GarmentCategory.KIDS));
@@ -257,13 +257,13 @@ describe('Order Creation Workflows - Laundry vs Dry Cleaning Separation', () => 
     assert.strictEqual(isServiceAllowedInWorkflow({ name: 'Free Shoe' }, 'DRY_CLEANING'), false);
   });
 
-  it('isCategoryAllowedInWorkflow allows WEIGHT_BASED in Laundry and forbids WEIGHT_BASED in Dry Cleaning', () => {
+  it('isCategoryAllowedInWorkflow allows WEIGHT_BASED in Laundry and allows WEIGHT_BASED as exception in Dry Cleaning', () => {
     assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.WEIGHT_BASED, 'LAUNDRY'), true);
     assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.MEN, 'LAUNDRY'), true);
     assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.WOMEN, 'LAUNDRY'), true);
     assert.strictEqual(
       isCategoryAllowedInWorkflow(GarmentCategory.WEIGHT_BASED, 'DRY_CLEANING'),
-      false,
+      true,
     );
     assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.MEN, 'DRY_CLEANING'), true);
     assert.strictEqual(
@@ -288,9 +288,9 @@ describe('Order Creation Workflows - Laundry vs Dry Cleaning Separation', () => 
     assert.ok(!dryCleanServices.some((s) => s.name === 'Wash + Steam Iron'));
   });
 
-  it('filterCategoriesForService hides WEIGHT_BASED when in Dry Cleaning workflow', () => {
+  it('filterCategoriesForService keeps WEIGHT_BASED as an exception category in Dry Cleaning workflow', () => {
     const result = filterCategoriesForService(allCategories, '1', mockServices, 'DRY_CLEANING');
-    assert.ok(!result.includes(GarmentCategory.WEIGHT_BASED));
+    assert.ok(result.includes(GarmentCategory.WEIGHT_BASED));
     assert.ok(result.includes(GarmentCategory.MEN));
   });
 
