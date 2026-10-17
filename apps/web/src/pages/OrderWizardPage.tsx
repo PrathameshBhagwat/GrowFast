@@ -59,10 +59,10 @@ export function OrderWizardPage() {
     paramWorkflow === 'LAUNDRY'
       ? 'LAUNDRY'
       : paramWorkflow === 'DRY_CLEANING'
-      ? 'DRY_CLEANING'
-      : initialEntryMode === 'WEIGHT'
-      ? 'LAUNDRY'
-      : 'DRY_CLEANING';
+        ? 'DRY_CLEANING'
+        : initialEntryMode === 'WEIGHT'
+          ? 'LAUNDRY'
+          : 'DRY_CLEANING';
   const [activeWorkflow, setActiveWorkflow] = useState<OrderWorkflowType>(initialWorkflow);
 
   // Workflow switch modal confirmation state
@@ -2472,13 +2472,19 @@ export function OrderWizardPage() {
                   <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-1">
                     <Check size={18} strokeWidth={3} />
                   </div>
-                  <p className="text-sm font-bold text-emerald-900">All required photos attached!</p>
-                  <p className="text-xs text-emerald-700">You can now proceed to create the order.</p>
+                  <p className="text-sm font-bold text-emerald-900">
+                    All required photos attached!
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    You can now proceed to create the order.
+                  </p>
                 </div>
               ) : (
                 missingPiecesList.map((m, idx) => {
                   const targetItem = items[m.itemIndex];
-                  const isWb = targetItem?.isWeightBased || (targetItem?.weight != null && targetItem?.weight > 0);
+                  const isWb =
+                    targetItem?.isWeightBased ||
+                    (targetItem?.weight != null && targetItem?.weight > 0);
 
                   const snapPhotoForItem = () => {
                     const canvas = document.createElement('canvas');
@@ -2495,16 +2501,22 @@ export function OrderWizardPage() {
                       ctx.font = '14px sans-serif';
                       ctx.fillText(`${m.unitLabel} • ${new Date().toLocaleTimeString()}`, 200, 165);
                     }
-                    canvas.toBlob((blob) => {
-                      if (blob) {
-                        const file = new File([blob], `snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
-                        if (isWb) {
-                          handleAddBatchPhoto(m.itemIndex, file);
-                        } else if (m.unitNumber != null) {
-                          handleAddPhotoToPiece(m.itemIndex, m.unitNumber, file);
+                    canvas.toBlob(
+                      (blob) => {
+                        if (blob) {
+                          const file = new File([blob], `snap-${Date.now()}.jpg`, {
+                            type: 'image/jpeg',
+                          });
+                          if (isWb) {
+                            handleAddBatchPhoto(m.itemIndex, file);
+                          } else if (m.unitNumber != null) {
+                            handleAddPhotoToPiece(m.itemIndex, m.unitNumber, file);
+                          }
                         }
-                      }
-                    }, 'image/jpeg', 0.9);
+                      },
+                      'image/jpeg',
+                      0.9,
+                    );
                   };
 
                   return (
@@ -2516,9 +2528,7 @@ export function OrderWizardPage() {
                         <div className="text-sm font-bold text-slate-900 truncate">
                           {m.garmentName}
                         </div>
-                        <div className="text-xs text-slate-500 font-medium">
-                          {m.unitLabel}
-                        </div>
+                        <div className="text-xs text-slate-500 font-medium">{m.unitLabel}</div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
@@ -2586,7 +2596,9 @@ export function OrderWizardPage() {
                     // Snap all remaining photos with one click!
                     missingPiecesList.forEach((m) => {
                       const targetItem = items[m.itemIndex];
-                      const isWb = targetItem?.isWeightBased || (targetItem?.weight != null && targetItem?.weight > 0);
+                      const isWb =
+                        targetItem?.isWeightBased ||
+                        (targetItem?.weight != null && targetItem?.weight > 0);
                       const canvas = document.createElement('canvas');
                       canvas.width = 400;
                       canvas.height = 300;
@@ -2599,18 +2611,28 @@ export function OrderWizardPage() {
                         ctx.textAlign = 'center';
                         ctx.fillText(m.garmentName, 200, 130);
                         ctx.font = '14px sans-serif';
-                        ctx.fillText(`${m.unitLabel} • ${new Date().toLocaleTimeString()}`, 200, 165);
+                        ctx.fillText(
+                          `${m.unitLabel} • ${new Date().toLocaleTimeString()}`,
+                          200,
+                          165,
+                        );
                       }
-                      canvas.toBlob((blob) => {
-                        if (blob) {
-                          const file = new File([blob], `snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
-                          if (isWb) {
-                            handleAddBatchPhoto(m.itemIndex, file);
-                          } else if (m.unitNumber != null) {
-                            handleAddPhotoToPiece(m.itemIndex, m.unitNumber, file);
+                      canvas.toBlob(
+                        (blob) => {
+                          if (blob) {
+                            const file = new File([blob], `snap-${Date.now()}.jpg`, {
+                              type: 'image/jpeg',
+                            });
+                            if (isWb) {
+                              handleAddBatchPhoto(m.itemIndex, file);
+                            } else if (m.unitNumber != null) {
+                              handleAddPhotoToPiece(m.itemIndex, m.unitNumber, file);
+                            }
                           }
-                        }
-                      }, 'image/jpeg', 0.9);
+                        },
+                        'image/jpeg',
+                        0.9,
+                      );
                     });
                   }
                 }}

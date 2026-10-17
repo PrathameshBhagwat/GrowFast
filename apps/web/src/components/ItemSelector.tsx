@@ -83,16 +83,14 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
         'wash and fold',
         'premium laundry',
       ];
-      const laundrySvc = serviceList.find((s) =>
-        preferred.includes(s.name.trim().toLowerCase()),
-      );
+      const laundrySvc = serviceList.find((s) => preferred.includes(s.name.trim().toLowerCase()));
       if (laundrySvc) return laundrySvc.id;
     }
     return serviceList[0]?.id || '';
   };
 
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
-    getPreferredServiceId(visibleServices, workflow) || activeServices[0]?.id || '',
+  const [selectedServiceId, setSelectedServiceId] = useState<string>(
+    () => getPreferredServiceId(visibleServices, workflow) || activeServices[0]?.id || '',
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');

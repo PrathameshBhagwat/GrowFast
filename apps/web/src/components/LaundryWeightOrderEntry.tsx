@@ -833,12 +833,18 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                                       ctx.textAlign = 'center';
                                       ctx.fillText(`Batch: ${item.weight} kg`, 200, 150);
                                     }
-                                    canvas.toBlob((blob) => {
-                                      if (blob) {
-                                        const file = new File([blob], `batch-${Date.now()}.jpg`, { type: 'image/jpeg' });
-                                        onAddBatchPhotoToItem(idx, file);
-                                      }
-                                    }, 'image/jpeg', 0.9);
+                                    canvas.toBlob(
+                                      (blob) => {
+                                        if (blob) {
+                                          const file = new File([blob], `batch-${Date.now()}.jpg`, {
+                                            type: 'image/jpeg',
+                                          });
+                                          onAddBatchPhotoToItem(idx, file);
+                                        }
+                                      },
+                                      'image/jpeg',
+                                      0.9,
+                                    );
                                   }}
                                   className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
                                 >
