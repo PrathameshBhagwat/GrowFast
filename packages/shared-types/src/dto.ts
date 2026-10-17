@@ -22,6 +22,7 @@ import {
   AdjustmentType,
   AdjustmentStatus,
 } from './enums';
+import type { OrderWorkflowType, OrderEntryMode } from './catalog';
 
 // ─── Auth DTOs ──────────────────────────────────────────────────────
 
@@ -203,6 +204,8 @@ export interface CreateOrderRequest {
   pickupType: PickupType;
   items: CreateOrderItemRequest[];
   notes?: string;
+  workflow?: OrderWorkflowType;
+  entryMode?: OrderEntryMode;
 }
 
 export interface CreateOrderPieceRequest {

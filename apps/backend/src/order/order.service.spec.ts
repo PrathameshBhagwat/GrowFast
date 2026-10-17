@@ -19,6 +19,8 @@ import {
   Role,
   PaymentMode,
   OrderPickupRequest,
+  ServiceCategory,
+  GarmentCategory,
 } from '@growfast/shared-types';
 
 const mockPrismaService: any = {
@@ -919,7 +921,114 @@ describe('OrderService', () => {
 
       await expect(
         service.updateOrderItem('o1', 'item-w', { weight: 0 }, 'store1'),
-      ).rejects.toThrow(new BadRequestException('Weight in kg must be greater than 0.'));
+      ).rejects.toThrow(new BadRequestException('Minimum permitted weight is 2.00 kg.'));
+
+      await expect(
+        service.updateOrderItem('o1', 'item-w', { weight: 1.5 }, 'store1'),
+      ).rejects.toThrow(new BadRequestException('Minimum permitted weight is 2.00 kg.'));
+    });
+
+    it('should reject updating weight for Dry Cleaning service (Dry Cleaning is strictly per-piece)', async () => {
+      const dryCleanOrder = {
+        ...mockOrder,
+        items: [
+          {
+            id: 'item-dc',
+            quantity: 1,
+            weight: null,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.PROCESSING,
+            unitPrice: 150,
+            serviceTypeId: 'svc-dry-clean',
+            garmentCatalogId: 'g1',
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(dryCleanOrder);
+      mockPrismaService.physicalGarment.count.mockResolvedValue(1);
+      mockPrismaService.serviceType.findUnique.mockResolvedValue({
+        id: 'svc-dry-clean',
+        name: 'Dry Clean',
+        category: ServiceCategory.DRY_CLEAN,
+      });
+
+      await expect(
+        service.updateOrderItem('o1', 'item-dc', { weight: 3.5 }, 'store1'),
+      ).rejects.toThrow(
+        new BadRequestException('Dry Cleaning is strictly per-piece and does not support weight.'),
+      );
+    });
+
+    it('should reject updating service to Dry Cleaning if item already has weight', async () => {
+      const weightOrder = {
+        ...mockOrder,
+        items: [
+          {
+            id: 'item-w',
+            quantity: 1,
+            weight: 3.5,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.PROCESSING,
+            unitPrice: 80,
+            serviceTypeId: 'svc-wash',
+            garmentCatalogId: 'g1',
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(weightOrder);
+      mockPrismaService.physicalGarment.count.mockResolvedValue(0);
+      mockPrismaService.serviceType.findUnique.mockResolvedValue({
+        id: 'svc-dry-clean',
+        name: 'Dry Clean',
+        category: ServiceCategory.DRY_CLEAN,
+        isActive: true,
+      });
+
+      await expect(
+        service.updateOrderItem('o1', 'item-w', { serviceTypeId: 'svc-dry-clean' }, 'store1'),
+      ).rejects.toThrow(
+        new BadRequestException('Dry Cleaning is strictly per-piece and does not support weight.'),
+      );
+    });
+
+    it('should reject updating garment to WEIGHT_BASED if service is Dry Cleaning', async () => {
+      const dryCleanOrder = {
+        ...mockOrder,
+        items: [
+          {
+            id: 'item-dc',
+            quantity: 1,
+            weight: null,
+            deliveredQuantity: 0,
+            itemStatus: ItemStatus.PROCESSING,
+            unitPrice: 150,
+            serviceTypeId: 'svc-dry-clean',
+            garmentCatalogId: 'g1',
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(dryCleanOrder);
+      mockPrismaService.physicalGarment.count.mockResolvedValue(0);
+      mockPrismaService.serviceType.findUnique.mockResolvedValue({
+        id: 'svc-dry-clean',
+        name: 'Dry Clean',
+        category: ServiceCategory.DRY_CLEAN,
+        isActive: true,
+      });
+      mockPrismaService.garmentCatalog.findUnique.mockResolvedValue({
+        id: 'g-weight',
+        name: 'Mixed Weight Laundry',
+        category: GarmentCategory.WEIGHT_BASED,
+        isActive: true,
+      });
+
+      await expect(
+        service.updateOrderItem('o1', 'item-dc', { garmentCatalogId: 'g-weight' }, 'store1'),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Dry Cleaning is strictly per-piece and does not support weight-based processing.',
+        ),
+      );
     });
 
     it('should reject reducing weight if new total is less than amount already paid', async () => {
@@ -3513,8 +3622,8 @@ describe('OrderService', () => {
       expect(result.itemCount).toBe(49);
     });
 
-    // 6. Walk-in, 50 pieces, no photos => succeeds.
-    it('Scenario 6: Walk-in, 50 pieces (bulk threshold), no photos => succeeds', async () => {
+    // 5b. Walk-in, exactly 50 pieces, no photos => rejected (up to and including 50 pieces is mandatory)
+    it('Scenario 5b: Walk-in, exactly 50 pieces, no photos => rejected (up to and including 50 pieces is mandatory)', async () => {
       setupMocks();
       const dto: any = {
         customerId,
@@ -3528,9 +3637,29 @@ describe('OrderService', () => {
           },
         ],
       };
+      await expect(service.createOrder(dto, employeeId, storeId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // 6. Walk-in, 51 pieces, no photos => succeeds (> 50 pieces is optional).
+    it('Scenario 6: Walk-in, 51 pieces (bulk threshold >50), no photos => succeeds', async () => {
+      setupMocks();
+      const dto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-regular',
+            quantity: 51,
+            pieces: [], // no photos
+          },
+        ],
+      };
       const result = await service.createOrder(dto, employeeId, storeId);
       expect(result).toBeDefined();
-      expect(result.itemCount).toBe(50);
+      expect(result.itemCount).toBe(51);
     });
 
     // 7. Walk-in, 60 pieces, no photos => succeeds.
@@ -3563,7 +3692,7 @@ describe('OrderService', () => {
           {
             garmentCatalogId: 'g-regular',
             serviceTypeId: 's-regular',
-            quantity: 50,
+            quantity: 55,
             pieces: [
               { unitNumber: 1, photoCount: 3 }, // piece 1 has 3 photos, others have 0
             ],
@@ -3572,7 +3701,7 @@ describe('OrderService', () => {
       };
       const result = await service.createOrder(dto, employeeId, storeId);
       expect(result).toBeDefined();
-      expect(result.itemCount).toBe(50);
+      expect(result.itemCount).toBe(55);
     });
 
     // 8. Weight-based order, no photos => rejected.
@@ -3641,7 +3770,7 @@ describe('OrderService', () => {
       expect(result.items[0].physicalGarments).toHaveLength(0); // No physical garments fabricated
     });
 
-    it('Scenario 10b: Rejects weight-based order with 0 kg, negative weight, or missing weight', async () => {
+    it('Scenario 10b: Rejects weight-based order with less than 2.00 kg, 0 kg, negative weight, or missing weight', async () => {
       setupMocks({ isWeightGarment: true, price: 80 });
       const zeroDto: any = {
         customerId,
@@ -3660,6 +3789,15 @@ describe('OrderService', () => {
         BadRequestException,
       );
 
+      // Weight below 2.00 kg (e.g. 1.5 kg)
+      const belowMinDto: any = {
+        ...zeroDto,
+        items: [{ ...zeroDto.items[0], weight: 1.5 }],
+      };
+      await expect(service.createOrder(belowMinDto, employeeId, storeId)).rejects.toThrow(
+        /minimum permitted weight is 2.00 kg/i,
+      );
+
       const negDto: any = {
         ...zeroDto,
         items: [{ ...zeroDto.items[0], weight: -2.5 }],
@@ -3674,6 +3812,95 @@ describe('OrderService', () => {
       };
       await expect(service.createOrder(missingWeightDto, employeeId, storeId)).rejects.toThrow(
         BadRequestException,
+      );
+    });
+
+    it('Scenario 10c: Rejects Dry Cleaning with weight or weight-based garments (strictly per-piece)', async () => {
+      setupMocks({ isWeightGarment: true, price: 100 });
+      // Mock service as Dry Clean
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 's-dry-clean',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          isActive: true,
+          estimatedDays: 2,
+        },
+      ]);
+      const dryCleanDto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-weight',
+            serviceTypeId: 's-dry-clean',
+            quantity: 1,
+            weight: 5.0,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+      await expect(service.createOrder(dryCleanDto, employeeId, storeId)).rejects.toThrow(
+        /Dry Cleaning is strictly per-piece and does not support weight-based processing/i,
+      );
+    });
+
+    it('Scenario 10d: Enforces workflow separation — rejects laundry services in Dry Cleaning workflow and Dry Clean in Laundry workflow', async () => {
+      setupMocks({ isWeightGarment: false, price: 100 });
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 's-wash',
+          name: 'Standard Wash',
+          category: ServiceCategory.WASH,
+          isActive: true,
+          estimatedDays: 2,
+        },
+      ]);
+
+      const laundryInDcDto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        workflow: 'DRY_CLEANING',
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-wash',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await expect(service.createOrder(laundryInDcDto, employeeId, storeId)).rejects.toThrow(
+        /not permitted in Dry Cleaning workflow/i,
+      );
+
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 's-dc',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          isActive: true,
+          estimatedDays: 2,
+        },
+      ]);
+
+      const dcInLaundryDto: any = {
+        customerId,
+        pickupType: PickupType.STORE_PICKUP,
+        workflow: 'LAUNDRY',
+        items: [
+          {
+            garmentCatalogId: 'g-regular',
+            serviceTypeId: 's-dc',
+            quantity: 1,
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await expect(service.createOrder(dcInLaundryDto, employeeId, storeId)).rejects.toThrow(
+        /not permitted in Laundry workflow/i,
       );
     });
 

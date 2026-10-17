@@ -241,7 +241,7 @@ describe('OrderItemEditModal', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('Weight-based item: rejects 0 or negative weight with validation message', async () => {
+  it('Weight-based item: rejects weight below 2.00 kg with validation message', async () => {
     const weightItem = {
       ...baseItem,
       id: 'weight-item-1',
@@ -265,12 +265,12 @@ describe('OrderItemEditModal', () => {
     );
 
     const weightInput = screen.getByLabelText(/Weight \(kg\)/i);
-    fireEvent.change(weightInput, { target: { value: '0' } });
+    fireEvent.change(weightInput, { target: { value: '1.5' } });
 
     const saveButton = screen.getByRole('button', { name: /Save Changes/i });
     fireEvent.click(saveButton);
 
-    expect(await screen.findByText('Weight must be greater than 0 kg')).toBeInTheDocument();
+    expect(await screen.findByText('Minimum permitted weight is 2.00 kg')).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

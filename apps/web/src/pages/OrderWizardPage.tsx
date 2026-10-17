@@ -10,9 +10,13 @@ import {
   GarmentCategory,
   ServiceCategory,
   formatCatalogServiceName,
+  isItemCompatibleWithWorkflow,
+  OrderEntryMode,
 } from '@growfast/shared-types';
+import type { OrderWorkflowType } from '@growfast/shared-types';
 import { CustomerSelector } from '../components/CustomerSelector';
 import { ItemSelector } from '../components/ItemSelector';
+import { LaundryWeightOrderEntry, LaundryWeightItem } from '../components/LaundryWeightOrderEntry';
 import { uploadPhoto } from '../services/photo.api';
 import {
   ArrowLeft,
@@ -30,6 +34,8 @@ import {
   Pencil,
   Check,
   Scale,
+  Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import { renderStitchGarmentIcon } from '../components/GarmentIcon';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -42,12 +48,36 @@ export function OrderWizardPage() {
   const initialCustomerId = searchParams.get('customerId');
   const { token } = useAuth();
 
+  // Entry mode state: Weight vs Pieces (Decision B)
+  const paramMode = searchParams.get('mode')?.toUpperCase();
+  const initialEntryMode: OrderEntryMode = paramMode === 'WEIGHT' ? 'WEIGHT' : 'PIECES';
+  const [activeEntryMode, setActiveEntryMode] = useState<OrderEntryMode>(initialEntryMode);
+
+  // Workflow state: Per-piece defaults strictly to Dry Cleaning, weight defaults to Laundry
+  const paramWorkflow = searchParams.get('workflow')?.toUpperCase();
+  const initialWorkflow: OrderWorkflowType =
+    paramWorkflow === 'LAUNDRY'
+      ? 'LAUNDRY'
+      : paramWorkflow === 'DRY_CLEANING'
+      ? 'DRY_CLEANING'
+      : initialEntryMode === 'WEIGHT'
+      ? 'LAUNDRY'
+      : 'DRY_CLEANING';
+  const [activeWorkflow, setActiveWorkflow] = useState<OrderWorkflowType>(initialWorkflow);
+
+  // Workflow switch modal confirmation state
+  const [pendingWorkflowSwitch, setPendingWorkflowSwitch] = useState<OrderWorkflowType | null>(
+    null,
+  );
+  const [incompatibleItemsToDrop, setIncompatibleItemsToDrop] = useState<any[]>([]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialCustomerId);
   const [customer, setCustomer] = useState<CustomerDTO | null>(null);
   const [customerLoading, setCustomerLoading] = useState(!!initialCustomerId);
   const [customerError, setCustomerError] = useState<string | null>(null);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showMissingPhotosModal, setShowMissingPhotosModal] = useState(false);
 
   // Active item detail configuration modal
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -142,15 +172,119 @@ export function OrderWizardPage() {
     setShowCustomerModal(false);
   };
 
+  // Workflow Switching Handlers
+  const handleRequestWorkflowSwitch = (targetWorkflow: OrderWorkflowType) => {
+    if (targetWorkflow === activeWorkflow) return;
+
+    // Detect incompatible items
+    const incompatible = items.filter(
+      (item) => !isItemCompatibleWithWorkflow(item, targetWorkflow, services),
+    );
+
+    if (incompatible.length > 0) {
+      setIncompatibleItemsToDrop(incompatible);
+      setPendingWorkflowSwitch(targetWorkflow);
+    } else {
+      setActiveWorkflow(targetWorkflow);
+      if (targetWorkflow === 'DRY_CLEANING') {
+        setActiveEntryMode('PIECES');
+      }
+    }
+  };
+
+  const handleConfirmWorkflowSwitch = () => {
+    if (!pendingWorkflowSwitch) return;
+
+    // Filter out incompatible items while preserving compatible items, quantities, customer, notes, express
+    setItems((prev) =>
+      prev.filter((item) => isItemCompatibleWithWorkflow(item, pendingWorkflowSwitch, services)),
+    );
+    setActiveWorkflow(pendingWorkflowSwitch);
+    if (pendingWorkflowSwitch === 'DRY_CLEANING') {
+      setActiveEntryMode('PIECES');
+    }
+    setPendingWorkflowSwitch(null);
+    setIncompatibleItemsToDrop([]);
+  };
+
+  const handleCancelWorkflowSwitch = () => {
+    setPendingWorkflowSwitch(null);
+    setIncompatibleItemsToDrop([]);
+  };
+
+  // Entry Mode Selection Handler (Decision B)
+  const handleSelectEntryMode = (mode: OrderEntryMode) => {
+    if (mode === 'WEIGHT') {
+      // Weight-based entry is exclusively Laundry — auto-set workflow
+      if (activeWorkflow !== 'LAUNDRY') {
+        const incompatible = items.filter(
+          (item) => !isItemCompatibleWithWorkflow(item, 'LAUNDRY', services),
+        );
+        if (incompatible.length > 0) {
+          setIncompatibleItemsToDrop(incompatible);
+          setPendingWorkflowSwitch('LAUNDRY');
+          return;
+        }
+        setActiveWorkflow('LAUNDRY');
+      }
+      setActiveEntryMode('WEIGHT');
+    } else {
+      // Pieces-based entry defaults to Dry Cleaning
+      if (activeWorkflow !== 'DRY_CLEANING') {
+        const incompatible = items.filter(
+          (item) => !isItemCompatibleWithWorkflow(item, 'DRY_CLEANING', services),
+        );
+        if (incompatible.length > 0) {
+          setIncompatibleItemsToDrop(incompatible);
+          setPendingWorkflowSwitch('DRY_CLEANING');
+          return;
+        }
+        setActiveWorkflow('DRY_CLEANING');
+      }
+      setActiveEntryMode('PIECES');
+    }
+  };
+
+  // Add Item to Order from LaundryWeightOrderEntry
+  const handleAddWeightItem = (weightItem: LaundryWeightItem) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        garmentCatalogId: weightItem.garmentCatalogId,
+        serviceTypeId: weightItem.serviceTypeId,
+        garmentName: weightItem.garmentName,
+        serviceName: weightItem.serviceName,
+        unitPrice: weightItem.unitPrice,
+        quantity: weightItem.garmentsCount || 1,
+        garmentsCount: weightItem.garmentsCount || 1,
+        weight: weightItem.weight,
+        isWeightBased: true,
+        lineTotal: weightItem.lineTotal,
+        topUpService: weightItem.addOns?.map((a) => a.name).join(', ') || '',
+        brand: '',
+        defectNotes:
+          weightItem.defectNotes ||
+          (weightItem.breakdownDetails ? `Breakdown: ${weightItem.breakdownDetails}` : ''),
+        colorTags: [],
+        photoFile: weightItem.batchPhotos?.[0]?.file || null,
+        pieces: [],
+        batchPhotos: weightItem.batchPhotos || [],
+        addOns: weightItem.addOns || [],
+      },
+    ]);
+  };
+
   // Add Item to Order (directly from garment card "+ Add")
   const handleAddItem = (garment: any, serviceId: string, unitPrice: number) => {
     const service = services.find((s) => s.id === serviceId);
     const serviceName = service ? formatCatalogServiceName(service.name) : 'Unknown';
+    // Weight-based processing is strictly exclusive to Laundry workflow
     const isWeightBased =
-      garment.category === 'WEIGHT_BASED' ||
-      garment.category === GarmentCategory.WEIGHT_BASED ||
-      service?.category === 'WEIGHT_BASED' ||
-      service?.category === ServiceCategory.WEIGHT_BASED;
+      activeWorkflow === 'LAUNDRY' &&
+      (garment.category === 'WEIGHT_BASED' ||
+        garment.category === GarmentCategory.WEIGHT_BASED ||
+        service?.category === 'WEIGHT_BASED' ||
+        service?.category === ServiceCategory.WEIGHT_BASED);
 
     if (isWeightBased) {
       setWeightModalData({
@@ -226,8 +360,8 @@ export function OrderWizardPage() {
   const handleConfirmWeight = () => {
     if (!weightModalData) return;
     const num = parseFloat(measuredWeightInput);
-    if (isNaN(num) || num <= 0) {
-      setWeightError('Please enter a valid weight greater than 0 kg (e.g. 5.5 kg).');
+    if (isNaN(num) || num < 2.0) {
+      setWeightError('Minimum permitted weight is 2.00 kg (e.g. 2.50 kg).');
       return;
     }
     const roundedWeight = Math.round(num * 100) / 100;
@@ -519,8 +653,18 @@ export function OrderWizardPage() {
 
   // Order Submission
   const handleCreateOrder = async () => {
-    if (!selectedCustomerId || items.length === 0) return;
-    if (isPhotoRequired && !allPiecesCovered) return;
+    if (!selectedCustomerId) {
+      setShowCustomerModal(true);
+      return;
+    }
+    if (items.length === 0) {
+      alert('Please add at least one item to the cart before checking out.');
+      return;
+    }
+    if (isPhotoRequired && !allPiecesCovered) {
+      setShowMissingPhotosModal(true);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -528,12 +672,14 @@ export function OrderWizardPage() {
         customerId: selectedCustomerId,
         isExpress,
         pickupType: 'STORE_PICKUP',
+        workflow: activeWorkflow,
+        entryMode: activeEntryMode,
         items: items.map((item) => {
           const isWb = item.isWeightBased || (item.weight != null && item.weight > 0);
           return {
             garmentCatalogId: item.garmentCatalogId,
             serviceTypeId: item.serviceTypeId,
-            quantity: isWb ? 1 : item.quantity || 1,
+            quantity: isWb ? item.garmentsCount || item.quantity || 1 : item.quantity || 1,
             weight: isWb ? item.weight : undefined,
             pieces: isWb
               ? item.batchPhotos && item.batchPhotos.length > 0
@@ -844,582 +990,765 @@ export function OrderWizardPage() {
         </div>
       </header>
 
-      {/* Accessible Section Heading for Screen Readers & Tests */}
-      <h2 className="sr-only">Add Items</h2>
-
-      {/* ─── 2. MAIN TWO-COLUMN CONTENT ──────────────────── */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden p-2 sm:p-2.5 gap-2.5">
-        {/* LEFT COLUMN: Garment Catalog (Takes all remaining width) */}
-        <div
-          className="flex-1 min-w-0 flex flex-col min-h-0 rounded-[3px] shadow-2xs overflow-hidden max-lg:min-h-[420px]"
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
-            transition: 'background-color 0.2s ease, border-color 0.2s ease',
-          }}
-        >
-          <ItemSelector
-            garments={garments}
-            services={services}
-            prices={prices}
-            onGarmentSelect={handleAddItem}
-            onBack={() => navigate(-1)}
-          />
-        </div>
-
-        {/* RIGHT COLUMN: Current Order Panel matching IMAGE 1 */}
-        <div
-          className="w-full lg:w-[440px] xl:w-[460px] shrink-0 flex flex-col rounded-xl shadow-xs overflow-hidden lg:h-full"
-          style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
-            transition: 'background-color 0.2s ease, border-color 0.2s ease',
-          }}
-        >
-          {/* 1. Panel Header */}
-          <div
-            className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0"
-            style={{ background: 'var(--bg-surface)', transition: 'background-color 0.2s ease' }}
-          >
-            <div className="flex items-center gap-2.5">
-              <ShoppingBag size={22} className="text-[#2563eb]" strokeWidth={2} />
-              <h3 className="font-bold text-lg text-slate-900 tracking-tight">Current Order</h3>
-              <span className="bg-[#eff6ff] text-[#2563eb] text-xs font-semibold px-2.5 py-0.5 rounded-full border border-[#dbeafe]">
-                {totalGarmentCount} {totalGarmentCount === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-
-            {items.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setItems([])}
-                className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                title="Clear all items from order"
-              >
-                <Trash2 size={15} className="text-rose-500" strokeWidth={2} />
-                <span>Clear All</span>
-              </button>
-            ) : (
-              <span className="text-xs font-medium text-slate-400 select-none">Order #NEW</span>
-            )}
-          </div>
-
-          {/* 2. Added Items List */}
-          <div
-            className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-3.5"
-            style={{ background: 'var(--bg-surface)' }}
-          >
-            {items.length === 0 ? (
-              /* Clean Empty State */
-              <div className="flex flex-col items-center justify-center py-12 text-center px-6 text-slate-400 select-none">
-                <div className="w-14 h-14 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 mb-3 shadow-2xs">
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="m7.5 4.27 9 5.15" />
-                    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                    <path d="m3.3 7 8.7 5 8.7-5" />
-                    <path d="M12 22V12" />
-                  </svg>
-                </div>
-                <h4 className="font-bold text-xs text-slate-800 mb-1.5">No items added yet</h4>
-                <p className="text-[11px] text-slate-400 max-w-[210px] leading-relaxed">
-                  Select garments from the catalog to add them to this order.
-                </p>
-              </div>
-            ) : (
-              items.map((item, idx) => {
-                const isWb = item.isWeightBased || (item.weight != null && item.weight > 0);
-                const multiplier = isWb ? item.weight : item.quantity;
-                const itemTotal = Math.round(item.unitPrice * multiplier * 100) / 100;
-                const coveredItemPieces = isWb
-                  ? item.batchPhotos && item.batchPhotos.length > 0
-                    ? 1
-                    : 0
-                  : (item.pieces || []).filter((p: any) => p.photos && p.photos.length > 0).length;
-                const totalRequired = isWb ? 1 : item.quantity;
-                const hasDetails =
-                  item.defectNotes || item.brand || item.topUpService || coveredItemPieces > 0;
-
-                return (
-                  <div
-                    key={idx}
-                    className="rounded-lg p-4 shadow-2xs transition-all fade-slide-item"
-                    style={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      transition:
-                        'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
-                    }}
-                  >
-                    {/* Proper 2-column layout: Left: Garment icon, Right: Item content */}
-                    <div className="flex gap-4 items-start">
-                      {/* Left: Garment Icon Box */}
-                      <div
-                        className="w-[52px] h-[52px] rounded-lg flex items-center justify-center shrink-0"
-                        style={{
-                          background: 'var(--bg-surface-muted)',
-                          border: '1px solid var(--border-subtle)',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        {renderStitchGarmentIcon(item.garmentName)}
-                      </div>
-
-                      {/* Right: Item Content */}
-                      <div className="flex-1 min-w-0">
-                        {/* Top row: Garment Name + Item Price aligned to top-right with padding */}
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="font-bold text-[15px] text-slate-900 truncate leading-snug">
-                            {item.garmentName}
-                          </span>
-                          <span className="font-bold text-[15px] text-slate-900 whitespace-nowrap font-mono shrink-0">
-                            ₹{itemTotal.toFixed(2)}
-                          </span>
-                        </div>
-
-                        {/* Service Name (10-12px vertical spacing) */}
-                        <div className="text-xs text-slate-500 font-normal mt-1">
-                          {item.serviceName}
-                        </div>
-
-                        {/* Unit Price each or per kg */}
-                        {isWb ? (
-                          <div className="text-xs text-blue-700 font-semibold mt-1 flex items-center gap-1.5">
-                            <span className="bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11.5px] flex items-center gap-1 font-mono">
-                              <Scale size={12} className="text-blue-600" />
-                              {item.weight} kg @ ₹{Number(item.unitPrice).toFixed(2)}/kg
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-slate-400 font-normal mt-0.5">
-                            ₹{Number(item.unitPrice).toFixed(2)} each
-                          </div>
-                        )}
-
-                        {/* Optional Defect / Notes Indicator */}
-                        {hasDetails && (
-                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600">
-                            {item.brand && (
-                              <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">
-                                🏷️ {item.brand}
-                              </span>
-                            )}
-                            {item.defectNotes && (
-                              <span
-                                className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded truncate max-w-[160px]"
-                                title={item.defectNotes}
-                              >
-                                ⚠️ {item.defectNotes}
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setEditingItemIndex(idx)}
-                              className={`px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
-                                coveredItemPieces === totalRequired
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                  : isPhotoRequired
-                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                                    : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                              }`}
-                              title={
-                                isWb
-                                  ? 'Click to view/add batch photos'
-                                  : 'Click to view/add piece photos'
-                              }
-                            >
-                              <Camera size={12} />
-                              <span>
-                                {isWb
-                                  ? `${coveredItemPieces > 0 ? 'Batch' : '0'} photographed ${coveredItemPieces > 0 ? '✓' : isPhotoRequired ? '⚠' : ''}`
-                                  : `${coveredItemPieces}/${item.quantity} photographed ${
-                                      coveredItemPieces === item.quantity
-                                        ? '✓'
-                                        : isPhotoRequired
-                                          ? '⚠'
-                                          : ''
-                                    }`}
-                              </span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Controls Row: 12px gap, 44px min touch target */}
-                        <div className="flex items-center justify-between mt-3.5 gap-2.5">
-                          {/* Left Control: Weight edit button OR Quantity Stepper */}
-                          {isWb ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setWeightModalData({
-                                  garment: {
-                                    id: item.garmentCatalogId,
-                                    name: item.garmentName,
-                                    category: 'WEIGHT_BASED',
-                                  },
-                                  serviceId: item.serviceTypeId,
-                                  unitPrice: item.unitPrice,
-                                  existingItemIndex: idx,
-                                  initialWeight: item.weight,
-                                });
-                                setMeasuredWeightInput(String(item.weight));
-                                setWeightError(null);
-                              }}
-                              className="h-[44px] min-h-[44px] px-3.5 border border-blue-300 rounded-lg bg-blue-50/70 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                              title="Click to edit measured weight"
-                            >
-                              <Scale size={15} />
-                              <span>{item.weight} kg (Edit)</span>
-                            </button>
-                          ) : (
-                            <div
-                              className="flex items-center rounded-lg shadow-2xs overflow-hidden shrink-0 h-[44px]"
-                              style={{
-                                border: '1px solid var(--border)',
-                                background: 'var(--bg-surface)',
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQuantity(idx, -1)}
-                                className="w-10 h-[44px] min-h-[44px] flex items-center justify-center text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
-                                title="Decrease quantity"
-                              >
-                                <Minus size={13} strokeWidth={2.5} />
-                              </button>
-                              <span className="w-10 h-[44px] flex items-center justify-center text-center font-bold text-sm text-slate-900 font-mono select-none">
-                                {item.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQuantity(idx, 1)}
-                                className="w-10 h-[44px] min-h-[44px] flex items-center justify-center text-[#2563eb] hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
-                                title="Increase quantity"
-                              >
-                                <Plus size={13} strokeWidth={2.5} />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Action Buttons: [ Photos & Notes ] [ Delete ] on same row */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Photos & Notes Button: 44px touch target */}
-                            <button
-                              type="button"
-                              onClick={() => setEditingItemIndex(idx)}
-                              className={`h-[44px] min-h-[44px] px-3 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
-                                coveredItemPieces === totalRequired
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                  : isPhotoRequired && coveredItemPieces < totalRequired
-                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                                    : hasDetails
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                              }`}
-                              title={
-                                isWb
-                                  ? 'Add batch photos or defect notes'
-                                  : 'Add piece photos or defect notes'
-                              }
-                            >
-                              <Camera size={15} />
-                              <span>Photos &amp; Notes</span>
-                            </button>
-
-                            {/* Delete Button: 44px touch target, destructive styling */}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="w-[44px] h-[44px] min-h-[44px] flex items-center justify-center border border-rose-200/80 rounded-lg bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
-                              title="Delete item"
-                            >
-                              <Trash2 size={15} strokeWidth={2} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* 3. General Notes Section (Collapsible & Compact) */}
-          <div className="px-4 py-1.5 shrink-0">
-            {!isNoteOpen && !generalNote.trim() ? (
-              <button
-                type="button"
-                id="add-order-note-btn"
-                onClick={() => setIsNoteOpen(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors py-1 px-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group"
-              >
-                <FileText
-                  size={13}
-                  className="text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
-                />
-                <span>+ Add order note (optional)</span>
-              </button>
-            ) : !isNoteOpen && generalNote.trim() ? (
-              <div className="flex items-center justify-between p-2 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/50 rounded-lg text-xs">
-                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-                  <FileText size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
-                    Note:
-                  </span>
-                  <span className="text-slate-600 dark:text-slate-300 truncate" title={generalNote}>
-                    {generalNote}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsNoteOpen(true)}
-                    className="p-1 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded transition-colors cursor-pointer"
-                    title="Edit order note"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGeneralNote('');
-                      setIsNoteOpen(false);
-                    }}
-                    className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
-                    title="Remove note"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5 transition-all">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="general-order-note"
-                    className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200"
-                  >
-                    <FileText size={13} className="text-blue-600 dark:text-blue-400" />
-                    <span>General Notes</span>
-                    <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
-                      (Optional)
-                    </span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsNoteOpen(false)}
-                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-1.5 py-0.5 rounded cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-                <textarea
-                  id="general-order-note"
-                  rows={2}
-                  value={generalNote}
-                  onChange={(e) => setGeneralNote(e.target.value)}
-                  placeholder="Optional — add any special instructions"
-                  className="w-full text-xs p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-100 resize-none min-h-[44px]"
-                  autoFocus
-                />
-              </div>
-            )}
-          </div>
-
-          {/* 4. Totals Breakdown, Highlighted Total & Proceed Button */}
-          <div className="px-4 pt-1 pb-4 space-y-2.5 shrink-0">
-            {/* Photos Progress Card & Compliance Indicators (Compact) */}
-            {items.length > 0 && (
-              <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                    <Camera size={14} className="text-[#2563eb] shrink-0" />
-                    Photos
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      allPiecesCovered
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60 font-semibold'
-                        : isPhotoRequired
-                          ? 'bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60 font-semibold'
-                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
-                    }`}
-                  >
-                    Photos: {coveredPieces} / {totalGarmentCount} pieces{' '}
-                    {allPiecesCovered ? '✓' : ''}
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className={`h-1.5 transition-all duration-300 rounded-full ${
-                      allPiecesCovered ? 'bg-emerald-500' : 'bg-[#2563eb]'
-                    }`}
-                    style={{
-                      width: `${totalGarmentCount > 0 ? (coveredPieces / totalGarmentCount) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-
-                {/* Status Guidance (Compact) */}
-                {isPhotoRequired && !allPiecesCovered && (
-                  <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 rounded px-2.5 py-1.5 flex items-start gap-1.5 leading-snug">
-                    <span className="shrink-0 text-amber-600 dark:text-amber-400 font-bold">⚠</span>
-                    <span>
-                      <strong className="font-semibold">Photos required for all pieces.</strong>{' '}
-                      Click Photos &amp; Notes to capture at least 1 photo for each piece.
-                      {missingPiecesMessage && (
-                        <span className="text-amber-800 dark:text-amber-300 font-medium ml-1">
-                          ({missingPiecesMessage})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-
-                {!isPhotoRequired && totalGarmentCount >= 50 && !isOrderWeightBased && (
-                  <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/60 rounded px-2.5 py-1 leading-tight">
-                    Photos optional for bulk orders (50+ pieces).
-                  </p>
-                )}
-
-                {isOrderWeightBased && !allPiecesCovered && (
-                  <p className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/60 rounded px-2.5 py-1 leading-tight">
-                    Weight-based order: Photos required for all pieces.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Totals Breakdown */}
-            <div className="space-y-2 pt-1">
-              <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
-                <span>Items ({totalGarmentCount})</span>
-                <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold pr-1">
-                  ₹{subtotal.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
-                <span>Subtotal</span>
-                <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold pr-1">
-                  ₹{subtotal.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
-                <span>Discount</span>
-                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 pr-1">
-                  {discount > 0 ? `- ₹${discount.toFixed(2)}` : '- ₹0.00'}
-                </span>
-              </div>
-
-              {/* Express Delivery Checkbox (if configured) */}
-              {storeConfig?.expressSurchargePercent != null && (
-                <div className="pt-0.5 pb-0.5">
-                  <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={isExpress}
-                        onChange={(e) => setIsExpress(e.target.checked)}
-                        className="w-3.5 h-3.5 rounded border-amber-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                      <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                        ⚡ Express Delivery
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 font-mono pr-1">
-                      +{storeConfig.expressSurchargePercent}%
-                    </span>
-                  </label>
-                </div>
-              )}
-            </div>
-
-            {/* Divider Line */}
-            <div className="border-t border-slate-100" />
-
-            {/* Highlighted Total Box */}
-            <div
-              className="rounded-lg px-4 py-3.5 flex items-center justify-between"
-              style={{
-                background: 'var(--accent-muted)',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
-                transition: 'background-color 0.2s ease, border-color 0.2s ease',
-              }}
-            >
-              <div>
-                <div
-                  className="text-base font-bold tracking-tight"
-                  style={{ color: 'var(--accent)' }}
-                >
-                  Total
-                </div>
-                <div className="text-xs font-normal mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Inclusive of taxes
-                </div>
-              </div>
-              <div
-                className="text-2xl font-extrabold font-mono tracking-tight pr-1"
-                style={{ color: 'var(--accent)' }}
-              >
-                ₹{total.toFixed(2)}
-              </div>
-            </div>
-
-            {/* Primary Action: Proceed to Review */}
+      {/* ─── PRIMARY ENTRY MODE DECISION BAR ─── */}
+      <section
+        aria-label="Order Entry Mode Selection"
+        className="shrink-0 px-3 sm:px-6 py-2.5 z-5"
+        style={{
+          background: 'var(--bg-surface)',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+          <div className="grid grid-cols-2 gap-3 w-full max-w-2xl mx-auto">
+            {/* CREATE ORDER PER PIECES */}
             <button
               type="button"
-              onClick={handleCreateOrder}
-              disabled={
-                isSubmitting ||
-                items.length === 0 ||
-                !selectedCustomerId ||
-                (isPhotoRequired && !allPiecesCovered)
-              }
-              className={`w-full min-h-[48px] h-[48px] py-3.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
-                isSubmitting ||
-                items.length === 0 ||
-                !selectedCustomerId ||
-                (isPhotoRequired && !allPiecesCovered)
-                  ? 'bg-[#bfdbfe] text-white cursor-not-allowed opacity-90'
-                  : 'bg-[#2563eb] hover:bg-blue-700 text-white cursor-pointer shadow-xs active:scale-[0.99]'
+              id="entry-mode-pieces-btn"
+              role="button"
+              aria-pressed={activeEntryMode === 'PIECES'}
+              onClick={() => handleSelectEntryMode('PIECES')}
+              className={`min-h-[56px] px-4 py-2.5 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer ${
+                activeEntryMode === 'PIECES'
+                  ? 'bg-purple-50/90 border-purple-600 shadow-md ring-1 ring-purple-600/20 text-purple-950'
+                  : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
               }`}
-              title={
-                !selectedCustomerId
-                  ? 'Please select a customer first'
-                  : items.length === 0
-                    ? 'Add at least one item to proceed'
-                    : isPhotoRequired && !allPiecesCovered
-                      ? `Photos required: Please capture photos for all ${totalGarmentCount} pieces (${coveredPieces}/${totalGarmentCount} covered)`
-                      : 'Proceed to Review'
-              }
             >
-              {isSubmitting ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Creating Order...</span>
-                </>
-              ) : (
-                <>
-                  <Check size={18} strokeWidth={2.5} />
-                  <span>Proceed to Review</span>
-                  <ArrowRight size={18} strokeWidth={2} />
-                </>
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  activeEntryMode === 'PIECES'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                <Sparkles size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-black uppercase tracking-wider leading-tight">
+                  Create Order Per Pieces
+                </div>
+                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                  Dry Cleaning (default) • Per-garment pricing &amp; tags
+                </div>
+              </div>
+              {activeEntryMode === 'PIECES' && (
+                <div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0">
+                  <Check size={13} strokeWidth={3} />
+                </div>
+              )}
+            </button>
+
+            {/* CREATE ORDER PER WEIGHT */}
+            <button
+              type="button"
+              id="entry-mode-weight-btn"
+              role="button"
+              aria-pressed={activeEntryMode === 'WEIGHT'}
+              onClick={() => handleSelectEntryMode('WEIGHT')}
+              title="Weight-based Laundry order entry (min 2.00 kg)"
+              className={`min-h-[56px] px-4 py-2.5 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer ${
+                activeEntryMode === 'WEIGHT'
+                  ? 'bg-blue-50/90 border-blue-600 shadow-md ring-1 ring-blue-600/20 text-blue-950'
+                  : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  activeEntryMode === 'WEIGHT'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                <Scale size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-black uppercase tracking-wider leading-tight">
+                  Create Order Per Weight
+                </div>
+                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">
+                  Laundry only • Per-KG rate (min 2.00 kg)
+                </div>
+              </div>
+              {activeEntryMode === 'WEIGHT' && (
+                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Check size={13} strokeWidth={3} />
+                </div>
               )}
             </button>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Accessible Section Heading for Screen Readers & Tests */}
+      <h2 className="sr-only">Add Items</h2>
+
+      {/* ─── 2. MAIN CONTENT (WEIGHT VS PIECE WORKFLOW) ──────────────────── */}
+      {activeEntryMode === 'WEIGHT' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <LaundryWeightOrderEntry
+            services={services}
+            prices={prices}
+            weightGarments={garments.filter(
+              (g) => g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED,
+            )}
+            items={items}
+            onAddToCart={handleAddWeightItem}
+            onRemoveItem={handleRemoveItem}
+            onCheckout={handleCreateOrder}
+            onAddBatchPhotoToItem={handleAddBatchPhoto}
+            onRemoveBatchPhotoFromItem={handleRemoveBatchPhoto}
+            isSubmitting={isSubmitting}
+            pendingPickupsCount={164}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden p-2 sm:p-2.5 gap-2.5">
+          {/* LEFT COLUMN: Garment Catalog (Takes all remaining width) */}
+          <div
+            className="flex-1 min-w-0 flex flex-col min-h-0 rounded-[3px] shadow-2xs overflow-hidden max-lg:min-h-[420px]"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
+            }}
+          >
+            {/* Inline Laundry / Dry Cleaning Sub-Selector (Per-Piece mode only) */}
+            <div
+              className="shrink-0 px-3 py-2 flex items-center gap-2.5"
+              style={{
+                background: 'var(--bg-surface-muted, #f8fafc)',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                Service:
+              </span>
+              <div className="flex items-center gap-1.5" role="tablist">
+                <button
+                  type="button"
+                  id="workflow-dryclean-btn"
+                  role="tab"
+                  aria-selected={activeWorkflow === 'DRY_CLEANING'}
+                  onClick={() => handleRequestWorkflowSwitch('DRY_CLEANING')}
+                  className={`min-h-[34px] px-3 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeWorkflow === 'DRY_CLEANING'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <Sparkles size={13} />
+                  <span>Dry Cleaning</span>
+                </button>
+                <button
+                  type="button"
+                  id="workflow-laundry-btn"
+                  role="tab"
+                  aria-selected={activeWorkflow === 'LAUNDRY'}
+                  onClick={() => handleRequestWorkflowSwitch('LAUNDRY')}
+                  className={`min-h-[34px] px-3 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeWorkflow === 'LAUNDRY'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  <Scale size={13} />
+                  <span>Laundry (Per Piece)</span>
+                </button>
+              </div>
+              <span
+                className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ml-auto ${
+                  activeWorkflow === 'LAUNDRY'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-purple-100 text-purple-700'
+                }`}
+              >
+                {activeWorkflow === 'LAUNDRY' ? 'Per-piece Laundry' : 'Per-piece Dry Clean'}
+              </span>
+            </div>
+
+            <ItemSelector
+              garments={garments}
+              services={services}
+              prices={prices}
+              onGarmentSelect={handleAddItem}
+              onBack={() => navigate(-1)}
+              workflow={activeWorkflow}
+            />
+          </div>
+
+          {/* RIGHT COLUMN: Current Order Panel matching IMAGE 1 */}
+          <div
+            className="w-full lg:w-[440px] xl:w-[460px] shrink-0 flex flex-col rounded-xl shadow-xs overflow-hidden lg:h-full"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
+            }}
+          >
+            {/* 1. Panel Header */}
+            <div
+              className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0"
+              style={{ background: 'var(--bg-surface)', transition: 'background-color 0.2s ease' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <ShoppingBag size={22} className="text-[#2563eb]" strokeWidth={2} />
+                <h3 className="font-bold text-lg text-slate-900 tracking-tight">Current Order</h3>
+                <span className="bg-[#eff6ff] text-[#2563eb] text-xs font-semibold px-2.5 py-0.5 rounded-full border border-[#dbeafe]">
+                  {totalGarmentCount} {totalGarmentCount === 1 ? 'item' : 'items'}
+                </span>
+                <span
+                  id="current-order-workflow-badge"
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    activeWorkflow === 'LAUNDRY'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : 'bg-purple-100 text-purple-800 border border-purple-200'
+                  }`}
+                >
+                  {activeWorkflow === 'LAUNDRY' ? 'Laundry' : 'Dry Clean'}
+                </span>
+              </div>
+
+              {items.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setItems([])}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                  title="Clear all items from order"
+                >
+                  <Trash2 size={15} className="text-rose-500" strokeWidth={2} />
+                  <span>Clear All</span>
+                </button>
+              ) : (
+                <span className="text-xs font-medium text-slate-400 select-none">Order #NEW</span>
+              )}
+            </div>
+
+            {/* 2. Added Items List */}
+            <div
+              className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-3.5"
+              style={{ background: 'var(--bg-surface)' }}
+            >
+              {items.length === 0 ? (
+                /* Clean Empty State */
+                <div className="flex flex-col items-center justify-center py-12 text-center px-6 text-slate-400 select-none">
+                  <div className="w-14 h-14 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 mb-3 shadow-2xs">
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m7.5 4.27 9 5.15" />
+                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                      <path d="m3.3 7 8.7 5 8.7-5" />
+                      <path d="M12 22V12" />
+                    </svg>
+                  </div>
+                  <h4 className="font-bold text-xs text-slate-800 mb-1.5">No items added yet</h4>
+                  <p className="text-[11px] text-slate-400 max-w-[210px] leading-relaxed">
+                    Select garments from the catalog to add them to this order.
+                  </p>
+                </div>
+              ) : (
+                items.map((item, idx) => {
+                  const isWb = item.isWeightBased || (item.weight != null && item.weight > 0);
+                  const multiplier = isWb ? item.weight : item.quantity;
+                  const itemTotal = Math.round(item.unitPrice * multiplier * 100) / 100;
+                  const coveredItemPieces = isWb
+                    ? item.batchPhotos && item.batchPhotos.length > 0
+                      ? 1
+                      : 0
+                    : (item.pieces || []).filter((p: any) => p.photos && p.photos.length > 0)
+                        .length;
+                  const totalRequired = isWb ? 1 : item.quantity;
+                  const hasDetails =
+                    item.defectNotes || item.brand || item.topUpService || coveredItemPieces > 0;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-lg p-4 shadow-2xs transition-all fade-slide-item"
+                      style={{
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        transition:
+                          'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+                      }}
+                    >
+                      {/* Proper 2-column layout: Left: Garment icon, Right: Item content */}
+                      <div className="flex gap-4 items-start">
+                        {/* Left: Garment Icon Box */}
+                        <div
+                          className="w-[52px] h-[52px] rounded-lg flex items-center justify-center shrink-0"
+                          style={{
+                            background: 'var(--bg-surface-muted)',
+                            border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          {renderStitchGarmentIcon(item.garmentName)}
+                        </div>
+
+                        {/* Right: Item Content */}
+                        <div className="flex-1 min-w-0">
+                          {/* Top row: Garment Name + Item Price aligned to top-right with padding */}
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="font-bold text-[15px] text-slate-900 truncate leading-snug">
+                              {item.garmentName}
+                            </span>
+                            <span className="font-bold text-[15px] text-slate-900 whitespace-nowrap font-mono shrink-0">
+                              ₹{itemTotal.toFixed(2)}
+                            </span>
+                          </div>
+
+                          {/* Service Name (10-12px vertical spacing) */}
+                          <div className="text-xs text-slate-500 font-normal mt-1">
+                            {item.serviceName}
+                          </div>
+
+                          {/* Unit Price each or per kg */}
+                          {isWb ? (
+                            <div className="text-xs text-blue-700 font-semibold mt-1 flex items-center gap-1.5">
+                              <span className="bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11.5px] flex items-center gap-1 font-mono">
+                                <Scale size={12} className="text-blue-600" />
+                                {item.weight} kg @ ₹{Number(item.unitPrice).toFixed(2)}/kg
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-400 font-normal mt-0.5">
+                              ₹{Number(item.unitPrice).toFixed(2)} each
+                            </div>
+                          )}
+
+                          {/* Optional Defect / Notes Indicator */}
+                          {hasDetails && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600">
+                              {item.brand && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">
+                                  🏷️ {item.brand}
+                                </span>
+                              )}
+                              {item.defectNotes && (
+                                <span
+                                  className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded truncate max-w-[160px]"
+                                  title={item.defectNotes}
+                                >
+                                  ⚠️ {item.defectNotes}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setEditingItemIndex(idx)}
+                                className={`px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
+                                  coveredItemPieces === totalRequired
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : isPhotoRequired
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                                }`}
+                                title={
+                                  isWb
+                                    ? 'Click to view/add batch photos'
+                                    : 'Click to view/add piece photos'
+                                }
+                              >
+                                <Camera size={12} />
+                                <span>
+                                  {isWb
+                                    ? `${coveredItemPieces > 0 ? 'Batch' : '0'} photographed ${coveredItemPieces > 0 ? '✓' : isPhotoRequired ? '⚠' : ''}`
+                                    : `${coveredItemPieces}/${item.quantity} photographed ${
+                                        coveredItemPieces === item.quantity
+                                          ? '✓'
+                                          : isPhotoRequired
+                                            ? '⚠'
+                                            : ''
+                                      }`}
+                                </span>
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Controls Row: 12px gap, 44px min touch target */}
+                          <div className="flex items-center justify-between mt-3.5 gap-2.5">
+                            {/* Left Control: Weight edit button OR Quantity Stepper */}
+                            {isWb ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWeightModalData({
+                                    garment: {
+                                      id: item.garmentCatalogId,
+                                      name: item.garmentName,
+                                      category: 'WEIGHT_BASED',
+                                    },
+                                    serviceId: item.serviceTypeId,
+                                    unitPrice: item.unitPrice,
+                                    existingItemIndex: idx,
+                                    initialWeight: item.weight,
+                                  });
+                                  setMeasuredWeightInput(String(item.weight));
+                                  setWeightError(null);
+                                }}
+                                className="h-[44px] min-h-[44px] px-3.5 border border-blue-300 rounded-lg bg-blue-50/70 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                title="Click to edit measured weight"
+                              >
+                                <Scale size={15} />
+                                <span>{item.weight} kg (Edit)</span>
+                              </button>
+                            ) : (
+                              <div
+                                className="flex items-center rounded-lg shadow-2xs overflow-hidden shrink-0 h-[44px]"
+                                style={{
+                                  border: '1px solid var(--border)',
+                                  background: 'var(--bg-surface)',
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuantity(idx, -1)}
+                                  className="w-10 h-[44px] min-h-[44px] flex items-center justify-center text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Decrease quantity"
+                                >
+                                  <Minus size={13} strokeWidth={2.5} />
+                                </button>
+                                <span className="w-10 h-[44px] flex items-center justify-center text-center font-bold text-sm text-slate-900 font-mono select-none">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuantity(idx, 1)}
+                                  className="w-10 h-[44px] min-h-[44px] flex items-center justify-center text-[#2563eb] hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Increase quantity"
+                                >
+                                  <Plus size={13} strokeWidth={2.5} />
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Action Buttons: [ Photos & Notes ] [ Delete ] on same row */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {/* Photos & Notes Button: 44px touch target */}
+                              <button
+                                type="button"
+                                onClick={() => setEditingItemIndex(idx)}
+                                className={`h-[44px] min-h-[44px] px-3 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                  coveredItemPieces === totalRequired
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : isPhotoRequired && coveredItemPieces < totalRequired
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                      : hasDetails
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                }`}
+                                title={
+                                  isWb
+                                    ? 'Add batch photos or defect notes'
+                                    : 'Add piece photos or defect notes'
+                                }
+                              >
+                                <Camera size={15} />
+                                <span>Photos &amp; Notes</span>
+                              </button>
+
+                              {/* Delete Button: 44px touch target, destructive styling */}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(idx)}
+                                className="w-[44px] h-[44px] min-h-[44px] flex items-center justify-center border border-rose-200/80 rounded-lg bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
+                                title="Delete item"
+                              >
+                                <Trash2 size={15} strokeWidth={2} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* 3. General Notes Section (Collapsible & Compact) */}
+            <div className="px-4 py-1.5 shrink-0">
+              {!isNoteOpen && !generalNote.trim() ? (
+                <button
+                  type="button"
+                  id="add-order-note-btn"
+                  onClick={() => setIsNoteOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors py-1 px-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group"
+                >
+                  <FileText
+                    size={13}
+                    className="text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                  />
+                  <span>+ Add order note (optional)</span>
+                </button>
+              ) : !isNoteOpen && generalNote.trim() ? (
+                <div className="flex items-center justify-between p-2 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/50 rounded-lg text-xs">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                    <FileText size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span className="font-semibold text-slate-700 dark:text-slate-200 shrink-0">
+                      Note:
+                    </span>
+                    <span
+                      className="text-slate-600 dark:text-slate-300 truncate"
+                      title={generalNote}
+                    >
+                      {generalNote}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsNoteOpen(true)}
+                      className="p-1 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded transition-colors cursor-pointer"
+                      title="Edit order note"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGeneralNote('');
+                        setIsNoteOpen(false);
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
+                      title="Remove note"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5 transition-all">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="general-order-note"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                    >
+                      <FileText size={13} className="text-blue-600 dark:text-blue-400" />
+                      <span>General Notes</span>
+                      <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                        (Optional)
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsNoteOpen(false)}
+                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-1.5 py-0.5 rounded cursor-pointer"
+                    >
+                      Done
+                    </button>
+                  </div>
+                  <textarea
+                    id="general-order-note"
+                    rows={2}
+                    value={generalNote}
+                    onChange={(e) => setGeneralNote(e.target.value)}
+                    placeholder="Optional — add any special instructions"
+                    className="w-full text-xs p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-100 resize-none min-h-[44px]"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 4. Totals Breakdown, Highlighted Total & Proceed Button */}
+            <div className="px-4 pt-1 pb-4 space-y-2.5 shrink-0">
+              {/* Photos Progress Card & Compliance Indicators (Compact) */}
+              {items.length > 0 && (
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <Camera size={14} className="text-[#2563eb] shrink-0" />
+                      Photos
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        allPiecesCovered
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60 font-semibold'
+                          : isPhotoRequired
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60 font-semibold'
+                            : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      Photos: {coveredPieces} / {totalGarmentCount} pieces{' '}
+                      {allPiecesCovered ? '✓' : ''}
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className={`h-1.5 transition-all duration-300 rounded-full ${
+                        allPiecesCovered ? 'bg-emerald-500' : 'bg-[#2563eb]'
+                      }`}
+                      style={{
+                        width: `${totalGarmentCount > 0 ? (coveredPieces / totalGarmentCount) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Status Guidance (Compact) */}
+                  {isPhotoRequired && !allPiecesCovered && (
+                    <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 rounded px-2.5 py-1.5 flex items-start gap-1.5 leading-snug">
+                      <span className="shrink-0 text-amber-600 dark:text-amber-400 font-bold">
+                        ⚠
+                      </span>
+                      <span>
+                        <strong className="font-semibold">Photos required for all pieces.</strong>{' '}
+                        Click Photos &amp; Notes to capture at least 1 photo for each piece.
+                        {missingPiecesMessage && (
+                          <span className="text-amber-800 dark:text-amber-300 font-medium ml-1">
+                            ({missingPiecesMessage})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {!isPhotoRequired && totalGarmentCount > 50 && !isOrderWeightBased && (
+                    <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/60 rounded px-2.5 py-1 leading-tight">
+                      Photos optional for bulk orders (more than 50 pieces).
+                    </p>
+                  )}
+
+                  {isOrderWeightBased && !allPiecesCovered && (
+                    <p className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/60 rounded px-2.5 py-1 leading-tight">
+                      Weight-based order: Photos required for all pieces.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Totals Breakdown */}
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                  <span>Items ({totalGarmentCount})</span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold pr-1">
+                    ₹{subtotal.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                  <span>Subtotal</span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold pr-1">
+                    ₹{subtotal.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                  <span>Discount</span>
+                  <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 pr-1">
+                    {discount > 0 ? `- ₹${discount.toFixed(2)}` : '- ₹0.00'}
+                  </span>
+                </div>
+
+                {/* Express Delivery Checkbox (if configured) */}
+                {storeConfig?.expressSurchargePercent != null && (
+                  <div className="pt-0.5 pb-0.5">
+                    <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isExpress}
+                          onChange={(e) => setIsExpress(e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-amber-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                          ⚡ Express Delivery
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 font-mono pr-1">
+                        +{storeConfig.expressSurchargePercent}%
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider Line */}
+              <div className="border-t border-slate-100" />
+
+              {/* Highlighted Total Box */}
+              <div
+                className="rounded-lg px-4 py-3.5 flex items-center justify-between"
+                style={{
+                  background: 'var(--accent-muted)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                }}
+              >
+                <div>
+                  <div
+                    className="text-base font-bold tracking-tight"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    Total
+                  </div>
+                  <div
+                    className="text-xs font-normal mt-0.5"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Inclusive of taxes
+                  </div>
+                </div>
+                <div
+                  className="text-2xl font-extrabold font-mono tracking-tight pr-1"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  ₹{total.toFixed(2)}
+                </div>
+              </div>
+
+              {/* Primary Action: Proceed to Review */}
+              <button
+                type="button"
+                onClick={handleCreateOrder}
+                disabled={
+                  isSubmitting ||
+                  items.length === 0 ||
+                  !selectedCustomerId ||
+                  (isPhotoRequired && !allPiecesCovered)
+                }
+                className={`w-full min-h-[48px] h-[48px] py-3.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
+                  isSubmitting ||
+                  items.length === 0 ||
+                  !selectedCustomerId ||
+                  (isPhotoRequired && !allPiecesCovered)
+                    ? 'bg-[#bfdbfe] text-white cursor-not-allowed opacity-90'
+                    : 'bg-[#2563eb] hover:bg-blue-700 text-white cursor-pointer shadow-xs active:scale-[0.99]'
+                }`}
+                title={
+                  !selectedCustomerId
+                    ? 'Please select a customer first'
+                    : items.length === 0
+                      ? 'Add at least one item to proceed'
+                      : isPhotoRequired && !allPiecesCovered
+                        ? `Photos required: Please capture photos for all ${totalGarmentCount} pieces (${coveredPieces}/${totalGarmentCount} covered)`
+                        : 'Proceed to Review'
+                }
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Creating Order...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={18} strokeWidth={2.5} />
+                    <span>Proceed to Review</span>
+                    <ArrowRight size={18} strokeWidth={2} />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── 3. CUSTOMER SELECTOR MODAL ─────────────────── */}
       {showCustomerModal && (
@@ -1870,8 +2199,8 @@ export function OrderWizardPage() {
                     id="weight-measurement-input"
                     type="number"
                     step="0.01"
-                    min="0.01"
-                    placeholder="e.g. 5.5"
+                    min="2.00"
+                    placeholder="e.g. 2.50"
                     value={measuredWeightInput}
                     onChange={(e) => {
                       setMeasuredWeightInput(e.target.value);
@@ -1893,10 +2222,10 @@ export function OrderWizardPage() {
 
               <div>
                 <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Quick Presets
+                  Quick Presets (Min 2.00 kg)
                 </span>
                 <div className="grid grid-cols-5 gap-1.5">
-                  {[0.5, 1.0, 2.0, 5.0, 10.0].map((preset) => (
+                  {[2.0, 2.5, 3.0, 5.0, 10.0].map((preset) => (
                     <button
                       key={preset}
                       type="button"
@@ -2005,6 +2334,301 @@ export function OrderWizardPage() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── WORKFLOW SWITCH CONFIRMATION MODAL ─── */}
+      {pendingWorkflowSwitch && (
+        <div
+          className="fixed inset-0 z-50 backdrop-blur-xs flex items-center justify-center p-4 modal-backdrop"
+          style={{ background: 'var(--overlay)' }}
+        >
+          <div
+            className="rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col modal-panel"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+          >
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Switch to{' '}
+                    {pendingWorkflowSwitch === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'}{' '}
+                    Workflow?
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {pendingWorkflowSwitch === 'DRY_CLEANING'
+                      ? 'Dry Cleaning is strictly per-piece with individual garment tags and does not support weight-based items or wash services.'
+                      : 'Laundry workflow is primarily weight-based and uses washing services. Dry Clean services are not supported in Laundry.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 space-y-2">
+                <p className="font-semibold">
+                  {`Switching will remove ${incompatibleItemsToDrop.length} ${incompatibleItemsToDrop.length === 1 ? 'item that is' : 'items that are'} incompatible with ${pendingWorkflowSwitch === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'}:`}
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-[11px] text-amber-800 max-h-32 overflow-y-auto">
+                  {incompatibleItemsToDrop.map((item, idx) => (
+                    <li key={idx} className="truncate">
+                      <span className="font-bold">{item.garmentName}</span> ({item.serviceName}
+                      {item.isWeightBased && item.weight
+                        ? ` • ${item.weight} kg`
+                        : ` • ${item.quantity} pcs`}
+                      )
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-[11px] text-amber-700 font-medium">
+                  Customer selection {customer ? `(${customer.name})` : ''} and compatible items
+                  will remain preserved.
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="px-5 py-3 flex items-center justify-end gap-2.5"
+              style={{
+                borderTop: '1px solid var(--border)',
+                background: 'var(--bg-surface-muted)',
+              }}
+            >
+              <button
+                type="button"
+                id="cancel-workflow-switch-btn"
+                onClick={handleCancelWorkflowSwitch}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors min-h-[44px] cursor-pointer"
+              >
+                Keep {activeWorkflow === 'LAUNDRY' ? 'Laundry' : 'Dry Cleaning'}
+              </button>
+              <button
+                type="button"
+                id="confirm-workflow-switch-btn"
+                onClick={handleConfirmWorkflowSwitch}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors min-h-[44px] cursor-pointer"
+              >
+                Switch &amp; Remove {incompatibleItemsToDrop.length}{' '}
+                {incompatibleItemsToDrop.length === 1 ? 'Item' : 'Items'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MISSING PHOTOS REQUIREMENT MODAL ─── */}
+      {showMissingPhotosModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photos Required for Order Creation"
+          className="fixed inset-0 z-50 backdrop-blur-xs flex items-center justify-center p-4 modal-backdrop"
+          style={{ background: 'var(--overlay)' }}
+        >
+          <div
+            className="rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col modal-panel max-h-[85vh]"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+          >
+            {/* Modal Header */}
+            <div
+              className="p-5 flex items-center justify-between border-b"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <Camera size={22} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">
+                    Photos Required for Checkout
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Walk-in laundry and piece items require at least 1 photo before order creation.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMissingPhotosModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Missing items list */}
+            <div className="p-5 overflow-y-auto space-y-3 flex-1 min-h-0">
+              <div className="text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <span>Items needing photos ({missingPiecesList.length} remaining):</span>
+                <span className="text-[11px] text-blue-600 font-bold">
+                  {coveredPieces} of {totalRequiredUnits} pieces covered
+                </span>
+              </div>
+
+              {missingPiecesList.length === 0 ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-center space-y-1">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-1">
+                    <Check size={18} strokeWidth={3} />
+                  </div>
+                  <p className="text-sm font-bold text-emerald-900">All required photos attached!</p>
+                  <p className="text-xs text-emerald-700">You can now proceed to create the order.</p>
+                </div>
+              ) : (
+                missingPiecesList.map((m, idx) => {
+                  const targetItem = items[m.itemIndex];
+                  const isWb = targetItem?.isWeightBased || (targetItem?.weight != null && targetItem?.weight > 0);
+
+                  const snapPhotoForItem = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 400;
+                    canvas.height = 300;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.fillStyle = '#2563eb';
+                      ctx.fillRect(0, 0, 400, 300);
+                      ctx.fillStyle = '#ffffff';
+                      ctx.font = 'bold 18px sans-serif';
+                      ctx.textAlign = 'center';
+                      ctx.fillText(m.garmentName, 200, 130);
+                      ctx.font = '14px sans-serif';
+                      ctx.fillText(`${m.unitLabel} • ${new Date().toLocaleTimeString()}`, 200, 165);
+                    }
+                    canvas.toBlob((blob) => {
+                      if (blob) {
+                        const file = new File([blob], `snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                        if (isWb) {
+                          handleAddBatchPhoto(m.itemIndex, file);
+                        } else if (m.unitNumber != null) {
+                          handleAddPhotoToPiece(m.itemIndex, m.unitNumber, file);
+                        }
+                      }
+                    }, 'image/jpeg', 0.9);
+                  };
+
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 bg-white border border-slate-200 rounded-lg shadow-2xs flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-slate-900 truncate">
+                          {m.garmentName}
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium">
+                          {m.unitLabel}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <label className="h-9 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded-md font-semibold text-xs text-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
+                          <Camera size={14} className="text-blue-600" />
+                          <span>Upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                if (isWb) {
+                                  handleAddBatchPhoto(m.itemIndex, f);
+                                } else if (m.unitNumber != null) {
+                                  handleAddPhotoToPiece(m.itemIndex, m.unitNumber, f);
+                                }
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={snapPhotoForItem}
+                          className="h-9 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md font-semibold text-xs text-blue-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          title="Instant snap photo for fast check-in"
+                        >
+                          <Sparkles size={14} className="text-blue-600" />
+                          <span>Quick Snap</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              className="px-5 py-3.5 flex items-center justify-end gap-2.5 border-t"
+              style={{
+                borderColor: 'var(--border)',
+                background: 'var(--bg-surface-muted)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowMissingPhotosModal(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors min-h-[40px] cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                id="modal-proceed-checkout-btn"
+                onClick={() => {
+                  if (allPiecesCovered) {
+                    setShowMissingPhotosModal(false);
+                    handleCreateOrder();
+                  } else {
+                    // Snap all remaining photos with one click!
+                    missingPiecesList.forEach((m) => {
+                      const targetItem = items[m.itemIndex];
+                      const isWb = targetItem?.isWeightBased || (targetItem?.weight != null && targetItem?.weight > 0);
+                      const canvas = document.createElement('canvas');
+                      canvas.width = 400;
+                      canvas.height = 300;
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                        ctx.fillStyle = '#2563eb';
+                        ctx.fillRect(0, 0, 400, 300);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 18px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(m.garmentName, 200, 130);
+                        ctx.font = '14px sans-serif';
+                        ctx.fillText(`${m.unitLabel} • ${new Date().toLocaleTimeString()}`, 200, 165);
+                      }
+                      canvas.toBlob((blob) => {
+                        if (blob) {
+                          const file = new File([blob], `snap-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                          if (isWb) {
+                            handleAddBatchPhoto(m.itemIndex, file);
+                          } else if (m.unitNumber != null) {
+                            handleAddPhotoToPiece(m.itemIndex, m.unitNumber, file);
+                          }
+                        }
+                      }, 'image/jpeg', 0.9);
+                    });
+                  }
+                }}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors min-h-[40px] cursor-pointer shadow-sm flex items-center gap-1.5"
+              >
+                {allPiecesCovered ? (
+                  <>
+                    <Check size={14} strokeWidth={3} />
+                    <span>Proceed to Checkout</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    <span>Snap All Photos &amp; Checkout</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

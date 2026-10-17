@@ -5,7 +5,11 @@ import {
   filterServicesForCategory,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
+  isCategoryAllowedInWorkflow,
+  isServiceAllowedInWorkflow,
+  isDryCleanService,
 } from '@growfast/shared-types';
+import type { OrderWorkflowType } from '@growfast/shared-types';
 import {
   CatalogNavFilter,
   DEFAULT_CATEGORIES,
@@ -22,6 +26,7 @@ interface ItemSelectorProps {
   onGarmentSelect: (garment: any, serviceId: string, price: number) => void;
   selectedGarmentId?: string;
   onBack?: () => void;
+  workflow?: OrderWorkflowType;
 }
 
 const CATEGORIES = DEFAULT_CATEGORIES;
@@ -33,23 +38,88 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   prices,
   onGarmentSelect,
   selectedGarmentId,
+  workflow,
 }) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeServices = useMemo(() => services.filter((s) => s.isActive), [services]);
   const activeGarments = useMemo(() => garments.filter((g) => g.isActive), [garments]);
 
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(activeServices[0]?.id || '');
-  const [selectedCategory, setSelectedCategory] = useState<string>(CATEGORIES[0]);
+  // Fast O(1) price lookup map: `${garmentId}:${serviceId}` -> unitPrice
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of prices) {
+      if (p.garmentCatalogId && p.serviceTypeId) {
+        map.set(`${p.garmentCatalogId}:${p.serviceTypeId}`, p.price);
+      }
+    }
+    return map;
+  }, [prices]);
+
+  // Allowed categories based on workflow (e.g. Dry Cleaning excludes WEIGHT_BASED)
+  const workflowCategories = useMemo(() => {
+    return CATEGORIES.filter((c) => !workflow || isCategoryAllowedInWorkflow(c, workflow));
+  }, [workflow]);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    workflowCategories[0] || CATEGORIES[0],
+  );
+
+  // Visible services based on current category and workflow
+  const visibleServices = useMemo(() => {
+    return filterServicesForCategory(activeServices, selectedCategory, workflow);
+  }, [activeServices, selectedCategory, workflow]);
+
+  // Preferred service resolver: ensures workflow opens with primary intuitive service
+  const getPreferredServiceId = (serviceList: typeof visibleServices, wf?: OrderWorkflowType) => {
+    if (serviceList.length === 0) return '';
+    if (wf === 'DRY_CLEANING') {
+      const dc = serviceList.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN');
+      if (dc) return dc.id;
+    } else {
+      const preferred = [
+        'wash and steam iron',
+        'wash + steam iron',
+        'standard wash',
+        'wash and fold',
+        'premium laundry',
+      ];
+      const laundrySvc = serviceList.find((s) =>
+        preferred.includes(s.name.trim().toLowerCase()),
+      );
+      if (laundrySvc) return laundrySvc.id;
+    }
+    return serviceList[0]?.id || '';
+  };
+
+  const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
+    getPreferredServiceId(visibleServices, workflow) || activeServices[0]?.id || '',
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');
   const [activeOnly, setActiveOnly] = useState<boolean>(true);
 
-  // Keep first active service selected when loaded
+  // Sync selected category if current category becomes disallowed in workflow
   useEffect(() => {
-    if (!selectedServiceId && activeServices.length > 0) {
-      setSelectedServiceId(activeServices[0].id);
+    if (workflow && !isCategoryAllowedInWorkflow(selectedCategory, workflow)) {
+      setSelectedCategory(workflowCategories[0] || GarmentCategory.MEN);
     }
-  }, [activeServices, selectedServiceId]);
+  }, [workflow, selectedCategory, workflowCategories]);
+
+  // Sync selected service if current service becomes disallowed in visibleServices
+  useEffect(() => {
+    if (visibleServices.length > 0 && !visibleServices.some((s) => s.id === selectedServiceId)) {
+      const preferred = getPreferredServiceId(visibleServices, workflow);
+      setSelectedServiceId(preferred || visibleServices[0].id);
+    }
+  }, [visibleServices, selectedServiceId, workflow]);
+
+  // Keep preferred active service selected when loaded initially
+  useEffect(() => {
+    if (!selectedServiceId && visibleServices.length > 0) {
+      const preferred = getPreferredServiceId(visibleServices, workflow);
+      setSelectedServiceId(preferred || visibleServices[0].id);
+    }
+  }, [visibleServices, selectedServiceId, workflow]);
 
   // Keyboard shortcut: F2 focuses search
   useEffect(() => {
@@ -63,17 +133,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Visible services based on current category (Shoe hides 3 services)
-  const visibleServices = useMemo(() => {
-    return filterServicesForCategory(activeServices, selectedCategory);
-  }, [activeServices, selectedCategory]);
-
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
     const newServiceId = resolveCatalogSelectionOnCategoryChange(
       category,
       selectedServiceId,
       activeServices,
+      workflow,
     );
     if (newServiceId !== selectedServiceId) {
       setSelectedServiceId(newServiceId);
@@ -106,11 +172,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
     });
 
     return sortCatalogGarments(list, sortBy, (garmentId) => {
-      return (
-        prices.find(
-          (p) => p.garmentCatalogId === garmentId && p.serviceTypeId === selectedServiceId,
-        )?.price || 0
-      );
+      return priceMap.get(`${garmentId}:${selectedServiceId}`) ?? 0;
     });
   }, [
     activeGarments,
@@ -119,18 +181,19 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
     selectedCategory,
     searchQuery,
     sortBy,
-    prices,
+    priceMap,
     selectedServiceId,
   ]);
 
   const handleGarmentClick = (garment: any) => {
     if (!selectedServiceId) return;
 
-    const priceRecord = prices.find(
-      (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId,
-    );
+    // Safety: Dry Cleaning workflow strictly forbids weight-based garments
+    if (workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED) {
+      return;
+    }
 
-    const unitPrice = priceRecord ? priceRecord.price : 0;
+    const unitPrice = priceMap.get(`${garment.id}:${selectedServiceId}`) ?? 0;
     onGarmentSelect(garment, selectedServiceId, unitPrice);
   };
 
@@ -150,10 +213,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
         }}
       >
         <CatalogNavFilter
-          services={visibleServices}
+          services={activeServices}
+          workflow={workflow}
           activeServiceId={selectedServiceId}
           onServiceChange={handleServiceSelect}
-          categories={CATEGORIES}
+          categories={workflowCategories}
           categoryLabels={CATEGORY_LABELS}
           activeCategory={selectedCategory}
           onCategoryChange={handleCategorySelect}
@@ -281,11 +345,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
         <div className="order-garment-grid w-full">
           {filteredGarments.map((garment, idx) => {
-            const priceRecord = prices.find(
-              (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === selectedServiceId,
-            );
-            const hasPrice = priceRecord !== undefined && priceRecord !== null;
-            const price = hasPrice ? priceRecord.price : null;
+            const unitPrice = priceMap.get(`${garment.id}:${selectedServiceId}`);
+            const hasPrice = unitPrice !== undefined;
+            const price = hasPrice ? unitPrice : null;
             const isSelected = selectedGarmentId === garment.id;
 
             const categoryPrefix = (CATEGORY_LABELS[garment.category] || garment.category)

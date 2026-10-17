@@ -101,10 +101,19 @@ export {
   filterCategoriesForService,
   formatCatalogServiceName,
   isStarchingService,
+  isDryCleanService,
+  isWeightBasedCategory,
   STARCHING_ALLOWED_CATEGORIES,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
+  WORKFLOW_OPTIONS,
+  isServiceAllowedInWorkflow,
+  isCategoryAllowedInWorkflow,
+  isItemCompatibleWithWorkflow,
+  resolveCatalogSelectionOnWorkflowChange,
+  isEntryModeAllowedInWorkflow,
 } from './catalog';
+export type { OrderWorkflowType, OrderEntryMode, WorkflowOption } from './catalog';
 
 // Tag Template & Designer Contract (Phase T4)
 export { DEFAULT_TAG_DESIGN, sanitizeTagDesign } from './tag-template';

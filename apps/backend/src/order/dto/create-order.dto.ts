@@ -9,12 +9,15 @@ import {
   IsString,
   Min,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import {
   CreateOrderRequest,
   CreateOrderItemRequest,
   CreateOrderPieceRequest,
   PickupType,
+  OrderWorkflowType,
+  OrderEntryMode,
 } from '@growfast/shared-types';
 
 export class CreateOrderPieceDto implements CreateOrderPieceRequest {
@@ -46,7 +49,7 @@ export class CreateOrderItemDto implements CreateOrderItemRequest {
 
   @IsOptional()
   @IsNumber()
-  @Min(0.01)
+  @Min(2.0, { message: 'Minimum permitted weight is 2.00 kg.' })
   weight?: number;
 
   @IsOptional()
@@ -83,4 +86,12 @@ export class CreateOrderDto implements CreateOrderRequest {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsIn(['LAUNDRY', 'DRY_CLEANING'])
+  workflow?: OrderWorkflowType;
+
+  @IsOptional()
+  @IsIn(['WEIGHT', 'PIECES'])
+  entryMode?: OrderEntryMode;
 }

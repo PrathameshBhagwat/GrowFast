@@ -33,6 +33,7 @@ import {
   Info,
   Calendar,
   Clock,
+  Scale,
   AlertTriangle,
   RotateCw,
   ChevronDown,
@@ -1228,15 +1229,32 @@ export const HomePage: React.FC = () => {
                   Profile
                 </Button>
                 <Button
+                  id="create-order-per-weight-customer-btn"
+                  variant="secondary"
+                  size="md"
+                  icon={<Scale size={16} />}
+                  onClick={() =>
+                    navigate(
+                      `/orders/new?customerId=${selectedCustomer.id}&workflow=LAUNDRY&mode=WEIGHT`,
+                    )
+                  }
+                  aria-label="CREATE ORDER PER WEIGHT"
+                  style={{ minHeight: '44px', fontWeight: 700 }}
+                >
+                  CREATE ORDER PER WEIGHT
+                </Button>
+                <Button
                   id="create-order-for-customer-btn"
                   variant="primary"
                   size="md"
                   icon={<ArrowRight size={16} />}
-                  onClick={() => navigate(`/orders/new?customerId=${selectedCustomer.id}`)}
+                  onClick={() =>
+                    navigate(`/orders/new?customerId=${selectedCustomer.id}&mode=PIECES`)
+                  }
                   aria-label="Create Order for Customer"
-                  style={{ minHeight: '44px', fontWeight: 600 }}
+                  style={{ minHeight: '44px', fontWeight: 700 }}
                 >
-                  New Order
+                  CREATE ORDER PER PIECES
                 </Button>
               </div>
             </div>

@@ -141,4 +141,52 @@ describe('CatalogNavFilter Service & Category Rules', () => {
     fireEvent.click(womenBtn);
     expect(handleCategoryChange).toHaveBeenCalledWith(GarmentCategory.WOMEN);
   });
+
+  it('Requirement 6: when workflow is DRY_CLEANING, filters out wash services and Weight Based category', () => {
+    render(
+      <CatalogNavFilter
+        services={sampleServices}
+        workflow="DRY_CLEANING"
+        activeServiceId="svc-dc"
+        onServiceChange={vi.fn()}
+        activeCategory={GarmentCategory.MEN}
+        onCategoryChange={vi.fn()}
+        searchQuery=""
+        onSearchChange={vi.fn()}
+      />,
+    );
+
+    // Dry Clean is visible
+    expect(screen.getByRole('button', { name: /^dry clean$/i })).toBeInTheDocument();
+    // Wash services are hidden
+    expect(screen.queryByRole('button', { name: /^standard wash$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /wash \+ steam iron/i })).not.toBeInTheDocument();
+    // Weight based category is hidden
+    expect(screen.queryByRole('button', { name: /^weight based$/i })).not.toBeInTheDocument();
+    // Piece categories are visible
+    expect(screen.getByRole('button', { name: /^men$/i })).toBeInTheDocument();
+  });
+
+  it('Requirement 7: when workflow is LAUNDRY, filters out Dry Clean and preserves Weight Based category', () => {
+    render(
+      <CatalogNavFilter
+        services={sampleServices}
+        workflow="LAUNDRY"
+        activeServiceId="svc-wash"
+        onServiceChange={vi.fn()}
+        activeCategory={GarmentCategory.MEN}
+        onCategoryChange={vi.fn()}
+        searchQuery=""
+        onSearchChange={vi.fn()}
+      />,
+    );
+
+    // Standard wash and steam iron are visible
+    expect(screen.getByRole('button', { name: /^standard wash$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^steam iron$/i })).toBeInTheDocument();
+    // Dry Clean is hidden
+    expect(screen.queryByRole('button', { name: /^dry clean$/i })).not.toBeInTheDocument();
+    // Weight based category is visible
+    expect(screen.getByRole('button', { name: /^weight based$/i })).toBeInTheDocument();
+  });
 });

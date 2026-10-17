@@ -59,8 +59,8 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
     setError(null);
     try {
       if (isWeightBased) {
-        if (weight == null || isNaN(weight) || weight <= 0) {
-          setError('Weight must be greater than 0 kg');
+        if (weight == null || isNaN(weight) || weight < 2.0) {
+          setError('Minimum permitted weight is 2.00 kg');
           setSaving(false);
           return;
         }
@@ -123,7 +123,7 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
                   id="item-weight"
                   type="number"
                   step="0.01"
-                  min="0.01"
+                  min="2.00"
                   value={weight ?? ''}
                   onChange={(e) => {
                     const val = e.target.value === '' ? undefined : parseFloat(e.target.value);

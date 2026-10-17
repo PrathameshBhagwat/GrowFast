@@ -5,6 +5,7 @@ import {
   filterCategoriesForService,
   filterServicesForCategory,
   formatCatalogServiceName,
+  OrderWorkflowType,
 } from '@growfast/shared-types';
 
 export interface CatalogServiceItem {
@@ -91,6 +92,7 @@ export interface CatalogNavFilterProps {
   searchPlaceholder?: string;
   searchRef?: React.RefObject<HTMLInputElement | null>;
   rightToolbarContent?: React.ReactNode;
+  workflow?: OrderWorkflowType;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -108,6 +110,7 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
   searchPlaceholder,
   searchRef,
   rightToolbarContent,
+  workflow,
   className = '',
   style,
 }) => {
@@ -131,15 +134,15 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
     }
   };
 
-  // Filter visible services: excludes Free Shoe, Reprocess Cleaning, and shoe-hidden services
+  // Filter visible services: excludes Free Shoe, Reprocess Cleaning, shoe-hidden services, and workflow-incompatible services
   const visibleServices = useMemo(() => {
-    return filterServicesForCategory(services, activeCategory);
-  }, [services, activeCategory]);
+    return filterServicesForCategory(services, activeCategory, workflow);
+  }, [services, activeCategory, workflow]);
 
-  // When "Starching" is selected, show ONLY Men, Women, Kids
+  // When "Starching" is selected, show ONLY Men, Women, Kids; when Dry Cleaning workflow, hide Weight Based
   const visibleCategories = useMemo(() => {
-    return filterCategoriesForService(categories, activeServiceId, services);
-  }, [categories, activeServiceId, services]);
+    return filterCategoriesForService(categories, activeServiceId, services, workflow);
+  }, [categories, activeServiceId, services, workflow]);
 
   return (
     <div

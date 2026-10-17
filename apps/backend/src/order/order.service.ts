@@ -32,6 +32,8 @@ import {
   isPhotoRequiredForOrder,
   GarmentCategory,
   ServiceCategory,
+  isServiceAllowedInWorkflow,
+  isCategoryAllowedInWorkflow,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
@@ -131,14 +133,52 @@ export class OrderService {
           throw new BadRequestException(`Service type "${service.name}" is not active`);
         }
 
+        if (dto.workflow) {
+          if (!isServiceAllowedInWorkflow(service, dto.workflow)) {
+            throw new BadRequestException(
+              `Service "${service.name}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
+            );
+          }
+          if (!isCategoryAllowedInWorkflow(garment.category, dto.workflow)) {
+            throw new BadRequestException(
+              `Category "${garment.category}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
+            );
+          }
+        }
+
+        if (dto.entryMode === 'WEIGHT') {
+          if (dto.workflow === 'DRY_CLEANING') {
+            throw new BadRequestException(
+              'Dry Cleaning is strictly per-piece and cannot be entered per weight.',
+            );
+          }
+        }
+
+        // Dry Cleaning is strictly per-piece — never weight-based
+        const isDryClean =
+          service.category === ServiceCategory.DRY_CLEAN ||
+          service.name.trim().toLowerCase() === 'dry clean';
+
+        if (isDryClean) {
+          if (
+            garment.category === GarmentCategory.WEIGHT_BASED ||
+            (item.weight != null && item.weight > 0)
+          ) {
+            throw new BadRequestException(
+              `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+            );
+          }
+        }
+
         const isWeightBased =
           garment.category === GarmentCategory.WEIGHT_BASED ||
-          service.category === ServiceCategory.WEIGHT_BASED;
+          service.category === ServiceCategory.WEIGHT_BASED ||
+          (item.weight != null && item.weight > 0);
 
         if (isWeightBased) {
-          if (item.weight == null || isNaN(item.weight) || item.weight <= 0) {
+          if (item.weight == null || isNaN(item.weight) || item.weight < 2.0) {
             throw new BadRequestException(
-              `Weight in kg is required and must be greater than 0 for weight-based item "${garment.name}".`,
+              `Weight in kg is required and minimum permitted weight is 2.00 kg for weight-based item "${garment.name}".`,
             );
           }
         }
@@ -711,10 +751,36 @@ export class OrderService {
       });
       const unitPrice = priceRecord?.price ?? orderItem.unitPrice;
 
+      // Dry Cleaning is strictly per-piece — never weight-based
+      const targetService = await tx.serviceType.findUnique({ where: { id: serviceTypeId } });
+      const isDryCleanTarget =
+        targetService &&
+        (targetService.category === ServiceCategory.DRY_CLEAN ||
+          targetService.name.trim().toLowerCase() === 'dry clean');
+
+      if (isDryCleanTarget) {
+        if (
+          dto.weight != null ||
+          (dto.weight === undefined && orderItem.weight != null && orderItem.weight > 0)
+        ) {
+          throw new BadRequestException(
+            'Dry Cleaning is strictly per-piece and does not support weight.',
+          );
+        }
+        const targetGarment = await tx.garmentCatalog.findUnique({
+          where: { id: garmentCatalogId },
+        });
+        if (targetGarment?.category === GarmentCategory.WEIGHT_BASED) {
+          throw new BadRequestException(
+            'Dry Cleaning is strictly per-piece and does not support weight-based processing.',
+          );
+        }
+      }
+
       const newWeight = dto.weight !== undefined ? dto.weight : orderItem.weight;
       if (newWeight !== null && newWeight !== undefined) {
-        if (isNaN(newWeight) || newWeight <= 0) {
-          throw new BadRequestException('Weight in kg must be greater than 0.');
+        if (isNaN(newWeight) || newWeight < 2.0) {
+          throw new BadRequestException('Minimum permitted weight is 2.00 kg.');
         }
       }
 
@@ -787,13 +853,6 @@ export class OrderService {
           `Cannot reduce order item total below the amount already paid (₹${effectivePaid}). Please use the Financial Adjustment workflow (Refund/Store Credit) for adjustments.`,
         );
       }
-
-      const financialState = this.paymentService.calculateOrderFinancialState({
-        totalAmount: totals.totalAmount,
-        amountPaid: updatedOrder!.amountPaid,
-        paymentStatus: updatedOrder!.paymentStatus as any,
-        adjustments: (updatedOrder as any).adjustments,
-      });
 
       const itemsForStatus = updatedOrder!.items.map((i: any) => ({
         status: i.itemStatus as ItemStatus,

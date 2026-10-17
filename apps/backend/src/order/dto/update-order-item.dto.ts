@@ -26,7 +26,7 @@ export class UpdateOrderItemDto implements UpdateOrderItemRequest {
 
   @IsOptional()
   @IsNumber()
-  @Min(0.01)
+  @Min(2.0, { message: 'Minimum permitted weight is 2.00 kg.' })
   weight?: number;
 
   @IsOptional()
