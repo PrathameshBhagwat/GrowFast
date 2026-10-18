@@ -1060,17 +1060,17 @@ export function OrderWizardPage() {
         </div>
       </header>
 
-      {/* ─── PRIMARY ENTRY MODE DECISION BAR ─── */}
+      {/* ─── PRIMARY ENTRY MODE DECISION BAR (Compact & Space-Optimized) ─── */}
       <section
         aria-label="Order Entry Mode Selection"
-        className="shrink-0 px-3 sm:px-6 py-2.5 z-5"
+        className="shrink-0 px-3 sm:px-4 py-1.5 z-5"
         style={{
           background: 'var(--bg-surface)',
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-          <div className="grid grid-cols-2 gap-3 w-full max-w-2xl mx-auto">
+        <div className="flex items-center justify-center">
+          <div className="grid grid-cols-2 gap-2 w-full max-w-xl mx-auto">
             {/* CREATE ORDER PER PIECES */}
             <button
               type="button"
@@ -1078,32 +1078,32 @@ export function OrderWizardPage() {
               role="button"
               aria-pressed={activeEntryMode === 'PIECES'}
               onClick={() => handleSelectEntryMode('PIECES')}
-              className={`min-h-[56px] px-4 py-2.5 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer ${
+              className={`h-9 px-3 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
                 activeEntryMode === 'PIECES'
-                  ? 'bg-purple-50/90 border-purple-600 shadow-md ring-1 ring-purple-600/20 text-purple-950'
+                  ? 'bg-purple-50 border-purple-600 shadow-2xs text-purple-950 font-bold ring-1 ring-purple-600/20'
                   : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
               }`}
             >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                  activeEntryMode === 'PIECES'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                <Sparkles size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-black uppercase tracking-wider leading-tight">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                    activeEntryMode === 'PIECES'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <Sparkles size={13} />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider truncate">
                   Create Order Per Pieces
-                </div>
-                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">
-                  Dry Cleaning (default) • Per-garment pricing &amp; tags
-                </div>
+                </span>
+                <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">
+                  (Dry Clean)
+                </span>
               </div>
               {activeEntryMode === 'PIECES' && (
-                <div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0">
-                  <Check size={13} strokeWidth={3} />
+                <div className="w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0">
+                  <Check size={10} strokeWidth={3} />
                 </div>
               )}
             </button>
@@ -1116,32 +1116,32 @@ export function OrderWizardPage() {
               aria-pressed={activeEntryMode === 'WEIGHT'}
               onClick={() => handleSelectEntryMode('WEIGHT')}
               title="Weight-based Laundry order entry (min 2.00 kg)"
-              className={`min-h-[56px] px-4 py-2.5 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer ${
+              className={`h-9 px-3 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
                 activeEntryMode === 'WEIGHT'
-                  ? 'bg-blue-50/90 border-blue-600 shadow-md ring-1 ring-blue-600/20 text-blue-950'
+                  ? 'bg-blue-50 border-blue-600 shadow-2xs text-blue-950 font-bold ring-1 ring-blue-600/20'
                   : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700'
               }`}
             >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                  activeEntryMode === 'WEIGHT'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                <Scale size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-black uppercase tracking-wider leading-tight">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                    activeEntryMode === 'WEIGHT'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <Scale size={13} />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider truncate">
                   Create Order Per Weight
-                </div>
-                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">
-                  Laundry only • Per-KG rate (min 2.00 kg)
-                </div>
+                </span>
+                <span className="text-[10px] text-blue-600 font-medium hidden sm:inline">
+                  (Laundry / kg)
+                </span>
               </div>
               {activeEntryMode === 'WEIGHT' && (
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
-                  <Check size={13} strokeWidth={3} />
+                <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                  <Check size={10} strokeWidth={3} />
                 </div>
               )}
             </button>
@@ -1259,9 +1259,9 @@ export function OrderWizardPage() {
               )}
             </div>
 
-            {/* 2. Added Items List */}
+            {/* 2. Added Items List (Compact & Clear Spacing) */}
             <div
-              className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-3.5"
+              className="flex-1 min-h-0 overflow-y-auto px-3.5 py-2 space-y-2.5"
               style={{ background: 'var(--bg-surface)' }}
             >
               {items.length === 0 ? (
@@ -1307,7 +1307,7 @@ export function OrderWizardPage() {
                   return (
                     <div
                       key={idx}
-                      className="rounded-lg p-4 shadow-2xs transition-all fade-slide-item"
+                      className="rounded-lg p-3 shadow-2xs transition-all fade-slide-item"
                       style={{
                         background: 'var(--bg-surface)',
                         border: '1px solid var(--border)',
@@ -1315,11 +1315,11 @@ export function OrderWizardPage() {
                           'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                       }}
                     >
-                      {/* Proper 2-column layout: Left: Garment icon, Right: Item content */}
-                      <div className="flex gap-4 items-start">
+                      {/* 2-column layout: Left: Garment icon, Right: Item content */}
+                      <div className="flex gap-3 items-start">
                         {/* Left: Garment Icon Box */}
                         <div
-                          className="w-[52px] h-[52px] rounded-lg flex items-center justify-center shrink-0"
+                          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                           style={{
                             background: 'var(--bg-surface-muted)',
                             border: '1px solid var(--border-subtle)',
@@ -1331,46 +1331,40 @@ export function OrderWizardPage() {
 
                         {/* Right: Item Content */}
                         <div className="flex-1 min-w-0">
-                          {/* Top row: Garment Name + Item Price aligned to top-right with padding */}
-                          <div className="flex items-baseline justify-between gap-3">
-                            <span className="font-bold text-[15px] text-slate-900 truncate leading-snug">
+                          {/* Top row: Garment Name + Item Price */}
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-bold text-sm text-slate-900 truncate leading-snug">
                               {item.garmentName}
                             </span>
-                            <span className="font-bold text-[15px] text-slate-900 whitespace-nowrap font-mono shrink-0">
+                            <span className="font-bold text-sm text-slate-900 whitespace-nowrap font-mono shrink-0">
                               ₹{itemTotal.toFixed(2)}
                             </span>
                           </div>
 
-                          {/* Service Name (10-12px vertical spacing) */}
-                          <div className="text-xs text-slate-500 font-normal mt-1">
-                            {item.serviceName}
-                          </div>
-
-                          {/* Unit Price each or per kg */}
-                          {isWb ? (
-                            <div className="text-xs text-blue-700 font-semibold mt-1 flex items-center gap-1.5">
-                              <span className="bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11.5px] flex items-center gap-1 font-mono">
-                                <Scale size={12} className="text-blue-600" />
+                          {/* Subtitle row: Service Name + Unit Price combined */}
+                          <div className="text-[11.5px] text-slate-500 font-normal mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span>{item.serviceName}</span>
+                            <span>•</span>
+                            {isWb ? (
+                              <span className="text-blue-700 font-semibold font-mono">
                                 {item.weight} kg @ ₹{Number(item.unitPrice).toFixed(2)}/kg
                               </span>
-                            </div>
-                          ) : (
-                            <div className="text-xs text-slate-400 font-normal mt-0.5">
-                              ₹{Number(item.unitPrice).toFixed(2)} each
-                            </div>
-                          )}
+                            ) : (
+                              <span>₹{Number(item.unitPrice).toFixed(2)} each</span>
+                            )}
+                          </div>
 
                           {/* Optional Defect / Notes Indicator */}
                           {hasDetails && (
-                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600">
+                            <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-600">
                               {item.brand && (
-                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">
+                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-medium text-[10.5px]">
                                   🏷️ {item.brand}
                                 </span>
                               )}
                               {item.defectNotes && (
                                 <span
-                                  className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded truncate max-w-[160px]"
+                                  className="bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded truncate max-w-[150px] text-[10.5px]"
                                   title={item.defectNotes}
                                 >
                                   ⚠️ {item.defectNotes}
@@ -1379,7 +1373,7 @@ export function OrderWizardPage() {
                               <button
                                 type="button"
                                 onClick={() => setEditingItemIndex(idx)}
-                                className={`px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
+                                className={`px-1.5 py-0.5 rounded text-[10.5px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
                                   coveredItemPieces === totalRequired
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                     : isPhotoRequired
@@ -1392,11 +1386,11 @@ export function OrderWizardPage() {
                                     : 'Click to view/add piece photos'
                                 }
                               >
-                                <Camera size={12} />
+                                <Camera size={11} />
                                 <span>
                                   {isWb
-                                    ? `${coveredItemPieces > 0 ? 'Batch' : '0'} photographed ${coveredItemPieces > 0 ? '✓' : isPhotoRequired ? '⚠' : ''}`
-                                    : `${coveredItemPieces}/${item.quantity} photographed ${
+                                    ? `${coveredItemPieces > 0 ? 'Batch' : '0'} photo ${coveredItemPieces > 0 ? '✓' : isPhotoRequired ? '⚠' : ''}`
+                                    : `${coveredItemPieces}/${item.quantity} photo${coveredItemPieces === 1 ? '' : 's'} ${
                                         coveredItemPieces === item.quantity
                                           ? '✓'
                                           : isPhotoRequired
@@ -1408,8 +1402,8 @@ export function OrderWizardPage() {
                             </div>
                           )}
 
-                          {/* Controls Row: 12px gap, 44px min touch target */}
-                          <div className="flex items-center justify-between mt-3.5 gap-2.5">
+                          {/* Controls Row: Compact & Clean */}
+                          <div className="flex items-center justify-between mt-2.5 gap-2">
                             {/* Left Control: Weight edit button OR Quantity Stepper */}
                             {isWb ? (
                               <button
@@ -1429,15 +1423,15 @@ export function OrderWizardPage() {
                                   setMeasuredWeightInput(String(item.weight));
                                   setWeightError(null);
                                 }}
-                                className="h-[44px] min-h-[44px] px-3.5 border border-blue-300 rounded-lg bg-blue-50/70 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                className="h-[34px] min-h-[34px] px-3 border border-blue-300 rounded-md bg-blue-50/70 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                                 title="Click to edit measured weight"
                               >
-                                <Scale size={15} />
+                                <Scale size={13} />
                                 <span>{item.weight} kg (Edit)</span>
                               </button>
                             ) : (
                               <div
-                                className="flex items-center rounded-lg shadow-2xs overflow-hidden shrink-0 h-[44px]"
+                                className="flex items-center rounded-md shadow-2xs overflow-hidden shrink-0 h-[34px]"
                                 style={{
                                   border: '1px solid var(--border)',
                                   background: 'var(--bg-surface)',
@@ -1446,32 +1440,31 @@ export function OrderWizardPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateQuantity(idx, -1)}
-                                  className="w-10 h-[44px] min-h-[44px] flex items-center justify-center text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                                  className="w-8 h-[34px] min-h-[34px] flex items-center justify-center text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
                                   title="Decrease quantity"
                                 >
-                                  <Minus size={13} strokeWidth={2.5} />
+                                  <Minus size={12} strokeWidth={2.5} />
                                 </button>
-                                <span className="w-10 h-[44px] flex items-center justify-center text-center font-bold text-sm text-slate-900 font-mono select-none">
+                                <span className="w-8 h-[34px] flex items-center justify-center text-center font-bold text-xs text-slate-900 font-mono select-none">
                                   {item.quantity}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateQuantity(idx, 1)}
-                                  className="w-10 h-[44px] min-h-[44px] flex items-center justify-center text-[#2563eb] hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+                                  className="w-8 h-[34px] min-h-[34px] flex items-center justify-center text-[#2563eb] hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
                                   title="Increase quantity"
                                 >
-                                  <Plus size={13} strokeWidth={2.5} />
+                                  <Plus size={12} strokeWidth={2.5} />
                                 </button>
                               </div>
                             )}
 
-                            {/* Action Buttons: [ Photos & Notes ] [ Delete ] on same row */}
-                            <div className="flex items-center gap-2 shrink-0">
-                              {/* Photos & Notes Button: 44px touch target */}
+                            {/* Action Buttons: [ Photos & Notes ] [ Delete ] */}
+                            <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setEditingItemIndex(idx)}
-                                className={`h-[44px] min-h-[44px] px-3 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                className={`h-[34px] min-h-[34px] px-2.5 text-xs font-semibold rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
                                   coveredItemPieces === totalRequired
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                     : isPhotoRequired && coveredItemPieces < totalRequired
@@ -1486,18 +1479,17 @@ export function OrderWizardPage() {
                                     : 'Add piece photos or defect notes'
                                 }
                               >
-                                <Camera size={15} />
+                                <Camera size={13} />
                                 <span>Photos &amp; Notes</span>
                               </button>
 
-                              {/* Delete Button: 44px touch target, destructive styling */}
                               <button
                                 type="button"
                                 onClick={() => handleRemoveItem(idx)}
-                                className="w-[44px] h-[44px] min-h-[44px] flex items-center justify-center border border-rose-200/80 rounded-lg bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
+                                className="w-[34px] h-[34px] min-h-[34px] flex items-center justify-center border border-rose-200/80 rounded-md bg-rose-50/70 text-rose-500 hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
                                 title="Delete item"
                               >
-                                <Trash2 size={15} strokeWidth={2} />
+                                <Trash2 size={13} strokeWidth={2} />
                               </button>
                             </div>
                           </div>
@@ -1596,26 +1588,58 @@ export function OrderWizardPage() {
 
             {/* 4. Totals Breakdown, Highlighted Total & Proceed Button */}
             <div className="px-4 pt-1 pb-4 space-y-2.5 shrink-0">
-              {/* Photos Progress Card & Compliance Indicators (Compact) */}
+              {/* Photos Progress Card & Action (Compact & Space-Optimized) */}
               {items.length > 0 && (
                 <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <Camera size={14} className="text-[#2563eb] shrink-0" />
-                      Photos
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      <span className="font-bold text-xs text-slate-800 dark:text-slate-200 shrink-0">
+                        Photos
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-xs font-semibold shrink-0 ${
+                          allPiecesCovered
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : isPhotoRequired
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+                              : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                        }`}
+                      >
+                        Photos: {coveredPieces} / {totalGarmentCount} pieces{' '}
+                        {allPiecesCovered ? '✓' : ''}
+                      </span>
+                    </div>
+
+                    {/* Quick Photo Action Button directly visible in the Photos card */}
+                    <button
+                      type="button"
+                      id="open-photo-upload-btn"
+                      onClick={() => {
+                        const firstUncoveredIdx = items.findIndex((it) => {
+                          const isWb = it.isWeightBased || (it.weight != null && it.weight > 0);
+                          if (isWb) return !it.batchPhotos || it.batchPhotos.length === 0;
+                          const covered = (it.pieces || []).filter(
+                            (p: any) => p.photos && p.photos.length > 0,
+                          ).length;
+                          return covered < it.quantity;
+                        });
+                        setEditingItemIndex(firstUncoveredIdx >= 0 ? firstUncoveredIdx : 0);
+                      }}
+                      className={`h-7 px-2.5 rounded text-[11px] font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
                         allPiecesCovered
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60 font-semibold'
-                          : isPhotoRequired
-                            ? 'bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60 font-semibold'
-                            : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                          ? 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
                       }`}
+                      title={
+                        allPiecesCovered
+                          ? 'View/manage captured photos'
+                          : 'Click to capture or upload photos'
+                      }
                     >
-                      Photos: {coveredPieces} / {totalGarmentCount} pieces{' '}
-                      {allPiecesCovered ? '✓' : ''}
-                    </span>
+                      <Camera size={12} />
+                      <span>{allPiecesCovered ? 'View Photos' : '+ Upload Photos'}</span>
+                    </button>
                   </div>
 
                   {/* Progress bar */}
@@ -1630,40 +1654,31 @@ export function OrderWizardPage() {
                     />
                   </div>
 
-                  {/* Status Guidance (Compact) */}
+                  {/* Single-Line Warning Alert strictly in one line */}
                   {isPhotoRequired && !allPiecesCovered && (
-                    <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 rounded px-2.5 py-1.5 flex items-start gap-1.5 leading-snug">
-                      <span className="shrink-0 text-amber-600 dark:text-amber-400 font-bold">
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 rounded px-2 py-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                      <span className="shrink-0 text-amber-600 dark:text-amber-400 font-bold text-xs">
                         ⚠
                       </span>
-                      <span>
+                      <span className="truncate">
                         <strong className="font-semibold">Photos required for all pieces.</strong>{' '}
-                        Click Photos &amp; Notes to capture at least 1 photo for each piece.
-                        {missingPiecesMessage && (
-                          <span className="text-amber-800 dark:text-amber-300 font-medium ml-1">
-                            ({missingPiecesMessage})
-                          </span>
-                        )}
+                        Click "+ Upload Photos" to capture.
                       </span>
                     </div>
                   )}
 
                   {!isPhotoRequired && totalGarmentCount > 50 && !isOrderWeightBased && (
-                    <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/60 rounded px-2.5 py-1 leading-tight">
-                      Photos optional for bulk orders (more than 50 pieces).
-                    </p>
-                  )}
-
-                  {isOrderWeightBased && !allPiecesCovered && (
-                    <p className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-800/60 rounded px-2.5 py-1 leading-tight">
-                      Weight-based order: Photos required for all pieces.
-                    </p>
+                    <div className="flex items-center gap-1 text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/50 dark:border-blue-800/60 rounded px-2 py-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
+                      <span className="truncate">
+                        Photos optional for bulk orders (&gt;50 pieces).
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
 
               {/* Totals Breakdown */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-1.5 pt-0.5">
                 <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
                   <span>Items ({totalGarmentCount})</span>
                   <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold pr-1">
@@ -1686,7 +1701,7 @@ export function OrderWizardPage() {
                 {/* Express Delivery Checkbox (if configured) */}
                 {storeConfig?.expressSurchargePercent != null && (
                   <div className="pt-0.5 pb-0.5">
-                    <label className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-colors">
+                    <label className="flex items-center justify-between cursor-pointer p-1.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-colors">
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -1711,7 +1726,7 @@ export function OrderWizardPage() {
 
               {/* Highlighted Total Box */}
               <div
-                className="rounded-lg px-4 py-3.5 flex items-center justify-between"
+                className="rounded-lg px-3.5 py-2.5 flex items-center justify-between"
                 style={{
                   background: 'var(--accent-muted)',
                   border: '1px solid rgba(59, 130, 246, 0.25)',
@@ -1720,20 +1735,20 @@ export function OrderWizardPage() {
               >
                 <div>
                   <div
-                    className="text-base font-bold tracking-tight"
+                    className="text-sm font-bold tracking-tight"
                     style={{ color: 'var(--accent)' }}
                   >
                     Total
                   </div>
                   <div
-                    className="text-xs font-normal mt-0.5"
+                    className="text-[11px] font-normal mt-0.5"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     Inclusive of taxes
                   </div>
                 </div>
                 <div
-                  className="text-2xl font-extrabold font-mono tracking-tight pr-1"
+                  className="text-xl font-extrabold font-mono tracking-tight pr-1"
                   style={{ color: 'var(--accent)' }}
                 >
                   ₹{total.toFixed(2)}
@@ -1750,7 +1765,7 @@ export function OrderWizardPage() {
                   !selectedCustomerId ||
                   (isPhotoRequired && !allPiecesCovered)
                 }
-                className={`w-full min-h-[48px] h-[48px] py-3.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
+                className={`w-full min-h-[44px] h-[44px] py-2.5 px-4 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
                   isSubmitting ||
                   items.length === 0 ||
                   !selectedCustomerId ||
