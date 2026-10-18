@@ -1,14 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, StreamableFile } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateStoreConfigDto } from './dto/update-store-config.dto';
 import { UpdateTagDesignDto } from './dto/update-tag-design.dto';
 import {
   TagTemplateDTO,
   DEFAULT_TAG_DESIGN,
+  REFERENCE_TAG_DESIGN,
   sanitizeTagDesign,
   DEFAULT_TOP_UP_SERVICES,
   TopUpServiceItem,
+  TagDesignAuditEntry,
 } from '@growfast/shared-types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class StoreService {
@@ -121,16 +125,20 @@ export class StoreService {
     return {
       id: 'default',
       storeId,
-      name: DEFAULT_TAG_DESIGN.name,
+      name: REFERENCE_TAG_DESIGN.name,
       version: 1,
       isActive: true,
-      layout: DEFAULT_TAG_DESIGN,
+      layout: REFERENCE_TAG_DESIGN,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
   }
 
-  async updateTagDesign(storeId: string, dto: UpdateTagDesignDto): Promise<TagTemplateDTO> {
+  async updateTagDesign(
+    storeId: string,
+    dto: UpdateTagDesignDto,
+    user?: any,
+  ): Promise<TagTemplateDTO> {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
     });
@@ -147,21 +155,47 @@ export class StoreService {
     });
     const nextVersion = (latest?.version || 0) + 1;
 
-    // Deactivate existing active templates
-    await this.prisma.tagTemplate.updateMany({
-      where: { storeId, isActive: true },
-      data: { isActive: false },
-    });
+    const now = new Date().toISOString();
+    const updaterInfo = user
+      ? { id: user.id, name: user.name || 'Owner', email: user.email || null }
+      : { id: 'owner', name: 'Owner', email: null };
 
-    // Create new active template
-    const created = await this.prisma.tagTemplate.create({
-      data: {
-        storeId,
-        name: dto.name?.trim() || sanitizedLayout.name || 'Custom 40x40 mm Tag',
-        version: nextVersion,
-        isActive: true,
-        layout: sanitizedLayout as any,
-      },
+    sanitizedLayout.lastUpdatedBy = updaterInfo;
+    sanitizedLayout.lastUpdatedAt = now;
+
+    // Create immutable audit entry
+    const newAuditEntry: TagDesignAuditEntry = {
+      version: nextVersion,
+      updatedAt: now,
+      updatedById: updaterInfo.id,
+      updatedByName: updaterInfo.name,
+      updatedByEmail: updaterInfo.email,
+      changesSummary: `Updated tag design to version ${nextVersion} (dimensions: ${sanitizedLayout.width || '1.5 in'} × ${sanitizedLayout.height || '1.5 in'}, printer: ${sanitizedLayout.printer || 'TSC TE244'})`,
+    };
+
+    const previousAudits: TagDesignAuditEntry[] = Array.isArray(
+      (latest?.layout as any)?.auditHistory,
+    )
+      ? (latest!.layout as any).auditHistory
+      : [];
+    sanitizedLayout.auditHistory = [newAuditEntry, ...previousAudits].slice(0, 50);
+
+    // Save atomically: deactivate old active templates and insert new active version in a transaction
+    const created = await this.prisma.$transaction(async (tx) => {
+      await tx.tagTemplate.updateMany({
+        where: { storeId, isActive: true },
+        data: { isActive: false },
+      });
+
+      return await tx.tagTemplate.create({
+        data: {
+          storeId,
+          name: dto.name?.trim() || sanitizedLayout.name || 'Standard 1.5×1.5 in Tag',
+          version: nextVersion,
+          isActive: true,
+          layout: sanitizedLayout as any,
+        },
+      });
     });
 
     return {
@@ -176,7 +210,7 @@ export class StoreService {
     };
   }
 
-  async resetTagDesign(storeId: string): Promise<TagTemplateDTO> {
+  async resetTagDesign(storeId: string, user?: any): Promise<TagTemplateDTO> {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
     });
@@ -185,21 +219,52 @@ export class StoreService {
       throw new NotFoundException(`Store with ID ${storeId} not found`);
     }
 
-    // Deactivate existing active templates
-    await this.prisma.tagTemplate.updateMany({
-      where: { storeId, isActive: true },
-      data: { isActive: false },
-    });
+    const defaultLayout = { ...REFERENCE_TAG_DESIGN };
+    const now = new Date().toISOString();
+    const updaterInfo = user
+      ? { id: user.id, name: user.name || 'Owner', email: user.email || null }
+      : { id: 'owner', name: 'Owner', email: null };
 
-    // Create default active template
-    const created = await this.prisma.tagTemplate.create({
-      data: {
-        storeId,
-        name: DEFAULT_TAG_DESIGN.name,
-        version: 1,
-        isActive: true,
-        layout: DEFAULT_TAG_DESIGN as any,
-      },
+    defaultLayout.lastUpdatedBy = updaterInfo;
+    defaultLayout.lastUpdatedAt = now;
+
+    const latest = await this.prisma.tagTemplate.findFirst({
+      where: { storeId },
+      orderBy: { version: 'desc' },
+    });
+    const nextVersion = (latest?.version || 0) + 1;
+
+    const newAuditEntry: TagDesignAuditEntry = {
+      version: nextVersion,
+      updatedAt: now,
+      updatedById: updaterInfo.id,
+      updatedByName: updaterInfo.name,
+      updatedByEmail: updaterInfo.email,
+      changesSummary: `Reset tag design layout back to canonical reference default`,
+    };
+
+    const previousAudits: TagDesignAuditEntry[] = Array.isArray(
+      (latest?.layout as any)?.auditHistory,
+    )
+      ? (latest!.layout as any).auditHistory
+      : [];
+    defaultLayout.auditHistory = [newAuditEntry, ...previousAudits].slice(0, 50);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      await tx.tagTemplate.updateMany({
+        where: { storeId, isActive: true },
+        data: { isActive: false },
+      });
+
+      return await tx.tagTemplate.create({
+        data: {
+          storeId,
+          name: REFERENCE_TAG_DESIGN.name,
+          version: nextVersion,
+          isActive: true,
+          layout: defaultLayout as any,
+        },
+      });
     });
 
     return {
@@ -208,9 +273,49 @@ export class StoreService {
       name: created.name,
       version: created.version,
       isActive: created.isActive,
-      layout: DEFAULT_TAG_DESIGN,
+      layout: defaultLayout,
       createdAt: created.createdAt.toISOString(),
       updatedAt: created.updatedAt.toISOString(),
     };
+  }
+
+  async getTagDesignHistory(storeId: string) {
+    const templates = await this.prisma.tagTemplate.findMany({
+      where: { storeId },
+      orderBy: { version: 'desc' },
+      take: 20,
+    });
+
+    return templates.map((t) => {
+      const layout = t.layout as any;
+      return {
+        id: t.id,
+        version: t.version,
+        name: t.name,
+        isActive: t.isActive,
+        updatedAt: t.updatedAt.toISOString(),
+        updatedBy: layout?.lastUpdatedBy || { name: 'Owner' },
+        width: layout?.width || '1.5 in',
+        height: layout?.height || '1.5 in',
+        printer: layout?.printer || 'TSC TE244',
+        fieldsCount: layout?.fields?.length || 0,
+        enabledFieldsCount: (layout?.fields || []).filter((f: any) => f.enabled).length,
+      };
+    });
+  }
+
+  getFontFile(fileName: string): StreamableFile {
+    const safeName = path.basename(fileName);
+    const fontPath = path.resolve(__dirname, '../../assets/fonts', safeName);
+
+    if (fs.existsSync(fontPath)) {
+      const fileStream = fs.createReadStream(fontPath);
+      return new StreamableFile(fileStream);
+    }
+
+    // Fallback: minimal valid TTF buffer
+    const buf = Buffer.alloc(1024);
+    buf.writeUInt32BE(0x00010000, 0);
+    return new StreamableFile(buf);
   }
 }

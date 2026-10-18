@@ -22,6 +22,7 @@ import {
   ServiceCategory,
   GarmentCategory,
   adjustDueDateForThursday,
+  ExpressDeliveryOption,
 } from '@growfast/shared-types';
 
 const mockPrismaService: any = {
@@ -4787,6 +4788,215 @@ describe('OrderService', () => {
 
       await expect(service.createOrder(standardWeightDto, 'emp-1', 'store-1')).rejects.toThrow(
         /Minimum permitted weight is 2\.00 kg/i,
+      );
+    });
+  });
+
+  describe('CHANGE 6: Express Delivery Multipliers (Canonical Rules)', () => {
+    const setupOrderMock = (expressOption?: ExpressDeliveryOption, isExpress = true) => {
+      const dto: any = {
+        customerId: 'cust-1',
+        isExpress,
+        expressDeliveryOption: expressOption,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-shirt',
+            serviceTypeId: 'svc-dry-clean',
+            quantity: 2,
+            pieces: [
+              { unitNumber: 1, photos: ['photo1'] },
+              { unitNumber: 2, photos: ['photo2'] },
+            ],
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({
+        id: 'cust-1',
+        phone: '9876543210',
+      });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        { id: 'g-shirt', name: 'Shirt', category: GarmentCategory.MEN, isActive: true },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 'svc-dry-clean',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          estimatedDays: 4,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+        { garmentCatalogId: 'g-shirt', serviceTypeId: 'svc-dry-clean', price: 100 },
+      ]);
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 20, // 20% base express charge
+      });
+      mockPrismaService.physicalGarment = {
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn(),
+      };
+      mockPrismaService.order.create = jest.fn().mockImplementation((args) => ({
+        id: 'ord-express-1',
+        ...args.data,
+        items: [
+          {
+            id: 'item-1',
+            garmentCatalogId: 'g-shirt',
+            serviceTypeId: 'svc-dry-clean',
+            quantity: 2,
+            unitPrice: 100,
+            lineTotal: 200,
+            itemStatus: ItemStatus.RECEIVED,
+            garmentCatalog: { name: 'Shirt', category: GarmentCategory.MEN },
+            serviceType: { category: ServiceCategory.DRY_CLEAN },
+            physicalGarments: [],
+          },
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+
+      return dto;
+    };
+
+    it('Same-day delivery calculates express charge as base express charge × 2.0', async () => {
+      // 2 shirts at ₹100 = ₹200 subtotal
+      // Base express = 20% of ₹200 = ₹40
+      // Same-day express = ₹40 × 2.0 = ₹80
+      // Taxable = ₹280, GST (18%) = ₹50.40, Total = ₹330.40
+      const dto = setupOrderMock(ExpressDeliveryOption.SAME_DAY);
+
+      const created = await service.createOrder(dto, 'emp-1', 'store-1');
+
+      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isExpress: true,
+            expressDeliveryOption: ExpressDeliveryOption.SAME_DAY,
+            subtotal: 200,
+            expressSurcharge: 80,
+            taxAmount: 50.4,
+            totalAmount: 330.4,
+            amountDue: 330.4,
+          }),
+        }),
+      );
+    });
+
+    it('Tomorrow / next-day evening delivery calculates express charge as base express charge × 1.5', async () => {
+      // 2 shirts at ₹100 = ₹200 subtotal
+      // Base express = 20% of ₹200 = ₹40
+      // Next-day evening express = ₹40 × 1.5 = ₹60
+      // Taxable = ₹260, GST (18%) = ₹46.80, Total = ₹306.80
+      const dto = setupOrderMock(ExpressDeliveryOption.NEXT_DAY_EVENING);
+
+      await service.createOrder(dto, 'emp-1', 'store-1');
+
+      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isExpress: true,
+            expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
+            subtotal: 200,
+            expressSurcharge: 60,
+            taxAmount: 46.8,
+            totalAmount: 306.8,
+            amountDue: 306.8,
+          }),
+        }),
+      );
+    });
+
+    it('Regular express delivery does not receive multiplier (base charge × 1.0)', async () => {
+      // 2 shirts at ₹100 = ₹200 subtotal
+      // Base express = 20% of ₹200 = ₹40
+      // Regular express = ₹40 × 1.0 = ₹40
+      // Taxable = ₹240, GST (18%) = ₹43.20, Total = ₹283.20
+      const dto = setupOrderMock(ExpressDeliveryOption.REGULAR);
+
+      await service.createOrder(dto, 'emp-1', 'store-1');
+
+      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isExpress: true,
+            expressDeliveryOption: ExpressDeliveryOption.REGULAR,
+            subtotal: 200,
+            expressSurcharge: 40,
+            taxAmount: 43.2,
+            totalAmount: 283.2,
+          }),
+        }),
+      );
+    });
+
+    it('Order item editing does not compound or multiply an already-multiplied charge', async () => {
+      // Simulate an order that was created with NEXT_DAY_EVENING (1.5x)
+      // When updated from 2 shirts to 3 shirts, subtotal becomes ₹300
+      // Base express = 20% of ₹300 = ₹60
+      // Recalculated express with 1.5x = ₹90 (NOT 1.5x the previous ₹60 surcharge)
+      const existingOrder: any = {
+        id: 'ord-edit-1',
+        orderNumber: 'ORD-0099',
+        customerId: 'cust-1',
+        storeId: 'store-1',
+        isExpress: true,
+        expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
+        subtotal: 200,
+        expressSurcharge: 60,
+        amountPaid: 0,
+        paymentStatus: PaymentStatus.PENDING,
+        items: [
+          {
+            id: 'item-1',
+            garmentCatalogId: 'g-shirt',
+            serviceTypeId: 'svc-dry-clean',
+            unitPrice: 100,
+            quantity: 3, // updated to 3
+            itemStatus: ItemStatus.RECEIVED,
+            serviceType: { estimatedDays: 4 },
+          },
+        ],
+        adjustments: [],
+      };
+
+      mockPrismaService.order.findUnique.mockResolvedValue(existingOrder);
+      mockPrismaService.orderItem.findUnique.mockResolvedValue(existingOrder.items[0]);
+      mockPrismaService.orderItem.update.mockResolvedValue(existingOrder.items[0]);
+      mockPrismaService.garmentCatalog.findUnique = jest.fn().mockResolvedValue({
+        id: 'g-shirt',
+        name: 'Shirt',
+        category: GarmentCategory.MEN,
+      });
+      mockPrismaService.serviceType.findUnique = jest.fn().mockResolvedValue({
+        id: 'svc-dry-clean',
+        category: ServiceCategory.DRY_CLEAN,
+        estimatedDays: 4,
+      });
+      mockPrismaService.store.findUnique.mockResolvedValue({
+        id: 'store-1',
+        expressSurchargePercent: 20,
+      });
+      mockPrismaService.order.update = jest.fn().mockResolvedValue(existingOrder);
+      service.findOrderById = jest.fn().mockResolvedValue(existingOrder);
+
+      await service.updateOrderItem('ord-edit-1', 'item-1', { quantity: 3 }, 'store-1');
+
+      expect(mockPrismaService.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'ord-edit-1' },
+          data: expect.objectContaining({
+            subtotal: 300,
+            expressSurcharge: 90, // Exactly 20% of 300 * 1.5 = 90
+            taxAmount: 70.2, // 18% of (300 + 90) = 70.2
+            totalAmount: 460.2,
+          }),
+        }),
       );
     });
   });

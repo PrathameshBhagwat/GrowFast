@@ -18,6 +18,7 @@ import {
   PickupType,
   OrderWorkflowType,
   OrderEntryMode,
+  ExpressDeliveryOption,
 } from '@growfast/shared-types';
 
 export class CreateOrderPieceDto implements CreateOrderPieceRequest {
@@ -79,6 +80,10 @@ export class CreateOrderDto implements CreateOrderRequest {
 
   @IsBoolean()
   isExpress!: boolean;
+
+  @IsOptional()
+  @IsEnum(ExpressDeliveryOption)
+  expressDeliveryOption?: ExpressDeliveryOption;
 
   @IsEnum(PickupType)
   pickupType!: PickupType;

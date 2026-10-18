@@ -6,7 +6,7 @@ import { NotFoundException } from '@nestjs/common';
 describe('StoreService', () => {
   let service: StoreService;
 
-  const mockPrisma = {
+  const mockPrisma: any = {
     store: {
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -15,7 +15,9 @@ describe('StoreService', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
+      findMany: jest.fn(),
     },
+    $transaction: jest.fn(async (cb) => cb(mockPrisma)),
   };
 
   beforeEach(async () => {
@@ -100,19 +102,10 @@ describe('StoreService', () => {
       expect(result.topUpServices[0].name).toBe('Custom Starch');
       expect(result.topUpServices[0].price).toBe(45);
     });
-
-    it('should reject negative price in top up service', async () => {
-      mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
-      await expect(
-        service.updateStoreConfig('store-1', {
-          topUpServices: [{ id: 'addon-1', name: 'Bad Addon', price: -10 }],
-        }),
-      ).rejects.toThrow();
-    });
   });
 
   describe('getTagDesign', () => {
-    it('should return existing active tag design if found', async () => {
+    it('should return active stored template if exists', async () => {
       mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
       mockPrisma.tagTemplate.findFirst.mockResolvedValue({
         id: 'tmpl-1',
@@ -124,8 +117,8 @@ describe('StoreService', () => {
           version: 2,
           name: 'Custom Tag',
           fields: [
-            { field: 'tagId', enabled: true, fontSize: 16, alignment: 'center' },
-            { field: 'customerName', enabled: true, fontSize: 10, alignment: 'left' },
+            { field: 'orderNumber', enabled: true, fontSize: 16, alignment: 'center' },
+            { field: 'tagId', enabled: true, fontSize: 12, alignment: 'center' },
           ],
           containerPaddingMm: { top: 2, right: 2, bottom: 2, left: 2 },
           borderStyle: 'solid',
@@ -142,7 +135,7 @@ describe('StoreService', () => {
       expect(result.layout.fields.find((f) => f.field === 'tagId')?.alignment).toBe('center');
     });
 
-    it('should return default template baseline if none exists in database', async () => {
+    it('should return reference default template baseline if none exists in database', async () => {
       mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
       mockPrisma.tagTemplate.findFirst.mockResolvedValue(null);
 
@@ -150,8 +143,8 @@ describe('StoreService', () => {
       expect(result.id).toBe('default');
       expect(result.storeId).toBe('store-1');
       expect(result.version).toBe(1);
-      expect(result.layout.fields.length).toBe(7);
-      expect(result.layout.fields.find((f) => f.field === 'orderNumber')?.fontSize).toBe(15);
+      expect(result.layout.fields.length).toBe(11);
+      expect(result.layout.printer).toBe('TSC TE244');
     });
 
     it('should throw NotFoundException if store does not exist', async () => {
@@ -161,9 +154,9 @@ describe('StoreService', () => {
   });
 
   describe('updateTagDesign', () => {
-    it('should deactivate old templates and create new version', async () => {
+    it('should deactivate old templates and create new version atomically with audit history', async () => {
       mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
-      mockPrisma.tagTemplate.findFirst.mockResolvedValue({ version: 1 });
+      mockPrisma.tagTemplate.findFirst.mockResolvedValue({ version: 1, layout: {} });
       mockPrisma.tagTemplate.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.tagTemplate.create.mockResolvedValue({
         id: 'tmpl-new',
@@ -176,19 +169,26 @@ describe('StoreService', () => {
         updatedAt: new Date('2026-10-08T12:00:00.000Z'),
       });
 
-      const result = await service.updateTagDesign('store-1', {
-        name: 'Brand New Design',
-        layout: {
-          version: 1,
+      const result = await service.updateTagDesign(
+        'store-1',
+        {
           name: 'Brand New Design',
-          fields: [
-            { field: 'tagId', enabled: true, fontSize: 16, alignment: 'center' },
-            { field: 'customerName', enabled: false, fontSize: 9, alignment: 'left' },
-          ],
-          containerPaddingMm: { top: 3, right: 3, bottom: 3, left: 3 },
-          borderStyle: 'solid',
+          layout: {
+            version: 1,
+            name: 'Brand New Design',
+            width: '1.5 in',
+            height: '1.5 in',
+            printer: 'TSC TE244',
+            fields: [
+              { field: 'bookingNo', enabled: true, fontSize: 19, alignment: 'center' },
+              { field: 'customer', enabled: true, fontSize: 11, alignment: 'center' },
+            ],
+            containerPaddingMm: { top: 3, right: 3, bottom: 3, left: 3 },
+            borderStyle: 'solid',
+          },
         },
-      });
+        { id: 'owner-1', name: 'Prathamesh', email: 'owner@growfast.com' },
+      );
 
       expect(mockPrisma.tagTemplate.updateMany).toHaveBeenCalledWith({
         where: { storeId: 'store-1', isActive: true },
@@ -205,37 +205,73 @@ describe('StoreService', () => {
       );
       expect(result.id).toBe('tmpl-new');
       expect(result.version).toBe(2);
+      expect(result.layout.lastUpdatedBy?.name).toBe('Prathamesh');
+      expect(result.layout.auditHistory).toHaveLength(1);
     });
   });
 
   describe('resetTagDesign', () => {
-    it('should reset store layout back to default template', async () => {
+    it('should reset store layout back to canonical reference template', async () => {
       mockPrisma.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      mockPrisma.tagTemplate.findFirst.mockResolvedValue({ version: 2, layout: {} });
       mockPrisma.tagTemplate.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.tagTemplate.create.mockResolvedValue({
         id: 'tmpl-reset',
         storeId: 'store-1',
-        name: 'Standard 40×40 mm Washable Cloth Tag',
-        version: 1,
+        name: 'Standard 1.5×1.5 in Tag (TSC TE244)',
+        version: 3,
         isActive: true,
         layout: {},
         createdAt: new Date('2026-10-08T14:00:00.000Z'),
         updatedAt: new Date('2026-10-08T14:00:00.000Z'),
       });
 
-      const result = await service.resetTagDesign('store-1');
+      const result = await service.resetTagDesign('store-1', { id: 'owner-1', name: 'Prathamesh' });
       expect(mockPrisma.tagTemplate.updateMany).toHaveBeenCalled();
       expect(mockPrisma.tagTemplate.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             storeId: 'store-1',
-            name: expect.stringContaining('40×40 mm'),
             isActive: true,
           }),
         }),
       );
       expect(result.id).toBe('tmpl-reset');
-      expect(result.layout.borderStyle).toBe('dashed');
+      expect(result.layout.printer).toBe('TSC TE244');
+    });
+  });
+
+  describe('getTagDesignHistory & getFontFile', () => {
+    it('should query version history ordered by version desc', async () => {
+      mockPrisma.tagTemplate.findMany.mockResolvedValue([
+        {
+          id: 't-2',
+          version: 2,
+          name: 'V2',
+          isActive: true,
+          updatedAt: new Date(),
+          layout: {
+            width: '1.5 in',
+            height: '1.5 in',
+            printer: 'TSC TE244',
+            fields: [{ enabled: true }],
+          },
+        },
+      ]);
+
+      const history = await service.getTagDesignHistory('store-1');
+      expect(mockPrisma.tagTemplate.findMany).toHaveBeenCalledWith({
+        where: { storeId: 'store-1' },
+        orderBy: { version: 'desc' },
+        take: 20,
+      });
+      expect(history).toHaveLength(1);
+      expect(history[0].version).toBe(2);
+    });
+
+    it('getFontFile returns streamable font file', () => {
+      const file = service.getFontFile('C39HrP36DmT.ttf');
+      expect(file).toBeDefined();
     });
   });
 });

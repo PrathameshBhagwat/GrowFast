@@ -35,6 +35,7 @@ import {
   isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
   adjustDueDateForThursday,
+  ExpressDeliveryOption,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
@@ -82,7 +83,11 @@ export class OrderService {
       if (!store) {
         throw new NotFoundException(`Store with ID "${storeId}" not found`);
       }
-      if (dto.isExpress && store.expressSurchargePercent == null) {
+      const isExpress =
+        dto.isExpress ||
+        dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY ||
+        dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING;
+      if (isExpress && store.expressSurchargePercent == null) {
         throw new BadRequestException(`Express service is not configured for this store`);
       }
 
@@ -296,10 +301,11 @@ export class OrderService {
         }
       }
 
-      // Calculate Totals (B5 canonical pricing + B7 express surcharge)
+      // Calculate Totals (B5 canonical pricing + B7 express surcharge + Express Multipliers)
       const totals = calculateOrderTotals(pricingInputs, {
-        isExpress: dto.isExpress,
+        isExpress,
         expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+        expressDeliveryOption: dto.expressDeliveryOption,
       });
 
       // 4. Due date placeholder (Deferred to B6)
@@ -323,9 +329,16 @@ export class OrderService {
 
       // 7. Calculate Due Date (B6 normal / B7 express)
       const calculatedDue = new Date(orderDate);
-      if (dto.isExpress) {
-        // B7: Express orders get halved turnaround (rounded up)
-        calculatedDue.setDate(calculatedDue.getDate() + Math.ceil(maxEstimatedDays / 2));
+      if (isExpress) {
+        if (dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY) {
+          // Same day delivery: due on orderDate
+        } else if (dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING) {
+          // Tomorrow / next-day evening delivery: 1 day turnaround
+          calculatedDue.setDate(calculatedDue.getDate() + 1);
+        } else {
+          // B7: Express orders get halved turnaround (rounded up)
+          calculatedDue.setDate(calculatedDue.getDate() + Math.ceil(maxEstimatedDays / 2));
+        }
       } else {
         calculatedDue.setDate(calculatedDue.getDate() + maxEstimatedDays);
       }
@@ -348,7 +361,10 @@ export class OrderService {
           orderDate,
           systemDueDate,
           effectiveDueDate: systemDueDate,
-          isExpress: dto.isExpress,
+          isExpress,
+          expressDeliveryOption: isExpress
+            ? dto.expressDeliveryOption || ExpressDeliveryOption.REGULAR
+            : null,
           serviceSummary,
           status: orderStatus,
           subtotal: totals.subtotal,
@@ -359,7 +375,7 @@ export class OrderService {
           amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
           paymentStatus: PaymentStatus.PENDING,
           pickupType: dto.pickupType,
-          priority: dto.isExpress ? OrderPriority.EXPRESS : OrderPriority.STANDARD,
+          priority: isExpress ? OrderPriority.EXPRESS : OrderPriority.STANDARD,
           notes: dto.notes,
           createdById: employeeId,
           storeId,
@@ -852,6 +868,7 @@ export class OrderService {
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: updatedOrder!.isExpress,
         expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+        expressDeliveryOption: (updatedOrder as any).expressDeliveryOption,
       });
 
       // Check payment safety: do not allow silent reduction of total below amount already paid
@@ -1283,6 +1300,7 @@ export class OrderService {
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: order.isExpress,
         expressSurchargePercent: store?.expressSurchargePercent ?? undefined,
+        expressDeliveryOption: (order as any).expressDeliveryOption,
       });
 
       const financialState = this.paymentService.calculateOrderFinancialState({
@@ -1412,6 +1430,7 @@ export class OrderService {
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: order.isExpress,
         expressSurchargePercent: store?.expressSurchargePercent ?? undefined,
+        expressDeliveryOption: (order as any).expressDeliveryOption,
       });
 
       // Compute existing adjustments and current effective paid via authoritative PaymentService
@@ -2024,6 +2043,7 @@ export class OrderService {
       orderDate: order.orderDate.toISOString(),
       effectiveDueDate: order.effectiveDueDate.toISOString(),
       isExpress: order.isExpress,
+      expressDeliveryOption: (order as any).expressDeliveryOption || undefined,
       priority: order.priority,
       status: order.status,
       subtotal: order.subtotal,

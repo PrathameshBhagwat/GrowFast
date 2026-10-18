@@ -4,7 +4,7 @@
  * Centralizes the calculation logic for order financial fields.
  */
 
-import { ItemStatus } from './enums';
+import { ItemStatus, ExpressDeliveryOption } from './enums';
 
 export interface PricingItemInput {
   quantity: number;
@@ -20,12 +20,50 @@ export interface PricingTotals {
   totalAmount: number;
 }
 
+/**
+ * Returns the express charge multiplier based on customer's requested delivery:
+ * - Same-day delivery: 2× the configured express charge
+ * - Tomorrow / next-day evening delivery: 1.5× the configured express charge
+ * - Regular delivery: No express multiplier (1.0×)
+ */
+export function getExpressMultiplier(option?: ExpressDeliveryOption | string | null): number {
+  if (!option) return 1.0;
+  const upper = String(option).toUpperCase().trim();
+  if (
+    upper === ExpressDeliveryOption.SAME_DAY ||
+    upper === 'SAME_DAY' ||
+    upper === 'SAME-DAY' ||
+    upper === 'SAME_DAY_DELIVERY'
+  ) {
+    return 2.0;
+  }
+  if (
+    upper === ExpressDeliveryOption.NEXT_DAY_EVENING ||
+    upper === 'NEXT_DAY_EVENING' ||
+    upper === 'TOMORROW_EVENING' ||
+    upper === 'NEXT_DAY' ||
+    upper === 'TOMORROW'
+  ) {
+    return 1.5;
+  }
+  return 1.0; // Regular delivery - no multiplier
+}
+
+/**
+ * Canonical currency rounding helper.
+ * Rounds half-up to 2 decimal places, correcting IEEE 754 binary floating-point artifacts.
+ */
+export function roundCurrency(val: number): number {
+  return Math.round((val + 1e-9) * 100) / 100;
+}
+
 export function calculateOrderTotals(
   items: PricingItemInput[],
   options?: {
     discountPercent?: number; // Kept at 0 for V1 based on user preference
     isExpress?: boolean;
     expressSurchargePercent?: number;
+    expressDeliveryOption?: ExpressDeliveryOption | string | null;
   },
 ): PricingTotals {
   let subtotal = 0;
@@ -33,44 +71,54 @@ export function calculateOrderTotals(
   for (const item of items) {
     // For weight-based items, multiplier is weight; otherwise quantity
     const multiplier = item.weight != null && item.weight > 0 ? item.weight : item.quantity;
-    subtotal += Math.round(item.unitPrice * multiplier * 100) / 100;
+    subtotal += roundCurrency(item.unitPrice * multiplier);
   }
+  subtotal = roundCurrency(subtotal);
 
   // 1. Discount (V1: forced to 0 by default)
   const discountPercent = options?.discountPercent ?? 0;
   let discountAmount = 0;
   if (discountPercent > 0) {
-    discountAmount = (subtotal * discountPercent) / 100;
+    discountAmount = roundCurrency((subtotal * discountPercent) / 100);
   }
 
-  const discountedSubtotal = subtotal - discountAmount;
+  const discountedSubtotal = roundCurrency(subtotal - discountAmount);
 
-  // 2. Express Surcharge (B7 Configurable)
-  const isExpress = options?.isExpress ?? false;
+  // 2. Express Surcharge (B7 Configurable + Express Delivery Multipliers)
+  const isExpressRequested =
+    options?.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY ||
+    options?.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING ||
+    options?.expressDeliveryOption === 'SAME_DAY' ||
+    options?.expressDeliveryOption === 'NEXT_DAY_EVENING';
+  const isExpress = options?.isExpress ?? isExpressRequested;
+
   let expressSurcharge = 0;
   if (isExpress) {
     if (options?.expressSurchargePercent == null) {
       throw new Error('Express surcharge percent must be provided for express orders');
     }
-    expressSurcharge = (discountedSubtotal * options.expressSurchargePercent) / 100;
+    const baseExpressCharge = roundCurrency(
+      (discountedSubtotal * options.expressSurchargePercent) / 100,
+    );
+    const multiplier = getExpressMultiplier(options?.expressDeliveryOption);
+    expressSurcharge = roundCurrency(baseExpressCharge * multiplier);
   }
 
   // 3. Tax (V1: 18% GST as per user choice)
   // GST applies on the discounted subtotal + express surcharge (surcharge is a taxable service fee)
   const TAX_RATE = 0.18;
-  const taxableAmount = discountedSubtotal + expressSurcharge;
-  const taxAmount = taxableAmount * TAX_RATE;
+  const taxableAmount = roundCurrency(discountedSubtotal + expressSurcharge);
+  const taxAmount = roundCurrency(taxableAmount * TAX_RATE);
 
   // 4. Total Amount
-  const totalAmount = discountedSubtotal + expressSurcharge + taxAmount;
+  const totalAmount = roundCurrency(discountedSubtotal + expressSurcharge + taxAmount);
 
   return {
-    // Math.round to avoid floating point precision issues in UI/DB
-    subtotal: Math.round(subtotal * 100) / 100,
-    discountAmount: Math.round(discountAmount * 100) / 100,
-    expressSurcharge: Math.round(expressSurcharge * 100) / 100,
-    taxAmount: Math.round(taxAmount * 100) / 100,
-    totalAmount: Math.round(totalAmount * 100) / 100,
+    subtotal,
+    discountAmount,
+    expressSurcharge,
+    taxAmount,
+    totalAmount,
   };
 }
 

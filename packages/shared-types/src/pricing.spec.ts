@@ -135,6 +135,81 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
     });
   });
 
+  describe('Express Delivery Pricing Multipliers (Canonical Rules)', () => {
+    const items = [{ quantity: 2, unitPrice: 100 }]; // subtotal = 200
+    const expressSurchargePercent = 25; // base express = 25% of 200 = 50
+
+    it('Regular delivery does not receive either multiplier (base charge × 1.0)', () => {
+      const totals = calculateOrderTotals(items, {
+        isExpress: true,
+        expressSurchargePercent,
+        expressDeliveryOption: 'REGULAR',
+      });
+      // Base express: 50 * 1.0 = 50
+      assert.strictEqual(totals.subtotal, 200);
+      assert.strictEqual(totals.expressSurcharge, 50);
+      // Taxable: 250, GST (18%): 45, Total: 295
+      assert.strictEqual(totals.taxAmount, 45);
+      assert.strictEqual(totals.totalAmount, 295);
+    });
+
+    it('Tomorrow/next-day evening express charge = base charge × 1.5', () => {
+      const totals = calculateOrderTotals(items, {
+        isExpress: true,
+        expressSurchargePercent,
+        expressDeliveryOption: 'NEXT_DAY_EVENING',
+      });
+      // Base express: 50 * 1.5 = 75
+      assert.strictEqual(totals.subtotal, 200);
+      assert.strictEqual(totals.expressSurcharge, 75);
+      // Taxable: 275, GST (18%): 49.50, Total: 324.50
+      assert.strictEqual(totals.taxAmount, 49.5);
+      assert.strictEqual(totals.totalAmount, 324.5);
+    });
+
+    it('Same-day express charge = base charge × 2.0', () => {
+      const totals = calculateOrderTotals(items, {
+        isExpress: true,
+        expressSurchargePercent,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      // Base express: 50 * 2.0 = 100
+      assert.strictEqual(totals.subtotal, 200);
+      assert.strictEqual(totals.expressSurcharge, 100);
+      // Taxable: 300, GST (18%): 54, Total: 354
+      assert.strictEqual(totals.taxAmount, 54);
+      assert.strictEqual(totals.totalAmount, 354);
+    });
+
+    it('Regular delivery without express produces 0 express charge', () => {
+      const totals = calculateOrderTotals(items, {
+        isExpress: false,
+        expressSurchargePercent,
+        expressDeliveryOption: 'REGULAR',
+      });
+      assert.strictEqual(totals.subtotal, 200);
+      assert.strictEqual(totals.expressSurcharge, 0);
+      assert.strictEqual(totals.taxAmount, 36);
+      assert.strictEqual(totals.totalAmount, 236);
+    });
+
+    it('Enforces consistent 2-decimal currency rounding on fractional multipliers', () => {
+      // Subtotal 133, express 15% => base express = 19.95
+      // 1.5x => 29.925 => rounded to 29.93
+      const oddItems = [{ quantity: 1, unitPrice: 133 }];
+      const totals = calculateOrderTotals(oddItems, {
+        isExpress: true,
+        expressSurchargePercent: 15,
+        expressDeliveryOption: 'NEXT_DAY_EVENING',
+      });
+      assert.strictEqual(totals.subtotal, 133);
+      assert.strictEqual(totals.expressSurcharge, 29.93);
+      // Taxable: 162.93, 18% GST: 29.3274 => 29.33, Total: 192.26
+      assert.strictEqual(totals.taxAmount, 29.33);
+      assert.strictEqual(totals.totalAmount, 192.26);
+    });
+  });
+
   describe('Fulfillment Breakdown', () => {
     it('calculates fulfillment for weight items correctly', () => {
       const items = [

@@ -30,6 +30,7 @@ export {
   NotificationStatus,
   AdjustmentType,
   AdjustmentStatus,
+  ExpressDeliveryOption,
 } from './enums';
 
 // DTOs
@@ -94,7 +95,12 @@ export { isPhotoRequiredForOrder } from './photo-rules';
 export type { PhotoRequirementContext } from './photo-rules';
 
 // Pricing Contract
-export { calculateOrderTotals, calculateFulfillmentBreakdown } from './pricing';
+export {
+  calculateOrderTotals,
+  calculateFulfillmentBreakdown,
+  getExpressMultiplier,
+  roundCurrency,
+} from './pricing';
 export type { PricingItemInput, PricingTotals, FulfillmentBreakdown } from './pricing';
 export {
   filterServicesForCategory,
@@ -125,8 +131,15 @@ export type {
   TopUpServiceItem,
 } from './catalog';
 
-// Tag Template & Designer Contract (Phase T4)
-export { DEFAULT_TAG_DESIGN, sanitizeTagDesign } from './tag-template';
+// Tag Template & Designer Contract (Phase T4 & Owner Design Tags)
+export {
+  DEFAULT_TAG_DESIGN,
+  REFERENCE_TAG_DESIGN,
+  sanitizeTagDesign,
+  SUPPORTED_TAG_FONTS,
+  SUPPORTED_TAG_PRINTERS,
+  SUPPORTED_TAG_DIMENSIONS,
+} from './tag-template';
 export type {
   TagFieldKey,
   TagTextAlign,
@@ -135,4 +148,6 @@ export type {
   TagDesignConfig,
   TagTemplateDTO,
   UpdateTagDesignRequest,
+  SupportedTagFont,
+  TagDesignAuditEntry,
 } from './tag-template';

@@ -133,6 +133,14 @@ export enum OrderPriority {
   VIP = 'VIP',
 }
 
+// ─── Express Delivery Option ────────────────────────────────────────
+
+export enum ExpressDeliveryOption {
+  REGULAR = 'REGULAR',
+  NEXT_DAY_EVENING = 'NEXT_DAY_EVENING',
+  SAME_DAY = 'SAME_DAY',
+}
+
 // ─── QC Status ──────────────────────────────────────────────────────
 
 export enum QCStatus {

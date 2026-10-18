@@ -199,6 +199,7 @@ model Order {
   dueDateOverrideReason String?       @map("due_date_override_reason")
   dueDateOverriddenBy   String?       @map("due_date_overridden_by")
   isExpress             Boolean       @default(false) @map("is_express")
+  expressDeliveryOption String?       @map("express_delivery_option")
   serviceSummary        String?       @map("service_summary")
   status                OrderStatus   @default(RECEIVED)
   subtotal              Float         @default(0)

@@ -21,6 +21,7 @@ import {
   NotificationStatus,
   AdjustmentType,
   AdjustmentStatus,
+  ExpressDeliveryOption,
 } from './enums';
 import type { OrderWorkflowType, OrderEntryMode } from './catalog';
 
@@ -125,6 +126,7 @@ export interface OrderSummaryDTO {
   orderDate: string;
   effectiveDueDate: string;
   isExpress: boolean;
+  expressDeliveryOption?: ExpressDeliveryOption;
   priority: OrderPriority;
   status: OrderStatus;
   subtotal: number;
@@ -201,6 +203,7 @@ export interface PhysicalGarmentDTO {
 export interface CreateOrderRequest {
   customerId: string;
   isExpress: boolean;
+  expressDeliveryOption?: ExpressDeliveryOption;
   pickupType: PickupType;
   items: CreateOrderItemRequest[];
   notes?: string;
