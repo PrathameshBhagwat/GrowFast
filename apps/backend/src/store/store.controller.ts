@@ -8,7 +8,6 @@ import {
   UseGuards,
   Request,
   Response,
-  StreamableFile,
 } from '@nestjs/common';
 import { StoreService } from './store.service';
 import { UpdateStoreConfigDto } from './dto/update-store-config.dto';

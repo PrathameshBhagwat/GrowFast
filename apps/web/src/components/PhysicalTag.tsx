@@ -17,6 +17,16 @@ export interface PhysicalTagData {
   storeLocation?: string;
   orderDate: string | Date;
   isCancelled?: boolean;
+  // Reference Image Fields
+  customerAddress?: string;
+  itemTotal?: number | string;
+  remarks?: string;
+  colour?: string;
+  bookingDate?: string | Date;
+  dueDate?: string | Date;
+  isWorkshop?: boolean;
+  barcodeValue?: string;
+  qrCodeValue?: string;
 }
 
 export interface PhysicalTagProps {
@@ -90,14 +100,35 @@ export function formatStoreHeader(storeName?: string, storeLocation?: string): s
 }
 
 /**
- * 40mm x 40mm physical washable cloth tag layout.
- * Visual source of truth is the reference tag:
- * - Line 1: Store name / location (compact uppercase)
- * - Line 2: Order Number (large, bold, prominent primary anchor e.g. ORD-001284)
- * - Line 3: Customer name
- * - Line 4: Service abbreviation + piece position (e.g. "DC  1/5" or "WSI  12/50")
- * - Line 5: Date with weekday (e.g. "2 Sep 26 Tue")
- * - Line 6: Garment name
+ * Resolves font name to CSS fontFamily with reliable fallbacks
+ */
+export function getCssFontFamily(font?: string): string {
+  switch (font) {
+    case 'C39HrP36DmT':
+      return "'C39HrP36DmT', 'Libre Barcode 39', monospace";
+    case 'Arial Black':
+      return "'Arial Black', Gadget, sans-serif";
+    case 'Calibri':
+      return "Calibri, Candara, Segoe, 'Segoe UI', Optima, Arial, sans-serif";
+    case 'Agency FB':
+      return "'Agency FB', Impact, sans-serif";
+    case 'Arial':
+      return "Arial, Helvetica, sans-serif";
+    case 'Roboto':
+      return "Roboto, sans-serif";
+    case 'Inter':
+      return "Inter, sans-serif";
+    case 'Courier New':
+      return "'Courier New', Courier, monospace";
+    default:
+      return 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  }
+}
+
+/**
+ * Physical washable cloth tag layout.
+ * Supports configurable 1.5 in x 1.5 in (or custom) dimensions,
+ * all reference image canonical fields, barcodes, QR codes, and typography.
  */
 export const PhysicalTag: React.FC<PhysicalTagProps> = ({
   data,
@@ -118,6 +149,14 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
     storeLocation,
     orderDate,
     isCancelled,
+    customerAddress,
+    itemTotal,
+    remarks,
+    colour,
+    bookingDate,
+    dueDate,
+    isWorkshop,
+    barcodeValue,
   } = data;
 
   const displayOrderNumber = orderNumber || tagId || 'ORD-000000';
@@ -129,8 +168,29 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
 
   const serviceCode = getServiceCode(serviceType);
   const piecePosition = `${unitNumber}/${totalPieces}`;
-  const formattedDate = formatTagDate(orderDate);
+  const formattedOrderDate = formatTagDate(bookingDate || orderDate);
   const storeHeader = formatStoreHeader(storeName, storeLocation);
+
+  // Workshop Due Date Prepone logic
+  const resolvedDueDate = React.useMemo(() => {
+    const rawDue = dueDate || orderDate;
+    if (!rawDue) return '';
+    const dateObj = new Date(rawDue);
+    if (isNaN(dateObj.getTime())) return '';
+
+    // If workshop prepone is enabled and this is a workshop tag, bring forward
+    if (
+      activeDesign.preponeWorkshopDueDate &&
+      isWorkshop &&
+      (activeDesign.workshopPreponeDays || 0) > 0
+    ) {
+      const days = activeDesign.workshopPreponeDays || 1;
+      const preponed = new Date(dateObj.getTime() - days * 24 * 60 * 60 * 1000);
+      return formatTagDate(preponed);
+    }
+
+    return formatTagDate(dateObj);
+  }, [dueDate, orderDate, activeDesign.preponeWorkshopDueDate, activeDesign.workshopPreponeDays, isWorkshop]);
 
   const getBorderValue = () => {
     if (borderStyle === 'none') return 'none';
@@ -138,27 +198,288 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
     return `1px ${borderStyle} ${color}`;
   };
 
-  const getAlignClass = (align?: string) => {
-    if (align === 'center') return 'text-center';
-    if (align === 'right') return 'text-right';
-    return 'text-left';
+  const getAlignStyle = (align?: string): React.CSSProperties['textAlign'] => {
+    if (align === 'center') return 'center';
+    if (align === 'right') return 'right';
+    if (align === 'left') return 'left';
+    return activeDesign.align || 'center';
   };
 
   const renderField = (fieldCfg: TagFieldConfig) => {
     if (!fieldCfg.enabled) return null;
 
-    const alignClass = getAlignClass(fieldCfg.alignment);
-    const weightClass = fieldCfg.isBold ? 'font-bold' : 'font-normal';
-    const monoClass = fieldCfg.isMono ? 'font-mono' : '';
-    const upperClass = fieldCfg.isUppercase ? 'uppercase' : '';
+    const textAlign = getAlignStyle(fieldCfg.alignment);
+    const alignClass =
+      textAlign === 'center' ? 'text-center' : textAlign === 'right' ? 'text-right' : 'text-left';
+    const fontFamily = getCssFontFamily(fieldCfg.font);
+    const fontStyle = fieldCfg.isItalic ? 'italic' : 'normal';
+    const textDecoration = fieldCfg.isUnderline ? 'underline' : 'none';
+    const fontWeight = fieldCfg.isBold ? ('bold' as const) : ('normal' as const);
+    const textTransform = fieldCfg.isUppercase ? ('uppercase' as const) : ('none' as const);
+
+    const baseStyle: React.CSSProperties = {
+      textAlign,
+      fontFamily,
+      fontStyle,
+      textDecoration,
+      fontWeight,
+      textTransform,
+      fontSize: `${fieldCfg.fontSize}px`,
+      lineHeight: 1.15,
+      color: '#000000',
+    };
 
     switch (fieldCfg.field) {
+      // ─── Reference Image Canonical Fields ─────────────────────────
+      case 'barcode': {
+        const rawCode = barcodeValue || orderNumber || tagId || 'ORD001284';
+        const formattedCode = `*${rawCode.replace(/[^A-Za-z0-9-]/g, '').toUpperCase()}*`;
+        return (
+          <div
+            key="barcode"
+            className={`overflow-hidden my-0.5 leading-none ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="tracking-wider block"
+              style={{
+                fontFamily: getCssFontFamily(fieldCfg.font || 'C39HrP36DmT'),
+                fontSize: `${fieldCfg.fontSize || 26}px`,
+                letterSpacing: '2px',
+                color: '#000000',
+              }}
+              title={rawCode}
+            >
+              {formattedCode}
+            </span>
+          </div>
+        );
+      }
+
+      case 'qrcode': {
+        return (
+          <div
+            key="qrcode"
+            className={`my-0.5 flex justify-center leading-none ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <div
+              className="bg-black p-0.5 rounded flex items-center justify-center text-white font-mono text-[7px]"
+              style={{
+                width: `${fieldCfg.fontSize || 32}px`,
+                height: `${fieldCfg.fontSize || 32}px`,
+              }}
+              title={`QR: ${orderNumber || tagId}`}
+            >
+              <svg viewBox="0 0 24 24" className="w-full h-full text-white fill-current">
+                <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm14 2h2v4h-2v-4zm-4-2h2v2h-2v-2zm2-2h2v2h-2v-2zm2 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 2h2v2h-2v-2z" />
+              </svg>
+            </div>
+          </div>
+        );
+      }
+
+      case 'bookingNo':
+      case 'orderNumber':
+        return (
+          <div
+            key="bookingNo"
+            className={`my-0.5 overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block tracking-wide"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial Black'),
+                fontWeight: fieldCfg.isBold !== false ? '900' : 'normal',
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+              title={displayOrderNumber}
+            >
+              {displayOrderNumber}
+            </span>
+          </div>
+        );
+
+      case 'customer':
+      case 'customerName':
+        return (
+          <div
+            key="customer"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Calibri'),
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+              title={customerName}
+            >
+              {customerName}
+            </span>
+          </div>
+        );
+
+      case 'address':
+        return (
+          <div
+            key="address"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial'),
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+              title={customerAddress || storeLocation || 'Pune'}
+            >
+              {customerAddress || storeLocation || 'Pune'}
+            </span>
+          </div>
+        );
+
+      case 'process':
+      case 'serviceAndPiece':
+        return (
+          <div
+            key="process"
+            className={`my-0.5 overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="block truncate"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial'),
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+            >
+              {serviceCode} <span className="ml-1 tracking-tight">{piecePosition}</span>
+            </span>
+          </div>
+        );
+
+      case 'itemTotal':
+        return (
+          <div
+            key="itemTotal"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block"
+              style={{
+                ...baseStyle,
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+            >
+              {itemTotal ? `Total: ${itemTotal}` : `Total: ${totalPieces} Pcs`}
+            </span>
+          </div>
+        );
+
+      case 'remark':
+        return (
+          <div
+            key="remark"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial'),
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+              title={remarks || 'No remarks'}
+            >
+              {remarks || 'No remarks'}
+            </span>
+          </div>
+        );
+
+      case 'colour':
+        return (
+          <div
+            key="colour"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block text-slate-700"
+              style={{
+                ...baseStyle,
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+            >
+              {colour || 'Standard'}
+            </span>
+          </div>
+        );
+
+      case 'bookingDate':
+      case 'date':
+        return (
+          <div
+            key="bookingDate"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Agency FB'),
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+            >
+              {formattedOrderDate}
+            </span>
+          </div>
+        );
+
+      case 'dueDate':
+        return (
+          <div
+            key="dueDate"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial'),
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
+            >
+              Due: {resolvedDueDate || formattedOrderDate}
+            </span>
+          </div>
+        );
+
+      // ─── Legacy Phase T4 Aliases ──────────────────────────────────
       case 'storeHeader':
         return (
-          <div key="storeHeader" className={`overflow-hidden ${alignClass}`}>
+          <div
+            key="storeHeader"
+            className={`overflow-hidden leading-none ${alignClass}`}
+            style={{ textAlign }}
+          >
             <span
-              className={`tracking-tight text-black truncate leading-none block ${weightClass} ${upperClass}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
+              className="tracking-tight truncate block"
+              style={{
+                ...baseStyle,
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
               title={storeHeader}
             >
               {storeHeader}
@@ -166,79 +487,43 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
           </div>
         );
 
-      case 'orderNumber':
-        return (
-          <div key="orderNumber" className={`my-0.5 overflow-hidden ${alignClass}`}>
-            <div
-              className={`tracking-wide text-black leading-none truncate ${fieldCfg.isBold ? 'font-black' : 'font-normal'} ${monoClass} ${upperClass}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
-              title={displayOrderNumber}
-            >
-              {displayOrderNumber}
-            </div>
-          </div>
-        );
-
       case 'tagId':
         return (
-          <div key="tagId" className={`my-0.5 overflow-hidden ${alignClass}`}>
-            <div
-              className={`tracking-wide text-black leading-none truncate ${fieldCfg.isBold ? 'font-black' : 'font-normal'} ${monoClass} ${upperClass}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
+          <div
+            key="tagId"
+            className={`my-0.5 overflow-hidden leading-none ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="tracking-wide block truncate"
+              style={{
+                ...baseStyle,
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
               title={displayTagId}
             >
               {displayTagId}
-            </div>
-          </div>
-        );
-
-      case 'customerName':
-        return (
-          <div key="customerName" className={`overflow-hidden ${alignClass}`}>
-            <div
-              className={`text-black truncate leading-tight ${fieldCfg.isBold ? 'font-semibold' : 'font-normal'} ${upperClass}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
-              title={customerName}
-            >
-              {customerName}
-            </div>
-          </div>
-        );
-
-      case 'serviceAndPiece':
-        return (
-          <div key="serviceAndPiece" className={`my-0.5 overflow-hidden ${alignClass}`}>
-            <span
-              className={`text-black leading-none ${fieldCfg.isBold ? 'font-black' : 'font-normal'}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
-            >
-              {serviceCode} <span className="ml-1 tracking-tight">{piecePosition}</span>
             </span>
-          </div>
-        );
-
-      case 'date':
-        return (
-          <div key="date" className={`overflow-hidden ${alignClass}`}>
-            <div
-              className={`text-black truncate leading-tight ${weightClass}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
-            >
-              {formattedDate}
-            </div>
           </div>
         );
 
       case 'garmentName':
         return (
-          <div key="garmentName" className={`overflow-hidden ${alignClass}`}>
-            <div
-              className={`text-black truncate leading-none tracking-tight ${fieldCfg.isBold ? 'font-semibold' : 'font-normal'} ${upperClass}`}
-              style={{ fontSize: `${fieldCfg.fontSize}px` }}
+          <div
+            key="garmentName"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+          >
+            <span
+              className="truncate block tracking-tight"
+              style={{
+                ...baseStyle,
+                fontSize: `${fieldCfg.fontSize}px`,
+              }}
               title={garmentName}
             >
               {garmentName}
-            </div>
+            </span>
           </div>
         );
 
@@ -252,18 +537,31 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
       ? activeDesign.fields
       : DEFAULT_TAG_DESIGN.fields;
 
+  // Resolve dimensions e.g. '1.5 in' -> '40mm' (calibrated for 40x40mm thermal cloth tags)
+  const resolveDimension = (dim?: string, fallback = '40mm') => {
+    if (!dim) return fallback;
+    if (dim.includes('1.5 in') || dim === '1.5in') return '40mm';
+    if (dim.includes('2.0 in') || dim === '2.0in') return '50mm';
+    if (dim.includes('40 mm') || dim === '40mm') return '40mm';
+    if (dim.includes('50 mm') || dim === '50mm') return '50mm';
+    return dim;
+  };
+
+  const tagWidth = resolveDimension(activeDesign.width, '40mm');
+  const tagHeight = resolveDimension(activeDesign.height, '40mm');
+
   return (
     <div
-      className={`physical-tag-40mm relative select-none ${
+      className={`physical-tag-40mm physical-tag-container relative select-none ${
         isCancelled ? 'opacity-80' : ''
       } ${className}`}
       style={{
-        width: '40mm',
-        height: '40mm',
-        minWidth: '40mm',
-        minHeight: '40mm',
-        maxWidth: '40mm',
-        maxHeight: '40mm',
+        width: tagWidth,
+        height: tagHeight,
+        minWidth: tagWidth,
+        minHeight: tagHeight,
+        maxWidth: tagWidth,
+        maxHeight: tagHeight,
         boxSizing: 'border-box',
         padding: `${padding.top}mm ${padding.right}mm ${padding.bottom}mm ${padding.left}mm`,
         display: 'flex',
@@ -271,8 +569,7 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
         justifyContent: 'space-between',
         backgroundColor: '#ffffff',
         color: '#000000',
-        fontFamily:
-          'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        fontFamily: getCssFontFamily(),
         lineHeight: activeDesign.lineHeight || 1.15,
         overflow: 'hidden',
         border: getBorderValue(),

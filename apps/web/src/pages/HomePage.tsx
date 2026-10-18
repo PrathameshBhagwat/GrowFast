@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Card, LoadingState, EmptyState, ErrorState } from '@growfast/ui';
@@ -38,6 +38,8 @@ import {
   RotateCw,
   ChevronDown,
   ChevronUp,
+  Settings,
+  Tag,
 } from 'lucide-react';
 
 const ROLE_CONFIG: Record<string, { icon: React.ReactNode; color: string; modules: string[] }> = {
@@ -165,6 +167,24 @@ export const HomePage: React.FC = () => {
   const [findOrderQuery, setFindOrderQuery] = useState('');
   const [isFindingOrder, setIsFindingOrder] = useState(false);
   const [findOrderError, setFindOrderError] = useState<string | null>(null);
+
+  // Owner Settings Navigation Dropdown State
+  const [isOwnerMenuOpen, setIsOwnerMenuOpen] = useState(false);
+  const ownerMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ownerMenuRef.current && !ownerMenuRef.current.contains(e.target as Node)) {
+        setIsOwnerMenuOpen(false);
+      }
+    };
+    if (isOwnerMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOwnerMenuOpen]);
 
   const handleFindOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -553,30 +573,116 @@ export const HomePage: React.FC = () => {
             >
               <span className="hidden sm:inline">Deliveries</span>
             </Button>
-            {(employee.role === 'OWNER' || employee.role === 'MANAGER') && (
-              <Button
-                id="home-staff-management"
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/staff')}
-                icon={<Users size={15} />}
-                aria-label="Staff Management"
-                style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
-              >
-                <span className="hidden sm:inline">Staff</span>
-              </Button>
+            {/* Owner Settings Area (Exclusively for OWNER role) */}
+            {employee.role === 'OWNER' ? (
+              <div className="relative" ref={ownerMenuRef}>
+                <Button
+                  id="owner-settings-nav"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsOwnerMenuOpen((prev) => !prev)}
+                  icon={<Settings size={15} className="text-blue-600 dark:text-blue-400" />}
+                  aria-label="Owner Settings"
+                  aria-expanded={isOwnerMenuOpen}
+                  style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+                  className="font-bold border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/30"
+                >
+                  <span className="hidden sm:inline">Owner Settings</span>
+                  <span className="sm:hidden">Settings</span>
+                  <ChevronDown size={14} className="ml-1 opacity-70" />
+                </Button>
+
+                {isOwnerMenuOpen && (
+                  <div
+                    id="owner-settings-dropdown-menu"
+                    className="absolute right-0 mt-2 w-56 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-100"
+                  >
+                    <div className="px-3 py-1.5 border-b border-gray-100 dark:border-slate-850 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">
+                      Owner Settings
+                    </div>
+
+                    {/* Section 1: Staff */}
+                    <button
+                      type="button"
+                      id="owner-menu-staff"
+                      onClick={() => {
+                        setIsOwnerMenuOpen(false);
+                        navigate('/owner/settings?tab=staff');
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-gray-700 dark:text-slate-200 min-h-[44px] cursor-pointer"
+                    >
+                      <Users size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                      <div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">Staff</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">Team roles & permissions</div>
+                      </div>
+                    </button>
+
+                    {/* Section 2: Design Tags */}
+                    <button
+                      type="button"
+                      id="owner-menu-design-tags"
+                      onClick={() => {
+                        setIsOwnerMenuOpen(false);
+                        navigate('/owner/settings?tab=design-tags');
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-gray-700 dark:text-slate-200 min-h-[44px] cursor-pointer"
+                    >
+                      <Tag size={16} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                      <div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">Design Tags</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">Layout, barcode & typography</div>
+                      </div>
+                    </button>
+
+                    {/* Section 3: Catalog */}
+                    <button
+                      type="button"
+                      id="owner-menu-catalog"
+                      onClick={() => {
+                        setIsOwnerMenuOpen(false);
+                        navigate('/owner/settings?tab=catalog');
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-gray-700 dark:text-slate-200 min-h-[44px] cursor-pointer"
+                    >
+                      <Shirt size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">Catalog</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">Garment types & pricing</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Non-owner staff navigation: Staff and Catalog buttons (No Design Tags) */
+              <>
+                {employee.role === 'MANAGER' && (
+                  <Button
+                    id="home-staff-management"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/staff')}
+                    icon={<Users size={15} />}
+                    aria-label="Staff Management"
+                    style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+                  >
+                    <span className="hidden sm:inline">Staff</span>
+                  </Button>
+                )}
+                <Button
+                  id="home-garment-catalog"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/catalog')}
+                  icon={<Shirt size={15} />}
+                  aria-label="Garment Catalog"
+                  style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+                >
+                  <span className="hidden sm:inline">Catalog</span>
+                </Button>
+              </>
             )}
-            <Button
-              id="home-garment-catalog"
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/catalog')}
-              icon={<Shirt size={15} />}
-              aria-label="Garment Catalog"
-              style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
-            >
-              <span className="hidden sm:inline">Catalog</span>
-            </Button>
 
             <Button
               id="find-edit-order-btn"

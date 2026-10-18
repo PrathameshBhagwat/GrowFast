@@ -42,11 +42,42 @@ export const TagDesignApi = {
   },
 
   /**
-   * Reset store tag design back to canonical T2/T3 default (Requires OWNER role).
+   * Reset store tag design back to canonical reference default (Requires OWNER role).
    */
   async resetDesign(): Promise<ApiResponse<TagDesignConfig>> {
     return apiFetch<ApiResponse<TagDesignConfig>>('/store/tag-design/reset', {
       method: 'POST',
     });
   },
+
+  /**
+   * Retrieve tag design change audit history (Requires OWNER role).
+   */
+  async getHistory(): Promise<ApiResponse<any[]>> {
+    return apiFetch<ApiResponse<any[]>>('/store/tag-design/history');
+  },
+
+  /**
+   * Authenticated font download for Code 39 barcode thermal printing.
+   */
+  async downloadFont(): Promise<void> {
+    const token = localStorage.getItem('token');
+    const API_URL = import.meta.env.VITE_API_URL || '/api';
+    const response = await fetch(`${API_URL}/store/tag-design/download-font`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to download font (HTTP ${response.status})`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'C39HrP36DmT.ttf';
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  },
 };
+

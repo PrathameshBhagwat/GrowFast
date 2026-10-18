@@ -4,7 +4,6 @@ import { UpdateStoreConfigDto } from './dto/update-store-config.dto';
 import { UpdateTagDesignDto } from './dto/update-tag-design.dto';
 import {
   TagTemplateDTO,
-  DEFAULT_TAG_DESIGN,
   REFERENCE_TAG_DESIGN,
   sanitizeTagDesign,
   DEFAULT_TOP_UP_SERVICES,
