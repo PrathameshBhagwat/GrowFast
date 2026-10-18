@@ -258,6 +258,16 @@ export function OrderWizardPage() {
 
   // Add Item to Order from LaundryWeightOrderEntry
   const handleAddWeightItem = (weightItem: LaundryWeightItem) => {
+    const garmentsCount = Math.max(1, weightItem.garmentsCount || 1);
+    const pieces = Array.from({ length: garmentsCount }, (_, idx) => {
+      const u = idx + 1;
+      const existingBatchPhoto = weightItem.batchPhotos?.[idx];
+      return {
+        unitNumber: u,
+        photos: existingBatchPhoto ? [existingBatchPhoto] : [],
+      };
+    });
+
     setItems((prev) => [
       ...prev,
       {
@@ -266,8 +276,8 @@ export function OrderWizardPage() {
         garmentName: weightItem.garmentName,
         serviceName: weightItem.serviceName,
         unitPrice: weightItem.unitPrice,
-        quantity: weightItem.garmentsCount || 1,
-        garmentsCount: weightItem.garmentsCount || 1,
+        quantity: garmentsCount,
+        garmentsCount,
         weight: weightItem.weight,
         isWeightBased: true,
         lineTotal: weightItem.lineTotal,
@@ -277,8 +287,8 @@ export function OrderWizardPage() {
           weightItem.defectNotes ||
           (weightItem.breakdownDetails ? `Breakdown: ${weightItem.breakdownDetails}` : ''),
         colorTags: [],
-        photoFile: weightItem.batchPhotos?.[0]?.file || null,
-        pieces: [],
+        photoFile: pieces[0]?.photos?.[0]?.file || null,
+        pieces,
         batchPhotos: weightItem.batchPhotos || [],
         addOns: weightItem.addOns || [],
       },
@@ -426,7 +436,7 @@ export function OrderWizardPage() {
           defectNotes: '',
           colorTags: [],
           photoFile: null,
-          pieces: [],
+          pieces: [{ unitNumber: 1, photos: [] }],
           batchPhotos: [] as Array<{ id: string; file: File; previewUrl: string }>,
         };
         return [...prev, newItem];
@@ -559,52 +569,39 @@ export function OrderWizardPage() {
   const isPhotoRequired = useMemo(() => {
     return isPhotoRequiredForOrder({
       isWalkIn: true,
-      totalPieces: totalRegularGarments,
+      totalPieces: totalGarmentCount,
       isWeightBased: isOrderWeightBased,
     });
-  }, [totalRegularGarments, isOrderWeightBased]);
+  }, [totalGarmentCount, isOrderWeightBased]);
 
-  // Piece-level and batch-level photo tracking and validation
+  // Piece-level and garment-level photo tracking and validation
   const { coveredPieces, totalRequiredUnits, missingPiecesList, allPiecesCovered } = useMemo(() => {
     let covered = 0;
     let required = 0;
     const missing: Array<{
       itemIndex: number;
       garmentName: string;
-      unitNumber?: number;
+      unitNumber: number;
       unitLabel: string;
     }> = [];
 
     items.forEach((item, itemIndex) => {
-      const isWb = item.isWeightBased || (item.weight != null && item.weight > 0);
-      if (isWb) {
+      const pieceCount = item.quantity || 1;
+      const pieces = item.pieces || [];
+
+      for (let u = 1; u <= pieceCount; u++) {
         required++;
-        const photos = item.batchPhotos || [];
-        if (photos.length > 0) {
+        const piece = pieces.find((p: any) => p.unitNumber === u);
+        const count = piece?.photos?.length || 0;
+        if (count > 0) {
           covered++;
         } else {
           missing.push({
             itemIndex,
             garmentName: item.garmentName,
-            unitLabel: `Batch (${item.weight} kg)`,
+            unitNumber: u,
+            unitLabel: pieceCount > 1 ? `Garment ${u}` : `Garment`,
           });
-        }
-      } else {
-        const pieces = item.pieces || [];
-        for (let u = 1; u <= item.quantity; u++) {
-          required++;
-          const piece = pieces.find((p: any) => p.unitNumber === u);
-          const count = piece?.photos?.length || 0;
-          if (count > 0) {
-            covered++;
-          } else {
-            missing.push({
-              itemIndex,
-              garmentName: item.garmentName,
-              unitNumber: u,
-              unitLabel: `Piece ${u}`,
-            });
-          }
         }
       }
     });
@@ -751,14 +748,10 @@ export function OrderWizardPage() {
             quantity: isWb ? item.garmentsCount || item.quantity || 1 : item.quantity || 1,
             weight: isWb ? item.weight : undefined,
             unitPrice: item.unitPrice,
-            pieces: isWb
-              ? item.batchPhotos && item.batchPhotos.length > 0
-                ? [{ unitNumber: 1, photoCount: item.batchPhotos.length }]
-                : []
-              : (item.pieces || []).map((p: any) => ({
-                  unitNumber: p.unitNumber,
-                  photoCount: p.photos?.length || 0,
-                })),
+            pieces: (item.pieces || []).map((p: any) => ({
+              unitNumber: p.unitNumber,
+              photoCount: p.photos?.length || 0,
+            })),
           };
         }),
         notes: generalNote.trim() || 'Created via POS terminal',
@@ -781,7 +774,7 @@ export function OrderWizardPage() {
       const body = await res.json();
       const createdOrder = body.data;
 
-      // Handle async photo uploads for both weight-based batch photos and individual piece photos
+      // Handle async photo uploads for all individual physical garments
       try {
         const uploadPromises: Promise<any>[] = [];
         for (let i = 0; i < items.length; i++) {
@@ -789,23 +782,7 @@ export function OrderWizardPage() {
           const createdItem = createdOrder.items?.[i];
           if (!createdItem) continue;
 
-          const isWb = item.isWeightBased || (item.weight != null && item.weight > 0);
-          if (isWb) {
-            for (const photo of item.batchPhotos || []) {
-              if (photo.file) {
-                uploadPromises.push(
-                  uploadPhoto(
-                    token!,
-                    photo.file,
-                    createdOrder.id,
-                    'FRONT' as PhotoType,
-                    createdItem.id,
-                    undefined,
-                  ),
-                );
-              }
-            }
-          } else if (item.pieces) {
+          if (item.pieces) {
             for (const piece of item.pieces) {
               if (!piece.photos || piece.photos.length === 0) continue;
               // Match physical garment by unitNumber
@@ -1380,23 +1357,17 @@ export function OrderWizardPage() {
                                       ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
                                       : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                                 }`}
-                                title={
-                                  isWb
-                                    ? 'Click to view/add batch photos'
-                                    : 'Click to view/add piece photos'
-                                }
+                                title="Click to view/add garment photos"
                               >
                                 <Camera size={11} />
                                 <span>
-                                  {isWb
-                                    ? `${coveredItemPieces > 0 ? 'Batch' : '0'} photo ${coveredItemPieces > 0 ? '✓' : isPhotoRequired ? '⚠' : ''}`
-                                    : `${coveredItemPieces}/${item.quantity} photo${coveredItemPieces === 1 ? '' : 's'} ${
-                                        coveredItemPieces === item.quantity
-                                          ? '✓'
-                                          : isPhotoRequired
-                                            ? '⚠'
-                                            : ''
-                                      }`}
+                                  {coveredItemPieces}/{totalRequired} photo
+                                  {totalRequired === 1 ? '' : 's'}{' '}
+                                  {coveredItemPieces === totalRequired
+                                    ? '✓'
+                                    : isPhotoRequired
+                                      ? '⚠'
+                                      : ''}
                                 </span>
                               </button>
                             </div>
@@ -1958,213 +1929,122 @@ export function OrderWizardPage() {
                   </div>
                 </div>
 
-                {items[editingItemIndex].isWeightBased ||
-                (items[editingItemIndex].weight != null && items[editingItemIndex].weight > 0) ? (
-                  /* Batch Photo Capture for Weight-based item */
-                  <div
-                    className={`border rounded-lg p-3 space-y-2.5 transition-colors ${
-                      (items[editingItemIndex].batchPhotos || []).length > 0
-                        ? 'border-emerald-200 bg-emerald-50/30'
-                        : isPhotoRequired
-                          ? 'border-amber-200 bg-amber-50/40'
-                          : 'border-slate-200 bg-slate-50/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900">
-                        Batch Photo ({items[editingItemIndex].weight} kg)
-                      </span>
-                      {(items[editingItemIndex].batchPhotos || []).length > 0 ? (
-                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded flex items-center gap-1">
-                          {(items[editingItemIndex].batchPhotos || []).length} photo
-                          {(items[editingItemIndex].batchPhotos || []).length > 1 ? 's' : ''} ✓
-                        </span>
-                      ) : isPhotoRequired ? (
-                        <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded flex items-center gap-1">
-                          0 photos ⚠ Required
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                          0 photos (Optional)
-                        </span>
-                      )}
-                    </div>
+                <div className="space-y-3 pt-1">
+                  {Array.from({ length: items[editingItemIndex].quantity }, (_, pIdx) => {
+                    const unitNum = pIdx + 1;
+                    const piece = (items[editingItemIndex].pieces || []).find(
+                      (p: any) => p.unitNumber === unitNum,
+                    );
+                    const piecePhotos = piece?.photos || [];
+                    const isCovered = piecePhotos.length > 0;
 
-                    {/* Batch Photo Thumbnails */}
-                    {(items[editingItemIndex].batchPhotos || []).length > 0 && (
-                      <div className="space-y-1 pt-1">
-                        <div className="text-[11px] font-medium text-slate-600">
-                          Captured Photos ({(items[editingItemIndex].batchPhotos || []).length}):
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                          {(items[editingItemIndex].batchPhotos || []).map(
-                            (photo: any, phIdx: number) => (
-                              <div
-                                key={photo.id || phIdx}
-                                className="flex flex-col items-center gap-1 shrink-0 bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => setViewingPhotoUrl(photo.previewUrl)}
-                                  className="w-20 h-20 rounded-md border border-slate-200 overflow-hidden bg-slate-100 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer block p-0"
-                                  title={`Click to preview Batch Photo ${phIdx + 1}`}
-                                  aria-label={`Preview Batch Photo ${phIdx + 1}`}
-                                >
-                                  <img
-                                    src={photo.previewUrl}
-                                    alt={`Batch Photo ${phIdx + 1}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </button>
-                                <div className="flex items-center justify-between w-full px-0.5 text-[10px] text-slate-600">
-                                  <span className="font-medium">Photo {phIdx + 1}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRemoveBatchPhoto(editingItemIndex, photo.id)
-                                    }
-                                    className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                    title={`Remove batch photo ${phIdx + 1}`}
-                                    aria-label={`Remove batch photo ${phIdx + 1}`}
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
-                                </div>
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Batch Photo Capture Action */}
-                    <div className="pt-1">
-                      <PhotoCapture
-                        label={
-                          (items[editingItemIndex].batchPhotos || []).length === 0
-                            ? isPhotoRequired
-                              ? `Capture Batch Photo (${items[editingItemIndex].weight} kg)`
-                              : `Capture Batch Photo (Optional)`
-                            : `+ Add Another Batch Photo`
-                        }
-                        allowCamera={true}
-                        resetAfterCapture={true}
-                        onCapture={(file) => handleAddBatchPhoto(editingItemIndex, file)}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  /* Piece-by-piece Photo Capture for regular garments */
-                  <div className="space-y-3 pt-1">
-                    {Array.from({ length: items[editingItemIndex].quantity }, (_, pIdx) => {
-                      const unitNum = pIdx + 1;
-                      const piece = (items[editingItemIndex].pieces || []).find(
-                        (p: any) => p.unitNumber === unitNum,
-                      );
-                      const piecePhotos = piece?.photos || [];
-                      const isCovered = piecePhotos.length > 0;
-
-                      return (
-                        <div
-                          key={unitNum}
-                          className={`border rounded-lg p-3 space-y-2.5 transition-colors ${
-                            isCovered
-                              ? 'border-emerald-200 bg-emerald-50/30'
-                              : isPhotoRequired
-                                ? 'border-amber-200 bg-amber-50/40'
-                                : 'border-slate-200 bg-slate-50/50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-900">
-                              Piece {unitNum} of {items[editingItemIndex].quantity}
-                            </span>
-                            {isCovered ? (
-                              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded flex items-center gap-1">
-                                {piecePhotos.length} photo{piecePhotos.length > 1 ? 's' : ''} ✓
-                              </span>
-                            ) : isPhotoRequired ? (
-                              <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded flex items-center gap-1">
-                                0 photos ⚠ Required
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                                0 photos (Optional)
+                    return (
+                      <div
+                        key={unitNum}
+                        className={`border rounded-lg p-3 space-y-2.5 transition-colors ${
+                          isCovered
+                            ? 'border-emerald-200 bg-emerald-50/30'
+                            : isPhotoRequired
+                              ? 'border-amber-200 bg-amber-50/40'
+                              : 'border-slate-200 bg-slate-50/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900">
+                            {items[editingItemIndex].quantity > 1
+                              ? `Garment ${unitNum} of ${items[editingItemIndex].quantity}`
+                              : `Garment ${unitNum}`}
+                            {items[editingItemIndex].isWeightBased && (
+                              <span className="ml-1 text-[11px] font-normal text-slate-500">
+                                ({items[editingItemIndex].weight} kg total)
                               </span>
                             )}
-                          </div>
+                          </span>
+                          {isCovered ? (
+                            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded flex items-center gap-1">
+                              {piecePhotos.length} photo{piecePhotos.length > 1 ? 's' : ''} ✓
+                            </span>
+                          ) : isPhotoRequired ? (
+                            <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded flex items-center gap-1">
+                              0 photos ⚠ Required
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                              0 photos (Optional)
+                            </span>
+                          )}
+                        </div>
 
-                          {/* Existing thumbnails / previews */}
-                          {piecePhotos.length > 0 && (
-                            <div className="space-y-1 pt-1">
-                              <div className="text-[11px] font-medium text-slate-600">
-                                Captured Photos ({piecePhotos.length}):
-                              </div>
-                              <div className="flex flex-wrap gap-3">
-                                {piecePhotos.map((photo: any, phIdx: number) => (
-                                  <div
-                                    key={photo.id || phIdx}
-                                    className="flex flex-col items-center gap-1 shrink-0 bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs"
+                        {/* Existing thumbnails / previews */}
+                        {piecePhotos.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <div className="text-[11px] font-medium text-slate-600">
+                              Captured Photos ({piecePhotos.length}):
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              {piecePhotos.map((photo: any, phIdx: number) => (
+                                <div
+                                  key={photo.id || phIdx}
+                                  className="flex flex-col items-center gap-1 shrink-0 bg-white p-1.5 rounded-lg border border-slate-200 shadow-2xs"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingPhotoUrl(photo.previewUrl)}
+                                    className="w-20 h-20 rounded-md border border-slate-200 overflow-hidden bg-slate-100 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer block p-0"
+                                    title={`Click to preview Photo ${phIdx + 1}`}
+                                    aria-label={`Preview Photo ${phIdx + 1} of Piece ${unitNum}`}
                                   >
+                                    <img
+                                      src={photo.previewUrl}
+                                      alt={`Piece ${unitNum} - Photo ${phIdx + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </button>
+                                  <div className="flex items-center justify-between w-full px-0.5 text-[10px] text-slate-600">
+                                    <span className="font-medium">Photo {phIdx + 1}</span>
                                     <button
                                       type="button"
-                                      onClick={() => setViewingPhotoUrl(photo.previewUrl)}
-                                      className="w-20 h-20 rounded-md border border-slate-200 overflow-hidden bg-slate-100 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer block p-0"
-                                      title={`Click to preview Photo ${phIdx + 1}`}
-                                      aria-label={`Preview Photo ${phIdx + 1} of Piece ${unitNum}`}
+                                      onClick={() =>
+                                        handleRemovePhotoFromPiece(
+                                          editingItemIndex,
+                                          unitNum,
+                                          photo.id,
+                                        )
+                                      }
+                                      className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                      title={`Remove photo ${phIdx + 1}`}
+                                      aria-label={`Remove photo ${phIdx + 1} from Piece ${unitNum}`}
                                     >
-                                      <img
-                                        src={photo.previewUrl}
-                                        alt={`Piece ${unitNum} - Photo ${phIdx + 1}`}
-                                        className="w-full h-full object-cover"
-                                      />
+                                      <Trash2 size={15} />
                                     </button>
-                                    <div className="flex items-center justify-between w-full px-0.5 text-[10px] text-slate-600">
-                                      <span className="font-medium">Photo {phIdx + 1}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleRemovePhotoFromPiece(
-                                            editingItemIndex,
-                                            unitNum,
-                                            photo.id,
-                                          )
-                                        }
-                                        className="min-h-[44px] min-w-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                        title={`Remove photo ${phIdx + 1}`}
-                                        aria-label={`Remove photo ${phIdx + 1} from Piece ${unitNum}`}
-                                      >
-                                        <Trash2 size={15} />
-                                      </button>
-                                    </div>
                                   </div>
-                                ))}
-                              </div>
+                                </div>
+                              ))}
                             </div>
-                          )}
-
-                          {/* Photo capture action */}
-                          <div className="pt-1">
-                            <PhotoCapture
-                              label={
-                                piecePhotos.length === 0
-                                  ? isPhotoRequired
-                                    ? `Capture Photo for Piece #${unitNum}`
-                                    : `Capture Photo for Piece #${unitNum} (Optional)`
-                                  : `+ Add Photo`
-                              }
-                              allowCamera={true}
-                              resetAfterCapture={true}
-                              onCapture={(file) =>
-                                handleAddPhotoToPiece(editingItemIndex, unitNum, file)
-                              }
-                            />
                           </div>
+                        )}
+
+                        {/* Photo capture action */}
+                        <div className="pt-1">
+                          <PhotoCapture
+                            label={
+                              piecePhotos.length === 0
+                                ? isPhotoRequired
+                                  ? `Capture Photo for Piece #${unitNum}`
+                                  : `Capture Photo for Piece #${unitNum} (Optional)`
+                                : `+ Add Photo`
+                            }
+                            allowCamera={true}
+                            resetAfterCapture={true}
+                            onCapture={(file) =>
+                              handleAddPhotoToPiece(editingItemIndex, unitNum, file)
+                            }
+                          />
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 

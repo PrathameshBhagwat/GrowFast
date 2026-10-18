@@ -745,6 +745,19 @@ describe('Phase T1: Tag System Foundation Tests (TESTS A through J)', () => {
     let capturedCreateData: any = null;
     mockPrismaService.order.create.mockImplementation(({ data }: any) => {
       capturedCreateData = data;
+      const physicalGarments = (data.items.create[0].physicalGarments?.create || []).map(
+        (pg: any) => ({
+          id: `pg-${pg.unitNumber}`,
+          unitNumber: pg.unitNumber,
+          tagId: pg.tagId,
+          isReady: false,
+          isCancelled: false,
+          isDelivered: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          photos: [],
+        }),
+      );
       return {
         id: 'ord-wb-1',
         orderNumber: 'ORD-WB-1',
@@ -777,7 +790,7 @@ describe('Phase T1: Tag System Foundation Tests (TESTS A through J)', () => {
             itemStatus: ItemStatus.RECEIVED,
             deliveredQuantity: 0,
             photos: [],
-            physicalGarments: [],
+            physicalGarments,
           },
         ],
         customer: { name: 'Rohan Sharma', phone: '9876543210' },
@@ -805,9 +818,12 @@ describe('Phase T1: Tag System Foundation Tests (TESTS A through J)', () => {
     );
 
     const itemData = capturedCreateData.items.create[0];
-    expect(itemData.physicalGarments).toBeUndefined();
-    expect(result.items[0].physicalGarments).toHaveLength(0);
+    expect(itemData.physicalGarments.create).toHaveLength(1);
+    expect(itemData.physicalGarments.create[0].tagId).toMatch(/^GF-/);
+    expect(result.items[0].physicalGarments).toHaveLength(1);
+    expect(result.items[0].physicalGarments[0].tagId).toMatch(/^GF-/);
     expect(result.items[0].weight).toBe(5.5);
+    expect(result.items[0].lineTotal).toBe(440);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -1054,6 +1070,712 @@ describe('Phase T1: Tag System Foundation Tests (TESTS A through J)', () => {
       expect(result.amountPaid).toBe(150);
       expect(mockPrismaService.order.update).not.toHaveBeenCalled();
       expect(mockPaymentService.calculateOrderFinancialState).toHaveBeenCalled();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // PHASE T3: WEIGHT-BASED LAUNDRY & PHOTO THRESHOLD CANONICAL RULES
+  // ─────────────────────────────────────────────────────────────
+  describe('Phase T3: Weight-Based Laundry & Photo Threshold Canonical Rules', () => {
+    const storeId = 'store-canonical-1';
+    const empId = 'emp-canonical-1';
+    const custId = 'cust-canonical-1';
+
+    const makeMockPg = (unitNumber: number, tagId: string, photos: any[] = []) => ({
+      id: `pg-${unitNumber}`,
+      unitNumber,
+      tagId,
+      isReady: false,
+      isCancelled: false,
+      isDelivered: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      photos,
+    });
+
+    beforeEach(() => {
+      mockPrismaService.store.findUnique.mockResolvedValue({ id: storeId, name: 'Main Store' });
+      mockPrismaService.customer.findUnique.mockResolvedValue({
+        id: custId,
+        name: 'Customer Test',
+      });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        {
+          id: 'g-laundry-kg',
+          name: 'Laundry Weight Item',
+          category: GarmentCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+        { id: 'g-shirt-piece', name: 'Shirt', category: GarmentCategory.MEN, isActive: true },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        {
+          id: 's-laundry-kg',
+          name: 'Wash & Steam Iron',
+          category: ServiceCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+        {
+          id: 's-dry-clean',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          isActive: true,
+        },
+      ]);
+      mockPrismaService.serviceGarmentPrice.findMany.mockResolvedValue([
+        { garmentCatalogId: 'g-laundry-kg', serviceTypeId: 's-laundry-kg', price: 80 },
+        { garmentCatalogId: 'g-shirt-piece', serviceTypeId: 's-dry-clean', price: 150 },
+      ]);
+
+      mockPrismaService.order.create.mockImplementation(({ data }: any) => {
+        return {
+          id: `ord-${Date.now()}`,
+          orderNumber: 'GF-TEST-01',
+          storeId,
+          customerId: custId,
+          orderDate: new Date(),
+          systemDueDate: new Date(),
+          effectiveDueDate: new Date(),
+          isExpress: false,
+          status: OrderStatus.RECEIVED,
+          subtotal: data.subtotal || 200,
+          totalAmount: data.totalAmount || 200,
+          amountPaid: 0,
+          amountDue: data.totalAmount || 200,
+          paymentStatus: PaymentStatus.PENDING,
+          pickupType: PickupType.STORE_PICKUP,
+          priority: OrderPriority.STANDARD,
+          createdById: empId,
+          items: data.items.create.map((it: any, i: number) => ({
+            id: `item-${i + 1}`,
+            quantity: it.quantity,
+            weight: it.weight,
+            unitPrice: it.unitPrice,
+            lineTotal: it.lineTotal,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            photos: [],
+            physicalGarments: (it.physicalGarments?.create || []).map((pg: any) =>
+              makeMockPg(pg.unitNumber, pg.tagId),
+            ),
+            garmentCatalog: {
+              name: 'Garment',
+              category: it.weight ? GarmentCategory.WEIGHT_BASED : GarmentCategory.MEN,
+            },
+            serviceType: {
+              category: it.weight ? ServiceCategory.WEIGHT_BASED : ServiceCategory.DRY_CLEAN,
+            },
+          })),
+          customer: { name: 'Customer Test', phone: '9876543210' },
+          createdBy: { name: 'Staff' },
+        };
+      });
+    });
+
+    // 1. One garment creates one physical garment and one permanent tag
+    it('1. One garment creates one physical garment and one permanent tag', async () => {
+      let capturedData: any = null;
+      const originalImpl = mockPrismaService.order.create.getMockImplementation();
+      mockPrismaService.order.create.mockImplementation(({ data }: any) => {
+        capturedData = data;
+        return originalImpl({ data });
+      });
+
+      const res = await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 1,
+              weight: 3.5,
+              pieces: [{ unitNumber: 1, photoCount: 1 }],
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      expect(capturedData.items.create[0].physicalGarments.create).toHaveLength(1);
+      expect(capturedData.items.create[0].physicalGarments.create[0].tagId).toMatch(/^GF-/);
+      expect(res.items[0].physicalGarments).toHaveLength(1);
+    });
+
+    // 2. Ten garments create ten physical garments and ten permanent tags
+    it('2. Ten garments create ten physical garments and ten permanent tags', async () => {
+      let capturedData: any = null;
+      const originalImpl = mockPrismaService.order.create.getMockImplementation();
+      mockPrismaService.order.create.mockImplementation(({ data }: any) => {
+        capturedData = data;
+        return originalImpl({ data });
+      });
+
+      const pieces = Array.from({ length: 10 }, (_, i) => ({ unitNumber: i + 1, photoCount: 1 }));
+      const res = await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 10,
+              weight: 5.0,
+              pieces,
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      const createdPgs = capturedData.items.create[0].physicalGarments.create;
+      expect(createdPgs).toHaveLength(10);
+      const tagSet = new Set(createdPgs.map((p: any) => p.tagId));
+      expect(tagSet.size).toBe(10);
+      expect(res.items[0].physicalGarments).toHaveLength(10);
+    });
+
+    // 3. Exactly 50 garments require a photo for every garment
+    it('3. Exactly 50 garments require a photo for every garment', async () => {
+      // 50 garments with only 49 covered => must be rejected
+      const incompletePieces = Array.from({ length: 49 }, (_, i) => ({
+        unitNumber: i + 1,
+        photoCount: 1,
+      }));
+      await expect(
+        service.createOrder(
+          {
+            customerId: custId,
+            isExpress: false,
+            pickupType: PickupType.STORE_PICKUP,
+            items: [
+              {
+                garmentCatalogId: 'g-laundry-kg',
+                serviceTypeId: 's-laundry-kg',
+                quantity: 50,
+                weight: 25.0,
+                pieces: incompletePieces,
+              },
+            ],
+          },
+          empId,
+          storeId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      // 50 garments with all 50 covered => succeeds
+      const all50Pieces = Array.from({ length: 50 }, (_, i) => ({
+        unitNumber: i + 1,
+        photoCount: 1,
+      }));
+      const result = await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 50,
+              weight: 25.0,
+              pieces: all50Pieces,
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+      expect(result).toBeDefined();
+    });
+
+    // 4. Fifty-one garments do not require photos
+    it('4. Fifty-one garments do not require photos', async () => {
+      const result = await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 51,
+              weight: 26.0,
+              pieces: [], // zero photos provided
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+      expect(result).toBeDefined();
+    });
+
+    // 5. Tags are generated for all garments when the count is greater than 50
+    it('5. Tags are generated for all garments when the count is greater than 50', async () => {
+      let capturedData: any = null;
+      const originalImpl = mockPrismaService.order.create.getMockImplementation();
+      mockPrismaService.order.create.mockImplementation(({ data }: any) => {
+        capturedData = data;
+        return originalImpl({ data });
+      });
+
+      await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 60,
+              weight: 30.0,
+              pieces: [],
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      const createdPgs = capturedData.items.create[0].physicalGarments.create;
+      expect(createdPgs).toHaveLength(60);
+      expect(createdPgs[0].tagId).toMatch(/^GF-/);
+      expect(createdPgs[59].tagId).toMatch(/^GF-/);
+      const tagSet = new Set(createdPgs.map((p: any) => p.tagId));
+      expect(tagSet.size).toBe(60);
+    });
+
+    // 6. Missing photos block the appropriate workflow step when the count is 50 or fewer
+    it('6. Missing photos block order creation when count is 50 or fewer', async () => {
+      await expect(
+        service.createOrder(
+          {
+            customerId: custId,
+            isExpress: false,
+            pickupType: PickupType.STORE_PICKUP,
+            items: [
+              {
+                garmentCatalogId: 'g-laundry-kg',
+                serviceTypeId: 's-laundry-kg',
+                quantity: 8,
+                weight: 4.5,
+                pieces: [{ unitNumber: 1, photoCount: 1 }], // only 1 of 8 covered
+              },
+            ],
+          },
+          empId,
+          storeId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    // 7. Failed or pending uploads do not satisfy mandatory photo validation
+    it('7. Failed or pending uploads (photoCount 0) do not satisfy mandatory photo validation', async () => {
+      await expect(
+        service.createOrder(
+          {
+            customerId: custId,
+            isExpress: false,
+            pickupType: PickupType.STORE_PICKUP,
+            items: [
+              {
+                garmentCatalogId: 'g-laundry-kg',
+                serviceTypeId: 's-laundry-kg',
+                quantity: 2,
+                weight: 3.0,
+                pieces: [
+                  { unitNumber: 1, photoCount: 1 },
+                  { unitNumber: 2, photoCount: 0 }, // failed or 0 photoCount
+                ],
+              },
+            ],
+          },
+          empId,
+          storeId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    // 8. Successful persisted photos satisfy the per-garment requirement
+    it('8. Successful persisted photos satisfy the per-garment requirement', async () => {
+      const res = await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 3,
+              weight: 3.5,
+              pieces: [
+                { unitNumber: 1, photoCount: 1 },
+                { unitNumber: 2, photoCount: 2 },
+                { unitNumber: 3, photoCount: 1 },
+              ],
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+      expect(res).toBeDefined();
+    });
+
+    // 9. Each photo is associated with the correct physical garment
+    it('9. Each photo is associated with the correct physical garment', async () => {
+      const mockOrderWithPgPhotos = {
+        id: 'ord-photos-pg',
+        orderNumber: 'GF-PHOTO-1',
+        storeId,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        isExpress: false,
+        priority: OrderPriority.STANDARD,
+        status: OrderStatus.RECEIVED,
+        totalAmount: 240,
+        amountPaid: 0,
+        amountDue: 240,
+        customer: { name: 'Test', phone: '123' },
+        createdBy: { name: 'Staff' },
+        items: [
+          {
+            id: 'item-pg',
+            garmentCatalog: { name: 'Laundry', category: GarmentCategory.WEIGHT_BASED },
+            serviceType: { category: ServiceCategory.WEIGHT_BASED },
+            quantity: 2,
+            weight: 3.0,
+            unitPrice: 80,
+            lineTotal: 240,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            photos: [],
+            physicalGarments: [
+              makeMockPg(1, 'GF-PG-1', [
+                {
+                  id: 'photo-1',
+                  url: 'https://cdn.example.com/p1.jpg',
+                  photoType: 'FRONT',
+                  uploadedAt: new Date(),
+                },
+              ]),
+              makeMockPg(2, 'GF-PG-2', [
+                {
+                  id: 'photo-2',
+                  url: 'https://cdn.example.com/p2.jpg',
+                  photoType: 'FRONT',
+                  uploadedAt: new Date(),
+                },
+              ]),
+            ],
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(mockOrderWithPgPhotos);
+
+      const order = await service.findOrderById('ord-photos-pg', storeId);
+      const pg1 = order.items[0].physicalGarments!.find((g: any) => g.unitNumber === 1);
+      const pg2 = order.items[0].physicalGarments!.find((g: any) => g.unitNumber === 2);
+      expect(pg1!.photos[0].id).toBe('photo-1');
+      expect(pg2!.photos[0].id).toBe('photo-2');
+    });
+
+    // 10. Editing an order preserves existing tag identities
+    it('10. Editing an order preserves existing tag identities', async () => {
+      const existingTags = ['GF-PERM-01', 'GF-PERM-02'];
+      const orderRecord = {
+        id: 'ord-edit-tags',
+        orderNumber: 'GF-EDIT-1',
+        storeId,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        isExpress: false,
+        priority: OrderPriority.STANDARD,
+        status: OrderStatus.RECEIVED,
+        totalAmount: 320,
+        amountPaid: 0,
+        amountDue: 320,
+        customer: { name: 'Test', phone: '123' },
+        createdBy: { name: 'Staff' },
+        items: [
+          {
+            id: 'item-edit',
+            garmentCatalog: { name: 'Laundry', category: GarmentCategory.WEIGHT_BASED },
+            serviceType: { category: ServiceCategory.WEIGHT_BASED },
+            quantity: 2,
+            weight: 4.0,
+            unitPrice: 80,
+            lineTotal: 320,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            photos: [],
+            physicalGarments: [makeMockPg(1, existingTags[0]), makeMockPg(2, existingTags[1])],
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(orderRecord);
+
+      const before = await service.findOrderById('ord-edit-tags', storeId);
+      const after = await service.findOrderById('ord-edit-tags', storeId);
+
+      expect(before.items[0].physicalGarments![0].tagId).toBe(existingTags[0]);
+      expect(after.items[0].physicalGarments![0].tagId).toBe(existingTags[0]);
+      expect(before.items[0].physicalGarments![1].tagId).toBe(existingTags[1]);
+      expect(after.items[0].physicalGarments![1].tagId).toBe(existingTags[1]);
+    });
+
+    // 11. Increasing garment count creates only the additional records and tags
+    it('11. Increasing garment count creates only the additional records and tags', async () => {
+      const initialTags = ['GF-EXIST-01', 'GF-EXIST-02'];
+      const existingOrder = {
+        id: 'ord-inc-count',
+        orderNumber: 'GF-INC-1',
+        storeId,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        status: OrderStatus.PROCESSING,
+        isExpress: false,
+        amountPaid: 0,
+        totalAmount: 320,
+        paymentStatus: PaymentStatus.PENDING,
+        customer: { name: 'Rohan Sharma', phone: '9876543210' },
+        createdBy: { name: 'Staff' },
+        items: [
+          {
+            id: 'item-inc',
+            quantity: 2,
+            unitPrice: 80,
+            lineTotal: 320,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            garmentCatalog: { name: 'Laundry', category: GarmentCategory.WEIGHT_BASED },
+            serviceType: { category: ServiceCategory.WEIGHT_BASED },
+            physicalGarments: initialTags.map((tag, i) => makeMockPg(i + 1, tag)),
+          },
+        ],
+        adjustments: [],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(existingOrder);
+
+      let addedGarmentData: any = null;
+      mockPrismaService.physicalGarment.create.mockImplementation(({ data }: any) => {
+        addedGarmentData = data;
+        return { id: 'pg-3', ...data, createdAt: new Date(), updatedAt: new Date() };
+      });
+
+      await service.addPhysicalGarment('ord-inc-count', 'item-inc', storeId);
+
+      expect(addedGarmentData).toBeDefined();
+      expect(addedGarmentData.unitNumber).toBe(3);
+      expect(addedGarmentData.tagId).toMatch(/^GF-[2-9A-Z]{6}$/);
+      expect(initialTags).not.toContain(addedGarmentData.tagId);
+    });
+
+    // 12. Retrying order creation does not create duplicate garments or tags
+    it('12. Retrying order creation does not create duplicate garments or tags', async () => {
+      const dto = {
+        customerId: custId,
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-laundry-kg',
+            serviceTypeId: 's-laundry-kg',
+            quantity: 4,
+            weight: 4.0,
+            pieces: Array.from({ length: 4 }, (_, i) => ({ unitNumber: i + 1, photoCount: 1 })),
+          },
+        ],
+      };
+
+      const attempt1 = await service.createOrder(dto, empId, storeId);
+      expect(attempt1.items[0].physicalGarments).toHaveLength(4);
+
+      // Unique tags per garment, no duplicates
+      const tags = attempt1.items[0].physicalGarments.map((g: any) => g.tagId);
+      expect(new Set(tags).size).toBe(4);
+    });
+
+    // 13. Weight-based Laundry pricing remains weight × configured price per kg
+    it('13. Weight-based Laundry pricing remains weight × configured price per kg', async () => {
+      let capturedData: any = null;
+      const originalImpl = mockPrismaService.order.create.getMockImplementation();
+      mockPrismaService.order.create.mockImplementation(({ data }: any) => {
+        capturedData = data;
+        return originalImpl({ data });
+      });
+
+      await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 8, // 8 garments
+              weight: 5.5, // 5.5 kg @ 80/kg
+              pieces: Array.from({ length: 8 }, (_, i) => ({ unitNumber: i + 1, photoCount: 1 })),
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      // lineTotal is exactly 5.5 * 80 = 440 (NOT 8 * 440)
+      expect(capturedData.items.create[0].lineTotal).toBe(440);
+      expect(capturedData.items.create[0].unitPrice).toBe(80);
+      expect(capturedData.items.create[0].weight).toBe(5.5);
+    });
+
+    // 14. Changing garment count does not change the base weight-based Laundry price
+    it('14. Changing garment count does not change the base weight-based Laundry price', async () => {
+      let capturedOrder1: any = null;
+      let capturedOrder2: any = null;
+
+      const originalImpl = mockPrismaService.order.create.getMockImplementation();
+      mockPrismaService.order.create
+        .mockImplementationOnce(({ data }: any) => {
+          capturedOrder1 = data;
+          return originalImpl({ data });
+        })
+        .mockImplementationOnce(({ data }: any) => {
+          capturedOrder2 = data;
+          return originalImpl({ data });
+        });
+
+      // 5.0 kg with 4 garments
+      await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 4,
+              weight: 5.0,
+              pieces: Array.from({ length: 4 }, (_, i) => ({ unitNumber: i + 1, photoCount: 1 })),
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      // 5.0 kg with 12 garments
+      await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-laundry-kg',
+              quantity: 12,
+              weight: 5.0,
+              pieces: Array.from({ length: 12 }, (_, i) => ({ unitNumber: i + 1, photoCount: 1 })),
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      // Base price in both cases is exactly 5.0 * 80 = 400
+      expect(capturedOrder1.items.create[0].lineTotal).toBe(400);
+      expect(capturedOrder2.items.create[0].lineTotal).toBe(400);
+    });
+
+    // 15. Ordinary Per Pieces orders continue to work correctly
+    it('15. Ordinary Per Pieces orders continue to work correctly', async () => {
+      let capturedData: any = null;
+      const originalImpl = mockPrismaService.order.create.getMockImplementation();
+      mockPrismaService.order.create.mockImplementation(({ data }: any) => {
+        capturedData = data;
+        return originalImpl({ data });
+      });
+
+      await service.createOrder(
+        {
+          customerId: custId,
+          isExpress: false,
+          pickupType: PickupType.STORE_PICKUP,
+          items: [
+            {
+              garmentCatalogId: 'g-shirt-piece',
+              serviceTypeId: 's-dry-clean',
+              quantity: 3, // 3 shirts @ 150 each
+              pieces: Array.from({ length: 3 }, (_, i) => ({ unitNumber: i + 1, photoCount: 1 })),
+            },
+          ],
+        },
+        empId,
+        storeId,
+      );
+
+      // Per piece line total: quantity * unitPrice = 3 * 150 = 450
+      expect(capturedData.items.create[0].lineTotal).toBe(450);
+      expect(capturedData.items.create[0].weight).toBeNull();
+      expect(capturedData.items.create[0].physicalGarments.create).toHaveLength(3);
+    });
+
+    // 16. Existing processing, readiness, pickup, and handover flows continue to recognize the permanent tags
+    it('16. Existing processing, readiness, pickup, and handover flows continue to recognize the permanent tags', async () => {
+      const orderWithTags = {
+        id: 'ord-flows',
+        orderNumber: 'GF-FLOW-1',
+        storeId,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        isExpress: false,
+        priority: OrderPriority.STANDARD,
+        status: OrderStatus.PROCESSING,
+        totalAmount: 400,
+        amountPaid: 400,
+        amountDue: 0,
+        customer: { name: 'Flow Customer', phone: '9999999999' },
+        createdBy: { name: 'Staff' },
+        items: [
+          {
+            id: 'item-flow',
+            garmentCatalog: { name: 'Laundry', category: GarmentCategory.WEIGHT_BASED },
+            serviceType: { category: ServiceCategory.WEIGHT_BASED },
+            quantity: 2,
+            weight: 5.0,
+            unitPrice: 80,
+            lineTotal: 400,
+            itemStatus: ItemStatus.PROCESSING,
+            deliveredQuantity: 0,
+            photos: [],
+            physicalGarments: [makeMockPg(1, 'GF-TAG-01'), makeMockPg(2, 'GF-TAG-02')],
+          },
+        ],
+      };
+      mockPrismaService.order.findUnique.mockResolvedValue(orderWithTags);
+
+      const retrievedOrder = await service.findOrderById('ord-flows', storeId);
+      expect(retrievedOrder.items[0].physicalGarments).toHaveLength(2);
+      expect(retrievedOrder.items[0].physicalGarments![0].tagId).toBe('GF-TAG-01');
+      expect(retrievedOrder.items[0].physicalGarments![1].tagId).toBe('GF-TAG-02');
     });
   });
 });

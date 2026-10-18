@@ -193,6 +193,11 @@ export class OrderService {
               `Weight in kg is required and minimum permitted weight is 2.00 kg for weight-based item "${garment.name}".`,
             );
           }
+          if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+            throw new BadRequestException(
+              `Number of garments must be a positive integer for weight-based item "${garment.name}".`,
+            );
+          }
         }
 
         if (isWeightPieceException) {
@@ -228,16 +233,15 @@ export class OrderService {
           defectNotes: item.defectNotes,
         };
 
-        // Weight-based items and weight-based piece exceptions do not fabricate individual physical piece garments
-        if (!isWeightBased && !isWeightPieceException) {
-          orderItemData.physicalGarments = {
-            create: Array.from({ length: item.quantity }, (_, i) => ({
-              unitNumber: i + 1,
-              tagId: this.generateTagId(),
-              isReady: false,
-            })),
-          };
-        }
+        // Every physical garment gets an individual PhysicalGarment record and a permanent, unique tag identity.
+        // For weight-based laundry orders, item.quantity is the declared garment count.
+        orderItemData.physicalGarments = {
+          create: Array.from({ length: item.quantity }, (_, i) => ({
+            unitNumber: i + 1,
+            tagId: this.generateTagId(),
+            isReady: false,
+          })),
+        };
 
         orderItemsData.push(orderItemData);
 
@@ -278,30 +282,15 @@ export class OrderService {
       if (photosRequired) {
         for (const item of dto.items) {
           const garment = garmentMap.get(item.garmentCatalogId);
-          const service = serviceMap.get(item.serviceTypeId);
           const garmentName = garment ? garment.name : item.garmentCatalogId;
-          const isItemWeightBased =
-            garment?.category === GarmentCategory.WEIGHT_BASED ||
-            service?.category === ServiceCategory.WEIGHT_BASED;
 
-          if (isItemWeightBased) {
-            // Weight-based batch requires at least 1 photo for the laundry item
-            const firstPiece = item.pieces?.[0];
-            const photoCount = firstPiece?.photoCount ?? firstPiece?.photos?.length ?? 0;
+          for (let u = 1; u <= item.quantity; u++) {
+            const pieceData = item.pieces?.find((p) => p.unitNumber === u);
+            const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
             if (photoCount < 1) {
               throw new BadRequestException(
-                `Photos are required for all pieces in this order. Item "${garmentName}" is missing photos.`,
+                `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
               );
-            }
-          } else {
-            for (let u = 1; u <= item.quantity; u++) {
-              const pieceData = item.pieces?.find((p) => p.unitNumber === u);
-              const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
-              if (photoCount < 1) {
-                throw new BadRequestException(
-                  `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
-                );
-              }
             }
           }
         }
@@ -1065,6 +1054,25 @@ export class OrderService {
         throw new BadRequestException('Cannot mark a cancelled garment as ready.');
       }
 
+      if (isReady) {
+        // Enforce photo requirement before advancing garment to ready
+        const allOrderGarments = await tx.physicalGarment.findMany({
+          where: { orderItem: { orderId } },
+        });
+        const activeGarmentCount = allOrderGarments.filter((g) => !g.isCancelled).length;
+        const isWalkIn = order.pickupType === PickupType.STORE_PICKUP;
+        if (isWalkIn && activeGarmentCount <= 50) {
+          const photoCount = await tx.orderPhoto.count({
+            where: { physicalGarmentId: garmentId },
+          });
+          if (photoCount < 1) {
+            throw new BadRequestException(
+              'A photo is required for this garment before it can be marked ready.',
+            );
+          }
+        }
+      }
+
       await tx.physicalGarment.update({
         where: { id: garmentId },
         data: { isReady },
@@ -1246,7 +1254,10 @@ export class OrderService {
 
       // 6. Increment quantity and lineTotal
       const newQuantity = orderItem.quantity + 1;
-      const newLineTotal = Number((orderItem.unitPrice * newQuantity).toFixed(2));
+      const isWeightBased = orderItem.weight != null && orderItem.weight > 0;
+      const newLineTotal = isWeightBased
+        ? orderItem.lineTotal
+        : Number((orderItem.unitPrice * newQuantity).toFixed(2));
 
       // 7. Derive new itemStatus (new garment is not ready, so all active garments cannot be all ready)
       const activeGarments = existingGarments.filter((g) => !g.isCancelled);
@@ -1267,6 +1278,7 @@ export class OrderService {
       const pricingInputs = order.items.map((i) => ({
         unitPrice: i.unitPrice,
         quantity: i.id === itemId ? newQuantity : i.quantity,
+        weight: i.weight,
       }));
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: order.isExpress,
@@ -1386,12 +1398,16 @@ export class OrderService {
 
       // 8. Financial check (Phase 3E)
       const newQuantity = orderItem.quantity - 1;
-      const newLineTotal = Number((orderItem.unitPrice * newQuantity).toFixed(2));
+      const isWeightBased = orderItem.weight != null && orderItem.weight > 0;
+      const newLineTotal = isWeightBased
+        ? orderItem.lineTotal
+        : Number((orderItem.unitPrice * newQuantity).toFixed(2));
 
       const store = await tx.store.findUnique({ where: { id: storeId } });
       const pricingInputs = order.items.map((i) => ({
         unitPrice: i.unitPrice,
         quantity: i.id === itemId ? newQuantity : i.quantity,
+        weight: i.weight,
       }));
       const totals = calculateOrderTotals(pricingInputs, {
         isExpress: order.isExpress,

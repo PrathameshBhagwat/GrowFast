@@ -34,16 +34,31 @@ describe('isPhotoRequiredForOrder', () => {
     );
   });
 
-  it('requires photos for walk-in weight-based orders regardless of piece count', () => {
-    // 5. WALK-IN + 50 pieces + weight-based => true
+  it('enforces canonical photo threshold for weight-based orders: <= 50 required, > 50 optional', () => {
+    // Exactly 50 garments in weight-based order: photos required for all 50
     assert.strictEqual(
       isPhotoRequiredForOrder({ isWalkIn: true, totalPieces: 50, isWeightBased: true }),
       true,
     );
-    // 6. WALK-IN + 100 pieces + weight-based => true
+    // 1 garment in weight-based order: photos required
+    assert.strictEqual(
+      isPhotoRequiredForOrder({ isWalkIn: true, totalPieces: 1, isWeightBased: true }),
+      true,
+    );
+    // 10 garments in weight-based order: photos required
+    assert.strictEqual(
+      isPhotoRequiredForOrder({ isWalkIn: true, totalPieces: 10, isWeightBased: true }),
+      true,
+    );
+    // 51 garments in weight-based order: photos optional (> 50)
+    assert.strictEqual(
+      isPhotoRequiredForOrder({ isWalkIn: true, totalPieces: 51, isWeightBased: true }),
+      false,
+    );
+    // 100 garments in weight-based order: photos optional (> 50)
     assert.strictEqual(
       isPhotoRequiredForOrder({ isWalkIn: true, totalPieces: 100, isWeightBased: true }),
-      true,
+      false,
     );
   });
 

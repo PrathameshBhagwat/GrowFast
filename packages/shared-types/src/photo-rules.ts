@@ -24,12 +24,15 @@
 export interface PhotoRequirementContext {
   isWalkIn: boolean;
   totalPieces: number;
-  isWeightBased: boolean;
+  isWeightBased?: boolean;
 }
 
 export function isPhotoRequiredForOrder(ctx: PhotoRequirementContext): boolean {
   if (!ctx.isWalkIn) {
     return false;
   }
-  return ctx.isWeightBased || ctx.totalPieces <= 50;
+  // Canonical photo requirement:
+  // <= 50 pieces/garments: photos required for every individual garment
+  // > 50 pieces/garments: photos optional (bulk order)
+  return ctx.totalPieces <= 50;
 }

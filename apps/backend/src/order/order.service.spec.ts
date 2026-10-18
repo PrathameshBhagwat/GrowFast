@@ -66,6 +66,11 @@ const mockPrismaService: any = {
     updateMany: jest.fn(),
     create: jest.fn(),
   },
+  orderPhoto: {
+    count: jest.fn().mockResolvedValue(1),
+    create: jest.fn(),
+    findMany: jest.fn().mockResolvedValue([]),
+  },
   notification: {
     findFirst: jest.fn().mockResolvedValue(null),
   },
@@ -77,10 +82,6 @@ const mockPrismaService: any = {
   payment: {
     update: jest.fn(),
     delete: jest.fn(),
-  },
-  orderPhoto: {
-    create: jest.fn(),
-    findMany: jest.fn(),
   },
 };
 
@@ -3381,6 +3382,7 @@ describe('OrderService', () => {
                 id: `pg-${itemId}-${pg.unitNumber}`,
                 orderItemId: itemId,
                 unitNumber: pg.unitNumber,
+                tagId: pg.tagId,
                 isReady: pg.isReady || false,
                 isCancelled: false,
                 isDelivered: false,
@@ -3726,8 +3728,8 @@ describe('OrderService', () => {
       );
     });
 
-    // 9. Weight-based order with 50+ pieces, no photos => rejected.
-    it('Scenario 9: Weight-based order with 50+ pieces, no photos => rejected', async () => {
+    // 9. Weight-based order with 50+ pieces (e.g. 55 pieces) => photos optional, order creation succeeds with 55 permanent tags.
+    it('Scenario 9: Weight-based order with 50+ pieces, no photos => succeeds with permanent tags for all pieces', async () => {
       setupMocks({ isWeightService: true });
       const dto: any = {
         customerId,
@@ -3742,13 +3744,14 @@ describe('OrderService', () => {
           },
         ],
       };
-      await expect(service.createOrder(dto, employeeId, storeId)).rejects.toThrow(
-        BadRequestException,
-      );
+      const result = await service.createOrder(dto, employeeId, storeId);
+      expect(result).toBeDefined();
+      expect(result.items[0].physicalGarments).toHaveLength(55);
+      expect(result.items[0].physicalGarments[0].tagId).toBeDefined();
     });
 
-    // 10. Weight-based order with required photo => succeeds without physical garments.
-    it('Scenario 10: Weight-based order with required photo => succeeds without physical garments', async () => {
+    // 10. Weight-based order with 1 garment => creates 1 physical garment with 1 permanent tag.
+    it('Scenario 10: Weight-based order with required photo => creates 1 physical garment with 1 permanent tag', async () => {
       setupMocks({ isWeightGarment: true, price: 80 });
       const dto: any = {
         customerId,
@@ -3768,7 +3771,8 @@ describe('OrderService', () => {
       expect(result.items[0].weight).toBe(5.5);
       expect(result.items[0].unitPrice).toBe(80);
       expect(result.items[0].lineTotal).toBe(440); // 5.5 * 80
-      expect(result.items[0].physicalGarments).toHaveLength(0); // No physical garments fabricated
+      expect(result.items[0].physicalGarments).toHaveLength(1);
+      expect(result.items[0].physicalGarments[0].tagId).toMatch(/^GF-/);
     });
 
     it('Scenario 10b: Rejects weight-based order with less than 2.00 kg, 0 kg, negative weight, or missing weight', async () => {
@@ -4251,10 +4255,10 @@ describe('OrderService', () => {
       expect(result.items[0].lineTotal).toBe(200);
       expect(result.items[0].physicalGarments).toHaveLength(2);
 
-      // Weight item: 5.5 * 80 = 440, 0 physical garments
+      // Weight item: 5.5 * 80 = 440, 1 physical garment with permanent tag
       expect(result.items[1].weight).toBe(5.5);
       expect(result.items[1].lineTotal).toBe(440);
-      expect(result.items[1].physicalGarments).toHaveLength(0);
+      expect(result.items[1].physicalGarments).toHaveLength(1);
 
       // Total before tax/discount = 640
       expect(result.subtotal).toBe(640);
@@ -4582,9 +4586,10 @@ describe('OrderService', () => {
       expect(createCall.data.subtotal).toBe(120);
       expect(createCall.data.totalAmount).toBe(141.6);
 
-      // Does not create fake individual physical garments for weight based entry
+      // Creates individual physical garments with permanent tags for each piece
       const createdItem = createCall.data.items.create[0];
-      expect(createdItem.physicalGarments).toBeUndefined();
+      expect(createdItem.physicalGarments.create).toHaveLength(3);
+      expect(createdItem.physicalGarments.create[0].tagId).toMatch(/^GF-/);
       expect(createdItem.quantity).toBe(3);
       expect(createdItem.unitPrice).toBe(40);
       expect(createdItem.lineTotal).toBe(120);
