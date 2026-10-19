@@ -1733,9 +1733,9 @@ export function OrderWizardPage() {
                         <span>⚡</span> Tomorrow
                       </div>
                       <div className="text-[10px] opacity-90 font-mono font-medium">
-                        {storeConfig?.expressSurchargePercent != null
+                        {storeConfig?.expressSurchargePercent != null && subtotal > 0
                           ? `+₹${(((subtotal * storeConfig.expressSurchargePercent) / 100) * 1.5).toFixed(0)}`
-                          : '1.5×'}
+                          : '1.5× base'}
                       </div>
                     </button>
 
@@ -1764,9 +1764,9 @@ export function OrderWizardPage() {
                         <span>⚡</span> Same Day
                       </div>
                       <div className="text-[10px] opacity-90 font-mono font-medium">
-                        {storeConfig?.expressSurchargePercent != null
+                        {storeConfig?.expressSurchargePercent != null && subtotal > 0
                           ? `+₹${(((subtotal * storeConfig.expressSurchargePercent) / 100) * 2.0).toFixed(0)}`
-                          : '2.0×'}
+                          : '2.0× base'}
                       </div>
                     </button>
                   </div>

@@ -22,7 +22,6 @@ export interface OrderTagsSectionProps {
   onViewPhotos: (photos: OrderPhotoDTO[], index: number, label: string) => void;
   className?: string;
   design?: TagDesignConfig;
-  onOpenDesigner?: () => void;
 }
 
 interface GarmentTagEntry {
@@ -45,7 +44,6 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
   onViewPhotos,
   className = '',
   design,
-  onOpenDesigner,
 }) => {
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -212,44 +210,28 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
           </p>
         </div>
 
-        {/* ─── Batch Actions Toolbar ─────────────────────────────────── */}
+        {/* ─── Batch Actions Toolbar (Tag Designer is exclusive to Owner Settings) ─ */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Always accessible Calibration / Test Tag button */}
+          {/* Calibration / Test Tag button */}
           <Button
             id="calibrate-tag-btn"
             variant="ghost"
             size="sm"
             onClick={handleOpenCalibration}
             style={{ minHeight: '44px' }}
-            className="text-xs font-semibold px-2.5 min-h-[44px] flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-850"
+            className="text-xs font-semibold px-3 min-h-[44px] flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-850 cursor-pointer"
             icon={<Compass size={15} />}
             title="Test 40×40 mm printer calibration"
           >
             Test Tag
           </Button>
 
-          {/* Optional Tag Designer navigation button (Admin/Owner) */}
-          {onOpenDesigner && (
-            <Button
-              id="open-tag-designer-btn"
-              variant="ghost"
-              size="sm"
-              onClick={onOpenDesigner}
-              style={{ minHeight: '44px' }}
-              className="text-xs font-semibold px-2.5 min-h-[44px] flex items-center gap-1.5 text-purple-700 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-200 border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40"
-              icon={<Palette size={15} />}
-              title="Customize 40×40 mm tag layout (Admin)"
-            >
-              Tag Designer
-            </Button>
-          )}
-
           {tagEntries.length > 0 && activeEntries.length > 0 && (
             <button
               type="button"
               id="select-all-tags-btn"
               onClick={handleSelectAllToggle}
-              className="text-xs font-semibold text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 px-2.5 py-2 rounded-md border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] transition-colors cursor-pointer"
+              className="text-xs font-semibold text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] transition-colors cursor-pointer"
             >
               {allActiveSelected ? (
                 <>
@@ -316,7 +298,7 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
       {tagEntries.length > 0 && (
         <div
           id="tag-grid"
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
         >
           {tagEntries.map((entry) => {
             const isSelected = selectedTagIds.has(entry.garmentId);
@@ -326,24 +308,24 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                 key={entry.garmentId}
                 id={`tag-card-${entry.garmentId}`}
                 data-testid={`tag-card-${entry.unitNumber}`}
-                className={`relative flex flex-col justify-between p-3 rounded-lg border transition-all ${
+                className={`relative flex flex-col justify-between p-3.5 rounded-xl border transition-all ${
                   entry.isCancelled
                     ? 'bg-gray-50/70 border-gray-200 border-dashed dark:bg-slate-900/40 dark:border-slate-800 opacity-75'
                     : isSelected
                       ? 'bg-blue-50/60 border-blue-400 dark:bg-blue-950/40 dark:border-blue-600 shadow-sm ring-1 ring-blue-400'
-                      : 'bg-white border-gray-200 dark:bg-slate-850 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700 shadow-sm'
+                      : 'bg-white border-gray-200 dark:bg-slate-850 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700 shadow-xs'
                 }`}
               >
-                {/* ─── Card Header: Checkbox & Piece Position ───────── */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
+                {/* ─── Top: Checkbox, Piece Info & Status ───────── */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <button
                       type="button"
                       id={`select-tag-checkbox-${entry.garmentId}`}
                       aria-label={`Select tag for Piece ${entry.unitNumber}/${entry.totalPieces}`}
                       disabled={entry.isCancelled}
                       onClick={() => handleToggleSelect(entry.garmentId)}
-                      className={`p-1 rounded min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                      className={`p-1.5 rounded-md min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
                         entry.isCancelled
                           ? 'opacity-40 cursor-not-allowed'
                           : 'hover:bg-gray-100 dark:hover:bg-slate-800'
@@ -356,18 +338,18 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                       )}
                     </button>
 
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-slate-100 block">
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-gray-900 dark:text-slate-100 block truncate">
                         Piece {entry.unitNumber}/{entry.totalPieces}
                       </span>
-                      <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                      <span className="text-[11px] text-gray-600 dark:text-slate-400 block break-words line-clamp-2 leading-tight">
                         {entry.garmentName}
                       </span>
                     </div>
                   </div>
 
                   {/* Status Badges */}
-                  <div>
+                  <div className="shrink-0">
                     {entry.isCancelled ? (
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-200 dark:border-red-800">
                         CANCELLED
@@ -388,9 +370,9 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                   </div>
                 </div>
 
-                {/* ─── Tag Identity Badge ────────────────────────────── */}
-                <div className="bg-gray-50 dark:bg-slate-900 p-2 rounded border border-gray-100 dark:border-slate-800 my-1 space-y-1">
-                  <div className="flex items-center justify-between">
+                {/* ─── Middle: Tag Identity Box ────────────────────────────── */}
+                <div className="bg-gray-50 dark:bg-slate-900/80 p-2.5 rounded-lg border border-gray-100 dark:border-slate-800 my-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
                     <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500">
                       Order / Piece
                     </span>
@@ -401,17 +383,21 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                       #{order.orderNumber} ({entry.unitNumber}/{entry.totalPieces})
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-gray-400 dark:text-slate-500">
-                    <span className="uppercase font-semibold">Internal Tag</span>
-                    <span id={`tag-id-display-${entry.garmentId}`} className="font-mono">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400">
+                    <span className="uppercase font-semibold text-[10px] text-gray-400 dark:text-slate-500">
+                      Internal Tag ID
+                    </span>
+                    <span
+                      id={`tag-id-display-${entry.garmentId}`}
+                      className="font-mono text-xs font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-slate-700 select-all"
+                    >
                       {entry.tagId}
                     </span>
                   </div>
                 </div>
 
-                {/* ─── Footer: Photos & Quick Print Actions ──────────── */}
-                <div className="flex items-center justify-between gap-1 mt-2 pt-2 border-t border-gray-100 dark:border-slate-800">
-                  {/* Photo Viewer seam */}
+                {/* ─── Footer: Photos Row (>=44px touch target) ──────── */}
+                <div className="flex items-center justify-between py-1 border-t border-gray-100 dark:border-slate-800">
                   {entry.photos.length > 0 ? (
                     <button
                       type="button"
@@ -423,43 +409,51 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                           `${entry.garmentName} (Piece ${entry.unitNumber}/${entry.totalPieces} • Tag ${entry.tagId})`,
                         )
                       }
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 min-h-[44px] px-1 cursor-pointer"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5 min-h-[44px] px-1 cursor-pointer font-medium"
                       title="View garment photos"
                     >
                       <Camera size={14} />
                       <span>{entry.photos.length} photos</span>
                     </button>
                   ) : (
-                    <span className="text-[11px] text-gray-400 dark:text-slate-500">No photos</span>
+                    <span className="text-[11px] text-gray-400 dark:text-slate-500 flex items-center gap-1.5 min-h-[44px] px-1">
+                      <Camera size={14} className="opacity-40" />
+                      <span>No photos</span>
+                    </span>
                   )}
+                </div>
 
-                  {/* Actions: Preview & Print */}
-                  <div className="flex items-center gap-1">
-                    <Button
-                      id={`preview-tag-btn-${entry.garmentId}`}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handlePreviewSingle(entry)}
-                      style={{ minHeight: '44px' }}
-                      className="text-xs min-h-[44px] px-2"
-                      title="Preview 40×40 mm tag"
-                      icon={<Eye size={14} />}
-                    >
-                      Preview
-                    </Button>
-                    <Button
-                      id={`print-tag-btn-${entry.garmentId}`}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePrintSingle(entry)}
-                      style={{ minHeight: '44px' }}
-                      className="text-xs min-h-[44px] px-2 font-semibold"
-                      title="Print tag"
-                      icon={<Printer size={14} />}
-                    >
-                      Print
-                    </Button>
-                  </div>
+                {/* ─── Actions Row: Preview & Print side-by-side (50% each) ─ */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
+                  <Button
+                    id={`preview-tag-btn-${entry.garmentId}`}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handlePreviewSingle(entry)}
+                    style={{ minHeight: '44px' }}
+                    className="w-full text-xs min-h-[44px] flex items-center justify-center gap-1.5 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
+                    title="Preview 40×40 mm tag"
+                    icon={<Eye size={14} />}
+                  >
+                    Preview
+                  </Button>
+                  <Button
+                    id={`print-tag-btn-${entry.garmentId}`}
+                    variant="outline"
+                    size="sm"
+                    disabled={entry.isCancelled}
+                    onClick={() => handlePrintSingle(entry)}
+                    style={{ minHeight: '44px' }}
+                    className={`w-full text-xs min-h-[44px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+                      entry.isCancelled
+                        ? 'opacity-40 cursor-not-allowed'
+                        : 'text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+                    }`}
+                    title={entry.isCancelled ? 'Cancelled garment cannot be printed' : 'Print tag'}
+                    icon={<Printer size={14} />}
+                  >
+                    Print
+                  </Button>
                 </div>
               </div>
             );

@@ -1188,9 +1188,6 @@ export function OrderDetailPage() {
             garmentLabel: label,
           })
         }
-        onOpenDesigner={
-          employee?.role === Role.OWNER ? () => navigate('/admin/tag-designer') : undefined
-        }
       />
 
       <Card>
