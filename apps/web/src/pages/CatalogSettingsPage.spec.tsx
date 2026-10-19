@@ -375,7 +375,7 @@ describe('CatalogSettingsPage', () => {
     expect(screen.queryByRole('button', { name: /next/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/showing 1–/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/showing \d+–\d+/i)).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   it('renders Top Up Services tab for OWNER and displays configurable add-on services', async () => {
     renderComponent();

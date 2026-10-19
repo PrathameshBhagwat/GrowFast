@@ -4871,7 +4871,7 @@ describe('OrderService', () => {
       // Taxable = ₹280, GST (18%) = ₹50.40, Total = ₹330.40
       const dto = setupOrderMock(ExpressDeliveryOption.SAME_DAY);
 
-      const created = await service.createOrder(dto, 'emp-1', 'store-1');
+      await service.createOrder(dto, 'emp-1', 'store-1');
 
       expect(mockPrismaService.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -4912,11 +4912,10 @@ describe('OrderService', () => {
       );
     });
 
-    it('Regular express delivery does not receive multiplier (base charge × 1.0)', async () => {
+    it('Regular delivery produces 0 express charge and is marked standard', async () => {
       // 2 shirts at ₹100 = ₹200 subtotal
-      // Base express = 20% of ₹200 = ₹40
-      // Regular express = ₹40 × 1.0 = ₹40
-      // Taxable = ₹240, GST (18%) = ₹43.20, Total = ₹283.20
+      // Regular delivery = No express charge (₹0)
+      // Taxable = ₹200, GST (18%) = ₹36.00, Total = ₹236.00
       const dto = setupOrderMock(ExpressDeliveryOption.REGULAR);
 
       await service.createOrder(dto, 'emp-1', 'store-1');
@@ -4924,15 +4923,41 @@ describe('OrderService', () => {
       expect(mockPrismaService.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            isExpress: true,
+            isExpress: false,
             expressDeliveryOption: ExpressDeliveryOption.REGULAR,
             subtotal: 200,
-            expressSurcharge: 40,
-            taxAmount: 43.2,
-            totalAmount: 283.2,
+            expressSurcharge: 0,
+            taxAmount: 36,
+            totalAmount: 236,
           }),
         }),
       );
+    });
+
+    it('rejects same-day express delivery when order date is Thursday (store weekly off)', async () => {
+      const dto = setupOrderMock(ExpressDeliveryOption.SAME_DAY);
+      // Mock Date to Thursday, Oct 22, 2026
+      const thursday = new Date('2026-10-22T10:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(thursday);
+
+      await expect(service.createOrder(dto, 'emp-1', 'store-1')).rejects.toThrow(
+        /Same-day express delivery is not available on Thursdays/i,
+      );
+
+      jest.useRealTimers();
+    });
+
+    it('rejects tomorrow evening express delivery when order date is Wednesday (store weekly off on Thursday)', async () => {
+      const dto = setupOrderMock(ExpressDeliveryOption.NEXT_DAY_EVENING);
+      // Mock Date to Wednesday, Oct 21, 2026
+      const wednesday = new Date('2026-10-21T10:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(wednesday);
+
+      await expect(service.createOrder(dto, 'emp-1', 'store-1')).rejects.toThrow(
+        /Tomorrow \/ next-day evening express delivery is not available on Wednesdays/i,
+      );
+
+      jest.useRealTimers();
     });
 
     it('Order item editing does not compound or multiply an already-multiplied charge', async () => {

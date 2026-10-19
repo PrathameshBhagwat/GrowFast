@@ -12,6 +12,8 @@ import {
   formatCatalogServiceName,
   isItemCompatibleWithWorkflow,
   OrderEntryMode,
+  ExpressDeliveryOption,
+  getDayOfWeekInTimezone,
 } from '@growfast/shared-types';
 import type { OrderWorkflowType } from '@growfast/shared-types';
 import { CustomerSelector } from '../components/CustomerSelector';
@@ -109,7 +111,15 @@ export function OrderWizardPage() {
   const [garments, setGarments] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
-  const [isExpress, setIsExpress] = useState(false);
+  const [deliverySpeed, setDeliverySpeed] = useState<ExpressDeliveryOption>(
+    ExpressDeliveryOption.REGULAR,
+  );
+  const isExpress = deliverySpeed !== ExpressDeliveryOption.REGULAR;
+  const currentDayOfWeek = useMemo(() => {
+    return getDayOfWeekInTimezone(new Date(), 'Asia/Kolkata');
+  }, []);
+  const isThursdayOff = currentDayOfWeek === 4;
+  const isWednesdayOff = currentDayOfWeek === 3;
   const [storeConfig, setStoreConfig] = useState<any>(null);
   const [generalNote, setGeneralNote] = useState('');
   const [isNoteOpen, setIsNoteOpen] = useState(false);
@@ -531,8 +541,9 @@ export function OrderWizardPage() {
     return calculateOrderTotals(pricingInputs, {
       isExpress,
       expressSurchargePercent: storeConfig?.expressSurchargePercent,
+      expressDeliveryOption: deliverySpeed,
     });
-  }, [pricingInputs, isExpress, storeConfig]);
+  }, [pricingInputs, isExpress, storeConfig, deliverySpeed]);
 
   const subtotal = pricingTotals.subtotal;
   const discount = pricingTotals.discountAmount;
@@ -737,6 +748,7 @@ export function OrderWizardPage() {
       const payload = {
         customerId: selectedCustomerId,
         isExpress,
+        expressDeliveryOption: deliverySpeed,
         pickupType: 'STORE_PICKUP',
         workflow: activeWorkflow,
         entryMode: activeEntryMode,
@@ -1669,25 +1681,113 @@ export function OrderWizardPage() {
                   </span>
                 </div>
 
-                {/* Express Delivery Checkbox (if configured) */}
-                {storeConfig?.expressSurchargePercent != null && (
-                  <div className="pt-0.5 pb-0.5">
-                    <label className="flex items-center justify-between cursor-pointer p-1.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/50 hover:bg-amber-50 dark:hover:bg-amber-950/60 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={isExpress}
-                          onChange={(e) => setIsExpress(e.target.checked)}
-                          className="w-3.5 h-3.5 rounded border-amber-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        />
-                        <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                          ⚡ Express Delivery
-                        </span>
+                {/* Delivery Speed Selection */}
+                <div className="pt-1 pb-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Delivery Speed
+                    </span>
+                    {storeConfig?.expressSurchargePercent == null && (
+                      <span className="text-[10px] text-slate-400">Standard only</span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                    {/* Regular */}
+                    <button
+                      type="button"
+                      id="speed-regular-btn"
+                      onClick={() => setDeliverySpeed(ExpressDeliveryOption.REGULAR)}
+                      className={`py-1.5 px-2 rounded-md text-center transition-all text-xs font-medium cursor-pointer ${
+                        deliverySpeed === ExpressDeliveryOption.REGULAR
+                          ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm font-semibold'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="leading-tight">Regular</div>
+                      <div className="text-[10px] opacity-75 font-normal">Standard</div>
+                    </button>
+
+                    {/* Tomorrow Evening (1.5x) */}
+                    <button
+                      type="button"
+                      id="speed-tomorrow-btn"
+                      disabled={storeConfig?.expressSurchargePercent == null || isWednesdayOff}
+                      onClick={() => setDeliverySpeed(ExpressDeliveryOption.NEXT_DAY_EVENING)}
+                      title={
+                        storeConfig?.expressSurchargePercent == null
+                          ? 'Express not configured for this store'
+                          : isWednesdayOff
+                            ? 'Tomorrow is Thursday (store weekly off)'
+                            : 'Tomorrow / Next-Day Evening Delivery (+1.5× base express)'
+                      }
+                      className={`py-1.5 px-2 rounded-md text-center transition-all text-xs font-medium cursor-pointer ${
+                        storeConfig?.expressSurchargePercent == null || isWednesdayOff
+                          ? 'opacity-40 cursor-not-allowed text-slate-400'
+                          : deliverySpeed === ExpressDeliveryOption.NEXT_DAY_EVENING
+                            ? 'bg-amber-500 text-white shadow-sm font-semibold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-400'
+                      }`}
+                    >
+                      <div className="leading-tight flex items-center justify-center gap-0.5">
+                        <span>⚡</span> Tomorrow
                       </div>
-                      <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 font-mono pr-1">
-                        +{storeConfig.expressSurchargePercent}%
+                      <div className="text-[10px] opacity-90 font-mono font-medium">
+                        {storeConfig?.expressSurchargePercent != null
+                          ? `+₹${(((subtotal * storeConfig.expressSurchargePercent) / 100) * 1.5).toFixed(0)}`
+                          : '1.5×'}
+                      </div>
+                    </button>
+
+                    {/* Same Day (2.0x) */}
+                    <button
+                      type="button"
+                      id="speed-same-day-btn"
+                      disabled={storeConfig?.expressSurchargePercent == null || isThursdayOff}
+                      onClick={() => setDeliverySpeed(ExpressDeliveryOption.SAME_DAY)}
+                      title={
+                        storeConfig?.expressSurchargePercent == null
+                          ? 'Express not configured for this store'
+                          : isThursdayOff
+                            ? 'Today is Thursday (store weekly off)'
+                            : 'Same-Day Express Delivery (+2.0× base express)'
+                      }
+                      className={`py-1.5 px-2 rounded-md text-center transition-all text-xs font-medium cursor-pointer ${
+                        storeConfig?.expressSurchargePercent == null || isThursdayOff
+                          ? 'opacity-40 cursor-not-allowed text-slate-400'
+                          : deliverySpeed === ExpressDeliveryOption.SAME_DAY
+                            ? 'bg-amber-500 text-white shadow-sm font-semibold'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-amber-700 dark:hover:text-amber-400'
+                      }`}
+                    >
+                      <div className="leading-tight flex items-center justify-center gap-0.5">
+                        <span>⚡</span> Same Day
+                      </div>
+                      <div className="text-[10px] opacity-90 font-mono font-medium">
+                        {storeConfig?.expressSurchargePercent != null
+                          ? `+₹${(((subtotal * storeConfig.expressSurchargePercent) / 100) * 2.0).toFixed(0)}`
+                          : '2.0×'}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Express Surcharge breakdown line if express is active */}
+                {expressSurcharge > 0 && (
+                  <div className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-400 font-medium">
+                    <span className="flex items-center gap-1">
+                      <span>⚡ Express Fee</span>
+                      <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80">
+                        (
+                        {deliverySpeed === ExpressDeliveryOption.SAME_DAY
+                          ? 'Same-day 2×'
+                          : 'Tomorrow 1.5×'}
+                        )
                       </span>
-                    </label>
+                    </span>
+                    <span className="font-mono font-semibold pr-1">
+                      + ₹{expressSurcharge.toFixed(2)}
+                    </span>
                   </div>
                 )}
               </div>

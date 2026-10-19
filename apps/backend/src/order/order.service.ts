@@ -35,6 +35,7 @@ import {
   isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
   adjustDueDateForThursday,
+  getDayOfWeekInTimezone,
   ExpressDeliveryOption,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
@@ -78,17 +79,38 @@ export class OrderService {
         throw new NotFoundException(`Customer with ID "${dto.customerId}" not found`);
       }
 
+      const orderDate = new Date();
+
       // 1.5 Fetch Store config
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store) {
         throw new NotFoundException(`Store with ID "${storeId}" not found`);
       }
       const isExpress =
-        dto.isExpress ||
         dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY ||
-        dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING;
-      if (isExpress && store.expressSurchargePercent == null) {
-        throw new BadRequestException(`Express service is not configured for this store`);
+        dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING ||
+        (Boolean(dto.isExpress) && dto.expressDeliveryOption !== ExpressDeliveryOption.REGULAR);
+
+      if (isExpress) {
+        if (store.expressSurchargePercent == null) {
+          throw new BadRequestException(`Express service is not configured for this store`);
+        }
+
+        // Validate schedule compatibility with store operations (Thursday weekly off)
+        const orderDay = getDayOfWeekInTimezone(orderDate, 'Asia/Kolkata');
+        if (dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY && orderDay === 4) {
+          throw new BadRequestException(
+            'Same-day express delivery is not available on Thursdays because Thursdays are store weekly off',
+          );
+        }
+        if (
+          dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING &&
+          orderDay === 3
+        ) {
+          throw new BadRequestException(
+            'Tomorrow / next-day evening express delivery is not available on Wednesdays because Thursdays are store weekly off',
+          );
+        }
       }
 
       // 2. Fetch all garments and services to validate them and get properties
@@ -309,7 +331,6 @@ export class OrderService {
       });
 
       // 4. Due date placeholder (Deferred to B6)
-      const orderDate = new Date();
 
       // 5. Generate Order Number (Sequential short business ID)
       let orderNumber: string;
@@ -363,8 +384,8 @@ export class OrderService {
           effectiveDueDate: systemDueDate,
           isExpress,
           expressDeliveryOption: isExpress
-            ? dto.expressDeliveryOption || ExpressDeliveryOption.REGULAR
-            : null,
+            ? dto.expressDeliveryOption || ExpressDeliveryOption.NEXT_DAY_EVENING
+            : ExpressDeliveryOption.REGULAR,
           serviceSummary,
           status: orderStatus,
           subtotal: totals.subtotal,

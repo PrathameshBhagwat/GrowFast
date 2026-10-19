@@ -140,7 +140,13 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
           {order.isExpress && (
             <div className="flex justify-between text-red-600 font-bold">
               <span>Priority:</span>
-              <span>EXPRESS</span>
+              <span>
+                {order.expressDeliveryOption === 'SAME_DAY'
+                  ? 'SAME-DAY EXPRESS (2×)'
+                  : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
+                    ? 'NEXT-DAY EXPRESS (1.5×)'
+                    : 'EXPRESS'}
+              </span>
             </div>
           )}
         </div>
@@ -209,7 +215,14 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
             </span>
           </div>
           <div className="flex justify-between text-gray-700">
-            <span>Express</span>
+            <span>
+              Express{' '}
+              {order.expressDeliveryOption === 'SAME_DAY'
+                ? '(2×)'
+                : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
+                  ? '(1.5×)'
+                  : ''}
+            </span>
             <span>
               {(order.expressSurcharge ?? 0) > 0
                 ? `+${formatCurrency(order.expressSurcharge)}`
@@ -374,7 +387,13 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
             {order.isExpress && (
               <div className="flex justify-between gap-2 text-red-600 font-bold">
                 <span>Priority:</span>
-                <span>EXPRESS DELIVERY</span>
+                <span>
+                  {order.expressDeliveryOption === 'SAME_DAY'
+                    ? 'SAME-DAY EXPRESS (2×)'
+                    : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
+                      ? 'NEXT-DAY EXPRESS (1.5×)'
+                      : 'EXPRESS DELIVERY'}
+                </span>
               </div>
             )}
           </div>
@@ -501,7 +520,14 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
 
           {(order.expressSurcharge ?? 0) > 0 && (
             <div className="flex justify-between text-orange-700 font-medium">
-              <span>Express Surcharge</span>
+              <span>
+                Express Surcharge{' '}
+                {order.expressDeliveryOption === 'SAME_DAY'
+                  ? '(Same-Day 2×)'
+                  : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
+                    ? '(Tomorrow 1.5×)'
+                    : ''}
+              </span>
               <span className="font-mono">+{formatCurrency(order.expressSurcharge)}</span>
             </div>
           )}
