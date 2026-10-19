@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, Optional, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import {
@@ -7,9 +7,14 @@ import {
   NotificationStatus,
   type NotificationDTO,
 } from '@growfast/shared-types';
-import { NotificationProvider, LogNotificationProvider } from './notification.provider';
+import {
+  NotificationProvider,
+  LogNotificationProvider,
+  NotificationDocument,
+} from './notification.provider';
 import { WhatsAppNotificationProvider } from './whatsapp-notification.provider';
 import { BaileysWhatsAppProvider } from './baileys-whatsapp.provider';
+import { BillPdfService } from './bill-pdf.service';
 
 /**
  * Notification Service — C8 Foundation
@@ -32,7 +37,13 @@ export class NotificationService {
   private readonly logProvider: NotificationProvider;
   private readonly whatsappProvider: NotificationProvider;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private billPdfService?: BillPdfService,
+  ) {
+    if (!this.billPdfService) {
+      this.billPdfService = new BillPdfService(this.prisma);
+    }
     this.logProvider = new LogNotificationProvider();
 
     const providerType = process.env.WHATSAPP_PROVIDER || 'log';
@@ -99,7 +110,22 @@ export class NotificationService {
         },
       });
 
-      // 3. Return the created state (background worker will handle dispatch)
+      // 3. Asynchronously trigger dispatch without blocking the caller
+      if (typeof setImmediate !== 'undefined') {
+        setImmediate(() => {
+          this.processNotification(notification.id).catch((err) => {
+            this.logger.error(`Async dispatch error for ${notification.id}: ${err.message}`);
+          });
+        });
+      } else {
+        Promise.resolve().then(() => {
+          this.processNotification(notification.id).catch((err) => {
+            this.logger.error(`Async dispatch error for ${notification.id}: ${err.message}`);
+          });
+        });
+      }
+
+      // Return the created state
       return this.toDTO(notification);
     } catch (err: any) {
       // CRITICAL: Never throw from this method — calling transactions must not break
@@ -109,7 +135,7 @@ export class NotificationService {
   }
 
   /**
-   * Process a single notification (called by the background worker).
+   * Process a single notification (called by the background worker or immediate dispatch).
    */
   async processNotification(notificationId: string): Promise<boolean> {
     const notification = await this.prisma.notification.findUnique({
@@ -118,11 +144,84 @@ export class NotificationService {
 
     if (!notification) return false;
 
+    // Idempotency: If already successfully sent, do not duplicate
+    if (notification.status === 'SENT') {
+      return true;
+    }
+
     try {
-      const store = await this.prisma.store.findUnique({
-        where: { id: notification.storeId },
-        select: { name: true },
-      });
+      const store = this.prisma.store
+        ? await this.prisma.store.findUnique({
+            where: { id: notification.storeId },
+            select: { name: true, address: true, phone: true },
+          })
+        : null;
+
+      let payload = (notification.payload as Record<string, unknown>) || {};
+
+      // Enrich payload from Order record when orderId is present
+      if (notification.orderId) {
+        try {
+          const order = await this.prisma.order.findUnique({
+            where: { id: notification.orderId },
+            include: { customer: true, items: true },
+          });
+          if (order) {
+            const totalPieces = (order.items || []).reduce(
+              (sum: number, it: any) => sum + (it.quantity || 1),
+              0,
+            );
+            const totalWeight = (order.items || []).reduce(
+              (sum: number, it: any) => sum + (it.weight ? Number(it.weight) : 0),
+              0,
+            );
+            payload = {
+              orderNumber: order.orderNumber,
+              customerName: order.customer?.name || 'Customer',
+              orderDate: order.orderDate,
+              deliveryDate: order.effectiveDueDate || order.systemDueDate,
+              orderTotal: order.totalAmount,
+              quantity: totalPieces,
+              weight: totalWeight,
+              amountPaid: order.amountPaid,
+              balanceDue: order.amountDue,
+              paymentStatus: order.paymentStatus,
+              ...payload,
+            };
+          }
+        } catch {
+          // Non-fatal, keep existing payload
+        }
+      }
+
+      let document: NotificationDocument | undefined;
+
+      // Event 1: If ORDER_CREATED, generate or retrieve the Bill PDF
+      if (
+        notification.eventType === NotificationEventType.ORDER_CREATED &&
+        notification.orderId &&
+        this.billPdfService
+      ) {
+        try {
+          const pdfBuffer = await this.billPdfService.generateBillPdf(
+            notification.orderId,
+            notification.storeId,
+          );
+          if (pdfBuffer && pdfBuffer.length > 0) {
+            const orderNumber = (payload.orderNumber as string) || notification.orderId;
+            document = {
+              buffer: pdfBuffer,
+              fileName: `Invoice_${orderNumber}.pdf`,
+              mimetype: 'application/pdf',
+            };
+          }
+        } catch (pdfErr: any) {
+          this.logger.error(
+            `Failed to generate bill PDF for notification ${notification.id}: ${pdfErr.message}`,
+          );
+          // PDF generation failure is logged safely; notification dispatch still continues
+        }
+      }
 
       const provider = this.getProvider(notification.channel as NotificationChannel);
       const result = await provider.dispatch({
@@ -130,8 +229,9 @@ export class NotificationService {
         channel: notification.channel,
         recipient: notification.recipient,
         eventType: notification.eventType,
-        payload: (notification.payload as Record<string, unknown>) || null,
-        storeName: store?.name || 'GrowFast Laundry',
+        payload,
+        storeName: store?.name || 'GrowFast',
+        document,
       });
 
       if (result.success) {

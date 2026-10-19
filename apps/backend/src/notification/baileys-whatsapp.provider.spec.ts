@@ -1,4 +1,3 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BaileysWhatsAppProvider } from './baileys-whatsapp.provider';
 import { NotificationEventType } from '@growfast/shared-types';
 import * as baileys from '@whiskeysockets/baileys';

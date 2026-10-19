@@ -4,7 +4,6 @@ import {
   NotificationDispatchPayload,
   NotificationDispatchResult,
 } from './notification.provider';
-import { NotificationEventType } from '@growfast/shared-types';
 import { formatNotificationMessage } from './templates/notification-templates';
 
 export class WhatsAppNotificationProvider implements NotificationProvider {
@@ -69,6 +68,33 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
 
     try {
+      const filename =
+        payload.document?.fileName ||
+        `Invoice_${payload.payload?.orderNumber || 'order'}.pdf`;
+
+      let requestBody: any;
+      if (payload.document && payload.payload?.mediaUrl) {
+        requestBody = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'document',
+          document: {
+            link: payload.payload.mediaUrl,
+            caption: messageBody,
+            filename,
+          },
+        };
+      } else {
+        requestBody = {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'text',
+          text: {
+            body: messageBody,
+          },
+        };
+      }
+
       const response = await fetch(
         `https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}/messages`,
         {
@@ -77,14 +103,7 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
             Authorization: `Bearer ${this.accessToken}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'text',
-            text: {
-              body: messageBody,
-            },
-          }),
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         },
       );
