@@ -95,7 +95,9 @@ describe('Notification Templates', () => {
       );
 
       expect(msg).toContain('Hi, Your GrowFast order *#T12844* is registered.');
-      expect(msg).toContain('Payment Received: ₹200\nBalance Due: ₹300\nPayment Status: Partially Paid');
+      expect(msg).toContain(
+        'Payment Received: ₹200\nBalance Due: ₹300\nPayment Status: Partially Paid',
+      );
       expect(msg).toContain('Thank you for choosing GrowFast!');
     });
 

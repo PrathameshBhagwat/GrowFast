@@ -69,8 +69,7 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
 
     try {
       const filename =
-        payload.document?.fileName ||
-        `Invoice_${payload.payload?.orderNumber || 'order'}.pdf`;
+        payload.document?.fileName || `Invoice_${payload.payload?.orderNumber || 'order'}.pdf`;
 
       let requestBody: any;
       if (payload.document && payload.payload?.mediaUrl) {

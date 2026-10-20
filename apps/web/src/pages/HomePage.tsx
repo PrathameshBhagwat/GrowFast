@@ -614,7 +614,9 @@ export const HomePage: React.FC = () => {
                       <Users size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
                       <div>
                         <div className="font-bold text-gray-900 dark:text-slate-100">Staff</div>
-                        <div className="text-[10px] text-gray-500 dark:text-slate-400">Team roles & permissions</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">
+                          Team roles & permissions
+                        </div>
                       </div>
                     </button>
 
@@ -630,8 +632,12 @@ export const HomePage: React.FC = () => {
                     >
                       <Tag size={16} className="text-purple-600 dark:text-purple-400 shrink-0" />
                       <div>
-                        <div className="font-bold text-gray-900 dark:text-slate-100">Design Tags</div>
-                        <div className="text-[10px] text-gray-500 dark:text-slate-400">Layout, barcode & typography</div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">
+                          Design Tags
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">
+                          Layout, barcode & typography
+                        </div>
                       </div>
                     </button>
 
@@ -645,10 +651,15 @@ export const HomePage: React.FC = () => {
                       }}
                       className="w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-gray-700 dark:text-slate-200 min-h-[44px] cursor-pointer"
                     >
-                      <Shirt size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <Shirt
+                        size={16}
+                        className="text-emerald-600 dark:text-emerald-400 shrink-0"
+                      />
                       <div>
                         <div className="font-bold text-gray-900 dark:text-slate-100">Catalog</div>
-                        <div className="text-[10px] text-gray-500 dark:text-slate-400">Garment types & pricing</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">
+                          Garment types & pricing
+                        </div>
                       </div>
                     </button>
                   </div>

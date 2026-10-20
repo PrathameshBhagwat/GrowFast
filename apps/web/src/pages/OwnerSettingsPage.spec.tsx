@@ -38,7 +38,9 @@ vi.mock('./StaffManagementPage', () => ({
   StaffManagementPage: () => <div data-testid="mock-staff-mgmt">Staff Management Embedded</div>,
 }));
 vi.mock('./CatalogSettingsPage', () => ({
-  CatalogSettingsPage: () => <div data-testid="mock-catalog-settings">Catalog Settings Embedded</div>,
+  CatalogSettingsPage: () => (
+    <div data-testid="mock-catalog-settings">Catalog Settings Embedded</div>
+  ),
 }));
 
 describe('OwnerSettingsPage (Owner Settings Navigation & Role Control)', () => {

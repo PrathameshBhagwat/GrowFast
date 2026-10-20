@@ -5,11 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { TagDesignerPage } from './TagDesignerPage';
 import { TagDesignApi } from '../services/tag-design.api';
-import {
-  Role,
-  REFERENCE_TAG_DESIGN,
-  type TagDesignConfig,
-} from '@growfast/shared-types';
+import { Role, REFERENCE_TAG_DESIGN, type TagDesignConfig } from '@growfast/shared-types';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {

@@ -139,7 +139,10 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/tag-designer" element={<Navigate to="/owner/settings?tab=design-tags" replace />} />
+      <Route
+        path="/tag-designer"
+        element={<Navigate to="/owner/settings?tab=design-tags" replace />}
+      />
       {/* Catch all — redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

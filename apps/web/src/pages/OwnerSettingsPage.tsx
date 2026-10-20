@@ -6,15 +6,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { TagDesignerPage } from './TagDesignerPage';
 import { StaffManagementPage } from './StaffManagementPage';
 import { CatalogSettingsPage } from './CatalogSettingsPage';
-import {
-  Settings,
-  Users,
-  Tag,
-  Shirt,
-  ArrowLeft,
-  ShieldCheck,
-  ShieldAlert,
-} from 'lucide-react';
+import { Settings, Users, Tag, Shirt, ArrowLeft, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 export type OwnerSettingsTab = 'design-tags' | 'staff' | 'catalog';
 

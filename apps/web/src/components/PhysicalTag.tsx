@@ -113,11 +113,11 @@ export function getCssFontFamily(font?: string): string {
     case 'Agency FB':
       return "'Agency FB', Impact, sans-serif";
     case 'Arial':
-      return "Arial, Helvetica, sans-serif";
+      return 'Arial, Helvetica, sans-serif';
     case 'Roboto':
-      return "Roboto, sans-serif";
+      return 'Roboto, sans-serif';
     case 'Inter':
-      return "Inter, sans-serif";
+      return 'Inter, sans-serif';
     case 'Courier New':
       return "'Courier New', Courier, monospace";
     default:
@@ -190,7 +190,13 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
     }
 
     return formatTagDate(dateObj);
-  }, [dueDate, orderDate, activeDesign.preponeWorkshopDueDate, activeDesign.workshopPreponeDays, isWorkshop]);
+  }, [
+    dueDate,
+    orderDate,
+    activeDesign.preponeWorkshopDueDate,
+    activeDesign.workshopPreponeDays,
+    isWorkshop,
+  ]);
 
   const getBorderValue = () => {
     if (borderStyle === 'none') return 'none';

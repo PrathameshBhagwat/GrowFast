@@ -146,8 +146,7 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
           document: payload.document.buffer,
           mimetype: payload.document.mimetype || 'application/pdf',
           fileName:
-            payload.document.fileName ||
-            `Invoice_${payload.payload?.orderNumber || 'order'}.pdf`,
+            payload.document.fileName || `Invoice_${payload.payload?.orderNumber || 'order'}.pdf`,
           caption: messageBody,
         });
       } else {
