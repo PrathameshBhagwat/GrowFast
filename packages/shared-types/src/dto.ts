@@ -437,6 +437,7 @@ export interface DashboardOrderMetrics {
   cancelled: number;
   overdue: number;
   dueToday: number;
+  dueTomorrow?: number;
 }
 
 export interface DashboardFinancialMetrics {
@@ -446,6 +447,90 @@ export interface DashboardFinancialMetrics {
   paidOrders: number;
   partialOrders: number;
   pendingOrders: number;
+  // Step 1 additions:
+  bookedOrderValue?: number;
+  collections?: number;
+  refunds?: number;
+  netCollections?: number;
+  outstandingBalance?: number;
+  collectionCount?: number;
+  refundCount?: number;
+}
+
+export interface MetricComparison {
+  current: number;
+  previous: number;
+  absoluteChange: number;
+  percentageChange: number | null;
+}
+
+export interface DashboardComparisonDTO {
+  previousPeriod: DashboardPeriod;
+  bookedOrderValue: MetricComparison;
+  collections: MetricComparison;
+  netCollections: MetricComparison;
+  totalOrders: MetricComparison;
+}
+
+export interface DashboardTrendPoint {
+  date: string;
+  bookedOrderValue: number;
+  orderCount: number;
+  collections: number;
+  refunds: number;
+  netCollections: number;
+}
+
+export interface DashboardTrendsDTO {
+  interval: 'daily' | 'weekly';
+  points: DashboardTrendPoint[];
+}
+
+export interface DashboardServiceBreakdown {
+  serviceName: string;
+  serviceCategory: string;
+  itemCount: number;
+  totalAmount: number;
+}
+
+export interface DashboardCategoryBreakdown {
+  category: string;
+  itemCount: number;
+  totalAmount: number;
+}
+
+export interface DashboardActionOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  status: OrderStatus;
+  effectiveDueDate: string;
+  orderDate: string;
+  itemCount: number;
+}
+
+export interface DashboardActionQueuesDTO {
+  overdue: {
+    count: number;
+    items: DashboardActionOrder[];
+  };
+  dueToday: {
+    count: number;
+    items: DashboardActionOrder[];
+  };
+  dueTomorrow: {
+    count: number;
+    items: DashboardActionOrder[];
+  };
+  pendingPayment: {
+    count: number;
+    totalAmountDue: number;
+    items: DashboardActionOrder[];
+  };
 }
 
 export interface DashboardDeliveryMetrics {
@@ -504,6 +589,11 @@ export interface DashboardSummaryDTO {
   readyOrders: DashboardReadyOrder[];
   recentOrders: DashboardRecentOrder[];
   recentActivity: DashboardActivity[];
+  trends?: DashboardTrendsDTO;
+  comparison?: DashboardComparisonDTO;
+  serviceBreakdown?: DashboardServiceBreakdown[];
+  categoryBreakdown?: DashboardCategoryBreakdown[];
+  actionQueues?: DashboardActionQueuesDTO;
 }
 
 export interface ApiResponse<T> {

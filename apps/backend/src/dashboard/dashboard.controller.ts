@@ -27,28 +27,49 @@ export class DashboardController {
   ): Promise<DashboardSummaryDTO> {
     const storeId: string = req.user.storeId;
 
-    // Default to today if no dates provided
+    const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
     let startDate: Date;
     let endDate: Date;
 
     if (startDateStr) {
-      startDate = new Date(startDateStr);
+      if (DATE_ONLY_REGEX.test(startDateStr.trim())) {
+        startDate = new Date(`${startDateStr.trim()}T00:00:00.000+05:30`);
+      } else {
+        startDate = new Date(startDateStr);
+      }
       if (isNaN(startDate.getTime())) {
         throw new BadRequestException(`Invalid startDate: "${startDateStr}"`);
       }
     } else {
-      startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const todayStr = formatter.format(new Date());
+      startDate = new Date(`${todayStr}T00:00:00.000+05:30`);
     }
 
     if (endDateStr) {
-      endDate = new Date(endDateStr);
+      if (DATE_ONLY_REGEX.test(endDateStr.trim())) {
+        endDate = new Date(`${endDateStr.trim()}T23:59:59.999+05:30`);
+      } else {
+        endDate = new Date(endDateStr);
+      }
       if (isNaN(endDate.getTime())) {
         throw new BadRequestException(`Invalid endDate: "${endDateStr}"`);
       }
     } else {
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const todayStr = formatter.format(new Date());
+      endDate = new Date(`${todayStr}T23:59:59.999+05:30`);
     }
 
     // Reject inverted ranges
