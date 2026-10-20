@@ -139,18 +139,18 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
     const items = [{ quantity: 2, unitPrice: 100 }]; // subtotal = 200
     const expressSurchargePercent = 25; // base express = 25% of 200 = 50
 
-    it('Regular delivery does not receive either multiplier (base charge × 1.0)', () => {
+    it('Regular delivery results in 0 express charge even if isExpress flag is set', () => {
       const totals = calculateOrderTotals(items, {
         isExpress: true,
         expressSurchargePercent,
         expressDeliveryOption: 'REGULAR',
       });
-      // Base express: 50 * 1.0 = 50
+      // Regular delivery has NO express charge
       assert.strictEqual(totals.subtotal, 200);
-      assert.strictEqual(totals.expressSurcharge, 50);
-      // Taxable: 250, GST (18%): 45, Total: 295
-      assert.strictEqual(totals.taxAmount, 45);
-      assert.strictEqual(totals.totalAmount, 295);
+      assert.strictEqual(totals.expressSurcharge, 0);
+      // Taxable: 200, GST (18%): 36, Total: 236
+      assert.strictEqual(totals.taxAmount, 36);
+      assert.strictEqual(totals.totalAmount, 236);
     });
 
     it('Tomorrow/next-day evening express charge = base charge × 1.5', () => {

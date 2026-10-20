@@ -14,6 +14,7 @@ import { OrderDetailPage } from './pages/OrderDetailPage';
 import { DeliveryPage } from './pages/DeliveryPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TagDesignerPage } from './pages/TagDesignerPage';
+import { OwnerSettingsPage } from './pages/OwnerSettingsPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -115,7 +116,21 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      {/* Developer C — Admin Tag Designer (Phase T4) */}
+      {/* Owner Settings Portal (Staff, Design Tags, Catalog) */}
+      <Route
+        path="/owner/settings"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER']}>
+            <OwnerSettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/owner/design-tags"
+        element={<Navigate to="/owner/settings?tab=design-tags" replace />}
+      />
+
+      {/* Developer C — Admin Tag Designer (Phase T4 & Reference Defaults) */}
       <Route
         path="/admin/tag-designer"
         element={
@@ -124,7 +139,7 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/tag-designer" element={<Navigate to="/admin/tag-designer" replace />} />
+      <Route path="/tag-designer" element={<Navigate to="/owner/settings?tab=design-tags" replace />} />
       {/* Catch all — redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -19,6 +19,15 @@ export interface NotificationDispatchResult {
 }
 
 /**
+ * Document attachment for notifications (e.g. Bill PDF)
+ */
+export interface NotificationDocument {
+  buffer: Buffer;
+  fileName: string;
+  mimetype: string;
+}
+
+/**
  * Payload passed to a notification provider for dispatch.
  */
 export interface NotificationDispatchPayload {
@@ -28,6 +37,7 @@ export interface NotificationDispatchPayload {
   eventType: string;
   payload: Record<string, unknown> | null;
   storeName?: string;
+  document?: NotificationDocument;
 }
 
 /**
@@ -57,10 +67,16 @@ export class LogNotificationProvider implements NotificationProvider {
       payload.storeName,
     );
 
+    if (payload.document) {
+      console.log(
+        `\n[${this.name}] Attached Document: ${payload.document.fileName} (${payload.document.buffer.length} bytes, ${payload.document.mimetype})`,
+      );
+    }
+
     if (formattedMessage) {
-      console.log(`\n================= CUSTOMER SMS =================`);
+      console.log(`\n================= CUSTOMER NOTIFICATION (${payload.channel}) =================`);
       console.log(formattedMessage);
-      console.log(`================================================\n`);
+      console.log(`==============================================================================\n`);
     } else {
       console.log(
         `[${this.name}] Notification event recorded (not dispatched):`,
@@ -72,6 +88,7 @@ export class LogNotificationProvider implements NotificationProvider {
         }),
       );
     }
+
 
     return {
       success: false,

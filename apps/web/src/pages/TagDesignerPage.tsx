@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, Button, LoadingState } from '@growfast/ui';
+import { Card, Button, LoadingState, Modal } from '@growfast/ui';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { PhysicalTag, PhysicalTagData } from '../components/PhysicalTag';
 import { TagCalibrationCard } from '../components/TagCalibrationCard';
@@ -9,11 +9,16 @@ import { TagPrintLayout } from '../components/TagPrintLayout';
 import { TagDesignApi } from '../services/tag-design.api';
 import { friendlyErrorMessage } from '../services/api';
 import {
+  REFERENCE_TAG_DESIGN,
   DEFAULT_TAG_DESIGN,
+  SUPPORTED_TAG_FONTS,
+  SUPPORTED_TAG_PRINTERS,
+  SUPPORTED_TAG_DIMENSIONS,
   type TagDesignConfig,
   type TagFieldConfig,
   type TagFieldKey,
   type TagTextAlign,
+  type TagDesignAuditEntry,
 } from '@growfast/shared-types';
 import {
   ArrowLeft,
@@ -29,16 +34,20 @@ import {
   AlignRight,
   CheckCircle2,
   AlertCircle,
-  Compass,
   Sliders,
-  Type,
   Maximize2,
   Layers,
+  Download,
+  History,
+  Clock,
+  User,
+  ShieldAlert,
+  Info,
 } from 'lucide-react';
 
 const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
   {
-    label: 'Standard (Silk Saree)',
+    label: 'Standard Order (Silk Saree)',
     data: {
       orderNumber: 'ORD-001284',
       tagId: 'GF-8402A',
@@ -47,9 +56,42 @@ const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
       customerName: 'Aishwarya Gangam',
       serviceType: 'DRY_CLEAN',
       garmentName: 'Silk Saree',
-      storeName: 'A Laundry',
-      storeLocation: 'Airoli',
-      orderDate: '2026-09-02T10:00:00.000Z',
+      storeName: 'GrowFast Laundry',
+      storeLocation: 'Airoli, Navi Mumbai',
+      customerAddress: 'Flat 402, Sunshine Heights, Airoli',
+      itemTotal: '5 Pcs',
+      remarks: 'Mild stain on border',
+      colour: 'Navy Blue',
+      orderDate: '2026-10-18T10:00:00.000Z',
+      bookingDate: '2026-10-18T10:00:00.000Z',
+      dueDate: '2026-10-21T18:00:00.000Z',
+      barcodeValue: 'ORD001284-01',
+      qrCodeValue: 'GF-8402A',
+      isWorkshop: false,
+    },
+  },
+  {
+    label: 'Workshop Processing Tag (Prepone Test)',
+    data: {
+      orderNumber: 'ORD-001285',
+      tagId: 'GF-8403W',
+      unitNumber: 2,
+      totalPieces: 5,
+      customerName: 'Aishwarya Gangam',
+      serviceType: 'DRY_CLEAN',
+      garmentName: 'Heavy Designer Sherwani',
+      storeName: 'GrowFast Central Workshop',
+      storeLocation: 'Airoli Hub',
+      customerAddress: 'Flat 402, Sunshine Heights, Airoli',
+      itemTotal: '5 Pcs',
+      remarks: 'Zari embroidery inspection required',
+      colour: 'Golden Cream',
+      orderDate: '2026-10-18T10:00:00.000Z',
+      bookingDate: '2026-10-18T10:00:00.000Z',
+      dueDate: '2026-10-21T18:00:00.000Z',
+      barcodeValue: 'ORD001285-02',
+      qrCodeValue: 'GF-8403W',
+      isWorkshop: true, // Marked as workshop tag to verify prepone calculation
     },
   },
   {
@@ -64,22 +106,16 @@ const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
       garmentName: 'Embroidered Heavy Designer Sherwani with Dupatta',
       storeName: 'GrowFast Laundry Flagship Hub',
       storeLocation: 'Navi Mumbai Central Sector 19',
-      orderDate: '2026-10-08T18:30:00.000Z',
-    },
-  },
-  {
-    label: '50-Piece Batch Tail',
-    data: {
-      orderNumber: 'ORD-000050',
-      tagId: 'GF-5050Z',
-      unitNumber: 50,
-      totalPieces: 50,
-      customerName: 'John Doe',
-      serviceType: 'STEAM_PRESS',
-      garmentName: 'Denim Jeans',
-      storeName: 'A Laundry',
-      storeLocation: 'Airoli',
-      orderDate: '2026-10-08T12:00:00.000Z',
+      customerAddress: 'Villa 12, Palm Meadows Estate, Sector 19',
+      itemTotal: '50 Pcs',
+      remarks: 'Handle with delicate silicone solvent only',
+      colour: 'Royal Purple & Gold',
+      orderDate: '2026-10-18T10:00:00.000Z',
+      bookingDate: '2026-10-18T10:00:00.000Z',
+      dueDate: '2026-10-22T18:00:00.000Z',
+      barcodeValue: 'ORD009999-48',
+      qrCodeValue: 'GF-LONGLBL-999',
+      isWorkshop: false,
     },
   },
 ];
@@ -88,21 +124,34 @@ export const TagDesignerPage: React.FC = () => {
   const navigate = useNavigate();
   const { employee } = useAuth();
 
-  const [design, setDesign] = useState<TagDesignConfig>(DEFAULT_TAG_DESIGN);
+  const [design, setDesign] = useState<TagDesignConfig>(REFERENCE_TAG_DESIGN);
+  const [initialDesignJson, setInitialDesignJson] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDownloadingFont, setIsDownloadingFont] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sampleIndex, setSampleIndex] = useState(0);
-  const [showCalibrationPreview, setShowCalibrationPreview] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [auditList, setAuditList] = useState<TagDesignAuditEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Check if owner role
+  const isOwner = employee?.role === 'OWNER';
 
   // Load existing active design
   useEffect(() => {
+    if (!isOwner) {
+      setIsLoading(false);
+      return;
+    }
     let isMounted = true;
     TagDesignApi.getDesign()
       .then((loaded) => {
         if (isMounted) {
-          setDesign(loaded || DEFAULT_TAG_DESIGN);
+          const active = loaded || REFERENCE_TAG_DESIGN;
+          setDesign(active);
+          setInitialDesignJson(JSON.stringify(active));
         }
       })
       .catch((err) => {
@@ -118,12 +167,52 @@ export const TagDesignerPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isOwner]);
 
+  // Determine if there are unsaved changes
+  const isDirty = useMemo(() => {
+    if (!initialDesignJson) return false;
+    return JSON.stringify(design) !== initialDesignJson;
+  }, [design, initialDesignJson]);
+
+  // General tag setting handlers
+  const handleWidthChange = (width: string) => {
+    setDesign((prev) => ({ ...prev, width }));
+  };
+
+  const handleHeightChange = (height: string) => {
+    setDesign((prev) => ({ ...prev, height }));
+  };
+
+  const handlePrinterChange = (printer: string) => {
+    setDesign((prev) => ({ ...prev, printer }));
+  };
+
+  const handleWetStrengthToggle = (wetStrengthPaper: boolean) => {
+    setDesign((prev) => ({ ...prev, wetStrengthPaper }));
+  };
+
+  const handleOverallAlignChange = (align: TagTextAlign) => {
+    setDesign((prev) => ({ ...prev, align }));
+  };
+
+  const handleWorkshopPreponeToggle = (preponeWorkshopDueDate: boolean) => {
+    setDesign((prev) => ({ ...prev, preponeWorkshopDueDate }));
+  };
+
+  const handleWorkshopDaysChange = (days: number) => {
+    const clamped = Math.max(0, Math.min(14, isNaN(days) ? 1 : days));
+    setDesign((prev) => ({ ...prev, workshopPreponeDays: clamped }));
+  };
+
+  // Field configuration handlers
   const handleFieldToggle = (index: number) => {
     setDesign((prev) => {
       const nextFields = [...prev.fields];
-      if (nextFields[index].field === 'orderNumber') return prev;
+      // Booking No. (orderNumber) is protected primary anchor
+      if (nextFields[index].field === 'orderNumber' || nextFields[index].field === 'bookingNo') {
+        return prev;
+      }
       nextFields[index] = {
         ...nextFields[index],
         enabled: !nextFields[index].enabled,
@@ -154,7 +243,15 @@ export const TagDesignerPage: React.FC = () => {
     });
   };
 
-  const handleAlignmentChange = (index: number, alignment: TagTextAlign) => {
+  const handleFieldFontChange = (index: number, font: string) => {
+    setDesign((prev) => {
+      const nextFields = [...prev.fields];
+      nextFields[index] = { ...nextFields[index], font };
+      return { ...prev, fields: nextFields };
+    });
+  };
+
+  const handleFieldAlignmentChange = (index: number, alignment: TagTextAlign) => {
     setDesign((prev) => {
       const nextFields = [...prev.fields];
       nextFields[index] = { ...nextFields[index], alignment };
@@ -162,48 +259,41 @@ export const TagDesignerPage: React.FC = () => {
     });
   };
 
-  const handleFontSizeChange = (index: number, delta: number) => {
+  const handleFieldFontSizeChange = (index: number, delta: number) => {
     setDesign((prev) => {
       const nextFields = [...prev.fields];
       const current = nextFields[index].fontSize;
-      // Clamped within safe bounds: 6.0px to 18.0px
-      const clamped = Math.min(18, Math.max(6, Math.round((current + delta) * 2) / 2));
+      const isLargeField =
+        nextFields[index].field === 'barcode' || nextFields[index].field === 'bookingNo';
+      const maxBound = isLargeField ? 28 : 18;
+      const clamped = Math.min(maxBound, Math.max(6, Math.round((current + delta) * 2) / 2));
       nextFields[index] = { ...nextFields[index], fontSize: clamped };
       return { ...prev, fields: nextFields };
     });
   };
 
-  const handleBoldToggle = (index: number) => {
+  const handleFieldStyleToggle = (index: number, style: 'bold' | 'italic' | 'underline') => {
     setDesign((prev) => {
       const nextFields = [...prev.fields];
-      nextFields[index] = {
-        ...nextFields[index],
-        isBold: !nextFields[index].isBold,
-      };
-      return { ...prev, fields: nextFields };
-    });
-  };
-
-  const handleUppercaseToggle = (index: number) => {
-    setDesign((prev) => {
-      const nextFields = [...prev.fields];
-      nextFields[index] = {
-        ...nextFields[index],
-        isUppercase: !nextFields[index].isUppercase,
-      };
+      if (style === 'bold') {
+        nextFields[index] = { ...nextFields[index], isBold: !nextFields[index].isBold };
+      } else if (style === 'italic') {
+        nextFields[index] = { ...nextFields[index], isItalic: !nextFields[index].isItalic };
+      } else if (style === 'underline') {
+        nextFields[index] = { ...nextFields[index], isUnderline: !nextFields[index].isUnderline };
+      }
       return { ...prev, fields: nextFields };
     });
   };
 
   const handlePaddingChange = (side: 'top' | 'right' | 'bottom' | 'left', delta: number) => {
     setDesign((prev) => {
-      const current = prev.containerPaddingMm[side];
-      // Clamped within safe bounds: 1.5mm to 4.0mm
+      const current = prev.containerPaddingMm?.[side] ?? 2.5;
       const clamped = Math.min(4.0, Math.max(1.5, Math.round((current + delta) * 10) / 10));
       return {
         ...prev,
         containerPaddingMm: {
-          ...prev.containerPaddingMm,
+          ...(prev.containerPaddingMm || REFERENCE_TAG_DESIGN.containerPaddingMm),
           [side]: clamped,
         },
       };
@@ -218,6 +308,11 @@ export const TagDesignerPage: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (!isOwner) {
+      setErrorMessage('Access denied: Only Store Owners can save tag design settings.');
+      return;
+    }
+
     setIsSaving(true);
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -226,9 +321,10 @@ export const TagDesignerPage: React.FC = () => {
       const res = await TagDesignApi.saveDesign(design);
       if (res.data) {
         setDesign(res.data);
+        setInitialDesignJson(JSON.stringify(res.data));
       }
       setSuccessMessage(
-        'Tag design configuration saved successfully! Active for all orders in your store.',
+        'Design Tags configuration saved successfully! Active for all orders in your store.',
       );
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err) {
@@ -239,8 +335,13 @@ export const TagDesignerPage: React.FC = () => {
   };
 
   const handleReset = async () => {
+    if (!isOwner) {
+      setErrorMessage('Access denied: Only Store Owners can reset tag design settings.');
+      return;
+    }
+
     const confirmed = window.confirm(
-      'Reset tag layout back to canonical default 40×40 mm reference design?',
+      'Reset tag layout back to canonical reference default design (1.5 × 1.5 in)?',
     );
     if (!confirmed) return;
 
@@ -252,10 +353,12 @@ export const TagDesignerPage: React.FC = () => {
       const res = await TagDesignApi.resetDesign();
       if (res.data) {
         setDesign(res.data);
+        setInitialDesignJson(JSON.stringify(res.data));
       } else {
-        setDesign(DEFAULT_TAG_DESIGN);
+        setDesign(REFERENCE_TAG_DESIGN);
+        setInitialDesignJson(JSON.stringify(REFERENCE_TAG_DESIGN));
       }
-      setSuccessMessage('Tag layout reset to canonical 40×40 mm default.');
+      setSuccessMessage('Tag layout reset to canonical reference default.');
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err) {
       setErrorMessage(friendlyErrorMessage(err));
@@ -264,12 +367,62 @@ export const TagDesignerPage: React.FC = () => {
     }
   };
 
-  const handleTestPrint = () => {
-    window.print();
+  const handleDownloadFont = async () => {
+    if (!isOwner) {
+      setErrorMessage('Access denied: Only Store Owners can download thermal printer font assets.');
+      return;
+    }
+
+    setIsDownloadingFont(true);
+    setErrorMessage(null);
+    try {
+      await TagDesignApi.downloadFont();
+      setSuccessMessage('Font C39HrP36DmT.ttf downloaded successfully.');
+      setTimeout(() => setSuccessMessage(null), 4000);
+    } catch (err) {
+      setErrorMessage(friendlyErrorMessage(err));
+    } finally {
+      setIsDownloadingFont(false);
+    }
   };
 
+  const handleOpenHistory = async () => {
+    setShowHistoryModal(true);
+    setIsLoadingHistory(true);
+    try {
+      const history = await TagDesignApi.getHistory();
+      setAuditList(history.data || design.auditHistory || []);
+    } catch {
+      setAuditList(design.auditHistory || []);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400 flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert size={24} />
+          </div>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-2">
+            Owner Access Required
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-slate-400 mb-6">
+            Only authenticated Store Owners have permission to view, customize, or save Design Tags
+            and font settings.
+          </p>
+          <Button variant="primary" onClick={() => navigate('/')} className="w-full">
+            Return to Dashboard
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <LoadingState message="Loading tag designer..." fullPage />;
+    return <LoadingState message="Loading Design Tags..." fullPage />;
   }
 
   const activeSample = SAMPLE_PRESETS[sampleIndex].data;
@@ -278,54 +431,114 @@ export const TagDesignerPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 p-3 sm:p-6 lg:p-8">
       {/* ─── Top Header Navigation ──────────────────────────────────── */}
       <div className="no-print max-w-7xl mx-auto mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <button
               type="button"
               id="tag-designer-back-btn"
               onClick={() => navigate(-1)}
               aria-label="Go back"
-              className="p-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer shadow-sm"
+              className="p-2.5 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer shadow-sm"
             >
               <ArrowLeft size={20} />
             </button>
             <div>
-              <div className="flex items-center gap-2">
-                <Sliders size={20} className="text-purple-600 dark:text-purple-400" />
-                <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-slate-100">
-                  Admin Tag Designer
+              <div className="flex flex-wrap items-center gap-2">
+                <Sliders size={20} className="text-blue-600 dark:text-blue-400" />
+                <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-slate-100 tracking-tight">
+                  Design Tags
                 </h1>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                  40 × 40 mm
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  {design.width || '1.5 in'} × {design.height || '1.5 in'}
                 </span>
+                {isDirty ? (
+                  <span
+                    id="unsaved-changes-badge"
+                    className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300 dark:border-amber-700 flex items-center gap-1"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Unsaved Changes
+                  </span>
+                ) : (
+                  <span
+                    id="saved-config-badge"
+                    className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-900 dark:bg-green-950/80 dark:text-green-200 border border-green-300 dark:border-green-700 flex items-center gap-1"
+                  >
+                    <CheckCircle2 size={12} className="text-green-600 dark:text-green-400" />
+                    Saved
+                  </span>
+                )}
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-                Customize washable cloth physical tag layout • Changes presentation only
-              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-slate-400 mt-1">
+                <span>Configure layout & typography for physical cloth tags</span>
+                {design.lastUpdatedAt && (
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-gray-600 dark:text-slate-400">
+                    <Clock size={12} />
+                    Last saved: {new Date(design.lastUpdatedAt).toLocaleDateString()} at{' '}
+                    {new Date(design.lastUpdatedAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+                {design.lastUpdatedBy?.name && (
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-gray-600 dark:text-slate-400">
+                    <User size={12} />
+                    by {design.lastUpdatedBy.name} (Owner)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ThemeToggle />
+            <Button
+              id="tag-design-history-btn"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenHistory}
+              style={{ minHeight: '44px' }}
+              className="min-h-[44px] text-xs font-semibold px-3"
+              icon={<History size={16} />}
+              aria-label="View design change history"
+            >
+              History
+            </Button>
+            <Button
+              id="download-font-btn"
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadFont}
+              disabled={isDownloadingFont}
+              style={{ minHeight: '44px' }}
+              className="min-h-[44px] text-xs font-semibold px-3"
+              icon={<Download size={16} />}
+              aria-label="Download Font"
+            >
+              {isDownloadingFont ? 'Downloading...' : 'Download Font'}
+            </Button>
             <Button
               id="reset-tag-design-btn"
               variant="outline"
+              size="sm"
               onClick={handleReset}
               disabled={isSaving}
               style={{ minHeight: '44px' }}
               className="min-h-[44px] text-xs font-semibold px-3"
-              icon={<RotateCcw size={15} />}
+              icon={<RotateCcw size={16} />}
             >
               Reset Default
             </Button>
             <Button
               id="save-tag-design-btn"
               variant="primary"
+              size="sm"
               onClick={handleSave}
               disabled={isSaving}
               style={{ minHeight: '44px' }}
               className="min-h-[44px] text-xs font-bold px-4 shadow-sm"
-              icon={<Save size={15} />}
+              icon={<Save size={16} />}
             >
               {isSaving ? 'Saving...' : 'Save Design'}
             </Button>
@@ -358,24 +571,157 @@ export const TagDesignerPage: React.FC = () => {
       <div className="no-print max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ─── Left Column: Controls (lg:col-span-7) ───────────────────── */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Card 1: Field Ordering & Visibility */}
+          {/* Card 1: General Tag Settings (Reference Image Section A) */}
           <Card className="p-4 sm:p-5">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Layers size={18} className="text-purple-600 dark:text-purple-400" />
-                <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
-                  Field Arrangement & Typography
-                </h2>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-slate-400">
-                Move fields up/down to change vertical flow
+            <div className="pb-3 mb-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                <Maximize2 size={18} className="text-blue-600 dark:text-blue-400" />
+                General Tag Settings
+              </h2>
+              <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+                Physical Geometry
               </span>
             </div>
 
-            <div className="space-y-3" id="tag-fields-list">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {/* Width Selector */}
+              <div>
+                <label
+                  htmlFor="tag-width-select"
+                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                >
+                  Width
+                </label>
+                <select
+                  id="tag-width-select"
+                  value={design.width || '1.5 in'}
+                  onChange={(e) => handleWidthChange(e.target.value)}
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  {SUPPORTED_TAG_DIMENSIONS.map((dim) => (
+                    <option key={dim} value={dim}>
+                      {dim}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Height Selector */}
+              <div>
+                <label
+                  htmlFor="tag-height-select"
+                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                >
+                  Height
+                </label>
+                <select
+                  id="tag-height-select"
+                  value={design.height || '1.5 in'}
+                  onChange={(e) => handleHeightChange(e.target.value)}
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  {SUPPORTED_TAG_DIMENSIONS.map((dim) => (
+                    <option key={dim} value={dim}>
+                      {dim}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Printer Selector */}
+              <div>
+                <label
+                  htmlFor="tag-printer-select"
+                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                >
+                  Printer
+                </label>
+                <select
+                  id="tag-printer-select"
+                  value={design.printer || 'TSC TE244'}
+                  onChange={(e) => handlePrinterChange(e.target.value)}
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  {SUPPORTED_TAG_PRINTERS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Align Selector */}
+              <div>
+                <label
+                  htmlFor="tag-overall-align-select"
+                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                >
+                  Align
+                </label>
+                <select
+                  id="tag-overall-align-select"
+                  value={design.align || 'center'}
+                  onChange={(e) => handleOverallAlignChange(e.target.value as TagTextAlign)}
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                >
+                  <option value="center">Center</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+
+              {/* Wet Strength Paper Checkbox */}
+              <div className="sm:col-span-2 flex items-center pt-2 sm:pt-6">
+                <label className="flex items-center gap-2.5 cursor-pointer min-h-[44px] px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-850 w-full transition-colors">
+                  <input
+                    type="checkbox"
+                    id="wet-strength-paper-checkbox"
+                    checked={Boolean(design.wetStrengthPaper)}
+                    onChange={(e) => handleWetStrengthToggle(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
+                      Wet Strength Paper
+                    </span>
+                    <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                      Optimizes thermal heat settings for non-tear washable cloth tags
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </Card>
+
+          {/* Card 2: Tag Field Configuration Table (Reference Image Section B & C) */}
+          <Card className="p-4 sm:p-5">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Layers size={18} className="text-blue-600 dark:text-blue-400" />
+                <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
+                  Tag Field Configuration
+                </h2>
+              </div>
+              <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+                11 Reference Fields
+              </span>
+            </div>
+
+            {/* Field Table Container */}
+            <div className="space-y-3" id="tag-fields-table">
               {design.fields.map((fieldCfg, index) => {
                 const isFirst = index === 0;
                 const isLast = index === design.fields.length - 1;
+                const isFixedKey =
+                  fieldCfg.field === 'bookingNo' || fieldCfg.field === 'orderNumber';
+                const supportsFont =
+                  fieldCfg.field !== 'qrcode' &&
+                  fieldCfg.field !== 'itemTotal' &&
+                  fieldCfg.field !== 'colour';
+                const supportsStyle =
+                  fieldCfg.field !== 'barcode' &&
+                  fieldCfg.field !== 'qrcode' &&
+                  fieldCfg.field !== 'colour';
 
                 return (
                   <div
@@ -387,10 +733,10 @@ export const TagDesignerPage: React.FC = () => {
                         : 'bg-gray-50 dark:bg-slate-950/50 border-gray-200 dark:border-slate-850 opacity-60'
                     }`}
                   >
-                    {/* Header: Reorder buttons, Name, Visibility Toggle */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    {/* Header Row: Reorder, Name, Print Yes/No */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        {/* Move Up / Down */}
+                        {/* Move Up / Down Steppers */}
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
@@ -424,7 +770,7 @@ export const TagDesignerPage: React.FC = () => {
 
                         <div>
                           <span className="text-xs font-bold text-gray-900 dark:text-slate-100 block">
-                            {index + 1}. {fieldCfg.label || fieldCfg.field}
+                            {fieldCfg.label || fieldCfg.field}
                           </span>
                           <span className="text-[10px] font-mono text-gray-500 dark:text-slate-400">
                             Key: {fieldCfg.field}
@@ -432,38 +778,71 @@ export const TagDesignerPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Enable/Disable Toggle */}
+                      {/* Print Yes / No Button Toggle */}
                       <button
                         type="button"
                         id={`toggle-field-btn-${fieldCfg.field}`}
                         onClick={() => handleFieldToggle(index)}
-                        aria-label={`Toggle visibility of ${fieldCfg.label || fieldCfg.field}`}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-md border min-h-[44px] cursor-pointer transition-colors ${
-                          fieldCfg.enabled
-                            ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-700'
-                            : 'bg-gray-100 text-gray-500 border-gray-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                        disabled={isFixedKey}
+                        aria-label={`Toggle Print for ${fieldCfg.label || fieldCfg.field}`}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border min-h-[44px] transition-colors cursor-pointer ${
+                          isFixedKey
+                            ? 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 opacity-90 cursor-default'
+                            : fieldCfg.enabled
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                              : 'bg-gray-100 text-gray-500 border-gray-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
                         }`}
                       >
                         {fieldCfg.enabled ? <Eye size={16} /> : <EyeOff size={16} />}
-                        <span>{fieldCfg.enabled ? 'Visible' : 'Hidden'}</span>
+                        <span>Print: {fieldCfg.enabled ? 'Yes' : 'No'}</span>
                       </button>
                     </div>
 
-                    {/* Field Presentation Controls: Alignment, Font Size, Style */}
+                    {/* Controls Row: Font, Align, Size, Style (Visible when enabled) */}
                     {fieldCfg.enabled && (
-                      <div className="pt-2 border-t border-gray-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-                        {/* Text Alignment */}
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] text-gray-500 dark:text-slate-400 mr-1">
+                      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs items-center">
+                        {/* Font Family Dropdown */}
+                        {supportsFont ? (
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                              Font:
+                            </span>
+                            <select
+                              id={`font-select-${fieldCfg.field}`}
+                              value={fieldCfg.font || 'Arial'}
+                              onChange={(e) => handleFieldFontChange(index, e.target.value)}
+                              className="w-full min-h-[44px] px-2 py-1 text-xs rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 font-medium"
+                            >
+                              {SUPPORTED_TAG_FONTS.map((font) => (
+                                <option key={font} value={font}>
+                                  {font}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                              Renderer:
+                            </span>
+                            <span className="inline-block px-2 py-2 text-xs text-gray-500 dark:text-slate-400 font-mono">
+                              Vector Engine
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Alignment Selector */}
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
                             Align:
                           </span>
-                          <div className="inline-flex rounded-md shadow-sm">
+                          <div className="inline-flex rounded-md shadow-sm w-full">
                             <button
                               type="button"
                               id={`align-left-btn-${fieldCfg.field}`}
-                              onClick={() => handleAlignmentChange(index, 'left')}
+                              onClick={() => handleFieldAlignmentChange(index, 'left')}
                               aria-label="Align left"
-                              className={`p-2 rounded-l-md border min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`flex-1 p-2 rounded-l-md border min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                                 fieldCfg.alignment === 'left'
                                   ? 'bg-blue-600 text-white border-blue-600'
                                   : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
@@ -474,9 +853,9 @@ export const TagDesignerPage: React.FC = () => {
                             <button
                               type="button"
                               id={`align-center-btn-${fieldCfg.field}`}
-                              onClick={() => handleAlignmentChange(index, 'center')}
+                              onClick={() => handleFieldAlignmentChange(index, 'center')}
                               aria-label="Align center"
-                              className={`p-2 border-t border-b border-r min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`flex-1 p-2 border-t border-b border-r min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                                 fieldCfg.alignment === 'center'
                                   ? 'bg-blue-600 text-white border-blue-600'
                                   : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
@@ -487,9 +866,9 @@ export const TagDesignerPage: React.FC = () => {
                             <button
                               type="button"
                               id={`align-right-btn-${fieldCfg.field}`}
-                              onClick={() => handleAlignmentChange(index, 'right')}
+                              onClick={() => handleFieldAlignmentChange(index, 'right')}
                               aria-label="Align right"
-                              className={`p-2 rounded-r-md border border-t border-b border-r min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`flex-1 p-2 rounded-r-md border border-t border-b border-r min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                                 fieldCfg.alignment === 'right'
                                   ? 'bg-blue-600 text-white border-blue-600'
                                   : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
@@ -500,97 +879,167 @@ export const TagDesignerPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Font Size Stepper (Clamped 6.0px - 18.0px) */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                        {/* Font Size Stepper */}
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
                             Size:
                           </span>
-                          <button
-                            type="button"
-                            id={`decrease-fontsize-btn-${fieldCfg.field}`}
-                            onClick={() => handleFontSizeChange(index, -0.5)}
-                            disabled={fieldCfg.fontSize <= 6}
-                            aria-label="Decrease font size"
-                            className="px-2.5 py-1 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            -
-                          </button>
-                          <span
-                            id={`fontsize-display-${fieldCfg.field}`}
-                            className="font-mono font-bold text-xs min-w-[40px] text-center"
-                          >
-                            {fieldCfg.fontSize}px
-                          </span>
-                          <button
-                            type="button"
-                            id={`increase-fontsize-btn-${fieldCfg.field}`}
-                            onClick={() => handleFontSizeChange(index, 0.5)}
-                            disabled={fieldCfg.fontSize >= 18}
-                            aria-label="Increase font size"
-                            className="px-2.5 py-1 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            +
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              id={`decrease-fontsize-btn-${fieldCfg.field}`}
+                              onClick={() => handleFieldFontSizeChange(index, -1)}
+                              disabled={fieldCfg.fontSize <= 6}
+                              aria-label="Decrease font size"
+                              className="px-2.5 py-1 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              -
+                            </button>
+                            <span
+                              id={`fontsize-display-${fieldCfg.field}`}
+                              className="font-mono font-bold text-xs min-w-[36px] text-center"
+                            >
+                              {fieldCfg.fontSize}px
+                            </span>
+                            <button
+                              type="button"
+                              id={`increase-fontsize-btn-${fieldCfg.field}`}
+                              onClick={() => handleFieldFontSizeChange(index, 1)}
+                              disabled={fieldCfg.fontSize >= 28}
+                              aria-label="Increase font size"
+                              className="px-2.5 py-1 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Bold & Uppercase toggles */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            id={`bold-toggle-btn-${fieldCfg.field}`}
-                            onClick={() => handleBoldToggle(index)}
-                            aria-label="Toggle bold"
-                            className={`px-3 py-1.5 rounded border min-h-[44px] text-xs font-bold cursor-pointer transition-colors ${
-                              fieldCfg.isBold
-                                ? 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
-                                : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
-                            }`}
-                          >
-                            B
-                          </button>
-                          <button
-                            type="button"
-                            id={`uppercase-toggle-btn-${fieldCfg.field}`}
-                            onClick={() => handleUppercaseToggle(index)}
-                            aria-label="Toggle uppercase"
-                            className={`px-3 py-1.5 rounded border min-h-[44px] text-xs font-bold cursor-pointer transition-colors ${
-                              fieldCfg.isUppercase
-                                ? 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
-                                : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
-                            }`}
-                          >
-                            AA
-                          </button>
-                        </div>
+                        {/* Style Checkboxes (Bold, Italic, Underline) */}
+                        {supportsStyle ? (
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                              Style:
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {/* Bold */}
+                              <button
+                                type="button"
+                                id={`bold-toggle-btn-${fieldCfg.field}`}
+                                onClick={() => handleFieldStyleToggle(index, 'bold')}
+                                aria-label="Toggle bold"
+                                className={`flex-1 py-1 rounded border min-h-[44px] font-bold text-xs cursor-pointer transition-colors ${
+                                  fieldCfg.isBold !== false
+                                    ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
+                                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
+                                }`}
+                              >
+                                B
+                              </button>
+                              {/* Italic */}
+                              <button
+                                type="button"
+                                id={`italic-toggle-btn-${fieldCfg.field}`}
+                                onClick={() => handleFieldStyleToggle(index, 'italic')}
+                                aria-label="Toggle italic"
+                                className={`flex-1 py-1 rounded border min-h-[44px] italic font-serif text-xs cursor-pointer transition-colors ${
+                                  fieldCfg.isItalic
+                                    ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
+                                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
+                                }`}
+                              >
+                                I
+                              </button>
+                              {/* Underline */}
+                              <button
+                                type="button"
+                                id={`underline-toggle-btn-${fieldCfg.field}`}
+                                onClick={() => handleFieldStyleToggle(index, 'underline')}
+                                aria-label="Toggle underline"
+                                className={`flex-1 py-1 rounded border min-h-[44px] underline text-xs cursor-pointer transition-colors ${
+                                  fieldCfg.isUnderline
+                                    ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
+                                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
+                                }`}
+                              >
+                                U
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                              Style:
+                            </span>
+                            <span className="text-[11px] text-gray-400 dark:text-slate-500">
+                              Auto-Formatted
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
+
+            {/* Section D: Additional Reference Option (Bottom Checkbox & Input) */}
+            <div className="mt-5 pt-4 border-t border-gray-200 dark:border-slate-800 bg-blue-50/40 dark:bg-blue-950/20 p-3.5 rounded-lg border border-blue-100 dark:border-blue-900/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="workshop-prepone-checkbox"
+                    checked={Boolean(design.preponeWorkshopDueDate)}
+                    onChange={(e) => handleWorkshopPreponeToggle(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
+                      Select to bring forward/Prepone Due Date for Workshop tags only.
+                    </span>
+                    <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                      Shifts the printed due date forward for factory/workshop processing without
+                      altering stored customer order dates.
+                    </span>
+                  </div>
+                </label>
+
+                <div className="flex items-center gap-2 pl-6 sm:pl-0">
+                  <span className="text-xs text-gray-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                    Prepone by:
+                  </span>
+                  <input
+                    type="number"
+                    id="workshop-prepone-days-input"
+                    min={0}
+                    max={14}
+                    value={design.workshopPreponeDays ?? 1}
+                    onChange={(e) => handleWorkshopDaysChange(parseInt(e.target.value, 10))}
+                    disabled={!design.preponeWorkshopDueDate}
+                    className="w-16 min-h-[44px] px-2.5 py-1 text-xs font-bold text-center rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 disabled:opacity-40"
+                  />
+                  <span className="text-xs text-gray-500 dark:text-slate-400">day(s)</span>
+                </div>
+              </div>
+            </div>
           </Card>
 
-          {/* Card 2: Margins & Border Styling */}
+          {/* Card 3: Boundary Inset Padding & Perimeter Guide */}
           <Card className="p-4 sm:p-5">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <Maximize2 size={18} className="text-purple-600 dark:text-purple-400" />
-                <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
-                  Tag Padding & Border
-                </h2>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-slate-400">
-                Safe physical boundary controls
+              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                <Maximize2 size={18} className="text-blue-600 dark:text-blue-400" />
+                Tag Padding & Boundary Guideline
+              </h2>
+              <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+                Physical Edge Margins
               </span>
             </div>
 
-            {/* Container Padding Steppers */}
-            <div className="mb-5">
-              <h3 className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">
-                Safe Tag Inset Padding (mm)
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {(['top', 'right', 'bottom', 'left'] as const).map((side) => {
+                const padVal = design.containerPaddingMm?.[side] ?? 2.5;
+                return (
                   <div
                     key={side}
                     className="p-2.5 rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center"
@@ -602,14 +1051,14 @@ export const TagDesignerPage: React.FC = () => {
                       id={`padding-display-${side}`}
                       className="text-sm font-black text-gray-900 dark:text-slate-100 my-1 font-mono"
                     >
-                      {design.containerPaddingMm[side]} mm
+                      {padVal} mm
                     </span>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         id={`decrease-padding-btn-${side}`}
                         onClick={() => handlePaddingChange(side, -0.5)}
-                        disabled={design.containerPaddingMm[side] <= 1.5}
+                        disabled={padVal <= 1.5}
                         aria-label={`Decrease ${side} padding`}
                         className="px-2 py-1 rounded border border-gray-300 dark:border-slate-700 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs disabled:opacity-30 cursor-pointer"
                       >
@@ -619,7 +1068,7 @@ export const TagDesignerPage: React.FC = () => {
                         type="button"
                         id={`increase-padding-btn-${side}`}
                         onClick={() => handlePaddingChange(side, 0.5)}
-                        disabled={design.containerPaddingMm[side] >= 4.0}
+                        disabled={padVal >= 4.0}
                         aria-label={`Increase ${side} padding`}
                         className="px-2 py-1 rounded border border-gray-300 dark:border-slate-700 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs disabled:opacity-30 cursor-pointer"
                       >
@@ -627,15 +1076,14 @@ export const TagDesignerPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
 
-            {/* Border Style Selector */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">
-                Perimeter Guide Line
-              </h3>
+              <span className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-2">
+                Perimeter Guide Line:
+              </span>
               <div className="inline-flex rounded-md shadow-sm">
                 {(['dashed', 'solid', 'none'] as const).map((style, idx) => (
                   <button
@@ -663,44 +1111,34 @@ export const TagDesignerPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* ─── Right Column: Live 40×40 mm Preview (lg:col-span-5) ──────── */}
-        <div className="lg:col-span-5 space-y-6">
-          <Card className="p-4 sm:p-5 sticky top-6">
+        {/* ─── Right Column: Live Tag Preview (lg:col-span-5) ───────────── */}
+        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
+          <Card className="p-4 sm:p-5">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <Type size={18} className="text-blue-600 dark:text-blue-400" />
+                <Printer size={18} className="text-blue-600 dark:text-blue-400" />
                 <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
-                  Live 40 × 40 mm Preview
+                  Live Tag Preview
                 </h2>
               </div>
-              <button
-                type="button"
-                id="toggle-calib-view-btn"
-                onClick={() => setShowCalibrationPreview((prev) => !prev)}
-                className={`text-xs font-semibold px-2.5 py-1.5 rounded-md border min-h-[44px] flex items-center gap-1 cursor-pointer transition-colors ${
-                  showCalibrationPreview
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700'
-                }`}
-              >
-                <Compass size={14} />
-                <span>{showCalibrationPreview ? 'Show Tag' : 'Calibration'}</span>
-              </button>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                Live Rendering
+              </span>
             </div>
 
-            {/* Sample Data Switcher */}
+            {/* Preset Selector */}
             <div className="mb-4">
               <label
-                htmlFor="sample-preset-select"
-                className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-1"
+                htmlFor="preview-sample-select"
+                className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1"
               >
-                Sample Garment Order:
+                Sample Data Scenario:
               </label>
               <select
-                id="sample-preset-select"
+                id="preview-sample-select"
                 value={sampleIndex}
                 onChange={(e) => setSampleIndex(Number(e.target.value))}
-                className="w-full text-xs font-semibold p-2.5 rounded-md border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 min-h-[44px]"
+                className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 font-medium"
               >
                 {SAMPLE_PRESETS.map((preset, idx) => (
                   <option key={preset.label} value={idx}>
@@ -710,62 +1148,119 @@ export const TagDesignerPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Live Render Surface (Exact 40×40 mm Tag) */}
-            <div className="flex flex-col items-center justify-center p-6 bg-gray-100 dark:bg-slate-950/70 rounded-xl border border-gray-200 dark:border-slate-800">
-              {/* Surrounding mounting plate */}
-              <div
-                className="relative bg-white shadow-lg rounded-sm p-1 border border-gray-300 flex items-center justify-center"
-                style={{
-                  width: '42mm',
-                  height: '42mm',
-                }}
-              >
-                {showCalibrationPreview ? (
-                  <TagCalibrationCard />
-                ) : (
-                  <PhysicalTag data={activeSample} design={design} />
-                )}
+            {/* Physical Tag Visual Sandbox */}
+            <div className="bg-slate-100 dark:bg-slate-900/80 rounded-xl p-6 flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-slate-800 min-h-[260px] relative overflow-hidden">
+              {/* Sample Data Watermark Notice */}
+              <div className="absolute top-2 left-2 right-2 flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 rounded px-2 py-0.5 uppercase tracking-wider">
+                <Info size={11} />
+                <span>Preview Sample Data • Not real customer data</span>
               </div>
 
-              {/* Physical specifications readout */}
-              <div className="mt-4 text-center space-y-1">
-                <div className="text-xs font-bold text-gray-800 dark:text-slate-200 flex items-center justify-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  Exact Print Boundary: 40.0 mm × 40.0 mm
-                </div>
-                <div className="text-[11px] text-gray-500 dark:text-slate-400">
-                  Target physical material: Washable cloth garment tag (1:1 square)
-                </div>
+              {/* The Rendered Tag */}
+              <div className="mt-5 p-2 bg-white shadow-xl rounded-sm">
+                <PhysicalTag data={activeSample} design={design} />
+              </div>
+
+              {/* Tag Spec Badge */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-gray-500 dark:text-slate-400">
+                <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
+                  Size: {design.width || '1.5 in'} × {design.height || '1.5 in'}
+                </span>
+                <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
+                  Printer: {design.printer || 'TSC TE244'}
+                </span>
+                {design.preponeWorkshopDueDate && activeSample.isWorkshop && (
+                  <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                    Workshop Preponed: -{design.workshopPreponeDays || 1} day(s)
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Direct Print Test Action */}
-            <div className="mt-5 pt-4 border-t border-gray-200 dark:border-slate-800">
+            {/* Test Print Action */}
+            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-slate-800">
               <Button
-                id="designer-print-test-btn"
-                variant="primary"
-                onClick={handleTestPrint}
-                style={{ minHeight: '44px' }}
-                className="w-full min-h-[44px] font-bold text-xs shadow-sm flex items-center justify-center gap-2"
+                variant="outline"
+                className="w-full min-h-[44px] text-xs font-semibold"
                 icon={<Printer size={16} />}
+                onClick={() => window.print()}
               >
-                Print Test Sample Tag (40×40 mm)
+                Test Print Sample Tag
               </Button>
-              <p className="text-[10px] text-gray-500 dark:text-slate-400 text-center mt-2">
-                Sends test tag directly to the browser print engine with 0 margins
-              </p>
             </div>
           </Card>
         </div>
       </div>
 
-      {/* ─── Print-Only DOM Container (targeted by @media print) ──────── */}
-      <TagPrintLayout
-        tags={[activeSample]}
-        isCalibration={showCalibrationPreview}
-        id="printable-tags"
-        design={design}
-      />
+      {/* ─── Change History Audit Modal (Section 5) ───────────────────── */}
+      {showHistoryModal && (
+        <Modal
+          open={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          title="Tag Design Change History (Audit Log)"
+          width="640px"
+        >
+          <div className="p-1 space-y-4">
+            <p className="text-xs text-gray-600 dark:text-slate-400">
+              Immutable audit record of all tag design modifications for this store. Accessible
+              exclusively by Store Owners.
+            </p>
+
+            {isLoadingHistory ? (
+              <div className="py-8 text-center text-xs text-gray-500">
+                Loading audit history...
+              </div>
+            ) : auditList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-gray-500">
+                No past design modifications recorded. You are currently on baseline version 1.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {auditList.map((entry, idx) => (
+                  <div
+                    key={`${entry.version}-${idx}`}
+                    className="p-3.5 rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-mono text-[10px]">
+                          v{entry.version}
+                        </span>
+                        <span>{entry.updatedByName}</span>
+                      </span>
+                      <span className="text-[11px] text-gray-500 font-mono">
+                        {new Date(entry.updatedAt).toLocaleString()}
+                      </span>
+                    </div>
+                    {entry.updatedByEmail && (
+                      <div className="text-[11px] text-gray-500 font-mono">
+                        Email: {entry.updatedByEmail}
+                      </div>
+                    )}
+                    <div className="text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-950 p-2 rounded border border-gray-200 dark:border-slate-850">
+                      {entry.changesSummary || 'Updated tag layout configuration.'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-3 border-t border-gray-200 dark:border-slate-800">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistoryModal(false)}
+                className="min-h-[44px]"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── Hidden Container for Test Printing ────────────────────────── */}
+      <TagPrintLayout tags={[activeSample]} design={design} />
     </div>
   );
 };

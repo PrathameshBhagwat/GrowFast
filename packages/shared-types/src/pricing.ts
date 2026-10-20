@@ -24,10 +24,10 @@ export interface PricingTotals {
  * Returns the express charge multiplier based on customer's requested delivery:
  * - Same-day delivery: 2× the configured express charge
  * - Tomorrow / next-day evening delivery: 1.5× the configured express charge
- * - Regular delivery: No express multiplier (1.0×)
+ * - Regular delivery: No express charge (0×)
  */
 export function getExpressMultiplier(option?: ExpressDeliveryOption | string | null): number {
-  if (!option) return 1.0;
+  if (!option) return 0;
   const upper = String(option).toUpperCase().trim();
   if (
     upper === ExpressDeliveryOption.SAME_DAY ||
@@ -46,7 +46,7 @@ export function getExpressMultiplier(option?: ExpressDeliveryOption | string | n
   ) {
     return 1.5;
   }
-  return 1.0; // Regular delivery - no multiplier
+  return 0; // Regular delivery - no express charge
 }
 
 /**
@@ -84,13 +84,13 @@ export function calculateOrderTotals(
 
   const discountedSubtotal = roundCurrency(subtotal - discountAmount);
 
-  // 2. Express Surcharge (B7 Configurable + Express Delivery Multipliers)
-  const isExpressRequested =
-    options?.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY ||
-    options?.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING ||
-    options?.expressDeliveryOption === 'SAME_DAY' ||
-    options?.expressDeliveryOption === 'NEXT_DAY_EVENING';
-  const isExpress = options?.isExpress ?? isExpressRequested;
+  // 2. Express Surcharge (Canonical Multipliers: Same-day 2.0x, Tomorrow evening 1.5x, Regular 0)
+  const option = options?.expressDeliveryOption;
+  const isRegular =
+    option === ExpressDeliveryOption.REGULAR || option === 'REGULAR' || option === 'STANDARD';
+
+  const multiplier = getExpressMultiplier(option);
+  const isExpress = !isRegular && (multiplier > 0 || Boolean(options?.isExpress));
 
   let expressSurcharge = 0;
   if (isExpress) {
@@ -100,8 +100,8 @@ export function calculateOrderTotals(
     const baseExpressCharge = roundCurrency(
       (discountedSubtotal * options.expressSurchargePercent) / 100,
     );
-    const multiplier = getExpressMultiplier(options?.expressDeliveryOption);
-    expressSurcharge = roundCurrency(baseExpressCharge * multiplier);
+    const effectiveMultiplier = multiplier > 0 ? multiplier : 1.0;
+    expressSurcharge = roundCurrency(baseExpressCharge * effectiveMultiplier);
   }
 
   // 3. Tax (V1: 18% GST as per user choice)

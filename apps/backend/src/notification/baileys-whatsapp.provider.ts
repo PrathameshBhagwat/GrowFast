@@ -4,7 +4,6 @@ import {
   NotificationDispatchPayload,
   NotificationDispatchResult,
 } from './notification.provider';
-import { NotificationEventType } from '@growfast/shared-types';
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
@@ -141,7 +140,19 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
         };
       }
 
-      const msg = await this.sock.sendMessage(jid, { text: messageBody });
+      let msg: any;
+      if (payload.document) {
+        msg = await this.sock.sendMessage(jid, {
+          document: payload.document.buffer,
+          mimetype: payload.document.mimetype || 'application/pdf',
+          fileName:
+            payload.document.fileName ||
+            `Invoice_${payload.payload?.orderNumber || 'order'}.pdf`,
+          caption: messageBody,
+        });
+      } else {
+        msg = await this.sock.sendMessage(jid, { text: messageBody });
+      }
 
       return {
         success: true,

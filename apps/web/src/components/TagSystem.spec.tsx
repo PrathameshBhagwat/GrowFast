@@ -808,23 +808,13 @@ describe('Phase T2: Tag UI & 40×40 mm Tag Preview & Printing Tests', () => {
       expect(screen.queryByText('Aishwarya Gangam')).not.toBeInTheDocument();
     });
 
-    it('OrderTagsSection renders Tag Designer button when onOpenDesigner callback is provided', () => {
+    it('OrderTagsSection does not render Tag Designer button (exclusive to Owner Settings)', () => {
       const onViewPhotos = vi.fn();
-      const onOpenDesigner = vi.fn();
 
-      render(
-        <OrderTagsSection
-          order={baseOrder}
-          onViewPhotos={onViewPhotos}
-          onOpenDesigner={onOpenDesigner}
-        />,
-      );
+      render(<OrderTagsSection order={baseOrder} onViewPhotos={onViewPhotos} />);
 
-      const designerBtn = screen.getByRole('button', { name: /tag designer/i });
-      expect(designerBtn).toBeInTheDocument();
-
-      fireEvent.click(designerBtn);
-      expect(onOpenDesigner).toHaveBeenCalledTimes(1);
+      const designerBtn = screen.queryByRole('button', { name: /tag designer/i });
+      expect(designerBtn).not.toBeInTheDocument();
     });
 
     it('TagPreviewModal renders live preview with active custom design', () => {

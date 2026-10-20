@@ -1,7 +1,51 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { DashboardSummaryDTO, OrderStatus as SharedOrderStatus } from '@growfast/shared-types';
-import { OrderStatus, DeliveryStatus, PaymentStatus, ItemStatus } from '@prisma/client';
+import type {
+  DashboardSummaryDTO,
+  OrderStatus as SharedOrderStatus,
+  DashboardActionOrder,
+  DashboardTrendPoint,
+  DashboardTrendsDTO,
+  DashboardComparisonDTO,
+  DashboardServiceBreakdown,
+  DashboardCategoryBreakdown,
+  DashboardActionQueuesDTO,
+  MetricComparison,
+} from '@growfast/shared-types';
+import {
+  OrderStatus,
+  DeliveryStatus,
+  PaymentStatus,
+  ItemStatus,
+  AdjustmentType,
+  AdjustmentStatus,
+} from '@prisma/client';
+
+function formatKolkataDate(d: Date): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(d);
+}
+
+function createComparison(current: number, previous: number): MetricComparison {
+  const absoluteChange = Number((current - previous).toFixed(2));
+  let percentageChange: number | null = null;
+  if (previous === 0) {
+    percentageChange = current === 0 ? 0 : null;
+  } else {
+    percentageChange = Number((((current - previous) / previous) * 100).toFixed(2));
+  }
+  return {
+    current: Number(current.toFixed(2)),
+    previous: Number(previous.toFixed(2)),
+    absoluteChange,
+    percentageChange,
+  };
+}
 
 @Injectable()
 export class DashboardService {
@@ -10,17 +54,34 @@ export class DashboardService {
   /**
    * Get the dashboard summary for a store within a date range.
    *
-   * All queries use database-side aggregation (count, aggregate, groupBy).
+   * All queries use database-side aggregation (count, aggregate, groupBy) or bounded queries.
    * Uses persisted Order.status (canonical, maintained by B8/C5).
-   * Uses persisted Order.amountPaid/amountDue (canonical, maintained by C4).
-   * Uses DeliveryRecord.status (authoritative, maintained by C5).
-   * Dashboard is STRICTLY READ-ONLY — zero mutations.
+   * Financial analytics:
+   *  - Collections: sum of successful Payment transactions by createdAt in period.
+   *  - Refunds: sum of completed FinancialAdjustment (REFUND) by createdAt in period.
+   *  - Net Collections: collections - refunds.
+   *  - Booked Order Value: sum of Order.totalAmount by orderDate in period.
+   *  - Outstanding Balance: store-wide positive amountDue across non-cancelled orders (period-independent).
+   * Operational analytics:
+   *  - Overdue, Due-Today, Due-Tomorrow: effectiveDueDate evaluated with Asia/Kolkata boundaries.
+   * STRICTLY READ-ONLY — zero mutations.
    */
   async getSummary(storeId: string, startDate: Date, endDate: Date): Promise<DashboardSummaryDTO> {
     const dateFilter = {
       gte: startDate,
       lte: endDate,
     };
+
+    // ─── Asia/Kolkata Calendar Boundaries ─────────────────────────
+    const now = new Date();
+    const todayStr = formatKolkataDate(now);
+    const todayStart = new Date(`${todayStr}T00:00:00.000+05:30`);
+    const todayEnd = new Date(`${todayStr}T23:59:59.999+05:30`);
+
+    const tomorrowDate = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = formatKolkataDate(tomorrowDate);
+    const tomorrowStart = new Date(`${tomorrowStr}T00:00:00.000+05:30`);
+    const tomorrowEnd = new Date(`${tomorrowStr}T23:59:59.999+05:30`);
 
     // ─── Order KPIs (database-side groupBy) ───────────────────────
     const ordersByStatus = await this.prisma.order.groupBy({
@@ -39,12 +100,10 @@ export class DashboardService {
 
     const totalOrders = Object.values(statusMap).reduce((s, v) => s + v, 0);
 
-    // ─── Overdue Orders ───────────────────────────────────────────
-    const now = new Date();
+    // ─── Operational Counts (Live Store-wide by effectiveDueDate) ─
     const overdueOrders = await this.prisma.order.count({
       where: {
         storeId,
-        orderDate: dateFilter,
         effectiveDueDate: { lt: now },
         status: {
           notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
@@ -52,17 +111,20 @@ export class DashboardService {
       },
     });
 
-    // ─── Due Today ────────────────────────────────────────────────
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
     const dueTodayOrders = await this.prisma.order.count({
       where: {
         storeId,
-        orderDate: dateFilter,
         effectiveDueDate: { gte: todayStart, lte: todayEnd },
+        status: {
+          notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+        },
+      },
+    });
+
+    const dueTomorrowOrders = await this.prisma.order.count({
+      where: {
+        storeId,
+        effectiveDueDate: { gte: tomorrowStart, lte: tomorrowEnd },
         status: {
           notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
         },
@@ -79,20 +141,73 @@ export class DashboardService {
       },
     });
 
-    // ─── Financial KPIs (database-side aggregate) ─────────────────
-    const financialAgg = await this.prisma.order.aggregate({
+    // ─── Financial KPIs (Authoritative Collections, Refunds, Balance) ─
+    // 1. Booked Order Value in period
+    const bookedAgg = await this.prisma.order.aggregate({
       where: {
         storeId,
         orderDate: dateFilter,
       },
       _sum: {
         totalAmount: true,
-        amountPaid: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+    const bookedOrderValue = Number((bookedAgg._sum.totalAmount || 0).toFixed(2));
+
+    // 2. Collections received in period by Payment.createdAt
+    const paymentsAgg = await this.prisma.payment.aggregate({
+      where: {
+        order: { storeId },
+        createdAt: dateFilter,
+      },
+      _sum: {
+        amount: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+    const collections = Number((paymentsAgg._sum.amount || 0).toFixed(2));
+    const collectionCount = paymentsAgg._count.id || 0;
+
+    // 3. Completed Refunds in period by FinancialAdjustment.createdAt
+    const refundsAgg = await this.prisma.financialAdjustment.aggregate({
+      where: {
+        order: { storeId },
+        type: AdjustmentType.REFUND,
+        status: AdjustmentStatus.COMPLETED,
+        createdAt: dateFilter,
+      },
+      _sum: {
+        amount: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+    const refunds = Number((refundsAgg._sum.amount || 0).toFixed(2));
+    const refundCount = refundsAgg._count.id || 0;
+
+    // 4. Net Collections
+    const netCollections = Number((collections - refunds).toFixed(2));
+
+    // 5. Live Store-wide Outstanding Balance (non-cancelled orders with amountDue > 0)
+    const outstandingAgg = await this.prisma.order.aggregate({
+      where: {
+        storeId,
+        status: { not: OrderStatus.CANCELLED },
+        amountDue: { gt: 0 },
+      },
+      _sum: {
         amountDue: true,
       },
     });
+    const outstandingBalance = Number((outstandingAgg._sum.amountDue || 0).toFixed(2));
 
-    // ─── Payment Status Counts (database-side groupBy) ────────────
+    // ─── Payment Status Counts for orders booked in period ────────
     const paymentsByStatus = await this.prisma.order.groupBy({
       by: ['paymentStatus'],
       where: {
@@ -107,7 +222,7 @@ export class DashboardService {
       paymentMap[row.paymentStatus] = row._count.id;
     }
 
-    // ─── Delivery KPIs (database-side groupBy) ────────────────────
+    // ─── Delivery KPIs ────────────────────────────────────────────
     const deliveriesByStatus = await this.prisma.deliveryRecord.groupBy({
       by: ['status'],
       where: {
@@ -135,6 +250,315 @@ export class DashboardService {
         orders: { some: { storeId } },
       },
     });
+
+    // ─── Previous-Period Comparison ───────────────────────────────
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const prevEndDate = new Date(startDate.getTime() - 1);
+    const prevStartDate = new Date(prevEndDate.getTime() - durationMs);
+    const prevDateFilter = { gte: prevStartDate, lte: prevEndDate };
+
+    const [prevBookedAgg, prevPaymentsAgg, prevRefundsAgg] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { storeId, orderDate: prevDateFilter },
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { order: { storeId }, createdAt: prevDateFilter },
+        _sum: { amount: true },
+      }),
+      this.prisma.financialAdjustment.aggregate({
+        where: {
+          order: { storeId },
+          type: AdjustmentType.REFUND,
+          status: AdjustmentStatus.COMPLETED,
+          createdAt: prevDateFilter,
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const prevBooked = Number((prevBookedAgg._sum.totalAmount || 0).toFixed(2));
+    const prevOrdersCount = prevBookedAgg._count.id || 0;
+    const prevCollections = Number((prevPaymentsAgg._sum.amount || 0).toFixed(2));
+    const prevRefunds = Number((prevRefundsAgg._sum.amount || 0).toFixed(2));
+    const prevNetCollections = Number((prevCollections - prevRefunds).toFixed(2));
+
+    const comparison: DashboardComparisonDTO = {
+      previousPeriod: {
+        startDate: prevStartDate.toISOString(),
+        endDate: prevEndDate.toISOString(),
+      },
+      bookedOrderValue: createComparison(bookedOrderValue, prevBooked),
+      collections: createComparison(collections, prevCollections),
+      netCollections: createComparison(netCollections, prevNetCollections),
+      totalOrders: createComparison(totalOrders, prevOrdersCount),
+    };
+
+    // ─── Trends (Daily Buckets) ───────────────────────────────────
+    const [trendOrders, trendPayments, trendRefunds] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { storeId, orderDate: dateFilter },
+        select: { orderDate: true, totalAmount: true },
+      }),
+      this.prisma.payment.findMany({
+        where: { order: { storeId }, createdAt: dateFilter },
+        select: { createdAt: true, amount: true },
+      }),
+      this.prisma.financialAdjustment.findMany({
+        where: {
+          order: { storeId },
+          type: AdjustmentType.REFUND,
+          status: AdjustmentStatus.COMPLETED,
+          createdAt: dateFilter,
+        },
+        select: { createdAt: true, amount: true },
+      }),
+    ]);
+
+    // Build day buckets spanning startDate to endDate in Asia/Kolkata
+    const startDayStr = formatKolkataDate(startDate);
+    const endDayStr = formatKolkataDate(endDate);
+    const curDate = new Date(`${startDayStr}T00:00:00.000+05:30`);
+    const endLimitDate = new Date(`${endDayStr}T00:00:00.000+05:30`);
+
+    const trendMap = new Map<string, DashboardTrendPoint>();
+    while (curDate.getTime() <= endLimitDate.getTime()) {
+      const bucketKey = formatKolkataDate(curDate);
+      if (!trendMap.has(bucketKey)) {
+        trendMap.set(bucketKey, {
+          date: bucketKey,
+          bookedOrderValue: 0,
+          orderCount: 0,
+          collections: 0,
+          refunds: 0,
+          netCollections: 0,
+        });
+      }
+      curDate.setDate(curDate.getDate() + 1);
+    }
+
+    for (const o of trendOrders) {
+      const key = formatKolkataDate(o.orderDate);
+      const point = trendMap.get(key);
+      if (point) {
+        point.bookedOrderValue = Number((point.bookedOrderValue + o.totalAmount).toFixed(2));
+        point.orderCount += 1;
+      }
+    }
+
+    for (const p of trendPayments) {
+      const key = formatKolkataDate(p.createdAt);
+      const point = trendMap.get(key);
+      if (point) {
+        point.collections = Number((point.collections + p.amount).toFixed(2));
+      }
+    }
+
+    for (const r of trendRefunds) {
+      const key = formatKolkataDate(r.createdAt);
+      const point = trendMap.get(key);
+      if (point) {
+        point.refunds = Number((point.refunds + r.amount).toFixed(2));
+      }
+    }
+
+    for (const point of trendMap.values()) {
+      point.netCollections = Number((point.collections - point.refunds).toFixed(2));
+    }
+
+    const trends: DashboardTrendsDTO = {
+      interval: 'daily',
+      points: Array.from(trendMap.values()),
+    };
+
+    // ─── Service & Category Breakdowns ────────────────────────────
+    const orderItems = await this.prisma.orderItem.findMany({
+      where: {
+        order: {
+          storeId,
+          orderDate: dateFilter,
+        },
+      },
+      select: {
+        quantity: true,
+        lineTotal: true,
+        serviceType: {
+          select: { name: true, category: true },
+        },
+        garmentCatalog: {
+          select: { category: true },
+        },
+      },
+    });
+
+    const serviceMap = new Map<string, DashboardServiceBreakdown>();
+    const categoryMap = new Map<string, DashboardCategoryBreakdown>();
+
+    for (const item of orderItems) {
+      const sKey = item.serviceType?.name || 'Unknown';
+      const sEntry = serviceMap.get(sKey) || {
+        serviceName: item.serviceType?.name || 'Unknown',
+        serviceCategory: item.serviceType?.category || 'OTHERS',
+        itemCount: 0,
+        totalAmount: 0,
+      };
+      sEntry.itemCount += item.quantity;
+      sEntry.totalAmount = Number((sEntry.totalAmount + item.lineTotal).toFixed(2));
+      serviceMap.set(sKey, sEntry);
+
+      const cKey = item.garmentCatalog?.category || 'OTHERS';
+      const cEntry = categoryMap.get(cKey) || {
+        category: cKey,
+        itemCount: 0,
+        totalAmount: 0,
+      };
+      cEntry.itemCount += item.quantity;
+      cEntry.totalAmount = Number((cEntry.totalAmount + item.lineTotal).toFixed(2));
+      categoryMap.set(cKey, cEntry);
+    }
+
+    const serviceBreakdown = Array.from(serviceMap.values()).sort(
+      (a, b) => b.totalAmount - a.totalAmount,
+    );
+    const categoryBreakdown = Array.from(categoryMap.values()).sort(
+      (a, b) => b.totalAmount - a.totalAmount,
+    );
+
+    // ─── Action Queues (Bounded findMany) ─────────────────────────
+    const mapToActionOrder = (o: any): DashboardActionOrder => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      customerName: o.customer.name,
+      customerPhone: o.customer.phone,
+      totalAmount: o.totalAmount,
+      amountPaid: o.amountPaid,
+      amountDue: o.amountDue,
+      status: o.status as unknown as SharedOrderStatus,
+      effectiveDueDate: o.effectiveDueDate.toISOString(),
+      orderDate: o.orderDate.toISOString(),
+      itemCount: o._count.items,
+    });
+
+    const [
+      overdueOrdersRaw,
+      dueTodayOrdersRaw,
+      dueTomorrowOrdersRaw,
+      pendingPaymentOrdersRaw,
+      pendingPaymentCount,
+    ] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          storeId,
+          effectiveDueDate: { lt: now },
+          status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          totalAmount: true,
+          amountPaid: true,
+          amountDue: true,
+          status: true,
+          effectiveDueDate: true,
+          orderDate: true,
+          customer: { select: { name: true, phone: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { effectiveDueDate: 'asc' },
+        take: 20,
+      }),
+      this.prisma.order.findMany({
+        where: {
+          storeId,
+          effectiveDueDate: { gte: todayStart, lte: todayEnd },
+          status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          totalAmount: true,
+          amountPaid: true,
+          amountDue: true,
+          status: true,
+          effectiveDueDate: true,
+          orderDate: true,
+          customer: { select: { name: true, phone: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { effectiveDueDate: 'asc' },
+        take: 20,
+      }),
+      this.prisma.order.findMany({
+        where: {
+          storeId,
+          effectiveDueDate: { gte: tomorrowStart, lte: tomorrowEnd },
+          status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          totalAmount: true,
+          amountPaid: true,
+          amountDue: true,
+          status: true,
+          effectiveDueDate: true,
+          orderDate: true,
+          customer: { select: { name: true, phone: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { effectiveDueDate: 'asc' },
+        take: 20,
+      }),
+      this.prisma.order.findMany({
+        where: {
+          storeId,
+          amountDue: { gt: 0 },
+          status: { not: OrderStatus.CANCELLED },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          totalAmount: true,
+          amountPaid: true,
+          amountDue: true,
+          status: true,
+          effectiveDueDate: true,
+          orderDate: true,
+          customer: { select: { name: true, phone: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { amountDue: 'desc' },
+        take: 20,
+      }),
+      this.prisma.order.count({
+        where: {
+          storeId,
+          amountDue: { gt: 0 },
+          status: { not: OrderStatus.CANCELLED },
+        },
+      }),
+    ]);
+
+    const actionQueues: DashboardActionQueuesDTO = {
+      overdue: {
+        count: overdueOrders,
+        items: overdueOrdersRaw.map(mapToActionOrder),
+      },
+      dueToday: {
+        count: dueTodayOrders,
+        items: dueTodayOrdersRaw.map(mapToActionOrder),
+      },
+      dueTomorrow: {
+        count: dueTomorrowOrders,
+        items: dueTomorrowOrdersRaw.map(mapToActionOrder),
+      },
+      pendingPayment: {
+        count: pendingPaymentCount,
+        totalAmountDue: outstandingBalance,
+        items: pendingPaymentOrdersRaw.map(mapToActionOrder),
+      },
+    };
 
     // ─── Ready Orders (orders with at least one READY item) ───────
     const readyOrdersRaw = await this.prisma.order.findMany({
@@ -281,14 +705,24 @@ export class DashboardService {
         cancelled: statusMap[OrderStatus.CANCELLED] || 0,
         overdue: overdueOrders,
         dueToday: dueTodayOrders,
+        dueTomorrow: dueTomorrowOrders,
       },
       financial: {
-        totalOrderValue: financialAgg._sum.totalAmount || 0,
-        amountPaid: financialAgg._sum.amountPaid || 0,
-        amountDue: financialAgg._sum.amountDue || 0,
+        // Preserved backward-compatible fields
+        totalOrderValue: bookedOrderValue,
+        amountPaid: collections,
+        amountDue: outstandingBalance,
         paidOrders: paymentMap[PaymentStatus.PAID] || 0,
         partialOrders: paymentMap[PaymentStatus.PARTIAL] || 0,
         pendingOrders: paymentMap[PaymentStatus.PENDING] || 0,
+        // Explicit Step 1 additions
+        bookedOrderValue,
+        collections,
+        refunds,
+        netCollections,
+        outstandingBalance,
+        collectionCount,
+        refundCount,
       },
       delivery: {
         scheduled: deliveryMap[DeliveryStatus.SCHEDULED] || 0,
@@ -304,6 +738,12 @@ export class DashboardService {
       readyOrders,
       recentOrders,
       recentActivity,
+      // Step 1 analytics aggregates
+      trends,
+      comparison,
+      serviceBreakdown,
+      categoryBreakdown,
+      actionQueues,
     };
   }
 }

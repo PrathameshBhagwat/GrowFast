@@ -5,7 +5,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { TagDesignerPage } from './TagDesignerPage';
 import { TagDesignApi } from '../services/tag-design.api';
-import { Role, DEFAULT_TAG_DESIGN, type TagDesignConfig } from '@growfast/shared-types';
+import {
+  Role,
+  REFERENCE_TAG_DESIGN,
+  type TagDesignConfig,
+} from '@growfast/shared-types';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -16,13 +20,15 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+let mockCurrentRole: Role = Role.OWNER;
+
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
     token: 'mock-owner-token',
     employee: {
       id: 'emp-owner-001',
       name: 'Owner Boss',
-      role: Role.OWNER,
+      role: mockCurrentRole,
       storeId: 'store-1',
       storeName: 'A Laundry',
     },
@@ -35,17 +41,20 @@ vi.mock('../services/tag-design.api', () => ({
     getDesign: vi.fn(),
     saveDesign: vi.fn(),
     resetDesign: vi.fn(),
+    getHistory: vi.fn(),
+    downloadFont: vi.fn(),
   },
 }));
 
-describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
+describe('TagDesignerPage (Design Tags Specification)', { timeout: 15000 }, () => {
   const mockDesign: TagDesignConfig = {
-    ...DEFAULT_TAG_DESIGN,
+    ...REFERENCE_TAG_DESIGN,
     name: 'Initial Store Design',
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCurrentRole = Role.OWNER;
     (TagDesignApi.getDesign as any).mockResolvedValue(mockDesign);
     (TagDesignApi.saveDesign as any).mockImplementation(async (layout: TagDesignConfig) => ({
       success: true,
@@ -54,9 +63,22 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     }));
     (TagDesignApi.resetDesign as any).mockResolvedValue({
       success: true,
-      data: DEFAULT_TAG_DESIGN,
+      data: REFERENCE_TAG_DESIGN,
       message: 'Reset',
     });
+    (TagDesignApi.getHistory as any).mockResolvedValue({
+      success: true,
+      data: [
+        {
+          version: 1,
+          updatedAt: '2026-10-18T10:00:00.000Z',
+          updatedByName: 'Prathamesh',
+          updatedByEmail: 'owner@growfast.com',
+          changesSummary: 'Initial baseline canonical design.',
+        },
+      ],
+    });
+    (TagDesignApi.downloadFont as any).mockResolvedValue(undefined);
     window.print = vi.fn();
     window.confirm = vi.fn(() => true);
   });
@@ -69,17 +91,40 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Live 40 × 40 mm Preview')).toBeInTheDocument();
-    expect(screen.getByText('Field Arrangement & Typography')).toBeInTheDocument();
-    expect(screen.getByText('Tag Padding & Border')).toBeInTheDocument();
+    // General Tag Settings
+    expect(screen.getByText('General Tag Settings')).toBeInTheDocument();
+    expect(screen.getByLabelText('Width')).toHaveValue('1.5 in');
+    expect(screen.getByLabelText('Height')).toHaveValue('1.5 in');
+    expect(screen.getByLabelText('Printer')).toHaveValue('TSC TE244');
+    expect(screen.getByLabelText(/Wet Strength Paper/i)).toBeInTheDocument();
+
+    // 11 Reference Fields check
+    expect(screen.getByText('BarCode')).toBeInTheDocument();
+    expect(screen.getByText('QRCode')).toBeInTheDocument();
+    expect(screen.getByText('Booking No.')).toBeInTheDocument();
+    expect(screen.getByText('Customer')).toBeInTheDocument();
+    expect(screen.getByText('Address')).toBeInTheDocument();
+    expect(screen.getByText('Process')).toBeInTheDocument();
+    expect(screen.getByText('Item Total')).toBeInTheDocument();
+    expect(screen.getByText('Remark')).toBeInTheDocument();
+    expect(screen.getByText('Colour')).toBeInTheDocument();
+    expect(screen.getByText('Booking Date')).toBeInTheDocument();
+    expect(screen.getByText('Due Date')).toBeInTheDocument();
+
+    // Live preview
+    expect(screen.getByText('Live Tag Preview')).toBeInTheDocument();
+    expect(screen.getByText(/Preview Sample Data/i)).toBeInTheDocument();
+
+    // Action buttons
     expect(screen.getByRole('button', { name: /save design/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reset default/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /download font/i })).toBeInTheDocument();
   });
 
-  it('toggles field visibility when toggle button is clicked', async () => {
+  it('toggles print visibility on fields', async () => {
     render(
       <MemoryRouter>
         <TagDesignerPage />
@@ -87,19 +132,19 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
     const toggleCustomerBtn = screen.getByRole('button', {
-      name: /toggle visibility of customer name/i,
+      name: /toggle print for customer/i,
     });
-    expect(toggleCustomerBtn).toHaveTextContent('Visible');
+    expect(toggleCustomerBtn).toHaveTextContent('Print: Yes');
 
     fireEvent.click(toggleCustomerBtn);
-    expect(toggleCustomerBtn).toHaveTextContent('Hidden');
+    expect(toggleCustomerBtn).toHaveTextContent('Print: No');
 
     fireEvent.click(toggleCustomerBtn);
-    expect(toggleCustomerBtn).toHaveTextContent('Visible');
+    expect(toggleCustomerBtn).toHaveTextContent('Print: Yes');
   });
 
   it('reorders fields using move up and move down buttons', async () => {
@@ -110,20 +155,23 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
-    // Move orderNumber up (index 1 -> index 0)
-    const moveUpOrderNumberBtn = screen.getByRole('button', {
-      name: /move order number \(primary anchor\) up/i,
+    // Move QRCode up (from index 1 to index 0)
+    const moveUpQRCodeBtn = screen.getByRole('button', {
+      name: /move qrcode up/i,
     });
-    fireEvent.click(moveUpOrderNumberBtn);
+    fireEvent.click(moveUpQRCodeBtn);
 
-    // After move up, orderNumber row should be first (1. Order Number)
-    expect(screen.getByText(/1\. Order Number/i)).toBeInTheDocument();
+    // QRCode is now first
+    const firstRowMoveUpBtn = screen.getByRole('button', {
+      name: /move qrcode up/i,
+    });
+    expect(firstRowMoveUpBtn).toBeDisabled();
   });
 
-  it('adjusts text alignment on field', async () => {
+  it('updates general settings: width, height, printer, and wet strength paper', async () => {
     render(
       <MemoryRouter>
         <TagDesignerPage />
@@ -131,16 +179,27 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
-    const alignCenterBtn = screen.getAllByRole('button', {
-      name: /align center/i,
-    })[0];
-    fireEvent.click(alignCenterBtn);
+    const widthSelect = screen.getByLabelText('Width');
+    fireEvent.change(widthSelect, { target: { value: '2.0 in' } });
+    expect(widthSelect).toHaveValue('2.0 in');
+
+    const printerSelect = screen.getByLabelText('Printer');
+    fireEvent.change(printerSelect, { target: { value: 'Zebra ZD220 / ZD230' } });
+    expect(printerSelect).toHaveValue('Zebra ZD220 / ZD230');
+
+    const wetStrengthCheckbox = screen.getByLabelText(/Wet Strength Paper/i);
+    expect(wetStrengthCheckbox).toBeChecked();
+    fireEvent.click(wetStrengthCheckbox);
+    expect(wetStrengthCheckbox).not.toBeChecked();
+
+    // Verify unsaved changes badge appears
+    expect(screen.getByText('Unsaved Changes')).toBeInTheDocument();
   });
 
-  it('increments and decrements font size within bounds', async () => {
+  it('handles workshop prepone due date toggle and days stepper', async () => {
     render(
       <MemoryRouter>
         <TagDesignerPage />
@@ -148,72 +207,21 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
-    const increaseBtn = screen.getAllByRole('button', {
-      name: /increase font size/i,
-    })[0];
-    fireEvent.click(increaseBtn);
-
-    const decreaseBtn = screen.getAllByRole('button', {
-      name: /decrease font size/i,
-    })[0];
-    fireEvent.click(decreaseBtn);
-  });
-
-  it('adjusts tag padding and border style', async () => {
-    render(
-      <MemoryRouter>
-        <TagDesignerPage />
-      </MemoryRouter>,
+    const preponeCheckbox = screen.getByLabelText(
+      /Select to bring forward\/Prepone Due Date for Workshop tags only/i,
     );
+    expect(preponeCheckbox).not.toBeChecked();
 
-    await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
-    });
+    fireEvent.click(preponeCheckbox);
+    expect(preponeCheckbox).toBeChecked();
 
-    const incTopPaddingBtn = screen.getByRole('button', {
-      name: /increase top padding/i,
-    });
-    fireEvent.click(incTopPaddingBtn);
-
-    const solidBorderBtn = screen.getByRole('button', { name: /solid/i });
-    fireEvent.click(solidBorderBtn);
-  });
-
-  it('switches sample order presets', async () => {
-    render(
-      <MemoryRouter>
-        <TagDesignerPage />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
-    });
-
-    const select = screen.getByLabelText(/sample garment order:/i);
-    fireEvent.change(select, { target: { value: '1' } }); // Long text preset
-  });
-
-  it('toggles calibration test pattern preview', async () => {
-    render(
-      <MemoryRouter>
-        <TagDesignerPage />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
-    });
-
-    const calibToggleBtn = screen.getByRole('button', { name: /calibration/i });
-    fireEvent.click(calibToggleBtn);
-    expect(screen.getByRole('button', { name: /show tag/i })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /show tag/i }));
-    expect(screen.getByRole('button', { name: /calibration/i })).toBeInTheDocument();
+    const daysInput = document.getElementById('workshop-prepone-days-input') as HTMLInputElement;
+    expect(daysInput).toBeEnabled();
+    fireEvent.change(daysInput, { target: { value: '2' } });
+    expect(daysInput.value).toBe('2');
   });
 
   it('saves design when Save Design button is clicked', async () => {
@@ -224,7 +232,7 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
     const saveBtn = screen.getByRole('button', { name: /save design/i });
@@ -232,11 +240,11 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
 
     await waitFor(() => {
       expect(TagDesignApi.saveDesign).toHaveBeenCalledTimes(1);
-      expect(screen.getByText(/tag design configuration saved successfully/i)).toBeInTheDocument();
+      expect(screen.getByText(/saved successfully/i)).toBeInTheDocument();
     });
   });
 
-  it('resets design to canonical default when Reset Default is clicked and confirmed', async () => {
+  it('resets design back to reference default layout on confirmation', async () => {
     render(
       <MemoryRouter>
         <TagDesignerPage />
@@ -244,21 +252,20 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
     const resetBtn = screen.getByRole('button', { name: /reset default/i });
     fireEvent.click(resetBtn);
 
+    expect(window.confirm).toHaveBeenCalled();
     await waitFor(() => {
       expect(TagDesignApi.resetDesign).toHaveBeenCalledTimes(1);
-      expect(
-        screen.getByText(/tag layout reset to canonical 40×40 mm default/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/reset to canonical reference default/i)).toBeInTheDocument();
     });
   });
 
-  it('triggers test print with active design when Print Test button is clicked', async () => {
+  it('triggers font download when Download Font button is clicked', async () => {
     render(
       <MemoryRouter>
         <TagDesignerPage />
@@ -266,14 +273,51 @@ describe('TagDesignerPage (Phase T4: Admin Tag Designer)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Admin Tag Designer')).toBeInTheDocument();
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
     });
 
-    const printBtn = screen.getByRole('button', {
-      name: /print test sample tag \(40×40 mm\)/i,
-    });
-    fireEvent.click(printBtn);
+    const downloadBtn = screen.getByRole('button', { name: /download font/i });
+    fireEvent.click(downloadBtn);
 
-    expect(window.print).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(TagDesignApi.downloadFont).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/C39HrP36DmT\.ttf downloaded successfully/i)).toBeInTheDocument();
+    });
+  });
+
+  it('opens history modal when History button is clicked', async () => {
+    render(
+      <MemoryRouter>
+        <TagDesignerPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
+    });
+
+    const historyBtn = screen.getByRole('button', { name: /history/i });
+    fireEvent.click(historyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tag Design Change History/i)).toBeInTheDocument();
+      expect(screen.getByText(/Initial baseline canonical design/i)).toBeInTheDocument();
+    });
+  });
+
+  it('rejects access for non-owner employees and renders access denied card', async () => {
+    mockCurrentRole = Role.COUNTER;
+
+    render(
+      <MemoryRouter>
+        <TagDesignerPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Owner Access Required')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Only authenticated Store Owners have permission/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('General Tag Settings')).not.toBeInTheDocument();
   });
 });

@@ -394,8 +394,12 @@ export function OrderDetailPage() {
               {order.paymentStatus}
             </span>
             {order.isExpress && (
-              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800 border border-red-200">
-                EXPRESS
+              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                {order.expressDeliveryOption === 'SAME_DAY'
+                  ? '⚡ SAME DAY (2×)'
+                  : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
+                    ? '⚡ TOMORROW (1.5×)'
+                    : '⚡ EXPRESS'}
               </span>
             )}
           </div>
@@ -512,7 +516,14 @@ export function OrderDetailPage() {
             </div>
             {order.isExpress && (order.expressSurcharge || 0) > 0 && (
               <div className="flex justify-between">
-                <span className="text-orange-600">⚡ Express Surcharge</span>
+                <span className="text-orange-600">
+                  ⚡ Express Surcharge{' '}
+                  {order.expressDeliveryOption === 'SAME_DAY'
+                    ? '(Same-Day 2×)'
+                    : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
+                      ? '(Tomorrow 1.5×)'
+                      : ''}
+                </span>
                 <span className="font-medium text-orange-600">₹{order.expressSurcharge}</span>
               </div>
             )}
@@ -1176,9 +1187,6 @@ export function OrderDetailPage() {
             currentIndex,
             garmentLabel: label,
           })
-        }
-        onOpenDesigner={
-          employee?.role === Role.OWNER ? () => navigate('/admin/tag-designer') : undefined
         }
       />
 
