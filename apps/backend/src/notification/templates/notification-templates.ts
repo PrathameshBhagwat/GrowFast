@@ -93,10 +93,7 @@ export function formatNotificationMessage(
         (amountPaidNum >= totalAmountNum && totalAmountNum > 0 && balanceDueNum === 0)
       ) {
         paymentSummary = `Payment Received: ₹${formatCurrencyVal(amountPaidNum)}\nPayment Status: Paid`;
-      } else if (
-        paymentStatus === 'PARTIAL' ||
-        (amountPaidNum > 0 && balanceDueNum > 0)
-      ) {
+      } else if (paymentStatus === 'PARTIAL' || (amountPaidNum > 0 && balanceDueNum > 0)) {
         paymentSummary = `Payment Received: ₹${formatCurrencyVal(amountPaidNum)}\nBalance Due: ₹${formatCurrencyVal(balanceDueNum)}\nPayment Status: Partially Paid`;
       } else {
         paymentSummary = `Payment Received: ₹0\nBalance Due: ₹${formatCurrencyVal(balanceDueNum)}\nPayment Status: Pending`;

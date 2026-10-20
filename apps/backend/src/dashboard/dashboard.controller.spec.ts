@@ -58,11 +58,7 @@ describe('DashboardController', () => {
   });
 
   it('should parse ISO timestamp strings directly without shifting', async () => {
-    await controller.getSummary(
-      mockReq,
-      '2026-09-01T10:00:00.000Z',
-      '2026-09-05T18:00:00.000Z',
-    );
+    await controller.getSummary(mockReq, '2026-09-01T10:00:00.000Z', '2026-09-05T18:00:00.000Z');
 
     expect(service.getSummary).toHaveBeenCalledTimes(1);
     const [, start, end] = (service.getSummary as jest.Mock).mock.calls[0];

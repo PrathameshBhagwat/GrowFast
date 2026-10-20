@@ -1207,9 +1207,7 @@ export const TagDesignerPage: React.FC = () => {
             </p>
 
             {isLoadingHistory ? (
-              <div className="py-8 text-center text-xs text-gray-500">
-                Loading audit history...
-              </div>
+              <div className="py-8 text-center text-xs text-gray-500">Loading audit history...</div>
             ) : auditList.length === 0 ? (
               <div className="py-8 text-center text-xs text-gray-500">
                 No past design modifications recorded. You are currently on baseline version 1.

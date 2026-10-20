@@ -155,9 +155,7 @@ describe('DashboardService', () => {
     // 7. Trend data:
     mockPrisma.order.findMany
       // 1st findMany: trendOrders
-      .mockResolvedValueOnce([
-        { orderDate: new Date('2026-09-01T10:00:00Z'), totalAmount: 15000 },
-      ])
+      .mockResolvedValueOnce([{ orderDate: new Date('2026-09-01T10:00:00Z'), totalAmount: 15000 }])
       // 2nd findMany: overdueActionOrdersRaw
       .mockResolvedValueOnce([
         {

@@ -80,4 +80,3 @@ export const TagDesignApi = {
     document.body.removeChild(link);
   },
 };
-

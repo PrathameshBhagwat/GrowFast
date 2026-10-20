@@ -74,9 +74,13 @@ export class LogNotificationProvider implements NotificationProvider {
     }
 
     if (formattedMessage) {
-      console.log(`\n================= CUSTOMER NOTIFICATION (${payload.channel}) =================`);
+      console.log(
+        `\n================= CUSTOMER NOTIFICATION (${payload.channel}) =================`,
+      );
       console.log(formattedMessage);
-      console.log(`==============================================================================\n`);
+      console.log(
+        `==============================================================================\n`,
+      );
     } else {
       console.log(
         `[${this.name}] Notification event recorded (not dispatched):`,
@@ -88,7 +92,6 @@ export class LogNotificationProvider implements NotificationProvider {
         }),
       );
     }
-
 
     return {
       success: false,
