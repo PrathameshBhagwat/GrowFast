@@ -14,6 +14,7 @@ import { StoreModule } from './store/store.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationModule } from './notification/notification.module';
+import { ReportModule } from './report/report.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NotificationModule } from './notification/notification.module';
     DeliveryModule,
     DashboardModule,
     NotificationModule,
+    ReportModule,
   ],
   providers: [
     {

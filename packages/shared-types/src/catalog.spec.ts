@@ -180,6 +180,15 @@ describe('resolveCatalogSelectionOnCategoryChange', () => {
     assert.strictEqual(result, '5'); // Shoe Cleaning
   });
 
+  it('auto-selects Shoe Cleaning when switching to Shoe from Dry Clean', () => {
+    const result = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.SHOES,
+      '2',
+      mockServices,
+    );
+    assert.strictEqual(result, '5'); // Shoe Cleaning
+  });
+
   it('auto-selects Standard Wash when leaving Shoe with Shoe Cleaning selected', () => {
     const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '5', mockServices);
     assert.strictEqual(result, '1'); // Standard Wash
@@ -210,6 +219,41 @@ describe('resolveCatalogSelectionOnCategoryChange', () => {
       mockServices,
     );
     assert.strictEqual(result, '8');
+  });
+});
+
+describe('resolveCatalogSelectionOnServiceChange', () => {
+  it('auto-selects Shoe category when switching to Shoe Cleaning service', () => {
+    const result = resolveCatalogSelectionOnServiceChange('5', GarmentCategory.MEN, mockServices);
+    assert.strictEqual(result, GarmentCategory.SHOES);
+  });
+
+  it('auto-switches to Men when Shoe is selected and user picks an incompatible service (Dry Clean)', () => {
+    const result = resolveCatalogSelectionOnServiceChange('2', GarmentCategory.SHOES, mockServices);
+    assert.strictEqual(result, GarmentCategory.MEN);
+  });
+
+  it('auto-switches to Men when Shoe is selected and user picks Standard Wash', () => {
+    const result = resolveCatalogSelectionOnServiceChange('1', GarmentCategory.SHOES, mockServices);
+    assert.strictEqual(result, GarmentCategory.MEN);
+  });
+
+  it('auto-switches to Men when Weight Based is selected and user picks Dry Clean', () => {
+    const result = resolveCatalogSelectionOnServiceChange(
+      '2',
+      GarmentCategory.WEIGHT_BASED,
+      mockServices,
+    );
+    assert.strictEqual(result, GarmentCategory.MEN);
+  });
+
+  it('keeps Women when switching between standard piece services (Dry Clean -> Steam Iron)', () => {
+    const result = resolveCatalogSelectionOnServiceChange(
+      '3',
+      GarmentCategory.WOMEN,
+      mockServices,
+    );
+    assert.strictEqual(result, GarmentCategory.WOMEN);
   });
 });
 
