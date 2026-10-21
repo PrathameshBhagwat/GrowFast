@@ -369,4 +369,47 @@ describe('DailyOrdersReportPage', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('Order Date / Time')).not.toBeInTheDocument();
   });
+
+  it('10. exportDailyOrdersToExcel neutralizes formula injection triggers', async () => {
+    exportExcelSpy.mockRestore();
+    let capturedBlob: Blob | null = null;
+    const originalCreateObjectURL = URL.createObjectURL;
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      capturedBlob = blob;
+      return 'blob:mock-url';
+    });
+
+    try {
+      const maliciousRow: any = {
+        formattedOrderDate: '19 Oct 2026, 10:00',
+        orderNumber: '=CMD|"/C calc"!A0',
+        customerCode: '+919999999999',
+        customerName: '@Attacker',
+        customerAddress: '\tTabbed Address',
+        customerPhone: '9876543210',
+        formattedDueDate: '25 Oct 2026',
+        pieces: 2,
+        weight: 1.5,
+        grossAmount: 200,
+        discount: 0,
+        netAmount: 200,
+        advance: 100,
+        balance: 100,
+        status: 'READY',
+        paymentStatus: 'PARTIAL',
+        orderTypeSummary: 'Laundry',
+        createdByName: 'Staff',
+      };
+
+      reportApi.exportDailyOrdersToExcel([maliciousRow], '2026-10-19');
+
+      expect(capturedBlob).not.toBeNull();
+      const text = await (capturedBlob as any).text();
+      expect(text).toContain('"\'=CMD');
+      expect(text).toContain('"\'@Attacker"');
+      expect(text).toContain('"\'\tTabbed Address"');
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+    }
+  });
 });

@@ -268,11 +268,12 @@ export class OrderService {
         }
 
         // Validate and compute supported store add-ons
-        const addonIds: string[] =
+        const rawAddonIds: string[] =
           item.addOnIds ||
           (Array.isArray((item as any).addOns)
             ? (item as any).addOns.map((a: any) => (typeof a === 'string' ? a : a.id))
             : []);
+        const addonIds: string[] = Array.from(new Set(rawAddonIds));
 
         let addOnsUnitPrice = 0;
         if (addonIds.length > 0) {

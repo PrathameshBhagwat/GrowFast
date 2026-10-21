@@ -123,7 +123,12 @@ export function exportDailyOrdersToExcel(
 
   const escapeCSV = (val: string | number | null | undefined): string => {
     if (val === null || val === undefined) return '""';
-    const s = String(val).replace(/"/g, '""');
+    if (typeof val === 'number') return `"${val}"`;
+    let s = String(val).replace(/"/g, '""');
+    // Prevent CSV / Excel formula injection (DDE attacks: =, +, @, \t, \r, or - followed by non-digits)
+    if (/^[=+@\t\r]/.test(s) || (/^-[^\d]/.test(s) && s !== '-')) {
+      s = `'${s}`;
+    }
     return `"${s}"`;
   };
 

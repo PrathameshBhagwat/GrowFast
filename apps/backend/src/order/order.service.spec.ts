@@ -386,6 +386,29 @@ describe('OrderService', () => {
       expect(callArgs.data.subtotal).toBe(230);
     });
 
+    it('should deduplicate repeated add-on selections to prevent duplicate charging', async () => {
+      const dtoWithDuplicateAddons = {
+        ...validDto,
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 1,
+            addOnIds: ['addon-starch', 'addon-starch'],
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await service.createOrder(dtoWithDuplicateAddons, 'emp1', 'store1');
+
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+      // Base: 150, Starching once: 30 => Unit price: 180 (not 210)
+      expect(callArgs.data.items.create[0].unitPrice).toBe(180);
+      expect(callArgs.data.items.create[0].lineTotal).toBe(180);
+      expect(callArgs.data.subtotal).toBe(180);
+    });
+
     it('should reject invalid or unauthorized add-on selections on the backend', async () => {
       const invalidAddonDto = {
         ...validDto,
