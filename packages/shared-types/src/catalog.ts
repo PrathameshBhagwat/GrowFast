@@ -13,7 +13,7 @@ const SHOE_HIDDEN_SERVICES = [
 const CATALOG_EXCLUDED_SERVICES = ['free shoe', 'reprocess cleaning'];
 
 /** Service names that are valid shoe-oriented services. */
-const SHOE_VALID_SERVICES = ['standard wash', 'dry clean', 'shoe cleaning'];
+const SHOE_VALID_SERVICES = ['shoe cleaning', 'free shoe'];
 
 /** Categories allowed when Starching service is selected. */
 export const STARCHING_ALLOWED_CATEGORIES: GarmentCategory[] = [
@@ -479,9 +479,10 @@ export function resolveCatalogSelectionOnCategoryChange<
  * Resolves the category selection when the user changes the service.
  * Business Rules:
  * 1. When Service becomes Shoe Cleaning or Free Shoe: auto-select Shoe category.
- * 2. When Service becomes Starching: if current category is NOT Men, Women, or Kids, auto-select Men.
- * 3. When Service becomes Dry Clean: if current category is Weight Based, auto-select Men (Dry Clean is strictly per-piece).
- * 4. For all other services: keep current category.
+ * 2. When Shoe category is selected and user selects an incompatible service (e.g. Dry Clean, Standard Wash): auto-select Men.
+ * 3. When Service becomes Starching: if current category is NOT Men, Women, or Kids, auto-select Men.
+ * 4. When Service becomes Dry Clean: if current category is Weight Based, auto-select Men (Dry Clean is strictly per-piece).
+ * 5. For all other services: keep current category.
  */
 export function resolveCatalogSelectionOnServiceChange<T extends { id: string; name: string }>(
   newServiceId: string,
@@ -495,6 +496,11 @@ export function resolveCatalogSelectionOnServiceChange<T extends { id: string; n
 
   if (name === 'shoe cleaning' || name === 'free shoe') {
     return GarmentCategory.SHOES;
+  }
+
+  // If current category is Shoe and an incompatible service is selected, switch to Men
+  if (isShoeCategory(currentCategory)) {
+    return GarmentCategory.MEN;
   }
 
   if (isStarchingService(newServiceId, services)) {

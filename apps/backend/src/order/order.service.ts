@@ -192,29 +192,41 @@ export class OrderService {
           service.category === ServiceCategory.DRY_CLEAN ||
           service.name.trim().toLowerCase() === 'dry clean';
 
-        if (isDryClean) {
-          if (
-            garment.category === GarmentCategory.WEIGHT_BASED ||
-            (item.weight != null && item.weight > 0)
-          ) {
-            throw new BadRequestException(
-              `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
-            );
-          }
+        if (isDryClean && item.weight != null && item.weight > 0) {
+          throw new BadRequestException(
+            `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+          );
         }
 
+        if (dto.workflow === 'DRY_CLEANING' && item.weight != null && item.weight > 0) {
+          throw new BadRequestException(
+            `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+          );
+        }
+
+        // Per-piece exception: In DRY_CLEANING workflow or PIECES entry mode,
+        // when either the garment or service has WEIGHT_BASED category but no
+        // weight is provided, treat it as a per-piece order line.
+        const hasWeightBasedFlag =
+          garment.category === GarmentCategory.WEIGHT_BASED ||
+          service.category === ServiceCategory.WEIGHT_BASED;
+
         const isWeightPieceException =
-          garment.category === GarmentCategory.WEIGHT_BASED &&
-          (service.category === ServiceCategory.DRY_CLEAN ||
+          hasWeightBasedFlag &&
+          (dto.workflow === 'DRY_CLEANING' ||
+            dto.entryMode === 'PIECES' ||
+            service.category === ServiceCategory.DRY_CLEAN ||
             service.name.toLowerCase().includes('dry clean') ||
             (item.unitPrice !== undefined && item.unitPrice > 0)) &&
           (item.weight == null || item.weight === undefined);
 
         const isWeightBased =
-          (garment.category === GarmentCategory.WEIGHT_BASED ||
-            service.category === ServiceCategory.WEIGHT_BASED ||
-            (item.weight != null && item.weight > 0)) &&
-          !isWeightPieceException;
+          !isWeightPieceException &&
+          dto.workflow !== 'DRY_CLEANING' &&
+          dto.entryMode !== 'PIECES' &&
+          (dto.entryMode === 'WEIGHT' ||
+            (item.weight != null && item.weight > 0) ||
+            hasWeightBasedFlag);
 
         if (isWeightBased) {
           if (item.weight == null || isNaN(item.weight) || item.weight < 2.0) {
@@ -240,7 +252,13 @@ export class OrderService {
 
         const priceKey = `${garment.id}_${service.id}`;
         let unitPrice = priceMap.get(priceKey) ?? 0;
-        if (isWeightPieceException && item.unitPrice !== undefined && item.unitPrice > 0) {
+        if (isWeightPieceException) {
+          if (item.unitPrice !== undefined && item.unitPrice > 0) {
+            unitPrice = item.unitPrice;
+          } else if (unitPrice === 0) {
+            unitPrice = 40;
+          }
+        } else if (unitPrice === 0 && item.unitPrice !== undefined && item.unitPrice > 0) {
           unitPrice = item.unitPrice;
         }
 
@@ -316,19 +334,16 @@ export class OrderService {
       // 3.5 Photo requirement validation
       const isWalkIn = dto.pickupType === PickupType.STORE_PICKUP;
       let totalPieces = 0;
-      let isWeightBasedOrder = false;
 
       for (const item of dto.items) {
         totalPieces += item.quantity;
-        const garment = garmentMap.get(item.garmentCatalogId);
-        const service = serviceMap.get(item.serviceTypeId);
-        if (
-          garment?.category === GarmentCategory.WEIGHT_BASED ||
-          service?.category === ServiceCategory.WEIGHT_BASED
-        ) {
-          isWeightBasedOrder = true;
-        }
       }
+
+      const isWeightBasedOrder =
+        dto.entryMode === 'WEIGHT' ||
+        (dto.entryMode !== 'PIECES' &&
+          dto.workflow !== 'DRY_CLEANING' &&
+          orderItemsData.some((oi) => oi.weight != null && oi.weight > 0));
 
       const photosRequired = isPhotoRequiredForOrder({
         isWalkIn,

@@ -650,3 +650,67 @@ export interface CreateNotificationRequest {
   recipient: string;
   payload?: Record<string, unknown>;
 }
+
+// ─── Daily Orders Report DTOs ────────────────────────────────────────
+
+export interface DailyOrderReportRowDTO {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  formattedOrderDate: string;
+  customerCode: string;
+  customerName: string;
+  customerAddress: string;
+  customerPhone: string;
+  dueDate: string;
+  formattedDueDate: string;
+  pieces: number;
+  weight: number | null;
+  grossAmount: number;
+  discount: number;
+  netAmount: number;
+  advance: number;
+  balance: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  orderTypeSummary?: string;
+  createdByName?: string;
+  createdById?: string;
+}
+
+export interface DailyOrdersReportSummaryDTO {
+  totalOrders: number;
+  totalPieces: number;
+  totalWeight: number;
+  totalGrossAmount: number;
+  totalDiscount: number;
+  totalNetAmount: number;
+  totalAdvance: number;
+  totalBalance: number;
+}
+
+export interface DailyOrdersReportResponseDTO {
+  success: boolean;
+  data: DailyOrderReportRowDTO[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  summary: DailyOrdersReportSummaryDTO;
+}
+
+export interface DailyOrdersReportQueryDTO {
+  startDate?: string;
+  endDate?: string;
+  timezone?: string;
+  customerId?: string;
+  orderNumber?: string;
+  orderType?: string;
+  userId?: string;
+  hasDiscount?: 'all' | 'with' | 'without' | string;
+  filterBy?: string;
+  page?: number;
+  pageSize?: number;
+  export?: boolean;
+}
+

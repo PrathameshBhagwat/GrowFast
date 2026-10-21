@@ -189,4 +189,43 @@ describe('CatalogNavFilter Service & Category Rules', () => {
     // Weight based category is visible
     expect(screen.getByRole('button', { name: /weight based/i })).toBeInTheDocument();
   });
+
+  it('Requirement 8: singleRow mode renders services, categories, and step labels in a combined container', () => {
+    const handleServiceChange = vi.fn();
+    const handleCategoryChange = vi.fn();
+
+    render(
+      <CatalogNavFilter
+        singleRow={true}
+        showStepNumbers={true}
+        services={sampleServices}
+        activeServiceId="svc-wash"
+        onServiceChange={handleServiceChange}
+        activeCategory={GarmentCategory.MEN}
+        onCategoryChange={handleCategoryChange}
+        searchQuery=""
+        onSearchChange={vi.fn()}
+      />,
+    );
+
+    // Labels exist
+    expect(screen.getByText('Select Service')).toBeInTheDocument();
+    expect(screen.getByText('Select Category')).toBeInTheDocument();
+
+    // Services exist
+    expect(screen.getByRole('button', { name: /standard wash/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dry clean/i })).toBeInTheDocument();
+
+    // Categories exist
+    expect(screen.getByRole('button', { name: /^men$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^women$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /weight based/i })).toBeInTheDocument();
+
+    // Interactivity works
+    fireEvent.click(screen.getByRole('button', { name: /dry clean/i }));
+    expect(handleServiceChange).toHaveBeenCalledWith('svc-dc');
+
+    fireEvent.click(screen.getByRole('button', { name: /^women$/i }));
+    expect(handleCategoryChange).toHaveBeenCalledWith(GarmentCategory.WOMEN);
+  });
 });
