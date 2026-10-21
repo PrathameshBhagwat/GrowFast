@@ -1171,7 +1171,7 @@ export const DashboardPage: React.FC = () => {
                           style={{
                             color: 'var(--text-placeholder, #9CA3AF)',
                             fontSize: 11,
-                            fontMono: true,
+                            fontFamily: 'monospace',
                             whiteSpace: 'nowrap',
                           }}
                         >

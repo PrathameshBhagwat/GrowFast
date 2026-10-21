@@ -3,10 +3,12 @@ import { ArrowLeft } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 export interface CatalogHeaderProps {
-  title?: string;
-  subtitle?: string;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  statusBadge?: React.ReactNode;
   onBack?: () => void;
   showLogo?: boolean;
+  showThemeToggle?: boolean;
   rightContent?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
@@ -14,19 +16,22 @@ export interface CatalogHeaderProps {
 
 export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
   title = 'Garment Catalog',
-  subtitle = 'Downtown Connaught Place #102 • Active Master Catalog',
+  subtitle = 'Downtown Connaught Place #102',
+  statusBadge,
   onBack,
   showLogo = true,
+  showThemeToggle = false,
   rightContent,
   className = '',
   style,
 }) => {
   return (
     <header
-      className={`bg-white border-b border-slate-200 shadow-xs flex items-center justify-between shrink-0 z-10 box-border ${className}`}
+      className={`bg-white border border-slate-200 rounded-[6px] shadow-xs flex items-center justify-between shrink-0 box-border ${className}`}
       style={{
         background: 'var(--bg-surface, #ffffff)',
-        borderBottom: '1px solid var(--border, #e2e8f0)',
+        border: '1px solid var(--border, #e2e8f0)',
+        borderRadius: '6px',
         padding: '8px 16px',
         minHeight: '52px',
         boxShadow: '0 1px 2px 0 var(--shadow-color, rgba(0, 0, 0, 0.05))',
@@ -86,19 +91,22 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
         )}
 
         <div className="flex flex-col justify-center">
-          <h1
-            className="text-slate-900 leading-none tracking-tight select-none"
-            style={{
-              fontSize: '18px',
-              fontWeight: 800,
-              color: 'var(--text-primary, #0f172a)',
-              lineHeight: 1.2,
-              letterSpacing: '-0.02em',
-              margin: 0,
-            }}
-          >
-            {title}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1
+              className="text-slate-900 leading-none tracking-tight select-none"
+              style={{
+                fontSize: '18px',
+                fontWeight: 800,
+                color: 'var(--text-primary, #0f172a)',
+                lineHeight: 1.2,
+                letterSpacing: '-0.02em',
+                margin: 0,
+              }}
+            >
+              {title}
+            </h1>
+            {statusBadge && <div className="flex items-center select-none">{statusBadge}</div>}
+          </div>
           {subtitle && (
             <p
               className="text-slate-500 truncate select-none"
@@ -121,7 +129,7 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
         className="flex items-center gap-2.5 shrink-0"
         style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}
       >
-        <ThemeToggle size="sm" />
+        {showThemeToggle && <ThemeToggle size="sm" />}
         {rightContent}
       </div>
     </header>

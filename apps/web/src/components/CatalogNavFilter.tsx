@@ -93,6 +93,8 @@ export interface CatalogNavFilterProps {
   searchRef?: React.RefObject<HTMLInputElement | null>;
   rightToolbarContent?: React.ReactNode;
   workflow?: OrderWorkflowType;
+  showStepNumbers?: boolean;
+  singleRow?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -111,6 +113,8 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
   searchRef,
   rightToolbarContent,
   workflow,
+  showStepNumbers = false,
+  singleRow = false,
   className = '',
   style,
 }) => {
@@ -121,6 +125,7 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
 
   const serviceScrollRef = useRef<HTMLDivElement>(null);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const singleRowScrollRef = useRef<HTMLDivElement>(null);
 
   const handleServiceWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (serviceScrollRef.current && e.deltaY !== 0 && !e.deltaX) {
@@ -134,15 +139,124 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
     }
   };
 
-  // Filter visible services: excludes Free Shoe, Reprocess Cleaning, shoe-hidden services, and workflow-incompatible services
+  const handleSingleRowWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (singleRowScrollRef.current && e.deltaY !== 0 && !e.deltaX) {
+      singleRowScrollRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  // Filter visible services:
+  // When workflow is present (Order Creation), enforce workflow and category restrictions.
+  // When no workflow is present (Catalog settings/browsing), display the configured services,
+  // excluding internal/non-catalog services like Free Shoe and Reprocess Cleaning.
   const visibleServices = useMemo(() => {
-    return filterServicesForCategory(services, activeCategory, workflow);
+    if (workflow) {
+      return filterServicesForCategory(services, activeCategory, workflow);
+    }
+    return services.filter((s) => {
+      const lower = s.name.trim().toLowerCase();
+      return lower !== 'free shoe' && lower !== 'reprocess cleaning';
+    });
   }, [services, activeCategory, workflow]);
 
   // When "Starching" is selected, show ONLY Men, Women, Kids; when Dry Cleaning workflow, hide Weight Based
   const visibleCategories = useMemo(() => {
     return filterCategoriesForService(categories, activeServiceId, services, workflow);
   }, [categories, activeServiceId, services, workflow]);
+
+  const renderServicePills = () => (
+    <div className="flex items-center gap-2 shrink-0">
+      {visibleServices.map((service) => {
+        const isActive = activeServiceId === service.id;
+        const displayName = formatCatalogServiceName(service.name);
+
+        return (
+          <button
+            key={service.id}
+            type="button"
+            onClick={() => onServiceChange(service.id)}
+            className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97] transition-all"
+            style={{
+              height: '34px',
+              minHeight: '34px',
+              paddingLeft: '14px',
+              paddingRight: '14px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              fontWeight: isActive ? 600 : 500,
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              border: isActive ? '1px solid #2563eb' : '1px solid var(--border)',
+              background: isActive ? '#2563eb' : 'var(--bg-surface)',
+              color: isActive ? '#ffffff' : 'var(--text-primary)',
+              boxShadow: isActive ? '0 1px 3px 0 rgba(37, 99, 235, 0.25)' : 'none',
+              flexShrink: 0,
+            }}
+          >
+            <span>{displayName}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const renderCategoryPills = () => (
+    <div className="flex items-center gap-2 shrink-0">
+      {visibleCategories.map((cat) => {
+        const isActive = activeCategory === cat;
+        const label = categoryLabels[cat] || cat;
+        const isWeightException = cat === GarmentCategory.WEIGHT_BASED || cat === 'WEIGHT_BASED';
+
+        return (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => onCategoryChange(cat)}
+            className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97] transition-all"
+            style={{
+              height: '34px',
+              minHeight: '34px',
+              paddingLeft: '14px',
+              paddingRight: '14px',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              fontWeight: isActive ? 600 : 500,
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              border: isActive
+                ? '1px solid #2563eb'
+                : isWeightException
+                  ? '1px dashed #d97706'
+                  : '1px solid var(--border)',
+              background: isActive
+                ? '#2563eb'
+                : isWeightException
+                  ? 'rgba(245, 158, 11, 0.08)'
+                  : 'var(--bg-surface)',
+              color: isActive ? '#ffffff' : isWeightException ? '#b45309' : 'var(--text-primary)',
+              boxShadow: isActive ? '0 1px 3px 0 rgba(37, 99, 235, 0.25)' : 'none',
+              flexShrink: 0,
+            }}
+          >
+            {isWeightException ? (
+              <span className="flex items-center gap-1.5">
+                <Scale size={13} className={isActive ? 'text-white' : 'text-amber-600'} />
+                <span>{label}</span>
+              </span>
+            ) : (
+              <span>{label}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div
@@ -155,190 +269,127 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
         ...style,
       }}
     >
-      {/* ─── 1. SERVICE ROW (TOP) ─── */}
-      <div
-        ref={serviceScrollRef}
-        onWheel={handleServiceWheel}
-        className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
-        style={{
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          padding: '4px 6px',
-          boxShadow: '0 1px 2px 0 var(--shadow-color)',
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          whiteSpace: 'nowrap',
-          transition: 'background-color 0.2s ease, border-color 0.2s ease',
-        }}
-      >
-        {/* Service Label Badge */}
+      {singleRow ? (
+        /* ─── COMBINED SERVICE & CATEGORY SINGLE ROW ─── */
         <div
-          className="flex items-center justify-center gap-1.5 shrink-0 px-2.5 py-1 rounded-md select-none"
+          ref={singleRowScrollRef}
+          onWheel={handleSingleRowWheel}
+          className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
           style={{
-            width: '94px',
-            minWidth: '94px',
-            height: '34px',
-            background: 'var(--bg-surface-inset)',
+            background: 'var(--bg-surface)',
             border: '1px solid var(--border)',
+            borderRadius: '10px',
+            padding: '5px 8px',
+            boxShadow: '0 1px 2px 0 var(--shadow-color)',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            whiteSpace: 'nowrap',
             transition: 'background-color 0.2s ease, border-color 0.2s ease',
           }}
         >
-          <Sparkles size={13} className="text-blue-500 shrink-0" />
-          <span
-            className="uppercase tracking-wider select-none font-bold text-[11px]"
-            style={{ color: 'var(--text-secondary)', letterSpacing: '0.04em' }}
+          {/* Service Section */}
+          {showStepNumbers && (
+            <div className="flex items-center gap-2 shrink-0 mr-1 select-none">
+              <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                Select Service
+              </span>
+            </div>
+          )}
+
+          {renderServicePills()}
+
+          {/* Vertical Divider */}
+          <div
+            className="w-[1px] h-6 mx-1 shrink-0 bg-slate-200 dark:bg-slate-700"
+            style={{ background: 'var(--border, #e2e8f0)' }}
+            aria-hidden="true"
+          />
+
+          {/* Category Section */}
+          {showStepNumbers && (
+            <div className="flex items-center gap-2 shrink-0 mr-1 select-none">
+              <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                Select Category
+              </span>
+            </div>
+          )}
+
+          {renderCategoryPills()}
+        </div>
+      ) : (
+        /* ─── TWO SEPARATE ROWS ─── */
+        <>
+          {/* ─── 1. SERVICE ROW (TOP) ─── */}
+          <div
+            ref={serviceScrollRef}
+            onWheel={handleServiceWheel}
+            className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              padding: '5px 8px',
+              boxShadow: '0 1px 2px 0 var(--shadow-color)',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              whiteSpace: 'nowrap',
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
+            }}
           >
-            Service
-          </span>
-        </div>
+            {/* Optional Step 1 Indicator */}
+            {showStepNumbers && (
+              <div className="flex items-center gap-2 shrink-0 mr-1 select-none">
+                <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                  Select Service
+                </span>
+              </div>
+            )}
 
-        {/* Service Pills */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {visibleServices.map((service) => {
-            const isActive = activeServiceId === service.id;
-            const displayName = formatCatalogServiceName(service.name);
+            {renderServicePills()}
+          </div>
 
-            return (
-              <button
-                key={service.id}
-                type="button"
-                onClick={() => onServiceChange(service.id)}
-                className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97]"
-                style={{
-                  height: '34px',
-                  minHeight: '34px',
-                  paddingLeft: '12px',
-                  paddingRight: '12px',
-                  borderRadius: '8px',
-                  fontSize: '12.5px',
-                  fontWeight: isActive ? 600 : 500,
-                  whiteSpace: 'nowrap',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: isActive ? 'var(--accent)' : 'var(--bg-surface-inset)',
-                  color: isActive ? '#ffffff' : 'var(--text-primary)',
-                  boxShadow: isActive ? '0 2px 6px -1px rgba(37, 99, 235, 0.3)' : 'none',
-                  flexShrink: 0,
-                }}
-              >
-                <span>{displayName}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ─── 2. CATEGORY ROW (DIRECTLY BELOW) ─── */}
-      <div
-        ref={categoryScrollRef}
-        onWheel={handleCategoryWheel}
-        className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
-        style={{
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          padding: '4px 6px',
-          boxShadow: '0 1px 2px 0 var(--shadow-color)',
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          whiteSpace: 'nowrap',
-          transition: 'background-color 0.2s ease, border-color 0.2s ease',
-        }}
-      >
-        {/* Category Label Badge */}
-        <div
-          className="flex items-center justify-center gap-1.5 shrink-0 px-2.5 py-1 rounded-md select-none"
-          style={{
-            width: '94px',
-            minWidth: '94px',
-            height: '34px',
-            background: 'var(--bg-surface-inset)',
-            border: '1px solid var(--border)',
-            transition: 'background-color 0.2s ease, border-color 0.2s ease',
-          }}
-        >
-          <Layers size={13} className="text-indigo-500 shrink-0" />
-          <span
-            className="uppercase tracking-wider select-none font-bold text-[11px]"
-            style={{ color: 'var(--text-secondary)', letterSpacing: '0.04em' }}
+          {/* ─── 2. CATEGORY ROW (DIRECTLY BELOW) ─── */}
+          <div
+            ref={categoryScrollRef}
+            onWheel={handleCategoryWheel}
+            className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              padding: '5px 8px',
+              boxShadow: '0 1px 2px 0 var(--shadow-color)',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              whiteSpace: 'nowrap',
+              transition: 'background-color 0.2s ease, border-color 0.2s ease',
+            }}
           >
-            Category
-          </span>
-        </div>
+            {/* Optional Step 2 Indicator */}
+            {showStepNumbers && (
+              <div className="flex items-center gap-2 shrink-0 mr-1 select-none">
+                <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                  Select Category
+                </span>
+              </div>
+            )}
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {visibleCategories.map((cat) => {
-            const isActive = activeCategory === cat;
-            const label = categoryLabels[cat] || cat;
-            const isWeightException =
-              cat === GarmentCategory.WEIGHT_BASED || cat === 'WEIGHT_BASED';
-
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => onCategoryChange(cat)}
-                className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97]"
-                style={{
-                  height: '34px',
-                  minHeight: '34px',
-                  paddingLeft: '12px',
-                  paddingRight: '12px',
-                  borderRadius: '8px',
-                  fontSize: '12.5px',
-                  fontWeight: isActive ? 600 : 500,
-                  whiteSpace: 'nowrap',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: isActive
-                    ? '1px solid var(--accent)'
-                    : isWeightException
-                      ? '1px dashed #d97706'
-                      : '1px solid var(--border)',
-                  background: isActive
-                    ? 'var(--accent)'
-                    : isWeightException
-                      ? 'rgba(245, 158, 11, 0.08)'
-                      : 'var(--bg-surface-inset)',
-                  color: isActive
-                    ? '#ffffff'
-                    : isWeightException
-                      ? '#b45309'
-                      : 'var(--text-primary)',
-                  boxShadow: isActive ? '0 2px 6px -1px rgba(37, 99, 235, 0.3)' : 'none',
-                  flexShrink: 0,
-                }}
-              >
-                {isWeightException ? (
-                  <span className="flex items-center gap-1.5">
-                    <Scale size={13} className={isActive ? 'text-white' : 'text-amber-600'} />
-                    <span>{label}</span>
-                  </span>
-                ) : (
-                  <span>{label}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+            {renderCategoryPills()}
+          </div>
+        </>
+      )}
 
       {/* ─── 3. SEARCH & TOOLBAR BAR ──────────────────── */}
       <div

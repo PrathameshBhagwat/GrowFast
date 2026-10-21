@@ -8,6 +8,7 @@ import {
   isCategoryAllowedInWorkflow,
   isServiceAllowedInWorkflow,
   isDryCleanService,
+  isStarchingService,
 } from '@growfast/shared-types';
 import type { OrderWorkflowType } from '@growfast/shared-types';
 import {
@@ -18,6 +19,62 @@ import {
   sortCatalogGarments,
 } from './CatalogNavFilter';
 import { renderStitchGarmentIcon } from './GarmentIcon';
+
+const GARMENT_SUBTITLES: Record<string, string> = {
+  Achkan: 'Traditional Wear',
+  Capri: 'Casual Wear',
+  Coat: 'Formal Blazer',
+  Dhoti: 'Silk / Cotton',
+  'Jacket Full Sleeves': 'Outerwear',
+  'Jacket Half Sleeves': 'Sleeveless / Vest',
+  'Jacket With Hood': 'Winter Parka',
+  Jeans: 'Denim Trousers',
+  Kurta: 'Standard Ethnic',
+  'Kurta (Men)': 'Standard Ethnic',
+  'Kurta Heavy': 'Embroidered / Zari',
+  'Leather Jacket': 'Special Care DC',
+  'Long Coat': 'Overcoat / Trench',
+  'Long Pullover': 'Wool Knit',
+  pant: 'formal',
+  Pants: 'Formal Trousers',
+  Pyjama: 'Cotton Lounge',
+  'Safari Suit Coat': 'Top Piece',
+  'Safari Suit Pant': 'Matching Bottom',
+  Sherwani: 'Wedding Heavy',
+  Shirt: 'Regular Formal',
+  'Shirt Woolen': 'Warm Blend',
+  Shorts: 'Bermuda / Sports',
+  'Suede Leather Jacket': 'Delicate Finish',
+  'Suit (2 Piece)': 'Coat + Trouser',
+  'Sweat Pants': 'Fleece Trackpants',
+  'Sweat Shirt': 'Casual Fleece',
+  'Sweat Shirt With Hood': 'Hooded Fleece',
+  'Sweater Full Sleeves Heavy': 'Cable Knit Wool',
+  'Sweater Full Heavy': 'Cable Knit Wool',
+  'Sweater Full Sleeves Plain': 'Fine Merino / Cashmere',
+  'Sweater Full Plain': 'Fine Merino / Cashmere',
+  'Swimming Costume': 'Active / Swim',
+  'T Shirt': 'Casual Cotton',
+  'Track Pant': 'Athletic / Gym',
+  'Under Wear': 'Inner Wear',
+  Vest: 'Inner / Casual',
+  'Waist Coat': 'Formal Layer',
+  'Shirt Silk': 'Pure Silk',
+  'Sweater Half': 'Knitted Vest',
+  'Sweater Half Sleeves Heavy': 'Heavy Knit Vest',
+  Saree: 'Traditional Silk / Georgette',
+  'Women Dress': 'Evening Wear',
+  Blouse: 'Designer / Silk',
+  Salwar: 'Cotton / Silk',
+  Kameez: 'Ethnic Top',
+  Kurti: 'Daily Casual',
+  Skirt: 'Flared / Pleated',
+  Leggings: 'Stretch Cotton',
+  Dupatta: 'Chiffon / Zari',
+  Shawl: 'Pashmina / Wool',
+  Lehenga: 'Bridal / Heavy',
+  Churidar: 'Traditional Bottom',
+};
 
 interface ItemSelectorProps {
   garments: any[];
@@ -236,7 +293,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
         selectedCategory === GarmentCategory.WEIGHT_BASED);
 
     const rawPrice = priceMap.get(`${garment.id}:${serviceIdToUse}`);
-    const unitPrice = isWeightPieceException ? (rawPrice ?? 40) : (rawPrice ?? 0);
+    const isStarching = isStarchingService(serviceIdToUse, activeServices);
+    const unitPrice = isWeightPieceException
+      ? (rawPrice ?? 40)
+      : isStarching
+        ? (rawPrice ?? 40)
+        : (rawPrice ?? 0);
     onGarmentSelect(garment, serviceIdToUse, unitPrice);
   };
 
@@ -267,6 +329,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           searchRef={searchInputRef}
+          showStepNumbers={true}
           searchPlaceholder={`Search in ${CATEGORY_LABELS[selectedCategory] || selectedCategory} by name, SKU or barcode (e.g. Kurta, Coat, Dhoti)...`}
           rightToolbarContent={
             <div className="flex items-center gap-3">
@@ -284,7 +347,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                       appearance: 'none',
                       background: 'var(--bg-surface)',
                       border: '1px solid var(--border)',
-                      borderRadius: '3px',
+                      borderRadius: '6px',
                       padding: '5px 24px 5px 8px',
                       fontSize: '12px',
                       fontWeight: 500,
@@ -357,31 +420,43 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
           @media (min-width: 480px) {
             .order-garment-grid {
               grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 8px;
+            }
+          }
+          @media (min-width: 640px) {
+            .order-garment-grid {
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: 8px;
             }
           }
           @media (min-width: 768px) {
             .order-garment-grid {
-              grid-template-columns: repeat(4, minmax(0, 1fr));
+              grid-template-columns: repeat(5, minmax(0, 1fr));
+              gap: 8px;
             }
           }
           @media (min-width: 1024px) {
             .order-garment-grid {
               grid-template-columns: repeat(5, minmax(0, 1fr));
+              gap: 8px;
             }
           }
           @media (min-width: 1280px) {
             .order-garment-grid {
               grid-template-columns: repeat(6, minmax(0, 1fr));
+              gap: 8px;
             }
           }
           @media (min-width: 1536px) {
             .order-garment-grid {
               grid-template-columns: repeat(7, minmax(0, 1fr));
+              gap: 8px;
             }
           }
           @media (min-width: 1800px) {
             .order-garment-grid {
               grid-template-columns: repeat(8, minmax(0, 1fr));
+              gap: 8px;
             }
           }
         `}</style>
@@ -396,7 +471,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 selectedCategory === GarmentCategory.WEIGHT_BASED);
 
             const rawPrice = priceMap.get(`${garment.id}:${selectedServiceId}`);
-            const unitPrice = isWeightPieceException ? (rawPrice ?? 40) : rawPrice;
+            const isStarching = isStarchingService(selectedServiceId, activeServices);
+            const unitPrice = isWeightPieceException
+              ? (rawPrice ?? 40)
+              : isStarching
+                ? (rawPrice ?? 40)
+                : rawPrice;
             const hasPrice = unitPrice !== undefined;
             const price = hasPrice ? unitPrice : null;
             const isSelected = selectedGarmentId === garment.id;
@@ -407,27 +487,31 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
             const sku = isWeightPieceException
               ? 'WEI-01'
               : `${categoryPrefix}-${String(idx + 1).padStart(2, '0')}`;
-            const subtitle = garment.section || garment.description || 'Standard Wear';
+            const subtitle =
+              GARMENT_SUBTITLES[garment.name] ||
+              garment.section ||
+              garment.description ||
+              'Standard Wear';
 
             return (
               <div
                 key={garment.id}
                 onClick={() => handleGarmentClick(garment)}
-                className={`border rounded-[3px] p-2 flex flex-col justify-between group transition-all shadow-2xs cursor-pointer ${
+                className={`border rounded-lg flex flex-col justify-between group transition-all shadow-2xs cursor-pointer ${
                   isSelected
                     ? 'ring-2 ring-blue-500 border-blue-500 shadow-xs'
                     : 'hover:border-blue-300 hover:shadow-xs'
                 }`}
                 style={{
                   background: isSelected ? 'var(--bg-surface-hover)' : 'var(--bg-surface)',
-                  border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--border)',
-                  borderRadius: '3px',
-                  padding: '8px 8px',
+                  border: isSelected ? '1px solid #2563eb' : '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '8px 7px 7px 7px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  minHeight: '180px',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
+                  minHeight: '184px',
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
@@ -465,15 +549,14 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   >
                     {hasPrice ? (
                       <span
-                        className="font-bold text-xs px-1.5 py-0.5 rounded-[2px] whitespace-nowrap shrink-0"
+                        className="font-bold whitespace-nowrap shrink-0"
                         style={{
-                          background: 'var(--color-primary-light, #eff6ff)',
-                          color: 'var(--color-primary, #2563eb)',
+                          background: 'rgba(239, 246, 255, 0.95)',
+                          color: '#2563eb',
                           fontWeight: 700,
                           fontSize: '11px',
-                          padding: '1px 6px',
-                          borderRadius: '2px',
-                          border: '1px solid var(--border)',
+                          padding: '1.5px 6px',
+                          borderRadius: '4px',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -488,15 +571,14 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                       </span>
                     ) : (
                       <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-[2px] whitespace-nowrap shrink-0"
+                        className="text-[10px] font-medium whitespace-nowrap shrink-0"
                         style={{
                           background: 'var(--bg-surface-inset)',
                           color: 'var(--text-muted)',
                           fontSize: '10px',
                           fontWeight: 500,
                           padding: '1px 5px',
-                          borderRadius: '2px',
-                          border: '1px solid var(--border)',
+                          borderRadius: '4px',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -507,23 +589,11 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   </div>
                 </div>
 
-                {/* Center Icon Box */}
+                {/* Center Icon */}
                 <div
-                  className="w-11 h-11 min-w-[44px] min-h-[44px] mx-auto rounded-[3px] flex items-center justify-center group-hover:text-blue-600 transition-colors my-1 shrink-0"
+                  className="w-9 h-9 min-w-[36px] min-h-[36px] mx-auto flex items-center justify-center group-hover:text-blue-600 transition-colors my-1 shrink-0"
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    minWidth: '44px',
-                    minHeight: '44px',
-                    margin: '4px auto',
-                    borderRadius: '3px',
-                    background: 'var(--bg-surface-inset)',
-                    border: '1px solid var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     color: 'var(--text-secondary)',
-                    flexShrink: 0,
                   }}
                 >
                   {renderStitchGarmentIcon(garment.name)}
@@ -532,7 +602,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 {/* Garment Title & Subtitle */}
                 <div
                   className="text-center w-full mb-1"
-                  style={{ textAlign: 'center', width: '100%', marginBottom: '4px' }}
+                  style={{ textAlign: 'center', width: '100%', marginBottom: '3px' }}
                 >
                   <h3
                     className="text-xs font-bold truncate leading-tight"
@@ -553,7 +623,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     className="text-[10px] truncate mt-0.5"
                     style={{
                       fontSize: '10px',
-                      color: 'var(--text-secondary)',
+                      color: 'var(--text-muted)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -565,25 +635,26 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   </p>
                 </div>
 
-                {/* Bottom Action: + Add (One plus icon and text 'Add') */}
+                {/* Bottom Action: + Add */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleGarmentClick(garment);
                   }}
-                  className="w-full mt-1.5 py-1 px-2 rounded-[2px] border text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs active:scale-[0.98]"
+                  className="w-full mt-1 py-1 px-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs active:scale-[0.98]"
                   style={{
                     height: '28px',
                     minHeight: '28px',
-                    borderRadius: '2px',
+                    borderRadius: '6px',
                     fontSize: '11.5px',
-                    border: '1px solid var(--color-primary)',
-                    background: 'var(--color-primary-light, #eff6ff)',
-                    color: 'var(--color-primary, #2563eb)',
+                    fontWeight: 600,
+                    border: '1px solid rgba(191, 219, 254, 0.7)',
+                    background: 'rgba(239, 246, 255, 0.9)',
+                    color: '#2563eb',
                   }}
                 >
-                  <Plus size={13} strokeWidth={2.5} />
+                  <Plus size={12} strokeWidth={2.5} />
                   <span>Add</span>
                 </button>
               </div>

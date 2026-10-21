@@ -92,6 +92,10 @@ export type {
   ApiError,
   NotificationDTO,
   CreateNotificationRequest,
+  DailyOrderReportRowDTO,
+  DailyOrdersReportSummaryDTO,
+  DailyOrdersReportResponseDTO,
+  DailyOrdersReportQueryDTO,
 } from './dto';
 
 // Order Status Contract

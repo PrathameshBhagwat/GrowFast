@@ -40,6 +40,7 @@ import {
   ChevronUp,
   Settings,
   Tag,
+  BarChart3,
 } from 'lucide-react';
 
 const ROLE_CONFIG: Record<string, { icon: React.ReactNode; color: string; modules: string[] }> = {
@@ -662,6 +663,28 @@ export const HomePage: React.FC = () => {
                         </div>
                       </div>
                     </button>
+
+                    {/* Section 4: Reports */}
+                    <button
+                      type="button"
+                      id="owner-menu-reports"
+                      onClick={() => {
+                        setIsOwnerMenuOpen(false);
+                        navigate('/reports/daily-orders');
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-gray-700 dark:text-slate-200 min-h-[44px] cursor-pointer"
+                    >
+                      <BarChart3
+                        size={16}
+                        className="text-amber-600 dark:text-amber-400 shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold text-gray-900 dark:text-slate-100">Reports</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">
+                          Daily orders & summaries
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 )}
               </div>
@@ -669,17 +692,30 @@ export const HomePage: React.FC = () => {
               /* Non-owner staff navigation: Staff and Catalog buttons (No Design Tags) */
               <>
                 {employee.role === 'MANAGER' && (
-                  <Button
-                    id="home-staff-management"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate('/staff')}
-                    icon={<Users size={15} />}
-                    aria-label="Staff Management"
-                    style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
-                  >
-                    <span className="hidden sm:inline">Staff</span>
-                  </Button>
+                  <>
+                    <Button
+                      id="home-staff-management"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/staff')}
+                      icon={<Users size={15} />}
+                      aria-label="Staff Management"
+                      style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+                    >
+                      <span className="hidden sm:inline">Staff</span>
+                    </Button>
+                    <Button
+                      id="home-reports"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/reports/daily-orders')}
+                      icon={<BarChart3 size={15} />}
+                      aria-label="Reports"
+                      style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+                    >
+                      <span className="hidden sm:inline">Reports</span>
+                    </Button>
+                  </>
                 )}
                 <Button
                   id="home-garment-catalog"
