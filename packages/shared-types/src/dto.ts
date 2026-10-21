@@ -226,6 +226,7 @@ export interface CreateOrderItemRequest {
   colorTags?: string[];
   defectNotes?: string;
   pieces?: CreateOrderPieceRequest[];
+  addOnIds?: string[];
 }
 
 export interface UpdateDueDateRequest {

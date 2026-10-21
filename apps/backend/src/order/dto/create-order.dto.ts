@@ -72,6 +72,11 @@ export class CreateOrderItemDto implements CreateOrderItemRequest {
   @ValidateNested({ each: true })
   @Type(() => CreateOrderPieceDto)
   pieces?: CreateOrderPieceDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  addOnIds?: string[];
 }
 
 export class CreateOrderDto implements CreateOrderRequest {
