@@ -671,12 +671,8 @@ describe('OrderWizardPage', () => {
     const weightBtn = screen.getByRole('button', { name: /Create Order Per Weight/i });
     fireEvent.click(weightBtn);
 
-    // Verify Screenshot 1 components are visible:
-    // 1. Notification banner
-    await waitFor(() => {
-      expect(screen.getByText(/pending pick up requests/i)).toBeInTheDocument();
-      expect(screen.getByText('164')).toBeInTheDocument();
-    });
+    // 1. Notification banner is completely removed from the page
+    expect(screen.queryByText(/pending pick up requests/i)).not.toBeInTheDocument();
 
     // 2. Selectable service cards
     expect(screen.getByText('Wash and Steam Iron')).toBeInTheDocument();
@@ -731,6 +727,233 @@ describe('OrderWizardPage', () => {
       expect(screen.getByText('2.5')).toBeInTheDocument();
       // 2.5 kg * 140 = 350
       expect(screen.getByText(/INR 350/i)).toBeInTheDocument();
+    });
+  });
+
+  it('makes the Add-on option visible and usable in Per-Piece mode, supports multiple add-ons, price recalculation, and chip removal', async () => {
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/customers/cust-003')) {
+        return { ok: true, json: async () => ({ data: mockCustomer }) };
+      }
+      if (url.includes('/store/config')) {
+        return {
+          ok: true,
+          json: async () => ({
+            id: 'store1',
+            topUpServices: [
+              { id: 'addon-starch', name: 'Starching', price: 30, description: 'Crisp finish' },
+              {
+                id: 'addon-stain',
+                name: 'Stain Treatment',
+                price: 50,
+                description: 'Spot removal',
+              },
+            ],
+          }),
+        };
+      }
+      if (url.includes('/pricing')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ garmentCatalogId: 'g1', serviceTypeId: 's1', price: 100 }],
+          }),
+        };
+      }
+      if (url.includes('/garments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ id: 'g1', name: 'Shirt', category: 'MEN', isActive: true }],
+          }),
+        };
+      }
+      if (url.includes('/services')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [
+              {
+                id: 's1',
+                name: 'Dry Clean',
+                category: 'DRY_CLEAN',
+                isActive: true,
+                estimatedDays: 2,
+              },
+            ],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const { fireEvent } = await import('@testing-library/react');
+    renderWithRouter('/orders/new?customerId=cust-003&workflow=dry_cleaning');
+
+    // Wait for catalog to load Shirt and Dry Clean
+    await waitFor(() => {
+      expect(screen.getByText('Shirt')).toBeInTheDocument();
+      expect(screen.getAllByText('Dry Clean').length).toBeGreaterThan(0);
+    });
+
+    // 1. Add Shirt to the cart
+    const addBtn = screen.getByRole('button', { name: /^Add$/i });
+    fireEvent.click(addBtn);
+
+    // Current order displays Shirt with initial price ₹100.00
+    await waitFor(() => {
+      expect(screen.getByText('Current Order')).toBeInTheDocument();
+      expect(screen.getAllByText('₹100.00').length).toBeGreaterThan(0);
+    });
+
+    // 2. Add-on button is visible on the item card with >= 44px min-height
+    const addonBtn = screen.getByRole('button', { name: /Add-on/i });
+    expect(addonBtn).toBeInTheDocument();
+    expect(addonBtn).toHaveClass('min-h-[44px]');
+
+    // 3. Click Add-on button -> Opens Select Supported Add-ons dialog
+    fireEvent.click(addonBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /Select Add-ons/i })).toBeInTheDocument();
+      expect(screen.getByText('Select Supported Add-ons')).toBeInTheDocument();
+      expect(screen.getByText('Starching')).toBeInTheDocument();
+      expect(screen.getByText('+₹30')).toBeInTheDocument();
+      expect(screen.getByText('Stain Treatment')).toBeInTheDocument();
+      expect(screen.getByText('+₹50')).toBeInTheDocument();
+    });
+
+    // 4. Select multiple add-ons: Starching and Stain Treatment
+    const starchingCheckbox = screen.getByLabelText(/Starching/i);
+    const stainCheckbox = screen.getByLabelText(/Stain Treatment/i);
+    fireEvent.click(starchingCheckbox);
+    fireEvent.click(stainCheckbox);
+
+    // Done button inside dialog closes modal
+    const doneBtn = screen.getByRole('button', { name: /Done/i });
+    expect(doneBtn).toHaveClass('min-h-[44px]');
+    fireEvent.click(doneBtn);
+
+    // Modal closes
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /Select Add-ons/i })).not.toBeInTheDocument();
+    });
+
+    // 5. Item card displays add-on badges and updated item price: 100 + 30 + 50 = ₹180.00
+    await waitFor(() => {
+      expect(screen.getByText('Starching (+₹30)')).toBeInTheDocument();
+      expect(screen.getByText('Stain Treatment (+₹50)')).toBeInTheDocument();
+      expect(screen.getAllByText('₹180.00').length).toBeGreaterThan(0);
+      expect(screen.getByText('(+₹80.00 add-ons)')).toBeInTheDocument();
+    });
+
+    // 6. Test removing one add-on via badge delete button (remove Stain Treatment)
+    const removeStainBtn = screen.getByRole('button', { name: /Remove Stain Treatment/i });
+    fireEvent.click(removeStainBtn);
+
+    // Price updates to: 100 + 30 = ₹130.00
+    await waitFor(() => {
+      expect(screen.queryByText('Stain Treatment (+₹50)')).not.toBeInTheDocument();
+      expect(screen.getByText('Starching (+₹30)')).toBeInTheDocument();
+      expect(screen.getAllByText('₹130.00').length).toBeGreaterThan(0);
+    });
+
+    // 7. Verify quantity multiplication: increase quantity to 2
+    const plusBtn = screen.getByRole('button', { name: /Increase quantity/i });
+    fireEvent.click(plusBtn);
+
+    // Quantity becomes 2, line total is (100 + 30) * 2 = ₹260.00
+    await waitFor(() => {
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getAllByText('₹260.00').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('removes selected add-ons cleanly when garment is removed without leaving invalid add-ons', async () => {
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes('/customers/cust-003')) {
+        return { ok: true, json: async () => ({ data: mockCustomer }) };
+      }
+      if (url.includes('/store/config')) {
+        return {
+          ok: true,
+          json: async () => ({
+            id: 'store1',
+            topUpServices: [{ id: 'addon-starch', name: 'Starching', price: 30 }],
+          }),
+        };
+      }
+      if (url.includes('/pricing')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ garmentCatalogId: 'g1', serviceTypeId: 's1', price: 100 }],
+          }),
+        };
+      }
+      if (url.includes('/garments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [{ id: 'g1', name: 'Shirt', category: 'MEN', isActive: true }],
+          }),
+        };
+      }
+      if (url.includes('/services')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [
+              {
+                id: 's1',
+                name: 'Dry Clean',
+                category: 'DRY_CLEAN',
+                isActive: true,
+                estimatedDays: 2,
+              },
+            ],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const { fireEvent } = await import('@testing-library/react');
+    renderWithRouter('/orders/new?customerId=cust-003&workflow=dry_cleaning');
+
+    await waitFor(() => {
+      expect(screen.getByText('Shirt')).toBeInTheDocument();
+    });
+
+    // Add Shirt
+    fireEvent.click(screen.getByRole('button', { name: /^Add$/i }));
+
+    // Open Add-on modal and add Starching
+    const addonBtn = await screen.findByRole('button', { name: /Add-on/i });
+    fireEvent.click(addonBtn);
+
+    const starchingCheckbox = await screen.findByLabelText(/Starching/i);
+    fireEvent.click(starchingCheckbox);
+    fireEvent.click(screen.getByRole('button', { name: /Done/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Starching (+₹30)')).toBeInTheDocument();
+    });
+
+    // Delete item from cart
+    const deleteBtn = screen.getByRole('button', { name: /Delete item/i });
+    fireEvent.click(deleteBtn);
+
+    // Item and its add-on are completely removed
+    await waitFor(() => {
+      expect(screen.queryByText('Starching (+₹30)')).not.toBeInTheDocument();
+      expect(screen.getByText('No items added yet')).toBeInTheDocument();
     });
   });
 });

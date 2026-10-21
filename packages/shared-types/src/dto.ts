@@ -226,6 +226,7 @@ export interface CreateOrderItemRequest {
   colorTags?: string[];
   defectNotes?: string;
   pieces?: CreateOrderPieceRequest[];
+  addOnIds?: string[];
 }
 
 export interface UpdateDueDateRequest {
@@ -531,6 +532,10 @@ export interface DashboardActionQueuesDTO {
     totalAmountDue: number;
     items: DashboardActionOrder[];
   };
+  readyForPickup?: {
+    count: number;
+    items: DashboardActionOrder[];
+  };
 }
 
 export interface DashboardDeliveryMetrics {
@@ -574,6 +579,7 @@ export interface DashboardRecentOrder {
 export interface DashboardActivity {
   id: string;
   eventType: string;
+  orderId?: string | null;
   orderNumber: string | null;
   message: string;
   createdAt: string;
@@ -643,4 +649,67 @@ export interface CreateNotificationRequest {
   channel: NotificationChannel;
   recipient: string;
   payload?: Record<string, unknown>;
+}
+
+// ─── Daily Orders Report DTOs ────────────────────────────────────────
+
+export interface DailyOrderReportRowDTO {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  formattedOrderDate: string;
+  customerCode: string;
+  customerName: string;
+  customerAddress: string;
+  customerPhone: string;
+  dueDate: string;
+  formattedDueDate: string;
+  pieces: number;
+  weight: number | null;
+  grossAmount: number;
+  discount: number;
+  netAmount: number;
+  advance: number;
+  balance: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  orderTypeSummary?: string;
+  createdByName?: string;
+  createdById?: string;
+}
+
+export interface DailyOrdersReportSummaryDTO {
+  totalOrders: number;
+  totalPieces: number;
+  totalWeight: number;
+  totalGrossAmount: number;
+  totalDiscount: number;
+  totalNetAmount: number;
+  totalAdvance: number;
+  totalBalance: number;
+}
+
+export interface DailyOrdersReportResponseDTO {
+  success: boolean;
+  data: DailyOrderReportRowDTO[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  summary: DailyOrdersReportSummaryDTO;
+}
+
+export interface DailyOrdersReportQueryDTO {
+  startDate?: string;
+  endDate?: string;
+  timezone?: string;
+  customerId?: string;
+  orderNumber?: string;
+  orderType?: string;
+  userId?: string;
+  hasDiscount?: 'all' | 'with' | 'without' | string;
+  filterBy?: string;
+  page?: number;
+  pageSize?: number;
+  export?: boolean;
 }

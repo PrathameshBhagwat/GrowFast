@@ -37,6 +37,8 @@ import {
   adjustDueDateForThursday,
   getDayOfWeekInTimezone,
   ExpressDeliveryOption,
+  TopUpServiceItem,
+  DEFAULT_TOP_UP_SERVICES,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
@@ -161,10 +163,10 @@ export class OrderService {
           throw new BadRequestException(`Service type "${service.name}" is not active`);
         }
 
-        if (dto.workflow) {
-          const isWeightException =
-            dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
+        const isWeightException =
+          dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
 
+        if (dto.workflow) {
           if (!isWeightException && !isServiceAllowedInWorkflow(service, dto.workflow)) {
             throw new BadRequestException(
               `Service "${service.name}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
@@ -190,29 +192,46 @@ export class OrderService {
           service.category === ServiceCategory.DRY_CLEAN ||
           service.name.trim().toLowerCase() === 'dry clean';
 
-        if (isDryClean) {
-          if (
-            garment.category === GarmentCategory.WEIGHT_BASED ||
-            (item.weight != null && item.weight > 0)
-          ) {
-            throw new BadRequestException(
-              `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
-            );
-          }
+        if (isDryClean && item.weight != null && item.weight > 0) {
+          throw new BadRequestException(
+            `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+          );
         }
 
+        if (
+          dto.workflow === 'DRY_CLEANING' &&
+          !isWeightException &&
+          item.weight != null &&
+          item.weight > 0
+        ) {
+          throw new BadRequestException(
+            `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+          );
+        }
+
+        // Per-piece exception: In DRY_CLEANING workflow or PIECES entry mode,
+        // when either the garment or service has WEIGHT_BASED category but no
+        // weight is provided, treat it as a per-piece order line.
+        const hasWeightBasedFlag =
+          garment.category === GarmentCategory.WEIGHT_BASED ||
+          service.category === ServiceCategory.WEIGHT_BASED;
+
         const isWeightPieceException =
-          garment.category === GarmentCategory.WEIGHT_BASED &&
-          (service.category === ServiceCategory.DRY_CLEAN ||
+          hasWeightBasedFlag &&
+          (dto.workflow === 'DRY_CLEANING' ||
+            dto.entryMode === 'PIECES' ||
+            service.category === ServiceCategory.DRY_CLEAN ||
             service.name.toLowerCase().includes('dry clean') ||
             (item.unitPrice !== undefined && item.unitPrice > 0)) &&
           (item.weight == null || item.weight === undefined);
 
         const isWeightBased =
-          (garment.category === GarmentCategory.WEIGHT_BASED ||
-            service.category === ServiceCategory.WEIGHT_BASED ||
-            (item.weight != null && item.weight > 0)) &&
-          !isWeightPieceException;
+          !isWeightPieceException &&
+          (dto.workflow !== 'DRY_CLEANING' || isWeightException) &&
+          dto.entryMode !== 'PIECES' &&
+          (dto.entryMode === 'WEIGHT' ||
+            (item.weight != null && item.weight > 0) ||
+            hasWeightBasedFlag);
 
         if (isWeightBased) {
           if (item.weight == null || isNaN(item.weight) || item.weight < 2.0) {
@@ -238,13 +257,46 @@ export class OrderService {
 
         const priceKey = `${garment.id}_${service.id}`;
         let unitPrice = priceMap.get(priceKey) ?? 0;
-        if (isWeightPieceException && item.unitPrice !== undefined && item.unitPrice > 0) {
+        if (isWeightPieceException) {
+          if (item.unitPrice !== undefined && item.unitPrice > 0) {
+            unitPrice = item.unitPrice;
+          } else if (unitPrice === 0) {
+            unitPrice = 40;
+          }
+        } else if (unitPrice === 0 && item.unitPrice !== undefined && item.unitPrice > 0) {
           unitPrice = item.unitPrice;
         }
 
+        // Validate and compute supported store add-ons
+        const rawAddonIds: string[] =
+          item.addOnIds ||
+          (Array.isArray((item as any).addOns)
+            ? (item as any).addOns.map((a: any) => (typeof a === 'string' ? a : a.id))
+            : []);
+        const addonIds: string[] = Array.from(new Set(rawAddonIds));
+
+        let addOnsUnitPrice = 0;
+        if (addonIds.length > 0) {
+          const storeTopUps: TopUpServiceItem[] =
+            (store.topUpServices as any) ?? DEFAULT_TOP_UP_SERVICES;
+          const topUpMap = new Map<string, TopUpServiceItem>(storeTopUps.map((t) => [t.id, t]));
+
+          for (const addonId of addonIds) {
+            const matchedAddon = topUpMap.get(addonId);
+            if (!matchedAddon) {
+              throw new BadRequestException(
+                `Invalid or unsupported add-on "${addonId}" selected for item "${garment.name}".`,
+              );
+            }
+            addOnsUnitPrice += matchedAddon.price;
+          }
+        }
+
+        const effectiveUnitPrice = unitPrice + addOnsUnitPrice;
+
         const lineTotal = isWeightBased
-          ? Math.round(unitPrice * item.weight! * 100) / 100
-          : Math.round(unitPrice * item.quantity * 100) / 100;
+          ? Math.round((unitPrice * item.weight! + addOnsUnitPrice) * 100) / 100
+          : Math.round(effectiveUnitPrice * item.quantity * 100) / 100;
 
         // For summary
         serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
@@ -254,7 +306,7 @@ export class OrderService {
           serviceTypeId: service.id,
           quantity: item.quantity,
           weight: isWeightBased ? item.weight : null,
-          unitPrice,
+          unitPrice: effectiveUnitPrice,
           lineTotal,
           colorTags: item.colorTags || [],
           defectNotes: item.defectNotes,
@@ -273,7 +325,9 @@ export class OrderService {
         orderItemsData.push(orderItemData);
 
         pricingInputs.push({
-          unitPrice,
+          unitPrice: isWeightBased
+            ? Math.round((lineTotal / item.weight!) * 100) / 100
+            : effectiveUnitPrice,
           quantity: item.quantity,
           weight: isWeightBased ? item.weight : null,
         });
@@ -286,19 +340,16 @@ export class OrderService {
       // 3.5 Photo requirement validation
       const isWalkIn = dto.pickupType === PickupType.STORE_PICKUP;
       let totalPieces = 0;
-      let isWeightBasedOrder = false;
 
       for (const item of dto.items) {
         totalPieces += item.quantity;
-        const garment = garmentMap.get(item.garmentCatalogId);
-        const service = serviceMap.get(item.serviceTypeId);
-        if (
-          garment?.category === GarmentCategory.WEIGHT_BASED ||
-          service?.category === ServiceCategory.WEIGHT_BASED
-        ) {
-          isWeightBasedOrder = true;
-        }
       }
+
+      const isWeightBasedOrder =
+        dto.entryMode === 'WEIGHT' ||
+        (dto.entryMode !== 'PIECES' &&
+          dto.workflow !== 'DRY_CLEANING' &&
+          orderItemsData.some((oi) => oi.weight != null && oi.weight > 0));
 
       const photosRequired = isPhotoRequiredForOrder({
         isWalkIn,

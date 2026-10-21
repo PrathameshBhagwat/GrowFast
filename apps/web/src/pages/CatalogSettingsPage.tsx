@@ -72,7 +72,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   HOME_CLEANING: 'Home Cleaning',
   SHOES: 'Shoe',
   OTHERS: 'Other',
-  WEIGHT_BASED: 'Weight Based',
+  WEIGHT_BASED: 'Weight Based (Exception)',
 };
 
 /** Deterministic SKU code generator matching Stitch design: SKU - [3-char code] - [index] */
@@ -459,6 +459,47 @@ const getServiceDotColor = (name: string): string => {
 
 type PageTab = 'garments' | 'pricing' | 'topup';
 
+/**
+ * Canonical 4 services displayed in Owner Settings -> Catalog:
+ * - Dry Clean
+ * - Shoe Cleaning
+ * - Starching
+ * - Steam Iron
+ */
+const isOwnerCatalogService = (serviceName: string): boolean => {
+  if (!serviceName) return false;
+  const lower = serviceName.trim().toLowerCase();
+  if (
+    lower === 'free shoe' ||
+    lower === 'reprocess cleaning' ||
+    lower.includes('standard wash') ||
+    lower.includes('wash and steam') ||
+    lower.includes('wash + steam') ||
+    lower.includes('wash and fold') ||
+    lower.includes('laundry')
+  ) {
+    return false;
+  }
+  return (
+    lower.includes('dry clean') ||
+    lower.includes('shoe') ||
+    lower.includes('starch') ||
+    lower.includes('steam')
+  );
+};
+
+const sortOwnerCatalogServices = <T extends { name: string }>(list: T[]): T[] => {
+  const getOrder = (name: string): number => {
+    const lower = name.trim().toLowerCase();
+    if (lower.includes('dry clean')) return 1;
+    if (lower.includes('shoe')) return 2;
+    if (lower.includes('starch')) return 3;
+    if (lower.includes('steam')) return 4;
+    return 99;
+  };
+  return [...list].sort((a, b) => getOrder(a.name) - getOrder(b.name));
+};
+
 export const CatalogSettingsPage: React.FC = () => {
   const { token, employee } = useAuth();
   const navigate = useNavigate();
@@ -492,7 +533,7 @@ export const CatalogSettingsPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<string>('name-asc');
-  const [activeOnly, setActiveOnly] = useState<boolean>(false);
+  const [activeOnly, setActiveOnly] = useState<boolean>(true);
   const catalogSearchRef = useRef<HTMLInputElement>(null);
 
   // ─── Modals State ───────────────────────────────────────
@@ -566,8 +607,17 @@ export const CatalogSettingsPage: React.FC = () => {
       setPricingData(pList);
 
       if (svcList.length > 0) {
-        setActiveServiceId((prev) => prev || svcList[0].id);
-        setPricingServiceId((prev) => prev || svcList[0].id);
+        const defaultSvc = svcList.find((s: any) => isOwnerCatalogService(s.name)) || svcList[0];
+        setActiveServiceId((prev) =>
+          prev && svcList.some((s: any) => s.id === prev && isOwnerCatalogService(s.name))
+            ? prev
+            : defaultSvc.id,
+        );
+        setPricingServiceId((prev) =>
+          prev && svcList.some((s: any) => s.id === prev && isOwnerCatalogService(s.name))
+            ? prev
+            : defaultSvc.id,
+        );
       }
 
       // Load configurable top-up services
@@ -735,23 +785,19 @@ export const CatalogSettingsPage: React.FC = () => {
     }
   };
 
-  // Visible services for each tab (Shoe hides 3 services)
-  const visibleGarmentServices = useMemo(() => {
-    return filterServicesForCategory(services, activeCategory);
-  }, [services, activeCategory]);
+  // Allowed services for Owner Settings -> Catalog UI (Display ONLY the 4 required services)
+  const ownerCatalogServices = useMemo(() => {
+    return sortOwnerCatalogServices(services.filter((s) => isOwnerCatalogService(s.name)));
+  }, [services]);
 
   // Sorted services for Garment Tab matching Stitch design
   const sortedGarmentServices = useMemo(() => {
-    return [...visibleGarmentServices].sort((a, b) => {
-      const nameA = formatCatalogServiceName(a.name);
-      const nameB = formatCatalogServiceName(b.name);
-      return nameA.localeCompare(nameB);
-    });
-  }, [visibleGarmentServices]);
+    return ownerCatalogServices;
+  }, [ownerCatalogServices]);
 
   const visiblePricingServices = useMemo(() => {
-    return filterServicesForCategory(services, pricingCategory);
-  }, [services, pricingCategory]);
+    return ownerCatalogServices;
+  }, [ownerCatalogServices]);
 
   // Visible services for Add Garment modal based on selected category (canonical Stitch ordering)
   const visibleCreateServices = useMemo(() => {
@@ -1321,83 +1367,94 @@ export const CatalogSettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-slate-100 font-sans">
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 font-sans">
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
-      <CatalogHeader
-        title="Garment Catalog"
-        subtitle="Downtown Connaught Place #102 • Active Master Catalog"
-        onBack={() => navigate('/')}
-        showLogo={true}
-        rightContent={
-          <>
-            {/* Catalog View / Service Pricing Tab Switcher */}
-            {canConfigurePricing && (
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-[3px] border border-slate-200 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('garments')}
-                  className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'garments'
-                      ? 'bg-white text-blue-600 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <LayoutGrid size={14} />
-                  <span>Catalog View</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('pricing')}
-                  className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'pricing'
-                      ? 'bg-white text-blue-600 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Tag size={14} />
-                  <span>Service Pricing</span>
-                </button>
-                <button
-                  type="button"
-                  id="tab-topup"
-                  onClick={() => setActiveTab('topup')}
-                  className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === 'topup'
-                      ? 'bg-white text-blue-600 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Sparkles size={14} />
-                  <span>Top Up Services</span>
-                </button>
-              </div>
-            )}
+      <div
+        className="w-full max-w-[1600px] mx-auto shrink-0"
+        style={{ maxWidth: '1600px', margin: '0 auto', padding: '6px 16px 0 16px', width: '100%' }}
+      >
+        <CatalogHeader
+          title="Garment Catalog"
+          statusBadge={
+            <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium select-none ml-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+              <span>Active Master Catalog</span>
+            </span>
+          }
+          subtitle="Downtown Connaught Place #102"
+          showLogo={true}
+          showThemeToggle={false}
+          rightContent={
+            <>
+              {/* Catalog View / Service Pricing Tab Switcher */}
+              {canConfigurePricing && (
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-[3px] border border-slate-200 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('garments')}
+                    className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'garments'
+                        ? 'bg-white text-blue-600 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <LayoutGrid size={14} />
+                    <span>Catalog View</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('pricing')}
+                    className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'pricing'
+                        ? 'bg-white text-blue-600 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Tag size={14} />
+                    <span>Service Pricing</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="tab-topup"
+                    onClick={() => setActiveTab('topup')}
+                    className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'topup'
+                        ? 'bg-white text-blue-600 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Sparkles size={14} />
+                    <span>Top Up Services</span>
+                  </button>
+                </div>
+              )}
 
-            {/* Export CSV Button */}
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              className="hidden sm:flex items-center gap-1.5 border border-slate-200 bg-white rounded-[3px] px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-xs"
-              title="Export catalog as CSV"
-            >
-              <Upload size={14} />
-              <span>Export CSV</span>
-            </button>
-
-            {/* Add Garment Button */}
-            {canManage && (
+              {/* Export CSV Button */}
               <button
                 type="button"
-                onClick={openCreateModal}
-                className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 active:scale-98 text-white rounded-[3px] text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                onClick={handleExportCSV}
+                className="hidden sm:flex items-center gap-1.5 border border-slate-200 bg-white rounded-[3px] px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-xs"
+                title="Export catalog as CSV"
               >
-                <Plus size={16} />
-                <span>Add Garment</span>
+                <Upload size={14} />
+                <span>Export CSV</span>
               </button>
-            )}
-          </>
-        }
-      />
+
+              {/* Add Garment Button */}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 active:scale-98 text-white rounded-[3px] text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Plus size={16} />
+                  <span>Add Garment</span>
+                </button>
+              )}
+            </>
+          }
+        />
+      </div>
 
       {/* ─── MAIN CONTENT VIEWPORT ────────────────────────── */}
       <main className="flex-1 flex flex-col min-h-0 bg-slate-50">
@@ -1438,49 +1495,68 @@ export const CatalogSettingsPage: React.FC = () => {
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                     searchRef={catalogSearchRef}
+                    showStepNumbers={true}
                     rightToolbarContent={
-                      <>
-                        <div
-                          className="flex items-center gap-2"
-                          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                        >
-                          <span style={{ color: '#64748b', fontWeight: 500, fontSize: '13px' }}>
-                            Sort:
-                          </span>
-                          <select
-                            value={sortOrder}
-                            onChange={(e) => setSortOrder(e.target.value)}
-                            aria-label="Sort garments"
+                      <div className="flex items-center gap-3">
+                        {/* Sort: Dropdown */}
+                        <div className="flex items-center gap-1.5">
+                          <span
                             style={{
-                              height: '32px',
-                              padding: '0 12px',
-                              background: '#ffffff',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '3px',
-                              fontSize: '13px',
-                              color: '#334155',
+                              fontSize: '12px',
+                              color: 'var(--text-secondary, #64748b)',
                               fontWeight: 500,
-                              cursor: 'pointer',
-                              outline: 'none',
                             }}
                           >
-                            {CATALOG_SORT_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
+                            Sort:
+                          </span>
+                          <div style={{ position: 'relative' }}>
+                            <select
+                              value={sortOrder}
+                              onChange={(e) => setSortOrder(e.target.value)}
+                              aria-label="Sort garments"
+                              style={{
+                                appearance: 'none',
+                                background: 'var(--bg-surface, #ffffff)',
+                                border: '1px solid var(--border, #e2e8f0)',
+                                borderRadius: '6px',
+                                padding: '5px 24px 5px 8px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                color: 'var(--text-primary, #0f172a)',
+                                cursor: 'pointer',
+                                boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)',
+                                outline: 'none',
+                              }}
+                            >
+                              {CATALOG_SORT_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown
+                              size={13}
+                              style={{
+                                position: 'absolute',
+                                right: '7px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: 'var(--text-secondary, #64748b)',
+                                pointerEvents: 'none',
+                              }}
+                            />
+                          </div>
                         </div>
 
+                        {/* Active Only Checkbox */}
                         <label
-                          className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer select-none"
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
+                            gap: '6px',
                             fontSize: '12px',
-                            color: '#334155',
-                            fontWeight: 500,
+                            fontWeight: 600,
+                            color: 'var(--text-primary, #0f172a)',
                             cursor: 'pointer',
                             userSelect: 'none',
                           }}
@@ -1489,11 +1565,17 @@ export const CatalogSettingsPage: React.FC = () => {
                             type="checkbox"
                             checked={activeOnly}
                             onChange={(e) => setActiveOnly(e.target.checked)}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            style={{
+                              width: '14px',
+                              height: '14px',
+                              borderRadius: '3px',
+                              accentColor: '#2563eb',
+                              cursor: 'pointer',
+                            }}
                           />
                           <span>Active Only</span>
                         </label>
-                      </>
+                      </div>
                     }
                   />
 
@@ -1810,6 +1892,7 @@ export const CatalogSettingsPage: React.FC = () => {
                       searchQuery={pricingSearch}
                       onSearchChange={setPricingSearch}
                       searchRef={searchRef}
+                      showStepNumbers={true}
                       searchPlaceholder={`Filter ${CATEGORY_LABELS[pricingCategory] || 'items'} items or barcode (F2)...`}
                       rightToolbarContent={
                         <div

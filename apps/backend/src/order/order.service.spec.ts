@@ -334,6 +334,103 @@ describe('OrderService', () => {
       expect(callArgs.data.totalAmount).toBe(expectedTotals.totalAmount);
     });
 
+    it('should calculate authoritative add-on pricing for per-piece items', async () => {
+      const dtoWithAddon = {
+        ...validDto,
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 2,
+            addOnIds: ['addon-starch'],
+            pieces: [
+              { unitNumber: 1, photoCount: 1 },
+              { unitNumber: 2, photoCount: 1 },
+            ],
+          },
+        ],
+      };
+
+      await service.createOrder(dtoWithAddon, 'emp1', 'store1');
+
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+      // Base: 150, Add-on (Starching): 30 => Effective unit price: 180
+      // Line total: 180 * 2 = 360
+      expect(callArgs.data.items.create[0].unitPrice).toBe(180);
+      expect(callArgs.data.items.create[0].lineTotal).toBe(360);
+      expect(callArgs.data.subtotal).toBe(360);
+      // Subtotal 360 + 18% GST (64.80) => total = 424.8
+      expect(callArgs.data.totalAmount).toBe(424.8);
+    });
+
+    it('should support multiple add-ons on a per-piece item without double counting', async () => {
+      const dtoWithMultipleAddons = {
+        ...validDto,
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 1,
+            addOnIds: ['addon-starch', 'addon-stain'],
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await service.createOrder(dtoWithMultipleAddons, 'emp1', 'store1');
+
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+      // Base: 150, Starching: 30, Stain Treatment: 50 => Unit price: 230
+      expect(callArgs.data.items.create[0].unitPrice).toBe(230);
+      expect(callArgs.data.items.create[0].lineTotal).toBe(230);
+      expect(callArgs.data.subtotal).toBe(230);
+    });
+
+    it('should deduplicate repeated add-on selections to prevent duplicate charging', async () => {
+      const dtoWithDuplicateAddons = {
+        ...validDto,
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 1,
+            addOnIds: ['addon-starch', 'addon-starch'],
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await service.createOrder(dtoWithDuplicateAddons, 'emp1', 'store1');
+
+      const callArgs = mockPrismaService.order.create.mock.calls[0][0];
+      // Base: 150, Starching once: 30 => Unit price: 180 (not 210)
+      expect(callArgs.data.items.create[0].unitPrice).toBe(180);
+      expect(callArgs.data.items.create[0].lineTotal).toBe(180);
+      expect(callArgs.data.subtotal).toBe(180);
+    });
+
+    it('should reject invalid or unauthorized add-on selections on the backend', async () => {
+      const invalidAddonDto = {
+        ...validDto,
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 1,
+            addOnIds: ['fake-unauthorized-addon'],
+            pieces: [{ unitNumber: 1, photoCount: 1 }],
+          },
+        ],
+      };
+
+      await expect(service.createOrder(invalidAddonDto, 'emp1', 'store1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createOrder(invalidAddonDto, 'emp1', 'store1')).rejects.toThrow(
+        /Invalid or unsupported add-on "fake-unauthorized-addon" selected for item "Shirt"/,
+      );
+    });
+
     it('should throw NotFoundException if customer not found', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(null);
       await expect(service.createOrder(validDto, 'emp1', 'store1')).rejects.toThrow(
@@ -4893,6 +4990,9 @@ describe('OrderService', () => {
       // Base express = 20% of ₹200 = ₹40
       // Next-day evening express = ₹40 × 1.5 = ₹60
       // Taxable = ₹260, GST (18%) = ₹46.80, Total = ₹306.80
+      const friday = new Date('2026-10-23T10:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(friday);
+
       const dto = setupOrderMock(ExpressDeliveryOption.NEXT_DAY_EVENING);
 
       await service.createOrder(dto, 'emp-1', 'store-1');
@@ -4910,6 +5010,8 @@ describe('OrderService', () => {
           }),
         }),
       );
+
+      jest.useRealTimers();
     });
 
     it('Regular delivery produces 0 express charge and is marked standard', async () => {

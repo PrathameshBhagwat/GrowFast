@@ -1,17 +1,47 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, LoadingState, ErrorState, EmptyState, StatusChip } from '@growfast/ui';
-import { OrderStatus, type DashboardSummaryDTO } from '@growfast/shared-types';
+import {
+  OrderStatus,
+  type DashboardSummaryDTO,
+  type MetricComparison,
+} from '@growfast/shared-types';
 import { fetchDashboardSummary } from '../services/dashboard.api';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { DashboardTrendChart } from '../components/DashboardTrendChart';
+import { DashboardBreakdownChart } from '../components/DashboardBreakdownChart';
+import { DashboardActionCenter } from '../components/DashboardActionCenter';
+import {
+  type DashboardDatePreset,
+  type DateRange,
+  getDateRangeForPreset,
+  validateCustomRange,
+  formatKolkataDate,
+  formatPeriodLabel,
+} from '../utils/dashboard-date';
 
 const POLL_INTERVAL_MS = 30_000;
 
+const PRESETS: { key: DashboardDatePreset; label: string }[] = [
+  { key: 'TODAY', label: 'Today' },
+  { key: 'YESTERDAY', label: 'Yesterday' },
+  { key: 'THIS_WEEK', label: 'This Week' },
+  { key: 'THIS_MONTH', label: 'This Month' },
+  { key: 'CUSTOM', label: 'Custom Range' },
+];
+
 /* ─── Helpers ─────────────────────────────────────────────────── */
 
-function formatCurrency(v: number): string {
-  return '\u20b9' + v.toLocaleString('en-IN');
+function formatCurrency(v?: number | null): string {
+  const val = v ?? 0;
+  return (
+    '\u20b9' +
+    val.toLocaleString('en-IN', {
+      minimumFractionDigits: Number.isInteger(val) ? 0 : 2,
+      maximumFractionDigits: 2,
+    })
+  );
 }
 
 function formatTime(iso: string): string {
@@ -61,133 +91,51 @@ export const DashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+
+  // Date Filter & Period Selection (Phase 2)
+  const [preset, setPreset] = useState<DashboardDatePreset>('TODAY');
+  const [dateRange, setDateRange] = useState<DateRange>(() => getDateRangeForPreset('TODAY'));
+  const [customStartDate, setCustomStartDate] = useState<string>(() => dateRange.startDate);
+  const [customEndDate, setCustomEndDate] = useState<string>(() => dateRange.endDate);
+  const [customError, setCustomError] = useState<string | null>(null);
+  const [showCustomInputs, setShowCustomInputs] = useState<boolean>(false);
+
   const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
 
+  const todayKolkataStr = formatKolkataDate();
+
   /* ─── Data Fetching ─────────────────────────────────────────── */
 
-  const loadDashboard = useCallback(async (silent = false) => {
+  const loadDashboard = useCallback(async (range: DateRange, silent = false) => {
+    // Cancel previous in-flight request to prevent race conditions
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const requestId = ++requestIdRef.current;
     if (!silent) {
       setLoading(true);
       setError(null);
     }
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const endDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      23,
-      59,
-      59,
-      999,
-    ).toISOString();
 
     try {
-      const result = await fetchDashboardSummary(startDate, endDate);
+      const result = await fetchDashboardSummary(range.startDate, range.endDate, controller.signal);
       if (requestId === requestIdRef.current && isMountedRef.current) {
         setData(result);
+        setError(null);
         setLastUpdated(new Date());
       }
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return;
+      }
       if (requestId === requestIdRef.current && isMountedRef.current) {
-        console.warn('Backend unavailable, using preview fallback for dashboard:', err?.message);
-        const fallbackDashboard: DashboardSummaryDTO = {
-          period: { startDate, endDate },
-          overview: { totalOrders: 18, totalItems: 42, totalCustomers: 15 },
-          orders: {
-            received: 3,
-            sorting: 2,
-            processing: 4,
-            drying: 2,
-            ironing: 3,
-            qualityCheck: 2,
-            packed: 2,
-            ready: 5,
-            outForDelivery: 2,
-            delivered: 8,
-            cancelled: 0,
-            overdue: 1,
-            dueToday: 6,
-          },
-          financial: {
-            totalOrderValue: 18450,
-            amountPaid: 14200,
-            amountDue: 4250,
-            paidOrders: 12,
-            partialOrders: 4,
-            pendingOrders: 2,
-          },
-          delivery: {
-            scheduled: 2,
-            assigned: 3,
-            inTransit: 2,
-            completed: 5,
-            failed: 0,
-          },
-          customers: {
-            total: 142,
-            newInPeriod: 4,
-          },
-          readyOrders: [
-            {
-              id: 'ord-101',
-              orderNumber: 'ORD-2026-0042',
-              customerName: 'Amit Shah',
-              customerPhone: '+91 98111 22334',
-              totalAmount: 1200,
-              amountPaid: 1200,
-              amountDue: 0,
-              readyItems: [{ garmentName: 'Silk Saree', quantity: 2 }],
-              remainingItems: [],
-            },
-            {
-              id: 'ord-102',
-              orderNumber: 'ORD-2026-0045',
-              customerName: 'Priya Joshi',
-              customerPhone: '+91 98555 66778',
-              totalAmount: 850,
-              amountPaid: 650,
-              amountDue: 200,
-              readyItems: [{ garmentName: 'Cotton Kurta', quantity: 3 }],
-              remainingItems: [{ garmentName: 'Dupatta', quantity: 1 }],
-            },
-          ],
-          recentOrders: [
-            {
-              id: 'ord-103',
-              orderNumber: 'ORD-2026-0048',
-              customerName: 'Neha Deshmukh',
-              itemCount: 2,
-              totalAmount: 650,
-              amountPaid: 650,
-              amountDue: 0,
-              status: OrderStatus.PROCESSING,
-              paymentStatus: 'PAID',
-              orderDate: new Date(Date.now() - 1800000).toISOString(),
-            },
-          ],
-          recentActivity: [
-            {
-              id: 'act-1',
-              eventType: 'ORDER_READY',
-              orderNumber: 'ORD-2026-0042',
-              message: 'Order ORD-2026-0042 marked as Ready for Pickup',
-              createdAt: new Date(Date.now() - 3600000).toISOString(),
-            },
-            {
-              id: 'act-2',
-              eventType: 'PAYMENT_RECEIVED',
-              orderNumber: 'ORD-2026-0042',
-              message: 'Received ₹1,200 via UPI for ORD-2026-0042',
-              createdAt: new Date(Date.now() - 3700000).toISOString(),
-            },
-          ],
-        };
-        setData(fallbackDashboard);
-        setLastUpdated(new Date());
+        setError(err?.message || 'Failed to load dashboard data. Please try again.');
       }
     } finally {
       if (requestId === requestIdRef.current && isMountedRef.current) {
@@ -196,19 +144,55 @@ export const DashboardPage: React.FC = () => {
     }
   }, []);
 
+  /* ─── Handlers ──────────────────────────────────────────────── */
+
+  const handleSelectPreset = (newPreset: DashboardDatePreset) => {
+    setPreset(newPreset);
+    setCustomError(null);
+    if (newPreset === 'CUSTOM') {
+      setShowCustomInputs(true);
+      return;
+    }
+    setShowCustomInputs(false);
+    const newRange = getDateRangeForPreset(newPreset);
+    if (newRange.startDate !== dateRange.startDate || newRange.endDate !== dateRange.endDate) {
+      setDateRange(newRange);
+      setCustomStartDate(newRange.startDate);
+      setCustomEndDate(newRange.endDate);
+    }
+  };
+
+  const handleApplyCustom = () => {
+    const validation = validateCustomRange(customStartDate, customEndDate);
+    if (!validation.isValid) {
+      setCustomError(validation.error || 'Invalid date range.');
+      return;
+    }
+    setCustomError(null);
+    const newRange: DateRange = { startDate: customStartDate, endDate: customEndDate };
+    setDateRange(newRange);
+  };
+
+  const handleRefresh = () => {
+    loadDashboard(dateRange);
+  };
+
+  /* ─── Polling & Initial Fetch ───────────────────────────────── */
+
   useEffect(() => {
     isMountedRef.current = true;
-    loadDashboard();
+    loadDashboard(dateRange);
 
     pollTimerRef.current = setInterval(() => {
-      loadDashboard(true);
+      loadDashboard(dateRange, true);
     }, POLL_INTERVAL_MS);
 
     return () => {
       isMountedRef.current = false;
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [loadDashboard]);
+  }, [dateRange, loadDashboard]);
 
   /* ─── Render States ─────────────────────────────────────────── */
 
@@ -240,25 +224,36 @@ export const DashboardPage: React.FC = () => {
           background: 'var(--bg-app, #F3F4F6)',
         }}
       >
-        <ErrorState message={error} onRetry={() => loadDashboard()} />
+        <ErrorState message={error} onRetry={() => loadDashboard(dateRange)} />
       </div>
     );
   }
 
   if (!data) return null;
 
-  const { overview, financial, orders, readyOrders, recentOrders, recentActivity } = data;
+  const {
+    overview,
+    financial,
+    orders,
+    readyOrders,
+    recentOrders,
+    recentActivity,
+    comparison,
+    trends,
+    serviceBreakdown,
+    categoryBreakdown,
+    actionQueues,
+  } = data;
 
-  const activeOrders =
-    orders.received +
-    orders.sorting +
+  const inProcessCount =
     orders.processing +
+    orders.sorting +
     orders.drying +
     orders.ironing +
     orders.qualityCheck +
-    orders.packed +
-    orders.ready +
-    orders.outForDelivery;
+    orders.packed;
+
+  const activeOrders = inProcessCount + orders.received + orders.ready + orders.outForDelivery;
 
   // Status filter tabs
   const statusTabs: { key: StatusFilter; label: string; count: number }[] = [
@@ -368,7 +363,7 @@ export const DashboardPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <ThemeToggle size="sm" />
             <button
-              onClick={() => loadDashboard()}
+              onClick={handleRefresh}
               style={{
                 background: 'rgba(255,255,255,0.2)',
                 border: '1px solid rgba(255,255,255,0.3)',
@@ -381,6 +376,7 @@ export const DashboardPage: React.FC = () => {
                 minHeight: 44,
                 minWidth: 44,
               }}
+              aria-label="Refresh dashboard data"
             >
               ↻ Refresh
             </button>
@@ -389,39 +385,459 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px' }}>
-        {/* ─── TODAY'S SUMMARY ──────────────────────────────── */}
+        {/* ─── DATE FILTER TOOLBAR (Phase 2) ───────────────────── */}
         <div
+          id="dashboard-date-filter-toolbar"
+          role="region"
+          aria-label="Dashboard period filters"
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: 12,
-            marginTop: -24,
+            background: 'var(--bg-surface, #FFF)',
+            borderRadius: 12,
+            padding: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            marginTop: -32,
+            marginBottom: 20,
+            border: '1px solid var(--border, #E5E7EB)',
           }}
         >
-          <SummaryCard
-            label="Today's Orders"
-            value={overview.totalOrders}
-            sub={`${activeOrders} active`}
-            color="#3B82F6"
-            onClick={() => {
-              setStatusFilter('ALL');
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
             }}
-          />
-          <SummaryCard
-            label="Today's Sales"
-            value={formatCurrency(financial.totalOrderValue)}
-            color="#8B5CF6"
-          />
-          <SummaryCard
-            label="Collected"
-            value={formatCurrency(financial.amountPaid)}
-            color="#10B981"
-          />
-          <SummaryCard
-            label="Amount Due"
-            value={formatCurrency(financial.amountDue)}
-            color={financial.amountDue > 0 ? '#EF4444' : '#10B981'}
-            attention={financial.amountDue > 0}
+          >
+            {/* Preset Buttons */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                alignItems: 'center',
+              }}
+              role="toolbar"
+              aria-label="Period presets"
+            >
+              {PRESETS.map((p) => {
+                const isActive = preset === p.key;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => handleSelectPreset(p.key)}
+                    aria-pressed={isActive}
+                    style={{
+                      minHeight: 44,
+                      minWidth: 44,
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      border: isActive
+                        ? '2px solid var(--accent, #2563EB)'
+                        : '1px solid var(--border, #D1D5DB)',
+                      background: isActive ? 'var(--accent, #2563EB)' : 'var(--bg-surface, #FFF)',
+                      color: isActive ? '#FFF' : 'var(--text-primary, #374151)',
+                      transition: 'all 0.15s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              aria-label="Refresh dashboard data"
+              disabled={loading}
+              style={{
+                minHeight: 44,
+                minWidth: 44,
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                border: '1px solid var(--border, #D1D5DB)',
+                background: 'var(--bg-surface, #FFF)',
+                color: 'var(--text-primary, #374151)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              <span
+                style={{
+                  display: 'inline-block',
+                  transform: loading ? 'rotate(180deg)' : undefined,
+                  transition: 'transform 0.5s ease',
+                }}
+              >
+                ↻
+              </span>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+
+          {/* Active Period Range Descriptor */}
+          <div
+            style={{
+              marginTop: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+              fontSize: 13,
+              color: 'var(--text-secondary, #4B5563)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontWeight: 600 }}>Active Period:</span>
+              <span
+                id="dashboard-active-period-label"
+                style={{
+                  fontWeight: 700,
+                  color: 'var(--accent, #1E40AF)',
+                  background: 'var(--accent-muted, #EFF6FF)',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                }}
+              >
+                {formatPeriodLabel(preset, dateRange.startDate, dateRange.endDate)}
+              </span>
+              {loading && (
+                <span style={{ fontSize: 12, color: 'var(--text-muted, #6B7280)' }}>
+                  (Updating...)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Custom Date Inputs (collapsible) */}
+          {showCustomInputs && (
+            <div
+              style={{
+                marginTop: 12,
+                paddingTop: 12,
+                borderTop: '1px solid var(--border, #F3F4F6)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                >
+                  From:
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    max={todayKolkataStr}
+                    onChange={(e) => {
+                      setCustomStartDate(e.target.value);
+                      setCustomError(null);
+                    }}
+                    aria-label="Start date"
+                    style={{
+                      minHeight: 44,
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border, #D1D5DB)',
+                      background: 'var(--bg-surface, #FFF)',
+                      color: 'var(--text-primary, #111827)',
+                      fontSize: 13,
+                    }}
+                  />
+                </label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                >
+                  To:
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    max={todayKolkataStr}
+                    onChange={(e) => {
+                      setCustomEndDate(e.target.value);
+                      setCustomError(null);
+                    }}
+                    aria-label="End date"
+                    style={{
+                      minHeight: 44,
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border, #D1D5DB)',
+                      background: 'var(--bg-surface, #FFF)',
+                      color: 'var(--text-primary, #111827)',
+                      fontSize: 13,
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleApplyCustom}
+                  style={{
+                    minHeight: 44,
+                    minWidth: 70,
+                    padding: '8px 16px',
+                    borderRadius: 6,
+                    background: 'var(--accent, #2563EB)',
+                    color: '#FFF',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+              {customError && (
+                <div role="alert" style={{ fontSize: 12, color: '#DC2626', fontWeight: 600 }}>
+                  {customError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Error Banner when background fetch/refresh fails while showing existing data */}
+        {error && data && (
+          <div
+            role="alert"
+            style={{
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              color: '#991B1B',
+              padding: '10px 16px',
+              borderRadius: 8,
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              fontSize: 13,
+            }}
+          >
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              style={{
+                background: '#DC2626',
+                color: '#FFF',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                minHeight: 36,
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* ─── FINANCIAL PERFORMANCE (Phase 3) ──────────────── */}
+        <section aria-labelledby="financial-performance-heading" style={{ marginBottom: 24 }}>
+          <SectionTitle id="financial-performance-heading">Financial Performance</SectionTitle>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+              gap: 12,
+            }}
+          >
+            <KpiCard
+              id="kpi-collections-received"
+              label="Collections Received"
+              value={formatCurrency(financial.collections ?? financial.amountPaid)}
+              comparison={comparison?.collections}
+              isCurrency={true}
+              sub={
+                financial.collectionCount !== undefined
+                  ? `${financial.collectionCount} payment transaction${financial.collectionCount === 1 ? '' : 's'}`
+                  : 'Collected in period'
+              }
+              color="#059669"
+            />
+            <KpiCard
+              id="kpi-refunds"
+              label="Refunds"
+              value={formatCurrency(financial.refunds ?? 0)}
+              isCurrency={true}
+              sub={
+                financial.refundCount !== undefined
+                  ? `${financial.refundCount} completed refund${financial.refundCount === 1 ? '' : 's'}`
+                  : 'Completed refunds in period'
+              }
+              color={(financial.refunds ?? 0) > 0 ? '#DC2626' : 'var(--text-muted, #6B7280)'}
+            />
+            <KpiCard
+              id="kpi-net-collections"
+              label="Net Collections"
+              value={formatCurrency(
+                financial.netCollections ??
+                  (financial.collections ?? financial.amountPaid) - (financial.refunds ?? 0),
+              )}
+              comparison={comparison?.netCollections}
+              isCurrency={true}
+              sub="Collections minus refunds"
+              color="#0D9488"
+            />
+            <KpiCard
+              id="kpi-order-value-booked"
+              label="Order Value Booked"
+              value={formatCurrency(financial.bookedOrderValue ?? financial.totalOrderValue)}
+              comparison={comparison?.bookedOrderValue}
+              isCurrency={true}
+              sub="Orders placed in period"
+              color="#7C3AED"
+            />
+            <KpiCard
+              id="kpi-outstanding-balance"
+              label="Current Outstanding Balance"
+              value={formatCurrency(financial.outstandingBalance ?? financial.amountDue)}
+              isCurrency={true}
+              badge="Live Snapshot"
+              badgeVariant={
+                (financial.outstandingBalance ?? financial.amountDue) > 0 ? 'warning' : 'neutral'
+              }
+              sub="Current store-wide outstanding balance; not limited to the selected date range."
+              color={
+                (financial.outstandingBalance ?? financial.amountDue) > 0 ? '#DC2626' : '#059669'
+              }
+              attention={(financial.outstandingBalance ?? financial.amountDue) > 0}
+            />
+          </div>
+        </section>
+
+        {/* ─── OPERATIONS & QUEUE HEALTH (Phase 3) ───────────── */}
+        <section aria-labelledby="operational-health-heading" style={{ marginBottom: 24 }}>
+          <SectionTitle id="operational-health-heading">Operations & Queue Health</SectionTitle>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+              gap: 12,
+            }}
+          >
+            <KpiCard
+              id="kpi-orders-created"
+              label="Orders Created"
+              value={overview.totalOrders}
+              comparison={comparison?.totalOrders}
+              isCurrency={false}
+              sub={`${activeOrders} active orders`}
+              color="#2563EB"
+              onClick={() => {
+                setStatusFilter('ALL');
+              }}
+            />
+            <KpiCard
+              id="kpi-in-process"
+              label="In Process"
+              value={inProcessCount}
+              badge="Live Queue"
+              badgeVariant="info"
+              sub="Washing, drying, ironing & packing"
+              color="#D97706"
+              onClick={() => {
+                setStatusFilter('PROCESSING');
+              }}
+            />
+            <KpiCard
+              id="kpi-ready-pickup"
+              label="Ready for Pickup"
+              value={orders.ready}
+              badge="Live Queue"
+              badgeVariant="info"
+              sub="Ready for customer collection"
+              color="#059669"
+              onClick={() => {
+                setStatusFilter('READY');
+              }}
+            />
+            <KpiCard
+              id="kpi-overdue-orders"
+              label="Overdue Orders"
+              value={orders.overdue}
+              badge="Live Queue"
+              badgeVariant={orders.overdue > 0 ? 'warning' : 'neutral'}
+              sub="Past effective due date"
+              color={orders.overdue > 0 ? '#DC2626' : '#6B7280'}
+              attention={orders.overdue > 0}
+            />
+            <KpiCard
+              id="kpi-due-today"
+              label="Due Today"
+              value={orders.dueToday}
+              badge="Asia/Kolkata"
+              sub="Orders due today"
+              color={orders.dueToday > 0 ? '#D97706' : '#6B7280'}
+            />
+            <KpiCard
+              id="kpi-due-tomorrow"
+              label="Due Tomorrow"
+              value={orders.dueTomorrow ?? 0}
+              badge="Asia/Kolkata"
+              sub="Orders due tomorrow"
+              color={(orders.dueTomorrow ?? 0) > 0 ? '#4B5563' : '#6B7280'}
+            />
+          </div>
+        </section>
+
+        {/* ─── TRENDS & PERFORMANCE (Phase 4) ──────────────── */}
+        <section aria-labelledby="trends-performance-heading" style={{ marginBottom: 24 }}>
+          <SectionTitle id="trends-performance-heading">Trends & Performance</SectionTitle>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+              gap: 16,
+            }}
+          >
+            <DashboardTrendChart trends={trends} currencyFormatter={formatCurrency} />
+            <DashboardBreakdownChart
+              serviceBreakdown={serviceBreakdown}
+              categoryBreakdown={categoryBreakdown}
+              currencyFormatter={formatCurrency}
+            />
+          </div>
+        </section>
+
+        {/* ─── ACTION CENTER (Phase 5) ─────────────────────── */}
+        <div style={{ marginBottom: 24 }}>
+          <DashboardActionCenter
+            actionQueues={actionQueues}
+            readyOrders={readyOrders}
+            currencyFormatter={formatCurrency}
           />
         </div>
 
@@ -438,7 +854,9 @@ export const DashboardPage: React.FC = () => {
           {statusTabs.map((tab) => (
             <button
               key={tab.key}
+              type="button"
               onClick={() => setStatusFilter(tab.key)}
+              aria-pressed={statusFilter === tab.key}
               style={{
                 padding: '10px 16px',
                 borderRadius: 8,
@@ -484,155 +902,55 @@ export const DashboardPage: React.FC = () => {
           ))}
         </div>
 
-        {/* ─── READY FOR CUSTOMER ──────────────────────────── */}
-        {readyOrders.length > 0 && (
-          <>
-            <SectionTitle>Ready for Customer ({readyOrders.length})</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {readyOrders.map((ro) => (
-                <Card key={ro.id} style={{ padding: 16 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          fontSize: 15,
-                          color: 'var(--text-primary, #111827)',
-                        }}
-                      >
-                        Order #{ro.orderNumber}
-                      </div>
-                      <div
-                        style={{ color: 'var(--text-muted, #6B7280)', fontSize: 13, marginTop: 2 }}
-                      >
-                        {ro.customerName} • {ro.customerPhone}
-                      </div>
-                    </div>
-                    <StatusChip status={OrderStatus.READY} />
-                  </div>
-
-                  {/* Ready items */}
-                  {ro.readyItems.length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: 'var(--success-text, #059669)',
-                          marginBottom: 4,
-                        }}
-                      >
-                        READY
-                      </div>
-                      {ro.readyItems.map((item, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            fontSize: 13,
-                            color: 'var(--text-primary, #374151)',
-                            paddingLeft: 8,
-                          }}
-                        >
-                          ✓ {item.garmentName} ×{item.quantity}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Remaining items */}
-                  {ro.remainingItems.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: 'var(--warning-text, #D97706)',
-                          marginBottom: 4,
-                        }}
-                      >
-                        STILL PROCESSING
-                      </div>
-                      {ro.remainingItems.map((item, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            fontSize: 13,
-                            color: 'var(--text-muted, #6B7280)',
-                            paddingLeft: 8,
-                          }}
-                        >
-                          • {item.garmentName} ×{item.quantity}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Financial */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 16,
-                      marginTop: 12,
-                      paddingTop: 12,
-                      borderTop: '1px solid var(--border, #E5E7EB)',
-                      fontSize: 13,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <span>
-                      Amount: <strong>{formatCurrency(ro.totalAmount)}</strong>
-                    </span>
-                    <span style={{ color: 'var(--success-text, #059669)' }}>
-                      Paid: <strong>{formatCurrency(ro.amountPaid)}</strong>
-                    </span>
-                    {ro.amountDue > 0 && (
-                      <span style={{ color: 'var(--danger-text, #DC2626)' }}>
-                        Due: <strong>{formatCurrency(ro.amountDue)}</strong>
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                    <Button
-                      variant="primary"
-                      style={{ minHeight: 44, fontSize: 13 }}
-                      onClick={() => navigate(`/orders/${ro.id}`)}
-                    >
-                      View Order
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </>
-        )}
-
         {/* ─── PAYMENT SUMMARY ─────────────────────────────── */}
         <SectionTitle>Payment Summary</SectionTitle>
         <Card style={{ padding: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <PaymentRow
-              label="Total Order Value"
-              value={formatCurrency(financial.totalOrderValue)}
+              label="Booked Order Value"
+              value={formatCurrency(financial.bookedOrderValue ?? financial.totalOrderValue)}
             />
             <PaymentRow
-              label="Amount Collected"
-              value={formatCurrency(financial.amountPaid)}
+              label="Collections Received"
+              value={formatCurrency(financial.collections ?? financial.amountPaid)}
               color="var(--success-text, #059669)"
             />
+            {financial.refunds !== undefined && financial.refunds > 0 && (
+              <>
+                <PaymentRow
+                  label="Completed Refunds"
+                  value={formatCurrency(financial.refunds)}
+                  color="var(--danger-text, #DC2626)"
+                />
+                <PaymentRow
+                  label="Net Collections"
+                  value={formatCurrency(
+                    financial.netCollections ?? financial.amountPaid - financial.refunds,
+                  )}
+                  color="var(--success-text, #059669)"
+                />
+              </>
+            )}
             <PaymentRow
-              label="Amount Outstanding"
-              value={formatCurrency(financial.amountDue)}
-              color={financial.amountDue > 0 ? 'var(--danger-text, #DC2626)' : undefined}
+              label="Live Store-wide Outstanding"
+              value={formatCurrency(financial.outstandingBalance ?? financial.amountDue)}
+              color={
+                (financial.outstandingBalance ?? financial.amountDue) > 0
+                  ? 'var(--danger-text, #DC2626)'
+                  : undefined
+              }
             />
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--text-muted, #6B7280)',
+                fontStyle: 'italic',
+                marginTop: 2,
+              }}
+            >
+              * Outstanding balance is a live store-wide snapshot, independent of the selected
+              period.
+            </div>
             <div
               style={{ borderTop: '1px solid var(--border, #E5E7EB)', paddingTop: 8, marginTop: 4 }}
             >
@@ -655,7 +973,11 @@ export const DashboardPage: React.FC = () => {
         <SectionTitle>Recent Orders</SectionTitle>
         {filteredOrders.length === 0 ? (
           <Card style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted, #9CA3AF)' }}>
-            {statusFilter === 'ALL' ? 'No orders today' : `No ${statusFilter.toLowerCase()} orders`}
+            {statusFilter === 'ALL'
+              ? preset === 'TODAY'
+                ? 'No orders today'
+                : 'No orders in selected period'
+              : `No ${statusFilter.toLowerCase()} orders`}
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -742,52 +1064,139 @@ export const DashboardPage: React.FC = () => {
             ))}
         </div>
 
-        {/* ─── RECENT ACTIVITY ─────────────────────────────── */}
-        {recentActivity.length > 0 && (
-          <>
-            <SectionTitle>Recent Activity</SectionTitle>
-            <Card style={{ padding: 0 }}>
-              {recentActivity.map((act, idx) => (
-                <div
-                  key={act.id}
-                  style={{
-                    padding: '10px 16px',
-                    borderBottom:
-                      idx < recentActivity.length - 1
-                        ? '1px solid var(--border, #F3F4F6)'
-                        : undefined,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ fontSize: 16 }}>
-                    {ACTIVITY_ICONS[act.eventType] || '\ud83d\udce3'}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ color: 'var(--text-primary, #374151)' }}>{act.message}</span>
-                    {act.orderNumber && (
-                      <span style={{ color: 'var(--text-muted, #6B7280)' }}>
-                        {' '}
-                        #{act.orderNumber}
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    style={{
-                      color: 'var(--text-placeholder, #9CA3AF)',
-                      fontSize: 11,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formatTime(act.createdAt)}
-                  </span>
-                </div>
-              ))}
+        {/* ─── RECENT ACTIVITY (Phase 5) ───────────────────── */}
+        <section
+          aria-labelledby="recent-activity-heading"
+          style={{ marginTop: 24, marginBottom: 24 }}
+        >
+          <SectionTitle id="recent-activity-heading">Recent Activity</SectionTitle>
+          {recentActivity.length === 0 ? (
+            <Card
+              id="recent-activity-empty"
+              style={{
+                padding: 24,
+                textAlign: 'center',
+                border: '1px dashed var(--border, #E5E7EB)',
+                background: 'var(--bg-surface, #FFF)',
+                color: 'var(--text-muted, #6B7280)',
+              }}
+            >
+              <div style={{ fontSize: 24, marginBottom: 6 }}>📋</div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary, #111827)' }}>
+                No recent activity recorded
+              </div>
+              <div
+                style={{ fontSize: 12, color: 'var(--text-placeholder, #9CA3AF)', marginTop: 4 }}
+              >
+                Order status changes and payment notifications for the selected period will appear
+                here.
+              </div>
             </Card>
-          </>
-        )}
+          ) : (
+            <Card style={{ padding: 0 }} id="recent-activity-card">
+              <div role="list" aria-label="Recent activity events">
+                {recentActivity.map((act, idx) => {
+                  const hasOrderLink = Boolean(act.orderId);
+                  return (
+                    <div
+                      key={act.id}
+                      role="listitem"
+                      tabIndex={hasOrderLink ? 0 : undefined}
+                      onClick={hasOrderLink ? () => navigate(`/orders/${act.orderId}`) : undefined}
+                      onKeyDown={
+                        hasOrderLink
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                navigate(`/orders/${act.orderId}`);
+                              }
+                            }
+                          : undefined
+                      }
+                      style={{
+                        padding: '12px 16px',
+                        borderBottom:
+                          idx < recentActivity.length - 1
+                            ? '1px solid var(--border, #F3F4F6)'
+                            : undefined,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        fontSize: 13,
+                        cursor: hasOrderLink ? 'pointer' : 'default',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      className={hasOrderLink ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}
+                      aria-label={
+                        hasOrderLink
+                          ? `${act.message}${act.orderNumber ? ` for order #${act.orderNumber}` : ''}. Press to view order.`
+                          : undefined
+                      }
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <span style={{ fontSize: 18, flexShrink: 0 }} aria-hidden="true">
+                          {ACTIVITY_ICONS[act.eventType] || '📢'}
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <span style={{ color: 'var(--text-primary, #374151)', fontWeight: 500 }}>
+                            {act.message}
+                          </span>
+                          {act.orderNumber && (
+                            <span
+                              style={{
+                                color: hasOrderLink
+                                  ? 'var(--accent, #2563EB)'
+                                  : 'var(--text-muted, #6B7280)',
+                                fontWeight: 600,
+                                marginLeft: 6,
+                              }}
+                            >
+                              #{act.orderNumber}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <span
+                          style={{
+                            color: 'var(--text-placeholder, #9CA3AF)',
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {formatTime(act.createdAt)}
+                        </span>
+                        {hasOrderLink && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: 'var(--accent, #2563EB)',
+                              fontWeight: 600,
+                            }}
+                            className="hidden sm:inline"
+                          >
+                            View →
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -795,49 +1204,353 @@ export const DashboardPage: React.FC = () => {
 
 /* ─── Sub-Components ────────────────────────────────────────────── */
 
-function SummaryCard({
-  label,
-  value,
-  sub,
-  color,
-  attention,
-  onClick,
+function ComparisonBadge({
+  comparison,
+  isCurrency = false,
 }: {
+  comparison: MetricComparison;
+  isCurrency?: boolean;
+}) {
+  const { current, previous, percentageChange } = comparison;
+
+  const formattedPrev = isCurrency ? formatCurrency(previous) : previous.toLocaleString('en-IN');
+
+  // Case 1: Standard comparison with percentageChange available (previous > 0)
+  if (percentageChange !== null && !isNaN(percentageChange)) {
+    if (percentageChange > 0) {
+      return (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            fontSize: 12,
+            fontWeight: 600,
+            marginTop: 4,
+            flexWrap: 'wrap',
+          }}
+          aria-label={`Increased by ${percentageChange}% compared to previous period`}
+        >
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+              padding: '2px 6px',
+              borderRadius: 4,
+              background: '#ECFDF5',
+              color: '#065F46',
+              border: '1px solid #A7F3D0',
+            }}
+          >
+            <span>↑</span>
+            <span>+{percentageChange}%</span>
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted, #6B7280)' }}>
+            vs {formattedPrev} prev
+          </span>
+        </div>
+      );
+    }
+
+    if (percentageChange < 0) {
+      return (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            fontSize: 12,
+            fontWeight: 600,
+            marginTop: 4,
+            flexWrap: 'wrap',
+          }}
+          aria-label={`Decreased by ${Math.abs(percentageChange)}% compared to previous period`}
+        >
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+              padding: '2px 6px',
+              borderRadius: 4,
+              background: '#FEF2F2',
+              color: '#991B1B',
+              border: '1px solid #FECACA',
+            }}
+          >
+            <span>↓</span>
+            <span>{percentageChange}%</span>
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted, #6B7280)' }}>
+            vs {formattedPrev} prev
+          </span>
+        </div>
+      );
+    }
+
+    // Unchanged (0%)
+    return (
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          fontSize: 12,
+          fontWeight: 600,
+          marginTop: 4,
+          flexWrap: 'wrap',
+        }}
+        aria-label="Unchanged compared to previous period"
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 2,
+            padding: '2px 6px',
+            borderRadius: 4,
+            background: 'var(--bg-surface-muted, #F3F4F6)',
+            color: 'var(--text-secondary, #4B5563)',
+            border: '1px solid var(--border, #E5E7EB)',
+          }}
+        >
+          <span>—</span>
+          <span>0%</span>
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted, #6B7280)' }}>
+          vs {formattedPrev} prev
+        </span>
+      </div>
+    );
+  }
+
+  // Case 2: Zero-baseline convention (previous was 0, current > 0)
+  if (current > 0) {
+    const formattedChange = isCurrency ? formatCurrency(current) : current.toLocaleString('en-IN');
+    return (
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          fontSize: 12,
+          fontWeight: 600,
+          marginTop: 4,
+          flexWrap: 'wrap',
+        }}
+        aria-label={`Increase of ${formattedChange} from zero baseline`}
+      >
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 2,
+            padding: '2px 6px',
+            borderRadius: 4,
+            background: '#EFF6FF',
+            color: '#1E40AF',
+            border: '1px solid #BFDBFE',
+          }}
+        >
+          <span>↑</span>
+          <span>+{formattedChange}</span>
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted, #6B7280)' }}>
+          vs {formattedPrev} prev
+        </span>
+      </div>
+    );
+  }
+
+  // Both previous and current are 0
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        fontSize: 12,
+        fontWeight: 600,
+        marginTop: 4,
+        flexWrap: 'wrap',
+      }}
+      aria-label="Zero compared to previous period"
+    >
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 2,
+          padding: '2px 6px',
+          borderRadius: 4,
+          background: 'var(--bg-surface-muted, #F3F4F6)',
+          color: 'var(--text-secondary, #4B5563)',
+          border: '1px solid var(--border, #E5E7EB)',
+        }}
+      >
+        <span>—</span>
+        <span>0%</span>
+      </span>
+      <span style={{ fontSize: 11, color: 'var(--text-muted, #6B7280)' }}>
+        vs {formattedPrev} prev
+      </span>
+    </div>
+  );
+}
+
+interface KpiCardProps {
+  id?: string;
   label: string;
   value: string | number;
   sub?: string;
-  color: string;
+  comparison?: MetricComparison;
+  isCurrency?: boolean;
+  color?: string;
   attention?: boolean;
+  badge?: string;
+  badgeVariant?: 'neutral' | 'warning' | 'info';
   onClick?: () => void;
-}) {
+}
+
+function KpiCard({
+  id,
+  label,
+  value,
+  sub,
+  comparison,
+  isCurrency = false,
+  color,
+  attention = false,
+  badge,
+  badgeVariant = 'neutral',
+  onClick,
+}: KpiCardProps) {
+  const isClickable = Boolean(onClick);
+
   return (
     <Card
+      id={id}
       style={{
-        padding: 20,
-        cursor: onClick ? 'pointer' : undefined,
-        borderLeft: attention ? `4px solid ${color}` : undefined,
+        padding: '16px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        cursor: isClickable ? 'pointer' : 'default',
+        borderLeft: attention && color ? `4px solid ${color}` : undefined,
         background: 'var(--bg-surface, #FFF)',
+        transition: 'all 0.15s ease',
+        minHeight: 120,
+        boxShadow: isClickable ? '0 1px 3px rgba(0,0,0,0.06)' : undefined,
       }}
       onClick={onClick}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={
+        isClickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      aria-label={isClickable ? `View ${label}` : undefined}
     >
-      <div style={{ fontSize: 13, color: 'var(--text-muted, #6B7280)', fontWeight: 500 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1.3, marginTop: 4 }}>
-        {typeof value === 'number' ? value.toLocaleString('en-IN') : value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: 12, color: 'var(--text-placeholder, #9CA3AF)', marginTop: 2 }}>
-          {sub}
+      <div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 6,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              color: 'var(--text-muted, #6B7280)',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.025em',
+            }}
+          >
+            {label}
+          </span>
+          {badge && (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '2px 6px',
+                borderRadius: 4,
+                textTransform: 'uppercase',
+                background:
+                  badgeVariant === 'warning'
+                    ? '#FEF3C7'
+                    : badgeVariant === 'info'
+                      ? '#E0F2FE'
+                      : 'var(--bg-surface-muted, #F3F4F6)',
+                color:
+                  badgeVariant === 'warning'
+                    ? '#92400E'
+                    : badgeVariant === 'info'
+                      ? '#0369A1'
+                      : 'var(--text-secondary, #4B5563)',
+                border:
+                  badgeVariant === 'warning'
+                    ? '1px solid #FDE68A'
+                    : badgeVariant === 'info'
+                      ? '1px solid #BAE6FD'
+                      : '1px solid var(--border, #E5E7EB)',
+              }}
+            >
+              {badge}
+            </span>
+          )}
         </div>
-      )}
+
+        <div
+          style={{
+            fontSize: typeof value === 'string' && value.length > 10 ? 22 : 26,
+            fontWeight: 700,
+            color: color || 'var(--text-primary, #111827)',
+            lineHeight: 1.25,
+            marginTop: 6,
+          }}
+        >
+          {typeof value === 'number' ? value.toLocaleString('en-IN') : value}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 8 }}>
+        {comparison && <ComparisonBadge comparison={comparison} isCurrency={isCurrency} />}
+        {sub && (
+          <div
+            style={{
+              fontSize: 11,
+              color: 'var(--text-placeholder, #9CA3AF)',
+              marginTop: comparison ? 4 : 2,
+              lineHeight: 1.35,
+            }}
+          >
+            {sub}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SummaryCard(props: KpiCardProps) {
+  return <KpiCard {...props} />;
+}
+
+function SectionTitle({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
     <h2
+      id={id}
       style={{
         fontSize: 16,
         fontWeight: 700,

@@ -387,4 +387,46 @@ describe('HomePage Component', () => {
       expect(screen.getByTestId('order-detail-page')).toBeInTheDocument();
     });
   });
+
+  it('11. Owner Settings dropdown contains Reports item that navigates to /reports/daily-orders', async () => {
+    mockEmployee = {
+      id: 'emp-owner-001',
+      name: 'Prathamesh Bhagwat',
+      role: 'OWNER',
+      storeId: 'store-pune-001',
+      storeName: 'Pune Main Store',
+    };
+
+    (global.fetch as any).mockImplementation(async () => {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, count: 0, data: [] }),
+      };
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route
+            path="/reports/daily-orders"
+            element={<div data-testid="reports-daily-orders-page">Reports Page</div>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const ownerSettingsBtn = screen.getByRole('button', { name: /owner settings/i });
+    expect(ownerSettingsBtn).toBeInTheDocument();
+    fireEvent.click(ownerSettingsBtn);
+
+    const reportsMenuItem = await screen.findByRole('button', { name: /reports/i });
+    expect(reportsMenuItem).toBeInTheDocument();
+    fireEvent.click(reportsMenuItem);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reports-daily-orders-page')).toBeInTheDocument();
+    });
+  });
 });

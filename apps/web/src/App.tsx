@@ -15,6 +15,7 @@ import { DeliveryPage } from './pages/DeliveryPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TagDesignerPage } from './pages/TagDesignerPage';
 import { OwnerSettingsPage } from './pages/OwnerSettingsPage';
+import { DailyOrdersReportPage } from './pages/DailyOrdersReportPage';
 import { LoadingState } from '@growfast/ui';
 
 export const App: React.FC = () => {
@@ -143,6 +144,17 @@ export const App: React.FC = () => {
         path="/tag-designer"
         element={<Navigate to="/owner/settings?tab=design-tags" replace />}
       />
+      {/* Developer B / Owner Settings — Daily Orders Report */}
+      <Route
+        path="/reports/daily-orders"
+        element={
+          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER']}>
+            <DailyOrdersReportPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/reports" element={<Navigate to="/reports/daily-orders" replace />} />
+
       {/* Catch all — redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

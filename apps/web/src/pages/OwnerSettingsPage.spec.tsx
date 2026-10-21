@@ -42,6 +42,11 @@ vi.mock('./CatalogSettingsPage', () => ({
     <div data-testid="mock-catalog-settings">Catalog Settings Embedded</div>
   ),
 }));
+vi.mock('./DailyOrdersReportPage', () => ({
+  DailyOrdersReportPage: () => (
+    <div data-testid="mock-daily-orders-report">Daily Orders Report Embedded</div>
+  ),
+}));
 
 describe('OwnerSettingsPage (Owner Settings Navigation & Role Control)', () => {
   beforeEach(() => {
@@ -49,7 +54,7 @@ describe('OwnerSettingsPage (Owner Settings Navigation & Role Control)', () => {
     mockCurrentRole = Role.OWNER;
   });
 
-  it('renders all three owner sections: Staff, Design Tags, and Catalog for OWNER', () => {
+  it('renders all four owner sections: Staff, Design Tags, Catalog, and Reports for OWNER', () => {
     render(
       <MemoryRouter initialEntries={['/owner/settings?tab=design-tags']}>
         <OwnerSettingsPage />
@@ -60,6 +65,7 @@ describe('OwnerSettingsPage (Owner Settings Navigation & Role Control)', () => {
     expect(screen.getByRole('button', { name: /staff/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /design tags/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /catalog/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reports/i })).toBeInTheDocument();
 
     // Default tab is design tags
     expect(screen.getByTestId('mock-tag-designer')).toBeInTheDocument();
@@ -79,6 +85,10 @@ describe('OwnerSettingsPage (Owner Settings Navigation & Role Control)', () => {
     // Click Catalog tab
     const catalogTab = screen.getByRole('button', { name: /catalog/i });
     fireEvent.click(catalogTab);
+
+    // Click Reports tab
+    const reportsTab = screen.getByRole('button', { name: /reports/i });
+    fireEvent.click(reportsTab);
   });
 
   it('denies access to non-owner role', () => {

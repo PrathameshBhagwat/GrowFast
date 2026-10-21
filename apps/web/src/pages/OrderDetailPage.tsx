@@ -344,12 +344,32 @@ export function OrderDetailPage() {
     }
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/orders/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let res: Response | null = null;
+      const maxRetries = 2;
 
-      if (!res.ok) {
-        throw new Error(`Failed to fetch order (${res.status})`);
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 600 * attempt));
+        }
+        try {
+          res = await fetch(`${API_URL}/orders/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (res.status === 503 && attempt < maxRetries) {
+            continue;
+          }
+          break;
+        } catch (fetchErr) {
+          if (attempt < maxRetries) {
+            continue;
+          }
+          throw fetchErr;
+        }
+      }
+
+      if (!res || !res.ok) {
+        throw new Error(`Failed to fetch order (${res?.status ?? 'error'})`);
       }
 
       const body = await res.json();
