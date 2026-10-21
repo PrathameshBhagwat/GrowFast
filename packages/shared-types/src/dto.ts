@@ -713,4 +713,3 @@ export interface DailyOrdersReportQueryDTO {
   pageSize?: number;
   export?: boolean;
 }
-

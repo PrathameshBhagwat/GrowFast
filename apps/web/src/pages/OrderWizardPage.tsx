@@ -340,8 +340,7 @@ export function OrderWizardPage() {
     // CHANGE 5: Weight-based exception in Per Pieces (DRY_CLEANING) workflow
     // Strictly a per-piece pricing exception, NOT a per-kg calculation.
     const isWeightGarment =
-      garment.category === 'WEIGHT_BASED' ||
-      garment.category === GarmentCategory.WEIGHT_BASED;
+      garment.category === 'WEIGHT_BASED' || garment.category === GarmentCategory.WEIGHT_BASED;
 
     if (activeWorkflow === 'DRY_CLEANING' && isWeightGarment) {
       setPieceExceptionModalData({
@@ -1011,10 +1010,7 @@ export function OrderWizardPage() {
         </div>
 
         {/* Center: Mode Switcher (Matching Reference Screenshot) */}
-        <div
-          aria-label="Order Entry Mode Selection"
-          className="flex items-center gap-2.5"
-        >
+        <div aria-label="Order Entry Mode Selection" className="flex items-center gap-2.5">
           {/* CREATE ORDER PER PIECE */}
           <button
             type="button"
@@ -1261,7 +1257,6 @@ export function OrderWizardPage() {
           />
         </div>
       ) : (
-
         <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden p-2.5 lg:p-3 gap-3 bg-slate-50/60 dark:bg-slate-950/60">
           {/* LEFT COLUMN: Garment Catalog */}
           <div
