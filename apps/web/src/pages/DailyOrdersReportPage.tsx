@@ -16,11 +16,7 @@ import {
   ArrowLeft,
   Check,
 } from 'lucide-react';
-import {
-  DailyOrderReportRowDTO,
-  DailyOrdersReportSummaryDTO,
-  Role,
-} from '@growfast/shared-types';
+import { DailyOrderReportRowDTO, DailyOrdersReportSummaryDTO, Role } from '@growfast/shared-types';
 import {
   fetchDailyOrdersReport,
   fetchEmployeesForFilter,
@@ -89,8 +85,12 @@ export const DailyOrdersReportPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Dropdown options data
-  const [employeesList, setEmployeesList] = useState<Array<{ id: string; name: string; role: string }>>([]);
-  const [customerOptions, setCustomerOptions] = useState<Array<{ id: string; name: string; customerCode?: string; phone: string }>>([]);
+  const [employeesList, setEmployeesList] = useState<
+    Array<{ id: string; name: string; role: string }>
+  >([]);
+  const [customerOptions, setCustomerOptions] = useState<
+    Array<{ id: string; name: string; customerCode?: string; phone: string }>
+  >([]);
   const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
 
   const datePopoverRef = useRef<HTMLDivElement>(null);
@@ -644,10 +644,11 @@ export const DailyOrdersReportPage: React.FC = () => {
                   : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
               }`}
             >
-              <Filter size={14} className={activeFilterCount > 0 ? 'text-blue-600' : 'text-slate-500'} />
-              <span>
-                FILTERS {activeFilterCount > 0 && `(${activeFilterCount})`}
-              </span>
+              <Filter
+                size={14}
+                className={activeFilterCount > 0 ? 'text-blue-600' : 'text-slate-500'}
+              />
+              <span>FILTERS {activeFilterCount > 0 && `(${activeFilterCount})`}</span>
             </button>
           </div>
         </div>
@@ -713,14 +714,9 @@ export const DailyOrdersReportPage: React.FC = () => {
                   </tr>
                 ) : (
                   orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-slate-50/70 transition-colors"
-                    >
+                    <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
                       {/* 1. Order Date / Time */}
-                      <td className="py-3.5 px-4 text-slate-700">
-                        {order.formattedOrderDate}
-                      </td>
+                      <td className="py-3.5 px-4 text-slate-700">{order.formattedOrderDate}</td>
 
                       {/* 2. Order No. (Clickable blue link) */}
                       <td className="py-3.5 px-4 font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
@@ -757,9 +753,7 @@ export const DailyOrdersReportPage: React.FC = () => {
                       </td>
 
                       {/* 7. Due Date */}
-                      <td className="py-3.5 px-4 text-slate-700">
-                        {order.formattedDueDate}
-                      </td>
+                      <td className="py-3.5 px-4 text-slate-700">{order.formattedDueDate}</td>
 
                       {/* 8. Pcs. */}
                       <td className="py-3.5 px-3 text-center text-slate-800 font-medium">
@@ -777,9 +771,7 @@ export const DailyOrdersReportPage: React.FC = () => {
                       </td>
 
                       {/* 11. Discount */}
-                      <td className="py-3.5 px-4 text-right text-slate-600">
-                        {order.discount}
-                      </td>
+                      <td className="py-3.5 px-4 text-right text-slate-600">{order.discount}</td>
 
                       {/* 12. Net Amount */}
                       <td className="py-3.5 px-4 text-right font-semibold text-slate-900">
@@ -810,18 +802,35 @@ export const DailyOrdersReportPage: React.FC = () => {
           {summary && totalOrders > 0 && !isLoading && (
             <div className="bg-[#F8FAFC] border-t border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-slate-700">
               <div className="flex items-center gap-4">
-                <span>Total Orders: <strong className="text-slate-900">{summary.totalOrders}</strong></span>
-                <span>Total Pcs: <strong className="text-slate-900">{summary.totalPieces}</strong></span>
+                <span>
+                  Total Orders: <strong className="text-slate-900">{summary.totalOrders}</strong>
+                </span>
+                <span>
+                  Total Pcs: <strong className="text-slate-900">{summary.totalPieces}</strong>
+                </span>
                 {summary.totalWeight > 0 && (
-                  <span>Total Weight: <strong className="text-slate-900">{summary.totalWeight} kg</strong></span>
+                  <span>
+                    Total Weight:{' '}
+                    <strong className="text-slate-900">{summary.totalWeight} kg</strong>
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-4 text-right">
-                <span>Gross: <strong className="text-slate-900">₹{summary.totalGrossAmount}</strong></span>
-                <span>Discount: <strong className="text-slate-900">₹{summary.totalDiscount}</strong></span>
-                <span>Net: <strong className="text-slate-900">₹{summary.totalNetAmount}</strong></span>
-                <span>Advance: <strong className="text-emerald-700">₹{summary.totalAdvance}</strong></span>
-                <span>Balance: <strong className="text-rose-600">₹{summary.totalBalance}</strong></span>
+                <span>
+                  Gross: <strong className="text-slate-900">₹{summary.totalGrossAmount}</strong>
+                </span>
+                <span>
+                  Discount: <strong className="text-slate-900">₹{summary.totalDiscount}</strong>
+                </span>
+                <span>
+                  Net: <strong className="text-slate-900">₹{summary.totalNetAmount}</strong>
+                </span>
+                <span>
+                  Advance: <strong className="text-emerald-700">₹{summary.totalAdvance}</strong>
+                </span>
+                <span>
+                  Balance: <strong className="text-rose-600">₹{summary.totalBalance}</strong>
+                </span>
               </div>
             </div>
           )}
@@ -999,9 +1008,7 @@ export const DailyOrdersReportPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* 4. User */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    User
-                  </label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">User</label>
                   <select
                     value={draftFilters.userId}
                     onChange={(e) =>

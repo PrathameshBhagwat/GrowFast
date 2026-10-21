@@ -92,10 +92,7 @@ export class ReportService {
       if (ot === 'weight_based' || ot === 'weight based') {
         where.items = {
           some: {
-            OR: [
-              { weight: { gt: 0 } },
-              { garmentCatalog: { category: 'WEIGHT_BASED' } },
-            ],
+            OR: [{ weight: { gt: 0 } }, { garmentCatalog: { category: 'WEIGHT_BASED' } }],
           },
         };
       } else if (ot === 'dry_cleaning' || ot === 'dry cleaning') {
@@ -111,7 +108,13 @@ export class ReportService {
           some: {
             serviceType: {
               name: {
-                in: ['Standard Wash', 'Steam Iron', 'Wash + Steam Iron', 'Starching', 'Starching Dc'],
+                in: [
+                  'Standard Wash',
+                  'Steam Iron',
+                  'Wash + Steam Iron',
+                  'Starching',
+                  'Starching Dc',
+                ],
                 mode: 'insensitive',
               },
             },
@@ -232,7 +235,8 @@ export class ReportService {
         orderNumber: order.orderNumber,
         orderDate: order.orderDate.toISOString(),
         formattedOrderDate,
-        customerCode: order.customer?.customerCode || `CUST-${order.customer?.phone?.slice(-4) || '0000'}`,
+        customerCode:
+          order.customer?.customerCode || `CUST-${order.customer?.phone?.slice(-4) || '0000'}`,
         customerName: order.customer?.name || 'Walk-in Customer',
         customerAddress: order.customer?.address || 'Store Walk-in',
         customerPhone: order.customer?.phone || '',

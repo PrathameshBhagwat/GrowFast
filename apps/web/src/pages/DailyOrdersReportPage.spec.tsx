@@ -126,7 +126,9 @@ describe('DailyOrdersReportPage', () => {
       storeId: 'store-pune-001',
     };
 
-    fetchReportSpy = vi.spyOn(reportApi, 'fetchDailyOrdersReport').mockResolvedValue(mockReportData as any);
+    fetchReportSpy = vi
+      .spyOn(reportApi, 'fetchDailyOrdersReport')
+      .mockResolvedValue(mockReportData as any);
     exportExcelSpy = vi.spyOn(reportApi, 'exportDailyOrdersToExcel').mockImplementation(() => {});
     fetchEmployeesSpy = vi.spyOn(reportApi, 'fetchEmployeesForFilter').mockResolvedValue([
       { id: 'emp-1', name: 'Rahul Joshi', role: 'COUNTER' },
@@ -200,7 +202,9 @@ describe('DailyOrdersReportPage', () => {
     await waitFor(() => expect(fetchReportSpy).toHaveBeenCalled());
 
     // Click Date range trigger
-    const popoverTrigger = screen.getByRole('button', { name: /oct \d{1,2}, \d{4} - oct \d{1,2}, \d{4}|select date range/i });
+    const popoverTrigger = screen.getByRole('button', {
+      name: /oct \d{1,2}, \d{4} - oct \d{1,2}, \d{4}|select date range/i,
+    });
     fireEvent.click(popoverTrigger);
 
     // Verify popover options
@@ -231,7 +235,9 @@ describe('DailyOrdersReportPage', () => {
 
     await waitFor(() => expect(fetchReportSpy).toHaveBeenCalledTimes(1));
 
-    const popoverTrigger = screen.getByRole('button', { name: /oct \d{1,2}, \d{4} - oct \d{1,2}, \d{4}|select date range/i });
+    const popoverTrigger = screen.getByRole('button', {
+      name: /oct \d{1,2}, \d{4} - oct \d{1,2}, \d{4}|select date range/i,
+    });
     fireEvent.click(popoverTrigger);
 
     // Select Yesterday
@@ -356,7 +362,11 @@ describe('DailyOrdersReportPage', () => {
     );
 
     expect(screen.getByText('Access Restricted')).toBeInTheDocument();
-    expect(screen.getByText(/Daily Orders reports are exclusively accessible to Store Owners and Store Managers/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Daily Orders reports are exclusively accessible to Store Owners and Store Managers/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Order Date / Time')).not.toBeInTheDocument();
   });
 });

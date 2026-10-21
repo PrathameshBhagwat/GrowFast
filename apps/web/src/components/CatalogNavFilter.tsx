@@ -208,8 +208,7 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
       {visibleCategories.map((cat) => {
         const isActive = activeCategory === cat;
         const label = categoryLabels[cat] || cat;
-        const isWeightException =
-          cat === GarmentCategory.WEIGHT_BASED || cat === 'WEIGHT_BASED';
+        const isWeightException = cat === GarmentCategory.WEIGHT_BASED || cat === 'WEIGHT_BASED';
 
         return (
           <button
@@ -240,11 +239,7 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
                 : isWeightException
                   ? 'rgba(245, 158, 11, 0.08)'
                   : 'var(--bg-surface)',
-              color: isActive
-                ? '#ffffff'
-                : isWeightException
-                  ? '#b45309'
-                  : 'var(--text-primary)',
+              color: isActive ? '#ffffff' : isWeightException ? '#b45309' : 'var(--text-primary)',
               boxShadow: isActive ? '0 1px 3px 0 rgba(37, 99, 235, 0.25)' : 'none',
               flexShrink: 0,
             }}

@@ -7,7 +7,16 @@ import { TagDesignerPage } from './TagDesignerPage';
 import { StaffManagementPage } from './StaffManagementPage';
 import { CatalogSettingsPage } from './CatalogSettingsPage';
 import { DailyOrdersReportPage } from './DailyOrdersReportPage';
-import { Settings, Users, Tag, Shirt, BarChart3, ArrowLeft, ShieldCheck, ShieldAlert } from 'lucide-react';
+import {
+  Settings,
+  Users,
+  Tag,
+  Shirt,
+  BarChart3,
+  ArrowLeft,
+  ShieldCheck,
+  ShieldAlert,
+} from 'lucide-react';
 
 export type OwnerSettingsTab = 'design-tags' | 'staff' | 'catalog' | 'reports';
 

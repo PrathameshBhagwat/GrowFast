@@ -105,11 +105,7 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
             >
               {title}
             </h1>
-            {statusBadge && (
-              <div className="flex items-center select-none">
-                {statusBadge}
-              </div>
-            )}
+            {statusBadge && <div className="flex items-center select-none">{statusBadge}</div>}
           </div>
           {subtitle && (
             <p

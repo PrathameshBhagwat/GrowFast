@@ -49,7 +49,9 @@ export async function fetchDailyOrdersReport(
 /**
  * Fetches store employees for the User filter dropdown.
  */
-export async function fetchEmployeesForFilter(): Promise<Array<{ id: string; name: string; role: string }>> {
+export async function fetchEmployeesForFilter(): Promise<
+  Array<{ id: string; name: string; role: string }>
+> {
   const token = localStorage.getItem('growfast_token');
   try {
     const res = await fetch(`${API_BASE}/employees?isActive=true`, {
@@ -69,7 +71,9 @@ export async function fetchEmployeesForFilter(): Promise<Array<{ id: string; nam
 /**
  * Searches customers for the Customer filter dropdown.
  */
-export async function searchCustomersForFilter(query: string): Promise<Array<{ id: string; name: string; customerCode?: string; phone: string }>> {
+export async function searchCustomersForFilter(
+  query: string,
+): Promise<Array<{ id: string; name: string; customerCode?: string; phone: string }>> {
   const token = localStorage.getItem('growfast_token');
   try {
     const params = new URLSearchParams({ page: '1', pageSize: '10' });
@@ -123,26 +127,28 @@ export function exportDailyOrdersToExcel(
     return `"${s}"`;
   };
 
-  const csvRows = rows.map((r) => [
-    escapeCSV(r.formattedOrderDate),
-    escapeCSV(r.orderNumber),
-    escapeCSV(r.customerCode),
-    escapeCSV(r.customerName),
-    escapeCSV(r.customerAddress),
-    escapeCSV(r.customerPhone),
-    escapeCSV(r.formattedDueDate),
-    escapeCSV(r.pieces),
-    escapeCSV(r.weight != null ? r.weight : '-'),
-    escapeCSV(r.grossAmount),
-    escapeCSV(r.discount),
-    escapeCSV(r.netAmount),
-    escapeCSV(r.advance),
-    escapeCSV(r.balance),
-    escapeCSV(r.status),
-    escapeCSV(r.paymentStatus),
-    escapeCSV(r.orderTypeSummary || '-'),
-    escapeCSV(r.createdByName || '-'),
-  ].join(','));
+  const csvRows = rows.map((r) =>
+    [
+      escapeCSV(r.formattedOrderDate),
+      escapeCSV(r.orderNumber),
+      escapeCSV(r.customerCode),
+      escapeCSV(r.customerName),
+      escapeCSV(r.customerAddress),
+      escapeCSV(r.customerPhone),
+      escapeCSV(r.formattedDueDate),
+      escapeCSV(r.pieces),
+      escapeCSV(r.weight != null ? r.weight : '-'),
+      escapeCSV(r.grossAmount),
+      escapeCSV(r.discount),
+      escapeCSV(r.netAmount),
+      escapeCSV(r.advance),
+      escapeCSV(r.balance),
+      escapeCSV(r.status),
+      escapeCSV(r.paymentStatus),
+      escapeCSV(r.orderTypeSummary || '-'),
+      escapeCSV(r.createdByName || '-'),
+    ].join(','),
+  );
 
   // Prepend UTF-8 BOM (\uFEFF) so Excel opens it with full UTF-8 character encoding support
   const csvContent = '\uFEFF' + [headers.join(','), ...csvRows].join('\r\n');

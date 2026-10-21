@@ -409,7 +409,10 @@ describe('HomePage Component', () => {
       <MemoryRouter initialEntries={['/']}>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/reports/daily-orders" element={<div data-testid="reports-daily-orders-page">Reports Page</div>} />
+          <Route
+            path="/reports/daily-orders"
+            element={<div data-testid="reports-daily-orders-page">Reports Page</div>}
+          />
         </Routes>
       </MemoryRouter>,
     );

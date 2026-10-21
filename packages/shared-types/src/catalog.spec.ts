@@ -248,11 +248,7 @@ describe('resolveCatalogSelectionOnServiceChange', () => {
   });
 
   it('keeps Women when switching between standard piece services (Dry Clean -> Steam Iron)', () => {
-    const result = resolveCatalogSelectionOnServiceChange(
-      '3',
-      GarmentCategory.WOMEN,
-      mockServices,
-    );
+    const result = resolveCatalogSelectionOnServiceChange('3', GarmentCategory.WOMEN, mockServices);
     assert.strictEqual(result, GarmentCategory.WOMEN);
   });
 });

@@ -160,7 +160,10 @@ describe('ReportService — Daily Orders Report', () => {
         storeCreditAmount: 0,
         totalAdjustments: 0,
         effectivePaid: order.amountPaid || 0,
-        amountDue: order.amountDue != null ? order.amountDue : Math.max(0, order.totalAmount - (order.amountPaid || 0)),
+        amountDue:
+          order.amountDue != null
+            ? order.amountDue
+            : Math.max(0, order.totalAmount - (order.amountPaid || 0)),
         paymentStatus:
           (order.amountPaid || 0) >= order.totalAmount
             ? PaymentStatus.PAID
@@ -267,7 +270,8 @@ describe('ReportService — Daily Orders Report', () => {
       filterBy: 'PAID',
     });
 
-    const callArgs = prisma.order.findMany.mock.calls[prisma.order.findMany.mock.calls.length - 2][0];
+    const callArgs =
+      prisma.order.findMany.mock.calls[prisma.order.findMany.mock.calls.length - 2][0];
     expect(callArgs.where.orderNumber.contains).toBe('T12980');
     expect(callArgs.where.discountAmount).toEqual({ gt: 0 });
     expect(callArgs.where.createdById).toBe('emp-1');

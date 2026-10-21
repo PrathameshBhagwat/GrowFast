@@ -153,10 +153,7 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/reports"
-        element={<Navigate to="/reports/daily-orders" replace />}
-      />
+      <Route path="/reports" element={<Navigate to="/reports/daily-orders" replace />} />
 
       {/* Catch all — redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
