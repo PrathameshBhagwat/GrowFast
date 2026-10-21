@@ -426,19 +426,31 @@ export class DashboardService {
     );
 
     // ─── Action Queues (Bounded findMany) ─────────────────────────
-    const mapToActionOrder = (o: any): DashboardActionOrder => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      customerName: o.customer.name,
-      customerPhone: o.customer.phone,
-      totalAmount: o.totalAmount,
-      amountPaid: o.amountPaid,
-      amountDue: o.amountDue,
-      status: o.status as unknown as SharedOrderStatus,
-      effectiveDueDate: o.effectiveDueDate.toISOString(),
-      orderDate: o.orderDate.toISOString(),
-      itemCount: o._count.items,
-    });
+    const mapToActionOrder = (o: any): DashboardActionOrder => {
+      const effDate = o.effectiveDueDate || o.orderDate;
+      const ordDate = o.orderDate || o.effectiveDueDate;
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        customerName: o.customer?.name || 'Customer',
+        customerPhone: o.customer?.phone || '',
+        totalAmount: o.totalAmount,
+        amountPaid: o.amountPaid,
+        amountDue: o.amountDue,
+        status: (o.status as unknown as SharedOrderStatus) || ('READY' as SharedOrderStatus),
+        effectiveDueDate: effDate
+          ? typeof effDate === 'string'
+            ? effDate
+            : effDate.toISOString()
+          : new Date().toISOString(),
+        orderDate: ordDate
+          ? typeof ordDate === 'string'
+            ? ordDate
+            : ordDate.toISOString()
+          : new Date().toISOString(),
+        itemCount: o._count?.items ?? o.items?.length ?? 0,
+      };
+    };
 
     const [
       overdueOrdersRaw,
@@ -540,26 +552,6 @@ export class DashboardService {
       }),
     ]);
 
-    const actionQueues: DashboardActionQueuesDTO = {
-      overdue: {
-        count: overdueOrders,
-        items: overdueOrdersRaw.map(mapToActionOrder),
-      },
-      dueToday: {
-        count: dueTodayOrders,
-        items: dueTodayOrdersRaw.map(mapToActionOrder),
-      },
-      dueTomorrow: {
-        count: dueTomorrowOrders,
-        items: dueTomorrowOrdersRaw.map(mapToActionOrder),
-      },
-      pendingPayment: {
-        count: pendingPaymentCount,
-        totalAmountDue: outstandingBalance,
-        items: pendingPaymentOrdersRaw.map(mapToActionOrder),
-      },
-    };
-
     // ─── Ready Orders (orders with at least one READY item) ───────
     const readyOrdersRaw = await this.prisma.order.findMany({
       where: {
@@ -607,6 +599,30 @@ export class DashboardService {
         remainingItems,
       };
     });
+
+    const actionQueues: DashboardActionQueuesDTO = {
+      overdue: {
+        count: overdueOrders,
+        items: overdueOrdersRaw.map(mapToActionOrder),
+      },
+      dueToday: {
+        count: dueTodayOrders,
+        items: dueTodayOrdersRaw.map(mapToActionOrder),
+      },
+      dueTomorrow: {
+        count: dueTomorrowOrders,
+        items: dueTomorrowOrdersRaw.map(mapToActionOrder),
+      },
+      pendingPayment: {
+        count: pendingPaymentCount,
+        totalAmountDue: outstandingBalance,
+        items: pendingPaymentOrdersRaw.map(mapToActionOrder),
+      },
+      readyForPickup: {
+        count: readyOrders.length,
+        items: readyOrdersRaw.map(mapToActionOrder),
+      },
+    };
 
     // ─── Recent Orders ────────────────────────────────────────────
     const recentOrdersRaw = await this.prisma.order.findMany({
@@ -675,6 +691,7 @@ export class DashboardService {
     const recentActivity = recentNotifications.map((n) => ({
       id: n.id,
       eventType: n.eventType,
+      orderId: n.orderId || null,
       orderNumber: n.orderId ? orderNumberMap[n.orderId] || null : null,
       message: eventMessages[n.eventType] || n.eventType,
       createdAt: n.createdAt.toISOString(),

@@ -369,19 +369,19 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
               grid-template-columns: repeat(5, minmax(0, 1fr));
             }
           }
-          @media (min-width: 1200px) {
+          @media (min-width: 1280px) {
+            .order-garment-grid {
+              grid-template-columns: repeat(6, minmax(0, 1fr));
+            }
+          }
+          @media (min-width: 1536px) {
             .order-garment-grid {
               grid-template-columns: repeat(7, minmax(0, 1fr));
             }
           }
-          @media (min-width: 1550px) {
-            .order-garment-grid {
-              grid-template-columns: repeat(8, minmax(0, 1fr));
-            }
-          }
           @media (min-width: 1800px) {
             .order-garment-grid {
-              grid-template-columns: repeat(9, minmax(0, 1fr));
+              grid-template-columns: repeat(8, minmax(0, 1fr));
             }
           }
         `}</style>

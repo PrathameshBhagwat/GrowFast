@@ -3,7 +3,6 @@ import {
   X,
   Plus,
   Minus,
-  Sparkles,
   Check,
   Trash2,
   Tag,
@@ -14,9 +13,17 @@ import {
   ShoppingBag,
   Camera,
   Upload,
+  RefreshCw,
 } from 'lucide-react';
 import { formatCatalogServiceName, DEFAULT_TOP_UP_SERVICES } from '@growfast/shared-types';
 import type { TopUpServiceItem } from '@growfast/shared-types';
+
+export interface GarmentPhotoSlot {
+  unitNumber: number;
+  photo?: { id: string; file: File; previewUrl: string };
+  status: 'pending' | 'uploaded' | 'error';
+  error?: string;
+}
 
 export interface LaundryWeightItem {
   id: string;
@@ -32,6 +39,10 @@ export interface LaundryWeightItem {
   defectNotes?: string;
   breakdownDetails?: string;
   batchPhotos?: Array<{ id: string; file: File; previewUrl: string }>;
+  pieces?: Array<{
+    unitNumber: number;
+    photos: Array<{ id: string; file: File; previewUrl: string }>;
+  }>;
 }
 
 export interface LaundryWeightOrderEntryProps {
@@ -79,30 +90,74 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
   onAddBatchPhotoToItem,
   onRemoveBatchPhotoFromItem,
   isSubmitting = false,
-  pendingPickupsCount = 164,
   className = '',
   topUpServices,
 }) => {
-  const [showBanner, setShowBanner] = useState(true);
+  // Canonical priority for Per-Weight Laundry service selection display:
+  // 1. Wash and Steam Iron
+  // 2. Wash and Fold
+  // 3. Laundry for White
+  // 4. Premium Laundry
+  // 5. Woolen Laundry
+  const getWeightServicePriority = (svc: { id?: string; name: string }): number => {
+    const id = svc.id?.toLowerCase() || '';
+    const name = svc.name.trim().toLowerCase();
 
-  // Available Laundry Services: Strictly wash-related services
+    // 1. Wash and Steam Iron
+    if (
+      id === 'svc-wash-iron' ||
+      name === 'wash and steam iron' ||
+      name === 'wash & steam iron' ||
+      name === 'wash + steam iron'
+    ) {
+      return 1;
+    }
+    // 2. Wash and Fold
+    if (id === 'svc-wash-fold' || name === 'wash and fold' || name === 'wash & fold') {
+      return 2;
+    }
+    // 3. Laundry for White
+    if (id === 'svc-laundry-white' || name === 'laundry for white' || name.includes('white')) {
+      return 3;
+    }
+    // 4. Premium Laundry
+    if (id === 'svc-laundry-premium' || name === 'premium laundry' || name.includes('premium')) {
+      return 4;
+    }
+    // 5. Woolen Laundry
+    if (id === 'svc-laundry-woolen' || name === 'woolen laundry' || name.includes('woolen')) {
+      return 5;
+    }
+    return 999;
+  };
+
+  // Available Laundry Services: Strictly wash-related services excluding Standard Wash
   const laundryServices = useMemo(() => {
     const validWeightServiceNames = [
       'wash and steam iron',
       'wash + steam iron',
+      'wash & steam iron',
       'wash and fold',
+      'wash & fold',
+      'laundry for white',
       'premium laundry',
       'woolen laundry',
-      'laundry for white',
-      'standard wash',
     ];
-    return services.filter((s) => {
+    const filtered = services.filter((s) => {
+      const id = s.id?.toLowerCase() || '';
       const name = s.name.trim().toLowerCase();
+
+      // Explicitly exclude Standard Wash from Per-Weight creation workflow
+      if (id === 'svc-wash' || name === 'standard wash') {
+        return false;
+      }
+
       return (
         s.isActive !== false &&
         (validWeightServiceNames.includes(name) ||
           s.category === 'WASH' ||
-          s.category === 'WASH_IRON') &&
+          s.category === 'WASH_IRON' ||
+          s.category === 'WEIGHT_BASED') &&
         name !== 'dry clean' &&
         s.category !== 'DRY_CLEAN' &&
         name !== 'free shoe' &&
@@ -115,24 +170,30 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
         !name.includes('starch')
       );
     });
+
+    // Enforce specified order:
+    // 1. Wash and Steam Iron
+    // 2. Wash and Fold
+    // 3. Laundry for White
+    // 4. Premium Laundry
+    // 5. Woolen Laundry
+    return [...filtered].sort((a, b) => {
+      const pA = getWeightServicePriority(a);
+      const pB = getWeightServicePriority(b);
+      return pA - pB;
+    });
   }, [services]);
 
-  // Selected Service state (default to first available)
+  // Selected Service state (default to first available: Wash and Steam Iron)
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
-    // Prefer Wash and Steam Iron or Wash and Fold
-    const preferred = laundryServices.find((s) =>
-      ['wash and steam iron', 'wash + steam iron', 'wash and fold'].includes(
-        s.name.trim().toLowerCase(),
-      ),
-    );
-    return preferred?.id || laundryServices[0]?.id || '';
+    return laundryServices[0]?.id || '';
   });
 
   // Ensure valid selectedServiceId
   const activeService = useMemo(() => {
     return (
       laundryServices.find((s) => s.id === selectedServiceId) ||
-      laundryServices[0] || { id: '', name: 'Standard Wash' }
+      laundryServices[0] || { id: 'svc-wash-iron', name: 'Wash and Steam Iron' }
     );
   }, [laundryServices, selectedServiceId]);
 
@@ -204,55 +265,129 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
   const [defectNotes, setDefectNotes] = useState<string>('');
   const [weightValidationMsg, setWeightValidationMsg] = useState<string | null>(null);
 
-  // Batch Photos state (Walk-in order requirement)
-  const [batchPhotos, setBatchPhotos] = useState<
-    Array<{ id: string; file: File; previewUrl: string }>
-  >([]);
-  const photoInputRef = useRef<HTMLInputElement>(null);
+  // Individual Garment Photo Slots state
+  const [garmentPhotos, setGarmentPhotos] = useState<GarmentPhotoSlot[]>([
+    { unitNumber: 1, status: 'pending' },
+  ]);
+  const [activeSlotForUpload, setActiveSlotForUpload] = useState<number | null>(null);
+  const singleSlotInputRef = useRef<HTMLInputElement>(null);
+  const multiPhotoInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const newPhotos = Array.from(files).map((f) => ({
-      id: `photo-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      file: f,
-      previewUrl: URL.createObjectURL(f),
-    }));
-    setBatchPhotos((prev) => [...prev, ...newPhotos]);
+  // Synchronize garment photo slots with garmentsCountInput
+  useEffect(() => {
+    const target = Math.max(1, garmentsCountInput || 1);
+    setGarmentPhotos((prev) => {
+      if (prev.length === target) return prev;
+      if (prev.length < target) {
+        const newSlots: GarmentPhotoSlot[] = [];
+        for (let u = prev.length + 1; u <= target; u++) {
+          newSlots.push({ unitNumber: u, status: 'pending' });
+        }
+        return [...prev, ...newSlots];
+      }
+      // Decreasing count: slice excess from end without reassigning
+      return prev.slice(0, target);
+    });
+  }, [garmentsCountInput]);
+
+  const targetCount = Math.max(1, garmentsCountInput || 1);
+  const isPhotosMandatory = targetCount <= 50;
+  const uploadedSlots = garmentPhotos.filter((s) => s.status === 'uploaded' && s.photo);
+  const uploadedCount = uploadedSlots.length;
+  const remainingCount = Math.max(0, targetCount - uploadedCount);
+
+  const progressMessage = isPhotosMandatory
+    ? `${uploadedCount} of ${targetCount} garment photos uploaded — ${remainingCount} remaining.`
+    : `${uploadedCount} of ${targetCount} garment photos uploaded (optional).`;
+
+  const handleFileForGarment = (unitNumber: number, file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setGarmentPhotos((prev) =>
+        prev.map((s) =>
+          s.unitNumber === unitNumber
+            ? { ...s, status: 'error', error: 'Invalid image file. Please select an image.' }
+            : s,
+        ),
+      );
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      setGarmentPhotos((prev) =>
+        prev.map((s) =>
+          s.unitNumber === unitNumber
+            ? { ...s, status: 'error', error: 'File exceeds 15MB limit.' }
+            : s,
+        ),
+      );
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    const photoId = `photo-${unitNumber}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    setGarmentPhotos((prev) =>
+      prev.map((s) =>
+        s.unitNumber === unitNumber
+          ? {
+              ...s,
+              photo: { id: photoId, file, previewUrl },
+              status: 'uploaded',
+              error: undefined,
+            }
+          : s,
+      ),
+    );
   };
 
-  const handleQuickSnapPhoto = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 300;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = '#2563eb';
-      ctx.fillRect(0, 0, 400, 300);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Batch Photo: ${activeWeightGarment.name}`, 200, 130);
-      ctx.font = '14px sans-serif';
-      ctx.fillText(`${weightInput} kg • ${new Date().toLocaleTimeString()}`, 200, 170);
-    }
-    canvas.toBlob(
-      (blob) => {
-        if (blob) {
-          const file = new File([blob], `batch-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          const previewUrl = URL.createObjectURL(file);
-          setBatchPhotos((prev) => [
-            ...prev,
-            {
-              id: `photo-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-              file,
-              previewUrl,
-            },
-          ]);
-        }
-      },
-      'image/jpeg',
-      0.9,
+  const handleTriggerUploadForSlot = (unitNumber: number) => {
+    setActiveSlotForUpload(unitNumber);
+    singleSlotInputRef.current?.click();
+  };
+
+  const handleReplaceGarmentPhoto = (unitNumber: number) => {
+    setActiveSlotForUpload(unitNumber);
+    singleSlotInputRef.current?.click();
+  };
+
+  const handleRemoveGarmentPhoto = (unitNumber: number) => {
+    setGarmentPhotos((prev) =>
+      prev.map((s) =>
+        s.unitNumber === unitNumber
+          ? { ...s, photo: undefined, status: 'pending', error: undefined }
+          : s,
+      ),
     );
+  };
+
+  const handleRetryGarmentPhoto = (unitNumber: number) => {
+    setActiveSlotForUpload(unitNumber);
+    singleSlotInputRef.current?.click();
+  };
+
+  const handleMultiFilesUpload = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    let fileIdx = 0;
+
+    setGarmentPhotos((prev) => {
+      return prev.map((slot) => {
+        if (slot.status !== 'uploaded' && fileIdx < fileArray.length) {
+          const file = fileArray[fileIdx++];
+          if (!file.type.startsWith('image/')) {
+            return { ...slot, status: 'error', error: 'Invalid image file.' };
+          }
+          const previewUrl = URL.createObjectURL(file);
+          const photoId = `photo-${slot.unitNumber}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          return {
+            ...slot,
+            photo: { id: photoId, file, previewUrl },
+            status: 'uploaded',
+            error: undefined,
+          };
+        }
+        return slot;
+      });
+    });
   };
 
   // Modals for Add-on and Garment Details
@@ -294,9 +429,25 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
       return;
     }
 
+    const count = Math.max(1, garmentsCountInput || 1);
     const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + a.price, 0);
     const baseTotal = Math.round(wt * pricePerKg * 100) / 100;
     const lineTotal = Math.round((baseTotal + addOnsTotal) * 100) / 100;
+
+    const pieces = Array.from({ length: count }, (_, idx) => {
+      const u = idx + 1;
+      const slot = garmentPhotos.find(
+        (s) => s.unitNumber === u && s.status === 'uploaded' && s.photo,
+      );
+      return {
+        unitNumber: u,
+        photos: slot?.photo ? [slot.photo] : [],
+      };
+    });
+
+    const allUploadedPhotos = pieces
+      .flatMap((p) => p.photos)
+      .filter((p): p is { id: string; file: File; previewUrl: string } => !!p);
 
     const newItem: LaundryWeightItem = {
       id: `w-item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -305,13 +456,14 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
       serviceTypeId: activeService.id,
       serviceName: activeService.name,
       weight: wt,
-      garmentsCount: Math.max(1, garmentsCountInput || 1),
+      garmentsCount: count,
       unitPrice: pricePerKg,
       lineTotal,
       addOns: [...selectedAddOns],
       defectNotes: defectNotes.trim() || undefined,
       breakdownDetails: garmentBreakdown.trim() || undefined,
-      batchPhotos: [...batchPhotos],
+      batchPhotos: allUploadedPhotos,
+      pieces,
     };
 
     onAddToCart(newItem);
@@ -320,7 +472,8 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
     setSelectedAddOns([]);
     setGarmentBreakdown('');
     setDefectNotes('');
-    setBatchPhotos([]);
+    setGarmentPhotos([{ unitNumber: 1, status: 'pending' }]);
+    setGarmentsCountInput(1);
     setWeightValidationMsg(null);
   };
 
@@ -400,34 +553,7 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
       className={`flex flex-col w-full h-full min-h-0 bg-white font-sans ${className}`}
       style={{ background: 'var(--bg-surface, #ffffff)' }}
     >
-      {/* ─── 1. TOP NOTIFICATION BANNER (Matching Screenshot 1) ─── */}
-      {showBanner && (
-        <div
-          id="laundry-weight-notification-banner"
-          className="shrink-0 flex items-center justify-between px-4 py-2 text-xs sm:text-sm font-medium transition-all"
-          style={{
-            background: '#e0f2fe',
-            color: '#0369a1',
-            borderBottom: '1px solid #bae6fd',
-          }}
-        >
-          <div className="flex-1 text-center font-normal">
-            You have <strong className="font-bold text-[#0284c7]">{pendingPickupsCount}</strong>{' '}
-            pending pick up requests.
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowBanner(false)}
-            className="text-[#0369a1] hover:text-[#075985] p-1 rounded-sm cursor-pointer ml-2"
-            title="Dismiss notification"
-            aria-label="Dismiss notification"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* ─── 2. MAIN SPLIT INTERFACE ─── */}
+      {/* ─── MAIN SPLIT INTERFACE ─── */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         {/* LEFT PANEL: Service Cards + Weight Form Controls */}
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 sm:p-6 border-r border-slate-200">
@@ -636,90 +762,248 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                 </div>
               )}
 
-              {/* Row 4.5: Batch Photos (Walk-in Requirement) */}
-              <div className="pt-2 border-t border-slate-200 space-y-2">
+              {/* Row 4.5: Individual Garment Photos (Determined from entered garment count) */}
+              <div className="pt-2 border-t border-slate-200 space-y-2.5">
+                {/* Header row */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Camera size={15} className="text-slate-700" />
-                    <span className="text-xs font-bold text-slate-800">Batch Photo</span>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      (Mandatory for walk-in laundry)
+                    <span className="text-xs font-bold text-slate-800">
+                      Individual Garment Photos
                     </span>
                   </div>
-                  {batchPhotos.length > 0 ? (
-                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Check size={11} strokeWidth={3} /> {batchPhotos.length} Attached
-                    </span>
+                  {isPhotosMandatory ? (
+                    remainingCount === 0 ? (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Check size={11} strokeWidth={3} /> {uploadedCount}/{targetCount} Complete
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <AlertCircle size={11} /> {remainingCount} Needed
+                      </span>
+                    )
                   ) : (
-                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <AlertCircle size={11} /> 1 Photo Required
+                    <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                      Optional (&gt;50)
                     </span>
                   )}
                 </div>
 
-                {/* Photo Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      handlePhotoFiles(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                  <button
-                    type="button"
-                    id="laundry-take-batch-photo-btn"
-                    onClick={() => photoInputRef.current?.click()}
-                    className="h-10 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded-sm font-semibold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-colors cursor-pointer min-h-[40px]"
-                  >
-                    <Camera size={14} className="text-blue-600" />
-                    <span>Upload / Snap</span>
-                  </button>
+                {/* Progress message and bar */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                    <span id="laundry-photo-progress-text">{progressMessage}</span>
+                    <span className="font-mono text-[11px] text-slate-500">
+                      {uploadedCount}/{targetCount}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        remainingCount === 0 ? 'bg-emerald-600' : 'bg-blue-600'
+                      }`}
+                      style={{ width: `${Math.min(100, (uploadedCount / targetCount) * 100)}%` }}
+                    />
+                  </div>
+                </div>
 
+                {/* Global action button: Upload Multiple */}
+                <div className="flex items-center gap-2 pt-0.5">
                   <button
                     type="button"
-                    id="laundry-quick-photo-btn"
-                    onClick={handleQuickSnapPhoto}
-                    className="h-10 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-sm font-semibold text-xs text-blue-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer min-h-[40px]"
-                    title="Quick snap photo for counter speed"
+                    id="laundry-upload-multi-photos-btn"
+                    onClick={() => multiPhotoInputRef.current?.click()}
+                    className="h-9 px-3 bg-white hover:bg-slate-50 border border-slate-300 rounded-sm font-semibold text-xs text-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer min-h-[44px]"
+                    title="Upload files for multiple garments at once"
                   >
-                    <Sparkles size={14} className="text-blue-600" />
-                    <span>Quick Snap</span>
+                    <Upload size={14} className="text-slate-600" />
+                    <span>Upload Multiple</span>
                   </button>
                 </div>
 
-                {/* Photo Thumbnails */}
-                {batchPhotos.length > 0 && (
-                  <div className="flex items-center gap-2 overflow-x-auto py-1">
-                    {batchPhotos.map((photo) => (
+                {/* Hidden File Inputs */}
+                <input
+                  ref={singleSlotInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && activeSlotForUpload != null) {
+                      handleFileForGarment(activeSlotForUpload, file);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <input
+                  ref={multiPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleMultiFilesUpload(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+
+                {/* Individual Garment Photo Slots */}
+                <div
+                  className="max-h-72 overflow-y-auto space-y-2 pr-1"
+                  id="laundry-garment-photo-slots"
+                >
+                  {garmentPhotos.map((slot) => {
+                    const isUploaded = slot.status === 'uploaded' && !!slot.photo;
+                    const isError = slot.status === 'error';
+
+                    return (
                       <div
-                        key={photo.id}
-                        className="relative w-14 h-14 rounded-md border border-slate-300 overflow-hidden shrink-0 group bg-slate-100"
+                        key={slot.unitNumber}
+                        data-slot-unit={slot.unitNumber}
+                        data-slot-status={slot.status}
+                        className={`p-2.5 rounded-md border flex items-center justify-between gap-3 min-h-[44px] transition-colors ${
+                          isUploaded
+                            ? 'bg-white border-emerald-200 shadow-2xs'
+                            : isError
+                              ? 'bg-rose-50/70 border-rose-300'
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
                       >
-                        <img
-                          src={photo.previewUrl}
-                          alt="Batch preview"
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setBatchPhotos((prev) => prev.filter((p) => p.id !== photo.id))
-                          }
-                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-colors cursor-pointer"
-                          title="Remove photo"
-                        >
-                          <X size={10} />
-                        </button>
+                        {/* Left: Thumbnail & Garment label */}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {isUploaded ? (
+                            <img
+                              src={slot.photo!.previewUrl}
+                              alt={`Garment ${slot.unitNumber}`}
+                              className="w-10 h-10 object-cover rounded border border-emerald-300 shrink-0"
+                            />
+                          ) : isError ? (
+                            <div className="w-10 h-10 rounded border border-rose-300 flex items-center justify-center bg-rose-100/60 text-rose-600 shrink-0">
+                              <AlertCircle size={18} />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded border border-dashed border-slate-300 flex items-center justify-center bg-slate-50 text-slate-400 shrink-0">
+                              <Camera size={18} />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-slate-800">
+                                {isUploaded
+                                  ? `Garment ${slot.unitNumber}`
+                                  : `Garment ${slot.unitNumber} — Add Photo`}
+                              </span>
+                              {isUploaded && (
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded inline-flex items-center gap-0.5">
+                                  <Check size={9} strokeWidth={3} /> Uploaded
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                              {isUploaded
+                                ? slot.photo!.file.name
+                                : isError
+                                  ? slot.error || 'Upload failed'
+                                  : isPhotosMandatory
+                                    ? 'Photo required'
+                                    : 'Optional'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right: Slot Action Buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            data-testid={`garment-photo-input-${slot.unitNumber}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleFileForGarment(slot.unitNumber, file);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          <input
+                            data-testid={`garment-replace-input-${slot.unitNumber}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleFileForGarment(slot.unitNumber, file);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          <input
+                            data-testid={`garment-retry-input-${slot.unitNumber}`}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleFileForGarment(slot.unitNumber, file);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          {isUploaded ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleReplaceGarmentPhoto(slot.unitNumber)}
+                                className="h-8 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer min-h-[44px]"
+                                title={`Replace Garment ${slot.unitNumber} photo`}
+                                aria-label={`Replace Garment ${slot.unitNumber} photo`}
+                              >
+                                <Upload size={12} />
+                                <span>Replace</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveGarmentPhoto(slot.unitNumber)}
+                                className="h-8 w-8 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded flex items-center justify-center transition-colors cursor-pointer min-h-[44px] min-w-[44px]"
+                                title={`Remove Garment ${slot.unitNumber} photo`}
+                                aria-label={`Remove Garment ${slot.unitNumber} photo`}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          ) : isError ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRetryGarmentPhoto(slot.unitNumber)}
+                              className="h-8 px-3 bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-800 rounded text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer min-h-[44px]"
+                              title={`Retry upload for garment ${slot.unitNumber}`}
+                              aria-label={`Retry Garment ${slot.unitNumber} photo`}
+                            >
+                              <RefreshCw size={12} />
+                              <span>Retry</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerUploadForSlot(slot.unitNumber)}
+                              className="h-8 px-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer min-h-[44px]"
+                              title={`Upload photo for garment ${slot.unitNumber}`}
+                              aria-label={`Upload photo for Garment ${slot.unitNumber}`}
+                            >
+                              <Camera size={13} className="text-blue-600" />
+                              <span>Upload</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Row 5: Add to Cart Button */}
@@ -821,56 +1105,74 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                         </p>
                       )}
 
-                      {/* Batch Photo Status on Item Card */}
-                      {isWeightItem && (
-                        <div className="mt-1.5 flex items-center gap-2">
-                          {item.batchPhotos && item.batchPhotos.length > 0 ? (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                              📸 {item.batchPhotos.length} Photo Attached
-                            </span>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                                ⚠️ Photo Needed
-                              </span>
-                              {onAddBatchPhotoToItem && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const canvas = document.createElement('canvas');
-                                    canvas.width = 400;
-                                    canvas.height = 300;
-                                    const ctx = canvas.getContext('2d');
-                                    if (ctx) {
-                                      ctx.fillStyle = '#2563eb';
-                                      ctx.fillRect(0, 0, 400, 300);
-                                      ctx.fillStyle = '#ffffff';
-                                      ctx.font = 'bold 20px sans-serif';
-                                      ctx.textAlign = 'center';
-                                      ctx.fillText(`Batch: ${item.weight} kg`, 200, 150);
-                                    }
-                                    canvas.toBlob(
-                                      (blob) => {
-                                        if (blob) {
-                                          const file = new File([blob], `batch-${Date.now()}.jpg`, {
-                                            type: 'image/jpeg',
-                                          });
-                                          onAddBatchPhotoToItem(idx, file);
+                      {/* Garment Photo Status on Item Card */}
+                      {isWeightItem &&
+                        (() => {
+                          const count = item.garmentsCount || item.quantity || 1;
+                          const covered = item.pieces
+                            ? item.pieces.filter((p: any) => p.photos && p.photos.length > 0).length
+                            : item.batchPhotos?.length || 0;
+                          const isMandatory = count <= 50;
+                          const isComplete = covered >= count;
+
+                          return (
+                            <div className="mt-1.5 flex items-center gap-2">
+                              {isComplete ? (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                  📸 {covered}/{count} Photos Attached
+                                </span>
+                              ) : isMandatory ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                    ⚠️ Photo Needed ({covered}/{count} Attached)
+                                  </span>
+                                  {onAddBatchPhotoToItem && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = 400;
+                                        canvas.height = 300;
+                                        const ctx = canvas.getContext('2d');
+                                        if (ctx) {
+                                          ctx.fillStyle = '#2563eb';
+                                          ctx.fillRect(0, 0, 400, 300);
+                                          ctx.fillStyle = '#ffffff';
+                                          ctx.font = 'bold 20px sans-serif';
+                                          ctx.textAlign = 'center';
+                                          ctx.fillText(`Garment Photo`, 200, 150);
                                         }
-                                      },
-                                      'image/jpeg',
-                                      0.9,
-                                    );
-                                  }}
-                                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                                >
-                                  + Quick Attach
-                                </button>
+                                        canvas.toBlob(
+                                          (blob) => {
+                                            if (blob) {
+                                              const file = new File(
+                                                [blob],
+                                                `garment-${Date.now()}.jpg`,
+                                                {
+                                                  type: 'image/jpeg',
+                                                },
+                                              );
+                                              onAddBatchPhotoToItem(idx, file);
+                                            }
+                                          },
+                                          'image/jpeg',
+                                          0.9,
+                                        );
+                                      }}
+                                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                    >
+                                      + Quick Attach
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                  📸 {covered}/{count} Photos Attached (Optional)
+                                </span>
                               )}
                             </div>
-                          )}
-                        </div>
-                      )}
+                          );
+                        })()}
                     </div>
 
                     <div className="flex flex-col items-end justify-between shrink-0 h-full min-h-[50px]">

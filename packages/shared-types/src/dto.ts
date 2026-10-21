@@ -226,6 +226,7 @@ export interface CreateOrderItemRequest {
   colorTags?: string[];
   defectNotes?: string;
   pieces?: CreateOrderPieceRequest[];
+  addOnIds?: string[];
 }
 
 export interface UpdateDueDateRequest {
@@ -531,6 +532,10 @@ export interface DashboardActionQueuesDTO {
     totalAmountDue: number;
     items: DashboardActionOrder[];
   };
+  readyForPickup?: {
+    count: number;
+    items: DashboardActionOrder[];
+  };
 }
 
 export interface DashboardDeliveryMetrics {
@@ -574,6 +579,7 @@ export interface DashboardRecentOrder {
 export interface DashboardActivity {
   id: string;
   eventType: string;
+  orderId?: string | null;
   orderNumber: string | null;
   message: string;
   createdAt: string;

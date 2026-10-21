@@ -5,6 +5,7 @@ const API_BASE = '/api/dashboard';
 export async function fetchDashboardSummary(
   startDate?: string,
   endDate?: string,
+  signal?: AbortSignal,
 ): Promise<DashboardSummaryDTO> {
   const params = new URLSearchParams();
   if (startDate) params.set('startDate', startDate);
@@ -18,6 +19,7 @@ export async function fetchDashboardSummary(
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal,
   });
 
   if (!res.ok) {

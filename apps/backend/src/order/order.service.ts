@@ -37,6 +37,8 @@ import {
   adjustDueDateForThursday,
   getDayOfWeekInTimezone,
   ExpressDeliveryOption,
+  TopUpServiceItem,
+  DEFAULT_TOP_UP_SERVICES,
 } from '@growfast/shared-types';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
@@ -242,9 +244,35 @@ export class OrderService {
           unitPrice = item.unitPrice;
         }
 
+        // Validate and compute supported store add-ons
+        const addonIds: string[] =
+          item.addOnIds ||
+          (Array.isArray((item as any).addOns)
+            ? (item as any).addOns.map((a: any) => (typeof a === 'string' ? a : a.id))
+            : []);
+
+        let addOnsUnitPrice = 0;
+        if (addonIds.length > 0) {
+          const storeTopUps: TopUpServiceItem[] =
+            (store.topUpServices as any) ?? DEFAULT_TOP_UP_SERVICES;
+          const topUpMap = new Map<string, TopUpServiceItem>(storeTopUps.map((t) => [t.id, t]));
+
+          for (const addonId of addonIds) {
+            const matchedAddon = topUpMap.get(addonId);
+            if (!matchedAddon) {
+              throw new BadRequestException(
+                `Invalid or unsupported add-on "${addonId}" selected for item "${garment.name}".`,
+              );
+            }
+            addOnsUnitPrice += matchedAddon.price;
+          }
+        }
+
+        const effectiveUnitPrice = unitPrice + addOnsUnitPrice;
+
         const lineTotal = isWeightBased
-          ? Math.round(unitPrice * item.weight! * 100) / 100
-          : Math.round(unitPrice * item.quantity * 100) / 100;
+          ? Math.round((unitPrice * item.weight! + addOnsUnitPrice) * 100) / 100
+          : Math.round(effectiveUnitPrice * item.quantity * 100) / 100;
 
         // For summary
         serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
@@ -254,7 +282,7 @@ export class OrderService {
           serviceTypeId: service.id,
           quantity: item.quantity,
           weight: isWeightBased ? item.weight : null,
-          unitPrice,
+          unitPrice: effectiveUnitPrice,
           lineTotal,
           colorTags: item.colorTags || [],
           defectNotes: item.defectNotes,
@@ -273,7 +301,9 @@ export class OrderService {
         orderItemsData.push(orderItemData);
 
         pricingInputs.push({
-          unitPrice,
+          unitPrice: isWeightBased
+            ? Math.round((lineTotal / item.weight!) * 100) / 100
+            : effectiveUnitPrice,
           quantity: item.quantity,
           weight: isWeightBased ? item.weight : null,
         });
