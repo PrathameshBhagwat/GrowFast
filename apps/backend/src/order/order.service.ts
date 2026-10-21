@@ -163,10 +163,10 @@ export class OrderService {
           throw new BadRequestException(`Service type "${service.name}" is not active`);
         }
 
-        if (dto.workflow) {
-          const isWeightException =
-            dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
+        const isWeightException =
+          dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
 
+        if (dto.workflow) {
           if (!isWeightException && !isServiceAllowedInWorkflow(service, dto.workflow)) {
             throw new BadRequestException(
               `Service "${service.name}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
@@ -198,7 +198,12 @@ export class OrderService {
           );
         }
 
-        if (dto.workflow === 'DRY_CLEANING' && item.weight != null && item.weight > 0) {
+        if (
+          dto.workflow === 'DRY_CLEANING' &&
+          !isWeightException &&
+          item.weight != null &&
+          item.weight > 0
+        ) {
           throw new BadRequestException(
             `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
           );
@@ -222,7 +227,7 @@ export class OrderService {
 
         const isWeightBased =
           !isWeightPieceException &&
-          dto.workflow !== 'DRY_CLEANING' &&
+          (dto.workflow !== 'DRY_CLEANING' || isWeightException) &&
           dto.entryMode !== 'PIECES' &&
           (dto.entryMode === 'WEIGHT' ||
             (item.weight != null && item.weight > 0) ||
