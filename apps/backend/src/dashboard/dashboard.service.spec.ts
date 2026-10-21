@@ -382,12 +382,19 @@ describe('DashboardService', () => {
     expect(result.actionQueues?.pendingPayment.count).toBe(6);
     expect(result.actionQueues?.pendingPayment.totalAmountDue).toBe(5500);
     expect(result.actionQueues?.pendingPayment.items[0].orderNumber).toBe('ORD-99');
+    expect(result.actionQueues?.readyForPickup?.count).toBe(1);
+    expect(result.actionQueues?.readyForPickup?.items[0].orderNumber).toBe('ORD-101');
 
     // Ready Orders & Recent Orders preserved
     expect(result.readyOrders).toHaveLength(1);
     expect(result.readyOrders[0].orderNumber).toBe('ORD-101');
     expect(result.recentOrders).toHaveLength(1);
     expect(result.recentOrders[0].orderNumber).toBe('ORD-102');
+
+    // Recent Activity with orderId reference
+    expect(result.recentActivity).toHaveLength(1);
+    expect(result.recentActivity[0].orderId).toBe('order-ready-1');
+    expect(result.recentActivity[0].orderNumber).toBe('ORD-101');
   });
 
   // ─── EMPTY STORE ──────────────────────────────────────────────

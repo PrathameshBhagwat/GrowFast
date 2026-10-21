@@ -7,6 +7,11 @@ export interface CardProps {
   onClick?: () => void;
   style?: React.CSSProperties;
   className?: string;
+  id?: string;
+  tabIndex?: number;
+  onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+  role?: string;
+  'aria-label'?: string;
 }
 
 const paddingMap = {
@@ -27,6 +32,11 @@ export const Card: React.FC<CardProps> = ({
   onClick,
   style,
   className,
+  id,
+  tabIndex,
+  onKeyDown,
+  role,
+  'aria-label': ariaLabel,
 }) => {
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
@@ -43,10 +53,14 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <div
+      id={id}
       style={cardStyle}
       className={className}
       onClick={onClick}
-      role={onClick ? 'button' : undefined}
+      role={role ?? (onClick ? 'button' : undefined)}
+      tabIndex={tabIndex}
+      onKeyDown={onKeyDown}
+      aria-label={ariaLabel}
     >
       {children}
     </div>
