@@ -218,6 +218,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
       serviceId,
       selectedCategory,
       activeServices,
+      workflow,
     );
     if (newCategory !== selectedCategory) {
       setSelectedCategory(newCategory as string);
@@ -232,15 +233,21 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
 
     // CHANGE 5: In Per Pieces (DRY_CLEANING) workflow under WEIGHT_BASED category, display EXACTLY ONE card
     if (isDryCleanWeightCategory) {
-      const existing = sourceList.find(
-        (g) => g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED,
-      );
+      const existing =
+        sourceList.find(
+          (g) =>
+            (g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED) &&
+            (g.id === 'g-wb-1' || g.name === 'Weight Based'),
+        ) ||
+        sourceList.find(
+          (g) => g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED,
+        );
       const singleItem = {
-        id: existing?.id || 'g-wb-piece-exception',
+        id: existing?.id || 'g-wb-1',
         name: 'Weight Based',
         category: 'WEIGHT_BASED',
         section: 'Per Piece Exception',
-        isActive: true,
+        isActive: existing ? existing.isActive : true,
       };
 
       const q = searchQuery.toLowerCase().trim();

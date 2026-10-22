@@ -164,7 +164,7 @@ async function main() {
     { id: 'g-h-10', name: 'Rug', category: 'HOUSEHOLD' as const },
 
     // ── WEIGHT_BASED (10) ──
-    { id: 'g-wb-1', name: 'Laundry 1kg', category: 'WEIGHT_BASED' as const },
+    { id: 'g-wb-1', name: 'Weight Based', category: 'WEIGHT_BASED' as const, section: 'Per Piece Exception' },
     { id: 'g-wb-2', name: 'Laundry 2kg', category: 'WEIGHT_BASED' as const },
     { id: 'g-wb-3', name: 'Laundry 3kg', category: 'WEIGHT_BASED' as const },
     { id: 'g-wb-4', name: 'Laundry 4kg', category: 'WEIGHT_BASED' as const },
@@ -384,6 +384,7 @@ async function main() {
     { garmentId: 'g-o-8', serviceId: 'svc-dry-clean', price: 60 },
     { garmentId: 'g-o-9', serviceId: 'svc-dry-clean', price: 100 },
     { garmentId: 'g-o-10', serviceId: 'svc-dry-clean', price: 120 },
+    { garmentId: 'g-wb-1', serviceId: 'svc-dry-clean', price: 40 },
 
     // ── STEAM PRESS: MEN ──
     { garmentId: 'g-m-1', serviceId: 'svc-steam-press', price: 30 },

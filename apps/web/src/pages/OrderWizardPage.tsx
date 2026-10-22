@@ -16,6 +16,7 @@ import {
   getDayOfWeekInTimezone,
   TopUpServiceItem,
   DEFAULT_TOP_UP_SERVICES,
+  Role,
 } from '@growfast/shared-types';
 import type { OrderWorkflowType } from '@growfast/shared-types';
 import { CustomerSelector } from '../components/CustomerSelector';
@@ -52,7 +53,8 @@ export function OrderWizardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialCustomerId = searchParams.get('customerId');
-  const { token } = useAuth();
+  const { token, employee } = useAuth();
+  const canModifyPrice = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
 
   // Entry mode state: Weight vs Pieces (Decision B)
   const paramMode = searchParams.get('mode')?.toUpperCase();
@@ -2560,19 +2562,29 @@ export function OrderWizardPage() {
 
               {/* 2. Price Per Piece */}
               <div>
-                <label
-                  htmlFor="piece-exception-price-input"
-                  className="block text-xs font-bold text-slate-800 mb-1.5"
-                >
-                  Price Per Piece (₹) <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="piece-exception-price-input"
+                    className="block text-xs font-bold text-slate-800"
+                  >
+                    Price Per Piece (₹) <span className="text-rose-500">*</span>
+                  </label>
+                  {!canModifyPrice && (
+                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-[3px]">
+                      Configured Rate (View Only)
+                    </span>
+                  )}
+                </div>
                 <input
                   id="piece-exception-price-input"
                   type="number"
                   min="0"
                   step="1"
+                  disabled={!canModifyPrice}
+                  readOnly={!canModifyPrice}
                   value={pieceExceptionModalData.unitPrice}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    if (!canModifyPrice) return;
                     setPieceExceptionModalData((prev) =>
                       prev
                         ? {
@@ -2580,31 +2592,37 @@ export function OrderWizardPage() {
                             unitPrice: Math.max(0, parseFloat(e.target.value) || 0),
                           }
                         : null,
-                    )
-                  }
-                  className="w-full text-base font-bold font-mono px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    );
+                  }}
+                  className={`w-full text-base font-bold font-mono px-3 py-2 border rounded-lg focus:outline-none ${
+                    canModifyPrice
+                      ? 'border-slate-300 focus:ring-2 focus:ring-blue-500 bg-white text-slate-900'
+                      : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
+                  }`}
                 />
-                {/* Presets */}
-                <div className="flex gap-1.5 mt-2">
-                  {[30, 40, 50, 60, 80].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() =>
-                        setPieceExceptionModalData((prev) =>
-                          prev ? { ...prev, unitPrice: preset } : null,
-                        )
-                      }
-                      className={`px-2.5 py-1.5 text-xs font-bold rounded border cursor-pointer ${
-                        pieceExceptionModalData.unitPrice === preset
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      ₹{preset}
-                    </button>
-                  ))}
-                </div>
+                {/* Presets - available to authorized admins only */}
+                {canModifyPrice && (
+                  <div className="flex gap-1.5 mt-2">
+                    {[30, 40, 50, 60, 80].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() =>
+                          setPieceExceptionModalData((prev) =>
+                            prev ? { ...prev, unitPrice: preset } : null,
+                          )
+                        }
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded border cursor-pointer ${
+                          pieceExceptionModalData.unitPrice === preset
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        ₹{preset}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* 3. Calculated Total */}
