@@ -688,7 +688,12 @@ export const CatalogSettingsPage: React.FC = () => {
       const record = pricingData.find(
         (p: any) => p.garmentCatalogId === garmentId && p.serviceTypeId === serviceId,
       );
-      if (record !== undefined && record !== null && record.price !== undefined && record.price !== null) {
+      if (
+        record !== undefined &&
+        record !== null &&
+        record.price !== undefined &&
+        record.price !== null
+      ) {
         return record.price;
       }
       if (garmentId === 'g-wb-1' && (!serviceId || serviceId === 'svc-dry-clean')) {
@@ -1763,10 +1768,10 @@ export const CatalogSettingsPage: React.FC = () => {
                             : `${categoryPrefix}-${String(skuIndex + 1).padStart(2, '0')}`;
                           const subtitle = isWeightPieceException
                             ? 'Per Piece Exception'
-                            : (garment.section ||
+                            : garment.section ||
                               garment.description ||
                               GARMENT_SUBTITLES[garment.name] ||
-                              'Standard Wear');
+                              'Standard Wear';
 
                           return (
                             <div

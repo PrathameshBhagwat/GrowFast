@@ -164,7 +164,12 @@ async function main() {
     { id: 'g-h-10', name: 'Rug', category: 'HOUSEHOLD' as const },
 
     // ── WEIGHT_BASED (10) ──
-    { id: 'g-wb-1', name: 'Weight Based', category: 'WEIGHT_BASED' as const, section: 'Per Piece Exception' },
+    {
+      id: 'g-wb-1',
+      name: 'Weight Based',
+      category: 'WEIGHT_BASED' as const,
+      section: 'Per Piece Exception',
+    },
     { id: 'g-wb-2', name: 'Laundry 2kg', category: 'WEIGHT_BASED' as const },
     { id: 'g-wb-3', name: 'Laundry 3kg', category: 'WEIGHT_BASED' as const },
     { id: 'g-wb-4', name: 'Laundry 4kg', category: 'WEIGHT_BASED' as const },
