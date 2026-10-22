@@ -4890,6 +4890,15 @@ describe('OrderService', () => {
   });
 
   describe('CHANGE 6: Express Delivery Multipliers (Canonical Rules)', () => {
+    beforeEach(() => {
+      // Pin system time to a Tuesday (2026-10-20) so tests run deterministically regardless of execution day
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-20T10:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     const setupOrderMock = (expressOption?: ExpressDeliveryOption, isExpress = true) => {
       const dto: any = {
         customerId: 'cust-1',
