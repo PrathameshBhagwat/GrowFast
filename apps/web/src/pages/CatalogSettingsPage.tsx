@@ -673,7 +673,7 @@ export const CatalogSettingsPage: React.FC = () => {
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     CATEGORIES.forEach((cat) => {
-      if (cat === GarmentCategory.WEIGHT_BASED || cat === 'WEIGHT_BASED') {
+      if (cat === GarmentCategory.WEIGHT_BASED) {
         counts[cat] = 1;
       } else {
         counts[cat] = garments.filter((g) => g.category === cat).length;
@@ -713,12 +713,9 @@ export const CatalogSettingsPage: React.FC = () => {
       const existing =
         garments.find(
           (g) =>
-            (g.category === GarmentCategory.WEIGHT_BASED || g.category === 'WEIGHT_BASED') &&
+            g.category === GarmentCategory.WEIGHT_BASED &&
             (g.id === 'g-wb-1' || g.name === 'Weight Based'),
-        ) ||
-        garments.find(
-          (g) => g.category === GarmentCategory.WEIGHT_BASED || g.category === 'WEIGHT_BASED',
-        );
+        ) || garments.find((g) => g.category === GarmentCategory.WEIGHT_BASED);
 
       const singleItem: GarmentCatalogDTO = {
         id: existing?.id || 'g-wb-1',
@@ -905,12 +902,9 @@ export const CatalogSettingsPage: React.FC = () => {
       const existing =
         garments.find(
           (g) =>
-            (g.category === GarmentCategory.WEIGHT_BASED || g.category === 'WEIGHT_BASED') &&
+            g.category === GarmentCategory.WEIGHT_BASED &&
             (g.id === 'g-wb-1' || g.name === 'Weight Based'),
-        ) ||
-        garments.find(
-          (g) => g.category === GarmentCategory.WEIGHT_BASED || g.category === 'WEIGHT_BASED',
-        );
+        ) || garments.find((g) => g.category === GarmentCategory.WEIGHT_BASED);
 
       const singleItem: GarmentCatalogDTO = {
         id: existing?.id || 'g-wb-1',
@@ -1753,7 +1747,6 @@ export const CatalogSettingsPage: React.FC = () => {
                           const price = getPriceFor(garment.id, activeServiceId);
                           const hasPrice = price !== null;
                           const isWeightPieceException =
-                            garment.category === 'WEIGHT_BASED' ||
                             garment.category === GarmentCategory.WEIGHT_BASED ||
                             activeCategory === 'WEIGHT_BASED' ||
                             activeCategory === GarmentCategory.WEIGHT_BASED;
