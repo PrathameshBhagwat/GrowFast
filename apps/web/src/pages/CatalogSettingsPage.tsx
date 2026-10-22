@@ -144,6 +144,24 @@ const GARMENT_SUBTITLES: Record<string, string> = {
 const renderStitchGarmentIcon = (name: string) => {
   const lower = name.toLowerCase();
 
+  // Weight Based (Exception)
+  if (lower.includes('weight')) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
+      </svg>
+    );
+  }
+
   // Shorts
   if (lower.includes('short')) {
     return (
@@ -655,7 +673,11 @@ export const CatalogSettingsPage: React.FC = () => {
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     CATEGORIES.forEach((cat) => {
-      counts[cat] = garments.filter((g) => g.category === cat).length;
+      if (cat === GarmentCategory.WEIGHT_BASED) {
+        counts[cat] = 1;
+      } else {
+        counts[cat] = garments.filter((g) => g.category === cat).length;
+      }
     });
     return counts;
   }, [garments]);
@@ -666,13 +688,59 @@ export const CatalogSettingsPage: React.FC = () => {
       const record = pricingData.find(
         (p: any) => p.garmentCatalogId === garmentId && p.serviceTypeId === serviceId,
       );
-      return record !== undefined && record !== null ? record.price : null;
+      if (
+        record !== undefined &&
+        record !== null &&
+        record.price !== undefined &&
+        record.price !== null
+      ) {
+        return record.price;
+      }
+      if (garmentId === 'g-wb-1' && (!serviceId || serviceId === 'svc-dry-clean')) {
+        return 40;
+      }
+      return null;
     },
     [pricingData],
   );
 
   // Filtered & Sorted garments for Garment Tab
   const filteredGarments = useMemo(() => {
+    const isWeightCategory =
+      activeCategory === GarmentCategory.WEIGHT_BASED || activeCategory === 'WEIGHT_BASED';
+
+    if (isWeightCategory) {
+      const existing =
+        garments.find(
+          (g) =>
+            g.category === GarmentCategory.WEIGHT_BASED &&
+            (g.id === 'g-wb-1' || g.name === 'Weight Based'),
+        ) || garments.find((g) => g.category === GarmentCategory.WEIGHT_BASED);
+
+      const singleItem: GarmentCatalogDTO = {
+        id: existing?.id || 'g-wb-1',
+        name: 'Weight Based',
+        category: GarmentCategory.WEIGHT_BASED,
+        section: 'Per Piece Exception',
+        isActive: existing ? existing.isActive : true,
+      };
+
+      if (activeOnly && !singleItem.isActive) {
+        return [];
+      }
+
+      const q = searchQuery.toLowerCase().trim();
+      if (
+        q &&
+        !singleItem.name.toLowerCase().includes(q) &&
+        !(singleItem.section || '').toLowerCase().includes(q) &&
+        !'weight based'.includes(q)
+      ) {
+        return [];
+      }
+      return [singleItem];
+    }
+
     const list = garments.filter((g) => {
       const matchesCategory = g.category === activeCategory;
       const matchesSearch =
@@ -749,7 +817,12 @@ export const CatalogSettingsPage: React.FC = () => {
   // --- Applicability Handlers ---
   const handleActiveCategoryChange = (cat: string) => {
     setActiveCategory(cat);
-    const newServiceId = resolveCatalogSelectionOnCategoryChange(cat, activeServiceId, services);
+    const newServiceId = resolveCatalogSelectionOnCategoryChange(
+      cat,
+      activeServiceId,
+      services,
+      'DRY_CLEANING',
+    );
     if (newServiceId !== activeServiceId) {
       setActiveServiceId(newServiceId);
     }
@@ -757,7 +830,12 @@ export const CatalogSettingsPage: React.FC = () => {
 
   const handleActiveServiceChange = (serviceId: string) => {
     setActiveServiceId(serviceId);
-    const newCategory = resolveCatalogSelectionOnServiceChange(serviceId, activeCategory, services);
+    const newCategory = resolveCatalogSelectionOnServiceChange(
+      serviceId,
+      activeCategory,
+      services,
+      'DRY_CLEANING',
+    );
     if (newCategory !== activeCategory) {
       setActiveCategory(newCategory as string);
     }
@@ -765,7 +843,12 @@ export const CatalogSettingsPage: React.FC = () => {
 
   const handlePricingCategoryChange = (cat: string) => {
     setPricingCategory(cat);
-    const newServiceId = resolveCatalogSelectionOnCategoryChange(cat, pricingServiceId, services);
+    const newServiceId = resolveCatalogSelectionOnCategoryChange(
+      cat,
+      pricingServiceId,
+      services,
+      'DRY_CLEANING',
+    );
     if (newServiceId !== pricingServiceId) {
       setPricingServiceId(newServiceId);
       setEditedPrices({});
@@ -779,6 +862,7 @@ export const CatalogSettingsPage: React.FC = () => {
       serviceId,
       pricingCategory,
       services,
+      'DRY_CLEANING',
     );
     if (newCategory !== pricingCategory) {
       setPricingCategory(newCategory as string);
@@ -811,6 +895,37 @@ export const CatalogSettingsPage: React.FC = () => {
 
   // Filtered garments for Pricing Tab
   const pricingFilteredGarments = useMemo(() => {
+    const isWeightCategory =
+      pricingCategory === GarmentCategory.WEIGHT_BASED || pricingCategory === 'WEIGHT_BASED';
+
+    if (isWeightCategory) {
+      const existing =
+        garments.find(
+          (g) =>
+            g.category === GarmentCategory.WEIGHT_BASED &&
+            (g.id === 'g-wb-1' || g.name === 'Weight Based'),
+        ) || garments.find((g) => g.category === GarmentCategory.WEIGHT_BASED);
+
+      const singleItem: GarmentCatalogDTO = {
+        id: existing?.id || 'g-wb-1',
+        name: 'Weight Based',
+        category: GarmentCategory.WEIGHT_BASED,
+        section: 'Per Piece Exception',
+        isActive: existing ? existing.isActive : true,
+      };
+
+      const q = pricingSearch.toLowerCase().trim();
+      if (
+        q &&
+        !singleItem.name.toLowerCase().includes(q) &&
+        !(singleItem.section || '').toLowerCase().includes(q) &&
+        !'weight based'.includes(q)
+      ) {
+        return [];
+      }
+      return [singleItem];
+    }
+
     return garments.filter((g) => {
       const matchesCategory = g.category === pricingCategory;
       const matchesSearch =
@@ -1631,18 +1746,25 @@ export const CatalogSettingsPage: React.FC = () => {
                         {filteredGarments.map((garment, idx) => {
                           const price = getPriceFor(garment.id, activeServiceId);
                           const hasPrice = price !== null;
+                          const isWeightPieceException =
+                            garment.category === GarmentCategory.WEIGHT_BASED ||
+                            activeCategory === 'WEIGHT_BASED' ||
+                            activeCategory === GarmentCategory.WEIGHT_BASED;
                           const skuIndex = idx;
                           const categoryPrefix = (
                             CATEGORY_LABELS[garment.category] || garment.category
                           )
                             .substring(0, 3)
                             .toUpperCase();
-                          const sku = `${categoryPrefix}-${String(skuIndex + 1).padStart(2, '0')}`;
-                          const subtitle =
-                            garment.section ||
-                            garment.description ||
-                            GARMENT_SUBTITLES[garment.name] ||
-                            'Standard Wear';
+                          const sku = isWeightPieceException
+                            ? 'WEI-01'
+                            : `${categoryPrefix}-${String(skuIndex + 1).padStart(2, '0')}`;
+                          const subtitle = isWeightPieceException
+                            ? 'Per Piece Exception'
+                            : garment.section ||
+                              garment.description ||
+                              GARMENT_SUBTITLES[garment.name] ||
+                              'Standard Wear';
 
                           return (
                             <div
@@ -1731,6 +1853,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                       }}
                                     >
                                       ₹{price.toFixed(0)}
+                                      {isWeightPieceException ? ' / pc' : ''}
                                     </span>
                                   ) : (
                                     <span

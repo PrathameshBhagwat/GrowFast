@@ -481,13 +481,14 @@ export function resolveCatalogSelectionOnCategoryChange<
  * 1. When Service becomes Shoe Cleaning or Free Shoe: auto-select Shoe category.
  * 2. When Shoe category is selected and user selects an incompatible service (e.g. Dry Clean, Standard Wash): auto-select Men.
  * 3. When Service becomes Starching: if current category is NOT Men, Women, or Kids, auto-select Men.
- * 4. When Service becomes Dry Clean: if current category is Weight Based, auto-select Men (Dry Clean is strictly per-piece).
+ * 4. When Service becomes Dry Clean: if current category is Weight Based, keep in DRY_CLEANING workflow as a per-piece exception, otherwise auto-select Men.
  * 5. For all other services: keep current category.
  */
 export function resolveCatalogSelectionOnServiceChange<T extends { id: string; name: string }>(
   newServiceId: string,
   currentCategory: string | GarmentCategory,
   services: T[],
+  workflow?: OrderWorkflowType,
 ): string | GarmentCategory {
   const newService = services.find((s) => s.id === newServiceId);
   if (!newService) return currentCategory;
@@ -514,6 +515,9 @@ export function resolveCatalogSelectionOnServiceChange<T extends { id: string; n
 
   if (isDryCleanService(newServiceId, services)) {
     if (isWeightBasedCategory(currentCategory)) {
+      if (workflow === 'DRY_CLEANING') {
+        return currentCategory;
+      }
       return GarmentCategory.MEN;
     }
   }
