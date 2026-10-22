@@ -92,83 +92,85 @@ export const DashboardBreakdownChart: React.FC<DashboardBreakdownChartProps> = (
       }}
     >
       {/* Header and Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div>
-          <h3
-            className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
-            id="breakdown-chart-title"
-          >
-            <span>Service &amp; Category Breakdown</span>
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Booked line items allocated by service &amp; garment category
-          </p>
-        </div>
-
-        {/* Toggles */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Dimension Selector */}
-          <div
-            role="group"
-            aria-label="Select Breakdown Dimension"
-            className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-          >
-            <button
-              type="button"
-              aria-pressed={dimension === 'CATEGORY'}
-              onClick={() => setDimension('CATEGORY')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-                dimension === 'CATEGORY'
-                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+      <div className="flex flex-col gap-2.5 mb-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h3
+              className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
+              id="breakdown-chart-title"
             >
-              Categories
-            </button>
-            <button
-              type="button"
-              aria-pressed={dimension === 'SERVICE'}
-              onClick={() => setDimension('SERVICE')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-                dimension === 'SERVICE'
-                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              Services
-            </button>
+              <span>Service &amp; Category Breakdown</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Booked line items allocated by service &amp; garment category
+            </p>
           </div>
 
-          {/* Metric Selector */}
-          <div
-            role="group"
-            aria-label="Select Breakdown Metric"
-            className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-          >
-            <button
-              type="button"
-              aria-pressed={metric === 'VALUE'}
-              onClick={() => setMetric('VALUE')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-                metric === 'VALUE'
-                  ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+          {/* Toggles */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Dimension Selector */}
+            <div
+              role="group"
+              aria-label="Select Breakdown Dimension"
+              className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
             >
-              Value (₹)
-            </button>
-            <button
-              type="button"
-              aria-pressed={metric === 'ITEMS'}
-              onClick={() => setMetric('ITEMS')}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-                metric === 'ITEMS'
-                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
+              <button
+                type="button"
+                aria-pressed={dimension === 'CATEGORY'}
+                onClick={() => setDimension('CATEGORY')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                  dimension === 'CATEGORY'
+                    ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Categories
+              </button>
+              <button
+                type="button"
+                aria-pressed={dimension === 'SERVICE'}
+                onClick={() => setDimension('SERVICE')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                  dimension === 'SERVICE'
+                    ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Services
+              </button>
+            </div>
+
+            {/* Metric Selector */}
+            <div
+              role="group"
+              aria-label="Select Breakdown Metric"
+              className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
             >
-              Items (Qty)
-            </button>
+              <button
+                type="button"
+                aria-pressed={metric === 'VALUE'}
+                onClick={() => setMetric('VALUE')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                  metric === 'VALUE'
+                    ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Value (₹)
+              </button>
+              <button
+                type="button"
+                aria-pressed={metric === 'ITEMS'}
+                onClick={() => setMetric('ITEMS')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                  metric === 'ITEMS'
+                    ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                Items (Qty)
+              </button>
+            </div>
           </div>
         </div>
       </div>

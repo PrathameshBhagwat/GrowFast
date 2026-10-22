@@ -16,6 +16,8 @@ export interface DashboardActionCenterProps {
   currencyFormatter?: (v: number) => string;
   className?: string;
   initialQueue?: ActionQueueType;
+  activeQueue?: ActionQueueType;
+  onQueueChange?: (q: ActionQueueType) => void;
 }
 
 function defaultCurrency(v?: number | null): string {
@@ -61,9 +63,21 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
   currencyFormatter = defaultCurrency,
   className = '',
   initialQueue = 'OVERDUE',
+  activeQueue: propActiveQueue,
+  onQueueChange,
 }) => {
   const navigate = useNavigate();
-  const [activeQueue, setActiveQueue] = useState<ActionQueueType>(initialQueue);
+  const [internalQueue, setInternalQueue] = useState<ActionQueueType>(initialQueue);
+
+  const isControlled = propActiveQueue !== undefined;
+  const activeQueue = isControlled ? propActiveQueue : internalQueue;
+
+  const handleSelectQueue = (q: ActionQueueType) => {
+    if (!isControlled) {
+      setInternalQueue(q);
+    }
+    onQueueChange?.(q);
+  };
 
   // Normalize queues
   const overdueItems = actionQueues?.overdue?.items || [];
@@ -111,7 +125,7 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
       currentItems = overdueItems;
       queueTitle = 'Overdue Orders';
       queueDescription =
-        'Orders that have passed their effective due date. Expedited processing & customer communication required.';
+        'Orders past their effective due date. Expedited processing & customer communication required.';
       emptyTitle = '🎉 No Overdue Orders!';
       emptySub = 'All active orders are strictly within promised turnaround dates.';
       reasonForAttention = 'Past effective due date — immediate turnaround required';
@@ -120,7 +134,7 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
       currentItems = dueTodayItems;
       queueTitle = 'Due Today';
       queueDescription =
-        'Orders scheduled for completion today in Asia/Kolkata timezone. Prioritize washing, pressing & packing.';
+        'Orders scheduled for completion today (Asia/Kolkata). Prioritize washing, pressing & packing.';
       emptyTitle = '✨ No Orders Due Today';
       emptySub = 'All scheduled orders for today have already been fulfilled or none are due.';
       reasonForAttention = 'Promised fulfillment date is today';
@@ -203,20 +217,24 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
     <section
       id="dashboard-action-center"
       aria-labelledby="action-center-heading"
-      className={`space-y-4 ${className}`}
+      className={`space-y-3 ${className}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h2
               id="action-center-heading"
-              className="text-lg font-bold text-slate-900 dark:text-slate-100"
+              className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100"
             >
               Action Center
             </h2>
-            {(overdueCount > 0 || dueTodayCount > 0) && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200 border border-rose-300 dark:border-rose-700 animate-pulse">
-                {overdueCount + dueTodayCount} Urgent
+            {overdueCount > 0 ? (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                {overdueCount} Overdue Action Items
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800">
+                Queues on Track
               </span>
             )}
           </div>
@@ -254,7 +272,7 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
               aria-controls={`panel-${tab.key.toLowerCase()}`}
               aria-selected={isActive}
               type="button"
-              onClick={() => setActiveQueue(tab.key)}
+              onClick={() => handleSelectQueue(tab.key)}
               className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-2 min-h-[44px] min-w-[44px] border ${
                 isActive
                   ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-400 dark:border-blue-700 shadow-2xs font-bold'
@@ -278,7 +296,7 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
         role="tabpanel"
         id={`panel-${activeQueue.toLowerCase()}`}
         aria-labelledby={`tab-${activeQueue.toLowerCase()}`}
-        className="space-y-3"
+        className="space-y-2.5"
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs px-1">
           <div className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
@@ -308,33 +326,37 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
           </Card>
         ) : (
           /* List of Queue Order Cards */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="list">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" role="list">
             {currentItems.map((item) => {
               const overdueDays = getRelativeDays(item.effectiveDueDate);
-              const isOverdue = activeQueue === 'OVERDUE' || overdueDays > 0;
+
+              const leftBorderAccent =
+                activeQueue === 'OVERDUE'
+                  ? 'border-l-4 border-l-rose-500'
+                  : activeQueue === 'DUE_TODAY'
+                    ? 'border-l-4 border-l-amber-500'
+                    : activeQueue === 'READY_FOR_PICKUP'
+                      ? 'border-l-4 border-l-emerald-500'
+                      : activeQueue === 'PENDING_PAYMENT'
+                        ? 'border-l-4 border-l-blue-500'
+                        : 'border-l-4 border-l-slate-300';
 
               return (
                 <Card
                   key={item.id}
                   id={`action-order-${item.id}`}
                   role="listitem"
-                  className="p-4 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer border focus-within:ring-2 focus-within:ring-blue-500"
+                  className={`p-3.5 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer border border-slate-200 dark:border-slate-700 ${leftBorderAccent} focus-within:ring-2 focus-within:ring-blue-500 rounded-xl`}
                   style={{
                     background: 'var(--bg-surface, #ffffff)',
-                    borderColor:
-                      activeQueue === 'OVERDUE'
-                        ? '#FCA5A5'
-                        : activeQueue === 'DUE_TODAY'
-                          ? '#FCD34D'
-                          : 'var(--border, #E5E7EB)',
                   }}
                   onClick={() => navigate(`/orders/${item.id}`)}
                 >
                   <div className="space-y-2">
                     {/* Header: Order Number, Customer, Status */}
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm text-slate-900 dark:text-slate-100 hover:text-blue-600 transition-colors">
                             #{item.orderNumber}
                           </span>
@@ -342,13 +364,15 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
                             • {item.itemCount} items
                           </span>
                         </div>
-                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                          <span>{item.customerName}</span>
+                        <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                          <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                            {item.customerName}
+                          </span>
                           {item.customerPhone && (
                             <a
                               href={`tel:${item.customerPhone}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-mono text-[11px]"
+                              className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-mono text-[11px] min-h-[24px]"
                               aria-label={`Call ${item.customerName} at ${item.customerPhone}`}
                             >
                               📞 {item.customerPhone}
@@ -361,9 +385,9 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
                       <StatusChip status={item.status} />
                     </div>
 
-                    {/* Due Date & Reason for Attention */}
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                    {/* Due Date & Attention Reason */}
+                    <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800 text-xs flex flex-wrap items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-slate-400 dark:text-slate-500">Due Date:</span>
                         <span className="font-medium text-slate-700 dark:text-slate-300 font-mono">
                           {formatShortDate(item.effectiveDueDate)}
@@ -391,8 +415,8 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
                         const ro = readyOrders.find((r) => r.id === item.id);
                         if (!ro || ro.readyItems.length === 0) return null;
                         return (
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-                            <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">
+                          <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800 text-xs">
+                            <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5">
                               READY GARMENTS:
                             </div>
                             <div className="space-y-0.5 text-slate-600 dark:text-slate-300">
@@ -408,9 +432,11 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
                           </div>
                         );
                       })()}
+                  </div>
 
-                    {/* Financial details row */}
-                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                  {/* Financials & Action Row */}
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-3 text-xs">
                       <div>
                         <span className="text-slate-400">Total: </span>
                         <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
@@ -430,13 +456,10 @@ export const DashboardActionCenter: React.FC<DashboardActionCenterProps> = ({
                         )}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Actions row */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
                     <Button
                       variant="primary"
-                      className="min-h-[44px] min-w-[44px] text-xs font-semibold px-4 cursor-pointer"
+                      className="min-h-[44px] min-w-[44px] text-xs font-semibold px-3.5 py-1.5 cursor-pointer inline-flex items-center justify-center gap-1"
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/orders/${item.id}`);

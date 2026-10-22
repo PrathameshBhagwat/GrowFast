@@ -182,78 +182,80 @@ export const DashboardTrendChart: React.FC<DashboardTrendChartProps> = ({
       }}
     >
       {/* Header with Title and Mode Toggles */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div>
-          <h3
-            className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
-            id="trends-chart-title"
-          >
-            <span>Performance Trends</span>
-            {trends?.interval && (
-              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                {trends.interval}
-              </span>
-            )}
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Collections received (Payment dates) &amp; Order value booked (Order dates)
-          </p>
-        </div>
+      <div className="flex flex-col gap-2.5 mb-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h3
+              className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
+              id="trends-chart-title"
+            >
+              <span>Performance Trends</span>
+              {trends?.interval && (
+                <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  {trends.interval}
+                </span>
+              )}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Collections received (Payment dates) &amp; Order value booked (Order dates)
+            </p>
+          </div>
 
-        {/* Series Filter Selector */}
-        <div
-          role="group"
-          aria-label="Filter Trend Series"
-          className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-auto"
-        >
-          <button
-            type="button"
-            aria-pressed={selectedSeries === 'ALL'}
-            onClick={() => setSelectedSeries('ALL')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-              selectedSeries === 'ALL'
-                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
+          {/* Series Filter Selector */}
+          <div
+            role="group"
+            aria-label="Filter Trend Series"
+            className="inline-flex flex-wrap rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-start sm:self-auto shrink-0"
           >
-            Overview
-          </button>
-          <button
-            type="button"
-            aria-pressed={selectedSeries === 'COLLECTIONS'}
-            onClick={() => setSelectedSeries('COLLECTIONS')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-              selectedSeries === 'COLLECTIONS'
-                ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            Collections
-          </button>
-          <button
-            type="button"
-            aria-pressed={selectedSeries === 'BOOKED_VALUE'}
-            onClick={() => setSelectedSeries('BOOKED_VALUE')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-              selectedSeries === 'BOOKED_VALUE'
-                ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            Booked Value
-          </button>
-          <button
-            type="button"
-            aria-pressed={selectedSeries === 'ORDERS'}
-            onClick={() => setSelectedSeries('ORDERS')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
-              selectedSeries === 'ORDERS'
-                ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            Order Volume
-          </button>
+            <button
+              type="button"
+              aria-pressed={selectedSeries === 'ALL'}
+              onClick={() => setSelectedSeries('ALL')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                selectedSeries === 'ALL'
+                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              aria-pressed={selectedSeries === 'COLLECTIONS'}
+              onClick={() => setSelectedSeries('COLLECTIONS')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                selectedSeries === 'COLLECTIONS'
+                  ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Collections
+            </button>
+            <button
+              type="button"
+              aria-pressed={selectedSeries === 'BOOKED_VALUE'}
+              onClick={() => setSelectedSeries('BOOKED_VALUE')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                selectedSeries === 'BOOKED_VALUE'
+                  ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Booked Value
+            </button>
+            <button
+              type="button"
+              aria-pressed={selectedSeries === 'ORDERS'}
+              onClick={() => setSelectedSeries('ORDERS')}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer min-h-[36px] ${
+                selectedSeries === 'ORDERS'
+                  ? 'bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Order Volume
+            </button>
+          </div>
         </div>
       </div>
 

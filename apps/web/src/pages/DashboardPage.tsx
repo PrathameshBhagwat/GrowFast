@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { DashboardTrendChart } from '../components/DashboardTrendChart';
 import { DashboardBreakdownChart } from '../components/DashboardBreakdownChart';
-import { DashboardActionCenter } from '../components/DashboardActionCenter';
+import { DashboardActionCenter, type ActionQueueType } from '../components/DashboardActionCenter';
 import {
   type DashboardDatePreset,
   type DateRange,
@@ -91,6 +91,7 @@ export const DashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [actionCenterQueue, setActionCenterQueue] = useState<ActionQueueType>('OVERDUE');
 
   // Date Filter & Period Selection (Phase 2)
   const [preset, setPreset] = useState<DashboardDatePreset>('TODAY');
@@ -318,13 +319,13 @@ export const DashboardPage: React.FC = () => {
       >
         <div
           style={{
-            maxWidth: 960,
+            maxWidth: 1240,
             margin: '0 auto',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             flexWrap: 'wrap',
-            gap: 8,
+            gap: 12,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -362,29 +363,11 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <ThemeToggle size="sm" />
-            <button
-              onClick={handleRefresh}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                color: '#FFF',
-                borderRadius: 8,
-                padding: '10px 16px',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 600,
-                minHeight: 44,
-                minWidth: 44,
-              }}
-              aria-label="Refresh dashboard data"
-            >
-              ↻ Refresh
-            </button>
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px' }}>
+      <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 16px' }}>
         {/* ─── DATE FILTER TOOLBAR (Phase 2) ───────────────────── */}
         <div
           id="dashboard-date-filter-toolbar"
@@ -667,13 +650,7 @@ export const DashboardPage: React.FC = () => {
         {/* ─── FINANCIAL PERFORMANCE (Phase 3) ──────────────── */}
         <section aria-labelledby="financial-performance-heading" style={{ marginBottom: 24 }}>
           <SectionTitle id="financial-performance-heading">Financial Performance</SectionTitle>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-              gap: 12,
-            }}
-          >
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             <KpiCard
               id="kpi-collections-received"
               label="Collections Received"
@@ -734,20 +711,20 @@ export const DashboardPage: React.FC = () => {
                 (financial.outstandingBalance ?? financial.amountDue) > 0 ? '#DC2626' : '#059669'
               }
               attention={(financial.outstandingBalance ?? financial.amountDue) > 0}
+              onClick={() => {
+                setActionCenterQueue('PENDING_PAYMENT');
+                document
+                  .getElementById('dashboard-action-center')
+                  ?.scrollIntoView?.({ behavior: 'smooth' });
+              }}
             />
           </div>
         </section>
 
         {/* ─── OPERATIONS & QUEUE HEALTH (Phase 3) ───────────── */}
         <section aria-labelledby="operational-health-heading" style={{ marginBottom: 24 }}>
-          <SectionTitle id="operational-health-heading">Operations & Queue Health</SectionTitle>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-              gap: 12,
-            }}
-          >
+          <SectionTitle id="operational-health-heading">Operations &amp; Queue Health</SectionTitle>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <KpiCard
               id="kpi-orders-created"
               label="Orders Created"
@@ -758,6 +735,9 @@ export const DashboardPage: React.FC = () => {
               color="#2563EB"
               onClick={() => {
                 setStatusFilter('ALL');
+                document
+                  .getElementById('order-status-overview')
+                  ?.scrollIntoView?.({ behavior: 'smooth' });
               }}
             />
             <KpiCard
@@ -770,6 +750,9 @@ export const DashboardPage: React.FC = () => {
               color="#D97706"
               onClick={() => {
                 setStatusFilter('PROCESSING');
+                document
+                  .getElementById('order-status-overview')
+                  ?.scrollIntoView?.({ behavior: 'smooth' });
               }}
             />
             <KpiCard
@@ -782,6 +765,10 @@ export const DashboardPage: React.FC = () => {
               color="#059669"
               onClick={() => {
                 setStatusFilter('READY');
+                setActionCenterQueue('READY_FOR_PICKUP');
+                document
+                  .getElementById('dashboard-action-center')
+                  ?.scrollIntoView?.({ behavior: 'smooth' });
               }}
             />
             <KpiCard
@@ -793,6 +780,12 @@ export const DashboardPage: React.FC = () => {
               sub="Past effective due date"
               color={orders.overdue > 0 ? '#DC2626' : '#6B7280'}
               attention={orders.overdue > 0}
+              onClick={() => {
+                setActionCenterQueue('OVERDUE');
+                document
+                  .getElementById('dashboard-action-center')
+                  ?.scrollIntoView?.({ behavior: 'smooth' });
+              }}
             />
             <KpiCard
               id="kpi-due-today"
@@ -815,14 +808,8 @@ export const DashboardPage: React.FC = () => {
 
         {/* ─── TRENDS & PERFORMANCE (Phase 4) ──────────────── */}
         <section aria-labelledby="trends-performance-heading" style={{ marginBottom: 24 }}>
-          <SectionTitle id="trends-performance-heading">Trends & Performance</SectionTitle>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-              gap: 16,
-            }}
-          >
+          <SectionTitle id="trends-performance-heading">Trends &amp; Performance</SectionTitle>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <DashboardTrendChart trends={trends} currencyFormatter={formatCurrency} />
             <DashboardBreakdownChart
               serviceBreakdown={serviceBreakdown}
@@ -838,11 +825,13 @@ export const DashboardPage: React.FC = () => {
             actionQueues={actionQueues}
             readyOrders={readyOrders}
             currencyFormatter={formatCurrency}
+            activeQueue={actionCenterQueue}
+            onQueueChange={setActionCenterQueue}
           />
         </div>
 
         {/* ─── ORDER STATUS OVERVIEW ───────────────────────── */}
-        <SectionTitle>Order Status</SectionTitle>
+        <SectionTitle id="order-status-overview">Order Status</SectionTitle>
         <div
           style={{
             display: 'flex',
@@ -1254,6 +1243,42 @@ function ComparisonBadge({
     }
 
     if (percentageChange < 0) {
+      if (current === 0) {
+        return (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              fontSize: 12,
+              fontWeight: 600,
+              marginTop: 4,
+              flexWrap: 'wrap',
+            }}
+            aria-label={`No activity this period compared to ${formattedPrev} previous`}
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 2,
+                padding: '2px 6px',
+                borderRadius: 4,
+                background: 'var(--bg-surface-muted, #F3F4F6)',
+                color: 'var(--text-secondary, #4B5563)',
+                border: '1px solid var(--border, #E5E7EB)',
+              }}
+            >
+              <span>—</span>
+              <span>No activity</span>
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted, #6B7280)' }}>
+              vs {formattedPrev} prev
+            </span>
+          </div>
+        );
+      }
+
       return (
         <div
           style={{
@@ -1441,6 +1466,7 @@ function KpiCard({
         background: 'var(--bg-surface, #FFF)',
         transition: 'all 0.15s ease',
         minHeight: 120,
+        height: '100%',
         boxShadow: isClickable ? '0 1px 3px rgba(0,0,0,0.06)' : undefined,
       }}
       onClick={onClick}
