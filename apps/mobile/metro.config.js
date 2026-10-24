@@ -22,6 +22,7 @@ config.resolver.extraNodeModules = {
   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
   react: path.resolve(projectRoot, 'node_modules/react'),
   'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
+  'react-native-web': path.resolve(projectRoot, 'node_modules/react-native-web'),
 };
 
 // 4. In monorepos, disable hierarchical lookup so packages are resolved strictly

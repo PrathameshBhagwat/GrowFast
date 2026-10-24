@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
 import {
   CustomerDTO,
@@ -8,6 +8,10 @@ import {
   OrderEntryMode,
   PickupType,
   ExpressDeliveryOption,
+  GarmentCatalogDTO,
+  ServiceTypeDTO,
+  GarmentCategory,
+  ServiceCategory,
   Role,
 } from '@growfast/shared-types';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
@@ -15,20 +19,111 @@ import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../../db
 import { getPhotosForDraft, PendingPhoto } from '../../db/photos';
 import { syncEngine } from '../../services/sync-engine';
 import { apiClient } from '../../api/client';
-import { CustomerStep } from './CustomerStep';
-import { CatalogItemsStep } from './CatalogItemsStep';
-import { OptionsStep } from './OptionsStep';
-import { RequirementsStep } from './RequirementsStep';
-import { ReviewConfirmStep } from './ReviewConfirmStep';
 
-export type WizardStep = 'CUSTOMER' | 'CATALOG' | 'OPTIONS' | 'REQUIREMENTS' | 'REVIEW';
+// Modular Screen Components
+import { CustomerStep } from './CustomerStep';
+import { ServiceCategoryStep } from './ServiceCategoryStep';
+import { CatalogGridStep } from './CatalogGridStep';
+import { ItemDetailsModal } from './ItemDetailsModal';
+import { OrderItemsReviewStep } from './OrderItemsReviewStep';
+import { FinalReviewStep } from './FinalReviewStep';
+import { OrderCreatedStep } from './OrderCreatedStep';
+
+export type WizardStep =
+  | 'CUSTOMER' // Screen 3 (Dev C)
+  | 'SERVICE_CATEGORY' // Screen 4 (Dev B)
+  | 'CATALOG_GRID' // Screen 5 (Dev B)
+  | 'ITEMS_REVIEW' // Screen 7 (Dev B)
+  | 'FINAL_REVIEW' // Screen 8 (Dev B)
+  | 'ORDER_CREATED'; // Screen 9 (Dev B)
 
 const STEPS: { key: WizardStep; label: string }[] = [
   { key: 'CUSTOMER', label: 'Customer' },
-  { key: 'CATALOG', label: 'Items' },
-  { key: 'OPTIONS', label: 'Options' },
-  { key: 'REQUIREMENTS', label: 'Photos' },
-  { key: 'REVIEW', label: 'Review' },
+  { key: 'SERVICE_CATEGORY', label: 'Services' },
+  { key: 'CATALOG_GRID', label: 'Catalog' },
+  { key: 'ITEMS_REVIEW', label: 'Cart' },
+  { key: 'FINAL_REVIEW', label: 'Review' },
+  { key: 'ORDER_CREATED', label: 'Confirmed' },
+];
+
+// Offline Fallback Seed Catalog
+const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
+  { id: 'cat-shirt', name: 'Shirt / T-Shirt', category: GarmentCategory.MEN, isActive: true },
+  { id: 'cat-trousers', name: 'Trousers / Pants', category: GarmentCategory.MEN, isActive: true },
+  { id: 'cat-suit', name: '2-Piece Suit', category: GarmentCategory.MEN, isActive: true },
+  { id: 'cat-kurta', name: 'Kurta / Pyjama', category: GarmentCategory.MEN, isActive: true },
+  { id: 'cat-saree', name: 'Saree (Silk/Cotton)', category: GarmentCategory.WOMEN, isActive: true },
+  { id: 'cat-dress', name: 'Dress / Gown', category: GarmentCategory.WOMEN, isActive: true },
+  {
+    id: 'cat-bedsheet',
+    name: 'Bedsheet / Linen',
+    category: GarmentCategory.HOUSEHOLD,
+    isActive: true,
+  },
+  {
+    id: 'cat-blanket',
+    name: 'Blanket / Quilt',
+    category: GarmentCategory.HOUSEHOLD,
+    isActive: true,
+  },
+  {
+    id: 'cat-kg-wash',
+    name: 'Wash & Fold (Per Kg)',
+    category: GarmentCategory.WEIGHT_BASED,
+    isActive: true,
+  },
+  {
+    id: 'cat-kg-iron',
+    name: 'Wash & Iron (Per Kg)',
+    category: GarmentCategory.WEIGHT_BASED,
+    isActive: true,
+  },
+];
+
+const FALLBACK_SERVICES: ServiceTypeDTO[] = [
+  {
+    id: 'srv-wash-iron',
+    name: 'Wash & Iron',
+    category: ServiceCategory.WASH_IRON,
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'srv-dry-clean',
+    name: 'Dry Clean',
+    category: ServiceCategory.DRY_CLEAN,
+    estimatedDays: 3,
+    isActive: true,
+  },
+  {
+    id: 'srv-steam-press',
+    name: 'Steam Press Only',
+    category: ServiceCategory.STEAM_PRESS,
+    estimatedDays: 1,
+    isActive: true,
+  },
+  {
+    id: 'srv-premium-wash',
+    name: 'Premium Wash & Fold',
+    category: ServiceCategory.WASH,
+    estimatedDays: 2,
+    isActive: true,
+  },
+];
+
+const FALLBACK_PRICES = [
+  { garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-wash-iron', price: 40 },
+  { garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-dry-clean', price: 80 },
+  { garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-steam-press', price: 25 },
+  { garmentCatalogId: 'cat-trousers', serviceTypeId: 'srv-wash-iron', price: 50 },
+  { garmentCatalogId: 'cat-trousers', serviceTypeId: 'srv-dry-clean', price: 90 },
+  { garmentCatalogId: 'cat-suit', serviceTypeId: 'srv-dry-clean', price: 250 },
+  { garmentCatalogId: 'cat-saree', serviceTypeId: 'srv-dry-clean', price: 180 },
+  { garmentCatalogId: 'cat-saree', serviceTypeId: 'srv-wash-iron', price: 100 },
+  { garmentCatalogId: 'cat-bedsheet', serviceTypeId: 'srv-wash-iron', price: 90 },
+  { garmentCatalogId: 'cat-blanket', serviceTypeId: 'srv-dry-clean', price: 200 },
+  { garmentCatalogId: 'cat-kg-wash', serviceTypeId: 'srv-premium-wash', price: 80 },
+  { garmentCatalogId: 'cat-kg-iron', serviceTypeId: 'srv-wash-iron', price: 120 },
 ];
 
 interface OrderWizardModalProps {
@@ -38,6 +133,7 @@ interface OrderWizardModalProps {
   userRole?: string;
   onClose: () => void;
   onOrderSavedOrSubmitted: () => void;
+  onViewOrderDetail?: (orderId: string) => void;
 }
 
 export function OrderWizardModal({
@@ -47,6 +143,7 @@ export function OrderWizardModal({
   userRole,
   onClose,
   onOrderSavedOrSubmitted,
+  onViewOrderDetail,
 }: OrderWizardModalProps) {
   const { isConnected } = useNetworkStatus();
   const canModifyPrice = userRole === Role.OWNER || userRole === Role.MANAGER;
@@ -61,6 +158,8 @@ export function OrderWizardModal({
   const [manualCustomerPhone, setManualCustomerPhone] = useState('');
   const [workflow, setWorkflow] = useState<OrderWorkflowType>('LAUNDRY');
   const [entryMode, setEntryMode] = useState<OrderEntryMode>('PIECES');
+  const [selectedServiceId, setSelectedServiceId] = useState('srv-wash-iron');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [items, setItems] = useState<CreateOrderItemRequest[]>([]);
   const [pickupType, setPickupType] = useState<PickupType>(PickupType.STORE_PICKUP);
   const [expressOption, setExpressOption] = useState<ExpressDeliveryOption>(
@@ -72,13 +171,47 @@ export function OrderWizardModal({
     expressSurchargePercent?: number | null;
   } | null>(null);
 
-  // Fetch store config when online
+  // Catalog Data
+  const [garments, setGarments] = useState<GarmentCatalogDTO[]>(FALLBACK_GARMENTS);
+  const [services, setServices] = useState<ServiceTypeDTO[]>(FALLBACK_SERVICES);
+  const [prices, setPrices] = useState<any[]>(FALLBACK_PRICES);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+
+  // Item Details Modal State (Screen 6)
+  const [itemConfigModalVisible, setItemConfigModalVisible] = useState(false);
+  const [configuringGarment, setConfiguringGarment] = useState<GarmentCatalogDTO | null>(null);
+  const [configuringExistingIndex, setConfiguringExistingIndex] = useState<number | undefined>(
+    undefined,
+  );
+  const [configuringInitialItem, setConfiguringInitialItem] =
+    useState<CreateOrderItemRequest | null>(null);
+
+  // Confirmed Order State (Screen 9)
+  const [confirmedOrder, setConfirmedOrder] = useState<{
+    orderId: string;
+    orderNumber: string;
+    isOfflineQueued?: boolean;
+  } | null>(null);
+
+  // Fetch catalog & store config
   useEffect(() => {
-    if (visible && isConnected) {
-      apiClient.store
-        .getConfig()
-        .then(setStoreConfig)
-        .catch(() => {});
+    if (visible) {
+      if (isConnected) {
+        setIsLoadingCatalog(true);
+        Promise.all([
+          apiClient.catalog.getGarments().catch(() => FALLBACK_GARMENTS),
+          apiClient.catalog.getServices().catch(() => FALLBACK_SERVICES),
+          apiClient.catalog.getPricing().catch(() => FALLBACK_PRICES),
+          apiClient.store.getConfig().catch(() => null),
+        ])
+          .then(([gRes, sRes, pRes, cfgRes]) => {
+            if (gRes && gRes.length > 0) setGarments(gRes);
+            if (sRes && sRes.length > 0) setServices(sRes);
+            if (pRes && pRes.length > 0) setPrices(pRes);
+            if (cfgRes) setStoreConfig(cfgRes);
+          })
+          .finally(() => setIsLoadingCatalog(false));
+      }
     }
   }, [visible, isConnected]);
 
@@ -117,6 +250,8 @@ export function OrderWizardModal({
         setNotes(draft.notes || '');
         setItems(draft.payload?.items || []);
         getPhotosForDraft(draft.clientDraftId).then(setPhotos);
+        setConfirmedOrder(null);
+        setCurrentStepIndex(draft.payload?.items && draft.payload.items.length > 0 ? 3 : 0);
       } else {
         // Fresh draft
         const newDraftId = generateUUID();
@@ -126,13 +261,16 @@ export function OrderWizardModal({
         setManualCustomerPhone('');
         setWorkflow('LAUNDRY');
         setEntryMode('PIECES');
+        setSelectedServiceId('srv-wash-iron');
+        setSelectedCategory('ALL');
         setItems([]);
         setPickupType(PickupType.STORE_PICKUP);
         setExpressOption(ExpressDeliveryOption.REGULAR);
         setNotes('');
         setPhotos([]);
+        setConfirmedOrder(null);
+        setCurrentStepIndex(0);
       }
-      setCurrentStepIndex(0);
     }
   }, [visible, draft]);
 
@@ -162,7 +300,7 @@ export function OrderWizardModal({
             ? item.pieces
             : Array.from({ length: pieceCount }, (_, i) => ({
                 unitNumber: i + 1,
-                photoCount: photos.length > 0 ? 1 : 0,
+                photoCount: photos.filter((p) => p.garmentId === item.garmentCatalogId).length,
               }));
         return {
           ...item,
@@ -195,7 +333,7 @@ export function OrderWizardModal({
   // Step Validation
   const validateStep = (stepIdx: number): boolean => {
     if (stepIdx === 0) {
-      // Customer step
+      // Screen 3: Customer step
       if (!selectedCustomer && !manualCustomerName.trim()) {
         Alert.alert(
           'Customer Required',
@@ -210,8 +348,8 @@ export function OrderWizardModal({
         Alert.alert('Phone Required', 'Please provide a valid 10-digit mobile number.');
         return false;
       }
-    } else if (stepIdx === 1) {
-      // Items step
+    } else if (stepIdx === 2 || stepIdx === 3) {
+      // Catalog & Items Review step
       if (items.length === 0) {
         Alert.alert('Items Required', 'Please add at least one garment or laundry item.');
         return false;
@@ -223,7 +361,6 @@ export function OrderWizardModal({
   const handleNext = async () => {
     if (!validateStep(currentStepIndex)) return;
 
-    // Auto-save progress to SQLite
     try {
       await persistDraftToStorage();
     } catch (err: any) {
@@ -236,7 +373,6 @@ export function OrderWizardModal({
   };
 
   const handleBack = async () => {
-    // Auto-save progress before going back
     try {
       await persistDraftToStorage();
     } catch (err: any) {
@@ -246,24 +382,79 @@ export function OrderWizardModal({
     if (currentStepIndex > 0) {
       setCurrentStepIndex(currentStepIndex - 1);
     } else {
-      // Step 0 back means close modal
       onClose();
     }
   };
 
-  // Save as Draft (Stays in local DRAFT status)
-  const handleSaveDraft = async () => {
-    await persistDraftToStorage('DRAFT');
-    onOrderSavedOrSubmitted();
+  // Quick add item from catalog
+  const handleQuickAddItem = (garment: GarmentCatalogDTO, serviceId: string, unitPrice: number) => {
+    const existingIndex = items.findIndex(
+      (it) => it.garmentCatalogId === garment.id && it.serviceTypeId === serviceId,
+    );
+
+    if (existingIndex >= 0) {
+      const updated = [...items];
+      const target = { ...updated[existingIndex] };
+      target.quantity = (target.quantity || 1) + 1;
+      updated[existingIndex] = target;
+      setItems(updated);
+    } else {
+      const newItem: CreateOrderItemRequest = {
+        garmentCatalogId: garment.id,
+        serviceTypeId: serviceId,
+        quantity: 1,
+        unitPrice,
+        pieces: [{ unitNumber: 1, photoCount: 0 }],
+      };
+      setItems([...items, newItem]);
+    }
   };
 
-  // Submit Order (Syncs if online, queues if offline)
+  // Quick decrement item from catalog
+  const handleQuickDecrementItem = (garmentId: string) => {
+    const existingIndex = items.findIndex((it) => it.garmentCatalogId === garmentId);
+    if (existingIndex >= 0) {
+      const target = items[existingIndex];
+      if ((target.quantity || 1) > 1) {
+        const updated = [...items];
+        updated[existingIndex] = { ...target, quantity: (target.quantity || 1) - 1 };
+        setItems(updated);
+      } else {
+        setItems(items.filter((_, idx) => idx !== existingIndex));
+      }
+    }
+  };
+
+  // Open item configuration modal (Screen 6)
+  const handleOpenItemConfig = (garment: GarmentCatalogDTO, existingIndex?: number) => {
+    setConfiguringGarment(garment);
+    setConfiguringExistingIndex(existingIndex);
+    setConfiguringInitialItem(existingIndex != null ? items[existingIndex] : null);
+    setItemConfigModalVisible(true);
+  };
+
+  // Save item from ItemDetailsModal
+  const handleSaveConfiguredItem = (item: CreateOrderItemRequest, existingIndex?: number) => {
+    if (existingIndex != null && existingIndex >= 0) {
+      const updated = [...items];
+      updated[existingIndex] = item;
+      setItems(updated);
+    } else {
+      setItems([...items, item]);
+    }
+  };
+
+  // Delete item from cart
+  const handleRemoveCartItem = (index: number) => {
+    setItems(items.filter((_, idx) => idx !== index));
+  };
+
+  // Submit order to server
   const handleSubmitOrder = async () => {
     await persistDraftToStorage('QUEUED');
     await queueDraftForSync(clientDraftId);
 
     if (isConnected) {
-      // Attempt immediate sync
       const syncResult = await syncEngine.syncDraft(clientDraftId);
       if (syncResult.success) {
         onOrderSavedOrSubmitted();
@@ -281,11 +472,10 @@ export function OrderWizardModal({
       } else {
         return {
           success: false,
-          error: syncResult.error || 'Server rejected submission',
+          error: syncResult.error || 'Server rejected order submission.',
         };
       }
     } else {
-      // Offline: successfully queued
       onOrderSavedOrSubmitted();
       return {
         success: false,
@@ -294,169 +484,270 @@ export function OrderWizardModal({
     }
   };
 
+  // Handle successful order creation (Screen 9)
+  const handleOrderCreatedSuccess = (order: { orderId: string; orderNumber: string }) => {
+    setConfirmedOrder({
+      orderId: order.orderId,
+      orderNumber: order.orderNumber,
+      isOfflineQueued: order.orderId === 'offline-queued',
+    });
+    setCurrentStepIndex(5); // Jump directly to Screen 9 (ORDER_CREATED)
+  };
+
+  // Create another order reset
+  const handleCreateAnotherOrder = () => {
+    const newDraftId = generateUUID();
+    setClientDraftId(newDraftId);
+    setSelectedCustomer(null);
+    setManualCustomerName('');
+    setManualCustomerPhone('');
+    setWorkflow('LAUNDRY');
+    setEntryMode('PIECES');
+    setSelectedServiceId(services[0]?.id || 'srv-wash-iron');
+    setSelectedCategory('ALL');
+    setItems([]);
+    setPickupType(PickupType.STORE_PICKUP);
+    setExpressOption(ExpressDeliveryOption.REGULAR);
+    setNotes('');
+    setPhotos([]);
+    setConfirmedOrder(null);
+    setCurrentStepIndex(0);
+  };
+
   const currentStep = STEPS[currentStepIndex];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
       <SafeAreaView style={styles.safeContainer}>
-        {/* Top Header */}
+        {/* Header Bar */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerBackBtn}
-            onPress={handleBack}
-            accessible={true}
-            accessibilityLabel="Go back or close wizard"
-          >
-            <Text style={styles.headerBackText}>
-              {currentStepIndex === 0 ? '✕ Cancel' : '‹ Back'}
-            </Text>
-          </TouchableOpacity>
+          {currentStepIndex !== 5 ? (
+            <TouchableOpacity
+              style={styles.headerBackBtn}
+              onPress={handleBack}
+              accessible={true}
+              accessibilityLabel="Go back or cancel"
+            >
+              <Text style={styles.headerBackText}>
+                {currentStepIndex === 0 ? '✕ Cancel' : '‹ Back'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 60 }} />
+          )}
 
-          <Text style={styles.headerTitle}>{draft ? 'Edit Order Draft' : 'New Mobile Order'}</Text>
+          <Text style={styles.headerTitle}>
+            {currentStepIndex === 5
+              ? 'Order Confirmation'
+              : draft
+                ? 'Edit Order Draft'
+                : 'New Mobile Order'}
+          </Text>
 
           <View style={styles.headerRightSpacer} />
         </View>
 
-        {/* Step Progress Indicator */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBarRow}>
-            {STEPS.map((step, idx) => (
-              <View
-                key={step.key}
-                style={[
-                  styles.progressSegment,
-                  idx <= currentStepIndex
-                    ? styles.progressSegmentFilled
-                    : styles.progressSegmentEmpty,
-                ]}
-              />
-            ))}
+        {/* Step Progress Segment Bar */}
+        {currentStepIndex !== 5 && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarRow}>
+              {STEPS.slice(0, 5).map((step, idx) => (
+                <View
+                  key={step.key}
+                  style={[
+                    styles.progressSegment,
+                    idx <= currentStepIndex
+                      ? styles.progressSegmentFilled
+                      : styles.progressSegmentEmpty,
+                  ]}
+                />
+              ))}
+            </View>
+            <View style={styles.stepLabelsRow}>
+              {STEPS.slice(0, 5).map((step, idx) => (
+                <Text
+                  key={step.key}
+                  style={[
+                    styles.stepLabelText,
+                    idx === currentStepIndex && styles.stepLabelTextActive,
+                  ]}
+                >
+                  {step.label}
+                </Text>
+              ))}
+            </View>
           </View>
-          <View style={styles.stepLabelsRow}>
-            {STEPS.map((step, idx) => (
-              <Text
-                key={step.key}
-                style={[
-                  styles.stepLabelText,
-                  idx === currentStepIndex && styles.stepLabelTextActive,
-                ]}
-              >
-                {step.label}
-              </Text>
-            ))}
-          </View>
-        </View>
+        )}
 
-        {/* Step Body */}
+        {/* Step Body Component */}
         <View style={styles.body}>
-          {currentStep?.key === 'CUSTOMER' && (
-            <CustomerStep
-              selectedCustomer={selectedCustomer}
-              onSelectCustomer={(cust) => {
-                setSelectedCustomer(cust);
-                setManualCustomerName(cust.name);
-                setManualCustomerPhone(cust.phone);
-              }}
-              onClearCustomer={() => {
-                setSelectedCustomer(null);
-                setManualCustomerName('');
-                setManualCustomerPhone('');
-              }}
-              manualCustomerName={manualCustomerName}
-              manualCustomerPhone={manualCustomerPhone}
-              onChangeManualDetails={(name, phone) => {
-                setManualCustomerName(name);
-                setManualCustomerPhone(phone);
-              }}
-              isConnected={isConnected}
-            />
+          {/* STEP 0: Customer (Screen 3 - Dev C) */}
+          {currentStepIndex === 0 && (
+            <View style={{ flex: 1 }}>
+              <CustomerStep
+                selectedCustomer={selectedCustomer}
+                onSelectCustomer={(c) => setSelectedCustomer(c)}
+                onClearCustomer={() => setSelectedCustomer(null)}
+                manualCustomerName={manualCustomerName}
+                manualCustomerPhone={manualCustomerPhone}
+                onChangeManualDetails={(name, phone) => {
+                  setManualCustomerName(name);
+                  setManualCustomerPhone(phone);
+                }}
+                isConnected={isConnected}
+              />
+              <View style={styles.customerFooter}>
+                <TouchableOpacity
+                  style={[
+                    styles.customerNextBtn,
+                    !selectedCustomer && !manualCustomerPhone && styles.customerNextBtnDisabled,
+                  ]}
+                  onPress={handleNext}
+                  disabled={!selectedCustomer && !manualCustomerPhone}
+                  accessible={true}
+                  accessibilityLabel="Proceed to Services"
+                >
+                  <Text style={styles.customerNextBtnText}>Continue to Services ›</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
 
-          {currentStep?.key === 'CATALOG' && (
-            <CatalogItemsStep
+          {/* STEP 1: Service & Category Selection (Screen 4 - Dev B) */}
+          {currentStepIndex === 1 && (
+            <ServiceCategoryStep
               workflow={workflow}
               onWorkflowChange={setWorkflow}
-              entryMode={entryMode}
-              onEntryModeChange={setEntryMode}
-              items={items}
-              onItemsChange={setItems}
-              canModifyPrice={canModifyPrice}
-              isConnected={isConnected}
+              selectedServiceId={selectedServiceId}
+              onSelectService={setSelectedServiceId}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              services={services}
+              isLoadingServices={isLoadingCatalog}
+              cartItemCount={items.length}
+              onContinue={handleNext}
             />
           )}
 
-          {currentStep?.key === 'OPTIONS' && (
-            <OptionsStep
-              pickupType={pickupType}
-              onPickupTypeChange={setPickupType}
-              expressOption={expressOption}
-              onExpressOptionChange={setExpressOption}
-              notes={notes}
-              onNotesChange={setNotes}
+          {/* STEP 2: Garment Catalog Grid (Screen 5 - Dev B) */}
+          {currentStepIndex === 2 && (
+            <CatalogGridStep
+              garments={garments}
+              services={services}
+              prices={prices}
+              selectedServiceId={selectedServiceId}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              items={items}
+              onOpenItemConfig={handleOpenItemConfig}
+              onQuickAddItem={handleQuickAddItem}
+              onQuickDecrementItem={handleQuickDecrementItem}
+              onProceedToReview={() => setCurrentStepIndex(3)}
+              onBackToService={() => setCurrentStepIndex(1)}
+              isLoadingCatalog={isLoadingCatalog}
             />
           )}
 
-          {currentStep?.key === 'REQUIREMENTS' && (
-            <RequirementsStep
-              clientDraftId={clientDraftId}
+          {/* STEP 3: Order Items Review & Line Totals (Screen 7 - Dev B) */}
+          {currentStepIndex === 3 && (
+            <OrderItemsReviewStep
               items={items}
-              pickupType={pickupType}
+              garments={garments}
+              services={services}
               photos={photos}
-              onPhotosChanged={refreshPhotos}
+              onEditItem={(idx) => {
+                const it = items[idx];
+                const g = garments.find((item) => item.id === it.garmentCatalogId) || {
+                  id: it.garmentCatalogId,
+                  name: 'Garment Item',
+                  category: it.weight ? GarmentCategory.WEIGHT_BASED : GarmentCategory.MEN,
+                  isActive: true,
+                };
+                handleOpenItemConfig(g, idx);
+              }}
+              onRemoveItem={handleRemoveCartItem}
+              onAddMoreItems={() => setCurrentStepIndex(2)}
+              onContinueToFinalReview={handleNext}
             />
           )}
 
-          {currentStep?.key === 'REVIEW' && (
-            <ReviewConfirmStep
+          {/* STEP 4: Final Order Review (Screen 8 - Dev B) */}
+          {currentStepIndex === 4 && (
+            <FinalReviewStep
               clientDraftId={clientDraftId}
               customer={selectedCustomer}
               manualCustomerName={manualCustomerName}
               manualCustomerPhone={manualCustomerPhone}
               workflow={workflow}
               pickupType={pickupType}
+              onPickupTypeChange={setPickupType}
               expressOption={expressOption}
+              onExpressOptionChange={setExpressOption}
               items={items}
+              garments={garments}
+              services={services}
               notes={notes}
+              onNotesChange={setNotes}
               photos={photos}
               isConnected={isConnected}
               storeConfig={storeConfig}
-              onSaveDraft={handleSaveDraft}
+              onSaveDraft={persistDraftToStorage}
               onSubmitOrder={handleSubmitOrder}
-              onDone={() => {
-                onOrderSavedOrSubmitted();
+              onOrderSuccess={handleOrderCreatedSuccess}
+            />
+          )}
+
+          {/* STEP 5: Order Created & Confirmed (Screen 9 - Dev B) */}
+          {currentStepIndex === 5 && confirmedOrder && (
+            <OrderCreatedStep
+              orderId={confirmedOrder.orderId}
+              orderNumber={confirmedOrder.orderNumber}
+              isOfflineQueued={Boolean(confirmedOrder.isOfflineQueued)}
+              totalPieces={items.reduce((s, it) => s + (it.quantity || 1), 0)}
+              totalAmount={items.reduce((s, it) => {
+                const multiplier = it.weight && it.weight > 0 ? it.weight : it.quantity || 1;
+                return s + (it.unitPrice || 0) * multiplier;
+              }, 0)}
+              customerName={selectedCustomer?.name || manualCustomerName}
+              customerPhone={selectedCustomer?.phone || manualCustomerPhone}
+              onViewOrder={(orderId) => {
                 onClose();
+                onViewOrderDetail?.(orderId);
+              }}
+              onCreateAnotherOrder={handleCreateAnotherOrder}
+              onDone={() => {
+                onClose();
+                onOrderSavedOrSubmitted();
               }}
             />
           )}
         </View>
 
-        {/* Bottom Navigation Footer (Steps 0 to 3) */}
-        {currentStepIndex < STEPS.length - 1 && (
-          <View style={styles.footer}>
-            {currentStepIndex > 0 ? (
-              <TouchableOpacity
-                style={styles.backFooterBtn}
-                onPress={handleBack}
-                accessible={true}
-                accessibilityLabel="Previous Step"
-              >
-                <Text style={styles.backFooterText}>‹ Back</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={{ flex: 1 }} />
-            )}
-
-            <TouchableOpacity
-              style={styles.nextFooterBtn}
-              onPress={handleNext}
-              accessible={true}
-              accessibilityLabel="Proceed to Next Step"
-            >
-              <Text style={styles.nextFooterText}>
-                Next: {STEPS[currentStepIndex + 1]?.label} ›
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* Modal: Item Details, Defect Notes & Photos (Screen 6 - Dev B) */}
+        {configuringGarment && (
+          <ItemDetailsModal
+            visible={itemConfigModalVisible}
+            clientDraftId={clientDraftId}
+            garment={configuringGarment}
+            service={services.find((s) => s.id === selectedServiceId) || services[0] || null}
+            unitPrice={
+              prices.find(
+                (p) =>
+                  (p.garmentCatalogId === configuringGarment.id ||
+                    p.garmentId === configuringGarment.id) &&
+                  (p.serviceTypeId === selectedServiceId || p.serviceId === selectedServiceId),
+              )?.price || 50
+            }
+            existingItemIndex={configuringExistingIndex}
+            initialItem={configuringInitialItem}
+            canModifyPrice={canModifyPrice}
+            onSaveItem={handleSaveConfiguredItem}
+            onClose={() => {
+              setItemConfigModalVisible(false);
+              setConfiguringGarment(null);
+            }}
+            onPhotosUpdated={refreshPhotos}
+          />
         )}
       </SafeAreaView>
     </Modal>
@@ -466,27 +757,28 @@ export function OrderWizardModal({
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
   },
   headerBackBtn: {
-    minHeight: 44,
-    minWidth: 64,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minHeight: 40,
     justifyContent: 'center',
   },
   headerBackText: {
-    fontSize: 15,
-    fontWeight: '600',
     color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '700',
   },
   headerTitle: {
     fontSize: 16,
@@ -494,19 +786,18 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   headerRightSpacer: {
-    width: 64,
+    width: 60,
   },
   progressContainer: {
-    backgroundColor: '#ffffff',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
   progressBarRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 6,
   },
   progressSegment: {
     flex: 1,
@@ -522,53 +813,40 @@ const styles = StyleSheet.create({
   stepLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   stepLabelText: {
-    fontSize: 11,
-    color: '#94a3b8',
+    fontSize: 10,
     fontWeight: '600',
+    color: '#94a3b8',
   },
   stepLabelTextActive: {
     color: '#2563eb',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   body: {
     flex: 1,
+    backgroundColor: '#f8fafc',
   },
-  footer: {
-    flexDirection: 'row',
+  customerFooter: {
     padding: 16,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    gap: 12,
   },
-  backFooterBtn: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  backFooterText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  nextFooterBtn: {
-    flex: 2,
-    minHeight: 48,
-    borderRadius: 8,
+  customerNextBtn: {
     backgroundColor: '#2563eb',
+    minHeight: 48,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nextFooterText: {
+  customerNextBtnDisabled: {
+    backgroundColor: '#94a3b8',
+  },
+  customerNextBtnText: {
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
-    color: '#ffffff',
   },
 });

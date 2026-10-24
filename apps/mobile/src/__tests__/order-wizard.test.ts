@@ -811,6 +811,151 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
     assert.equal(syncedDraft.syncStatus, 'SYNCED');
   });
 
+  // 18b. Failed customer resolution stops order creation and marks FAILED_RETRYABLE without submitting temp ID
+  it('18b. Failed customer auto-resolution halts order creation, never submits temporary customer ID, and marks FAILED_RETRYABLE', async () => {
+    const draftId = generateUUID();
+    const storeId = 'store-offline-01';
+
+    await saveDraft({
+      clientDraftId: draftId,
+      storeId,
+      customerId: 'cust-offline-temp',
+      customerName: 'Anand Shinde',
+      customerPhone: '9822998877',
+      payload: {
+        clientDraftId: draftId,
+        customerId: 'cust-offline-temp',
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'cat-shirt',
+            serviceTypeId: 'srv-wash-iron',
+            quantity: 1,
+            unitPrice: 40,
+          },
+        ],
+      },
+    });
+
+    await queueDraftForSync(draftId);
+
+    // Simulate network error on customer API
+    apiClient.customers.search = async () => {
+      throw new ApiError('Network request failed: customer search unreachable', 503);
+    };
+
+    let orderCreateCalled = false;
+    apiClient.orders.create = async () => {
+      orderCreateCalled = true;
+      throw new Error('Should NEVER be called with temporary customer ID');
+    };
+
+    const engine = new SyncEngine();
+    const result = await engine.syncDraft(draftId);
+
+    // Verify order creation was NOT called
+    assert.equal(result.success, false);
+    assert.equal(orderCreateCalled, false);
+    assert.match(result.error || '', /Customer resolution failed/);
+
+    // Verify draft remains with original clientDraftId and marked FAILED_RETRYABLE
+    const failedDraft = await getDraft(draftId);
+    assert.ok(failedDraft);
+    assert.equal(failedDraft.clientDraftId, draftId);
+    assert.equal(failedDraft.syncStatus, 'FAILED_RETRYABLE');
+    assert.equal(failedDraft.retryCount, 1);
+    assert.match(failedDraft.lastError || '', /Customer resolution failed/);
+  });
+
+  // 18c. Retrying sync after customer API recovers reuses original draft ID and resolves customer safely
+  it('18c. Retrying sync after customer API recovers reuses original draft ID and resolves customer safely', async () => {
+    const draftId = generateUUID();
+    const storeId = 'store-offline-01';
+
+    await saveDraft({
+      clientDraftId: draftId,
+      storeId,
+      customerId: 'cust-offline-temp',
+      customerName: 'Kavita Patil',
+      customerPhone: '9811223344',
+      payload: {
+        clientDraftId: draftId,
+        customerId: 'cust-offline-temp',
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'cat-saree',
+            serviceTypeId: 'srv-dry-clean',
+            quantity: 1,
+            unitPrice: 180,
+          },
+        ],
+      },
+    });
+
+    await queueDraftForSync(draftId);
+
+    // Attempt 1: Customer API fails
+    apiClient.customers.search = async () => {
+      throw new ApiError('Connection timed out', 504);
+    };
+    let orderCreateCallCount = 0;
+    apiClient.orders.create = async (payload) => {
+      orderCreateCallCount++;
+      return {
+        id: 'ord-retry-success-1',
+        orderNumber: 'ORD-000201',
+        customerId: payload.customerId,
+        status: OrderStatus.RECEIVED,
+        totalAmount: 180,
+        amountDue: 180,
+      } as any;
+    };
+
+    const engine = new SyncEngine();
+    const attempt1 = await engine.syncDraft(draftId);
+    assert.equal(attempt1.success, false);
+    assert.equal(orderCreateCallCount, 0);
+
+    // Attempt 2: Customer API recovers and finds existing customer
+    apiClient.customers.search = async () => ({
+      success: true,
+      data: [
+        {
+          id: 'cust-recovered-456',
+          customerCode: 'CUST-00456',
+          name: 'Kavita Patil',
+          phone: '9811223344',
+          email: null,
+          address: null,
+          pincode: null,
+          membership: MembershipTier.SILVER,
+          discountPercent: 5,
+          preferences: null,
+          registrationSource: 'WALK_IN',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+    });
+
+    const attempt2 = await engine.syncDraft(draftId);
+    assert.equal(attempt2.success, true);
+    assert.equal(orderCreateCallCount, 1);
+    assert.equal(attempt2.orderNumber, 'ORD-000201');
+
+    const syncedDraft = await getDraft(draftId);
+    assert.ok(syncedDraft);
+    assert.equal(syncedDraft.clientDraftId, draftId);
+    assert.equal(syncedDraft.customerId, 'cust-recovered-456');
+    assert.equal(syncedDraft.syncStatus, 'SYNCED');
+  });
+
   // 19. Dry Cleaning workflow is strictly per-piece and rejects weight-based items
   it('19. Dry Cleaning workflow is strictly per-piece and rejects weight-based items', () => {
     const dryCleanWorkflow = 'DRY_CLEANING';
