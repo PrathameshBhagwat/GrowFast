@@ -11,6 +11,8 @@
     "dev": "npm run dev --workspace=apps/backend & npm run dev --workspace=apps/web",
     "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:web": "npm run dev --workspace=apps/web",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "dev:mobile:clear": "npm run start --workspace=apps/mobile -- --clear",
     "build": "npm run build --workspaces --if-present",
     "build:backend": "npm run build --workspace=apps/backend",
     "build:web": "npm run build --workspace=apps/web",

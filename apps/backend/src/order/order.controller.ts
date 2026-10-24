@@ -70,6 +70,17 @@ export class OrderController {
     };
   }
 
+  @Get('by-draft/:draftId')
+  @UseGuards(JwtAuthGuard)
+  async findByDraftId(@Param('draftId') draftId: string, @Request() req: any) {
+    const storeId = req.user.storeId;
+    const order = await this.orderService.findOrderByDraftId(draftId, storeId);
+    return {
+      success: true,
+      data: order,
+    };
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async findOne(@Param('id') id: string, @Request() req: any) {

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Optional,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
@@ -71,513 +72,542 @@ export class OrderService {
     @Optional() private readonly businessSequenceService?: BusinessSequenceService,
   ) {}
 
+  /**
+   * Generates a deterministic SHA-256 fingerprint for order payload idempotency.
+   */
+  computeOrderPayloadHash(dto: CreateOrderDto): string {
+    const normalized = {
+      customerId: dto.customerId,
+      isExpress: Boolean(dto.isExpress),
+      expressDeliveryOption: dto.expressDeliveryOption ?? null,
+      pickupType: dto.pickupType,
+      notes: dto.notes?.trim() || null,
+      workflow: dto.workflow ?? null,
+      entryMode: dto.entryMode ?? null,
+      items: (dto.items || [])
+        .map((i) => ({
+          garmentCatalogId: i.garmentCatalogId,
+          serviceTypeId: i.serviceTypeId,
+          quantity: i.quantity,
+          weight: i.weight != null ? Number(i.weight) : null,
+          unitPrice: i.unitPrice != null ? Number(i.unitPrice) : null,
+          colorTags: [...(i.colorTags || [])].sort(),
+          defectNotes: i.defectNotes?.trim() || null,
+          addOnIds: [...(i.addOnIds || [])].sort(),
+          pieces: (i.pieces || [])
+            .map((p) => ({
+              unitNumber: p.unitNumber,
+              photoCount: p.photoCount ?? p.photos?.length ?? 0,
+              photos: [...(p.photos || [])].sort(),
+            }))
+            .sort((a, b) => a.unitNumber - b.unitNumber),
+        }))
+        .sort((a, b) =>
+          `${a.garmentCatalogId}_${a.serviceTypeId}`.localeCompare(
+            `${b.garmentCatalogId}_${b.serviceTypeId}`,
+          ),
+        ),
+    };
+    return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+  }
+
   async createOrder(
     dto: CreateOrderDto,
     employeeId: string,
     storeId: string,
     userRole?: Role | string,
   ) {
-    const result = await this.prisma.$transaction(async (tx) => {
-      // 1. Validate customer
-      const customer = await tx.customer.findUnique({
-        where: { id: dto.customerId },
-      });
-      if (!customer) {
-        throw new NotFoundException(`Customer with ID "${dto.customerId}" not found`);
-      }
+    const draftPayloadHash = dto.clientDraftId ? this.computeOrderPayloadHash(dto) : null;
+    let isIdempotentReplay = false;
 
-      const orderDate = new Date();
+    let result: any;
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        // 0. Idempotency check for existing draft within authenticated store
+        if (dto.clientDraftId) {
+          const existingOrder = await tx.order.findUnique({
+            where: {
+              storeId_clientDraftId: {
+                storeId,
+                clientDraftId: dto.clientDraftId,
+              },
+            },
+            include: {
+              items: {
+                include: {
+                  garmentCatalog: true,
+                  serviceType: true,
+                  photos: true,
+                  physicalGarments: {
+                    include: { photos: true },
+                    orderBy: { unitNumber: 'asc' },
+                  },
+                },
+              },
+              customer: true,
+              createdBy: true,
+              deliveredBy: true,
+              store: true,
+              payments: {
+                include: { receivedBy: true },
+                orderBy: { createdAt: 'desc' },
+              },
+              adjustments: {
+                include: { createdBy: true },
+                orderBy: { createdAt: 'desc' },
+              },
+            },
+          });
 
-      // 1.5 Fetch Store config
-      const store = await tx.store.findUnique({ where: { id: storeId } });
-      if (!store) {
-        throw new NotFoundException(`Store with ID "${storeId}" not found`);
-      }
-      const isExpress =
-        dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY ||
-        dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING ||
-        (Boolean(dto.isExpress) && dto.expressDeliveryOption !== ExpressDeliveryOption.REGULAR);
-
-      if (isExpress) {
-        if (store.expressSurchargePercent == null) {
-          throw new BadRequestException(`Express service is not configured for this store`);
-        }
-
-        // Validate schedule compatibility with store operations (Thursday weekly off)
-        const orderDay = getDayOfWeekInTimezone(orderDate, 'Asia/Kolkata');
-        if (dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY && orderDay === 4) {
-          throw new BadRequestException(
-            'Same-day express delivery is not available on Thursdays because Thursdays are store weekly off',
-          );
-        }
-        if (
-          dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING &&
-          orderDay === 3
-        ) {
-          throw new BadRequestException(
-            'Tomorrow / next-day evening express delivery is not available on Wednesdays because Thursdays are store weekly off',
-          );
-        }
-      }
-
-      // 2. Fetch all garments and services to validate them and get properties
-      const garmentIds = [...new Set(dto.items.map((item) => item.garmentCatalogId))];
-      const serviceIds = [...new Set(dto.items.map((item) => item.serviceTypeId))];
-
-      const garments = await tx.garmentCatalog.findMany({
-        where: { id: { in: garmentIds } },
-      });
-      const services = await tx.serviceType.findMany({
-        where: { id: { in: serviceIds } },
-      });
-
-      const garmentMap = new Map(garments.map((g) => [g.id, g]));
-      const serviceMap = new Map(services.map((s) => [s.id, s]));
-
-      // 3. Fetch Pricing
-      const prices = await tx.serviceGarmentPrice.findMany({
-        where: {
-          garmentCatalogId: { in: garmentIds },
-          serviceTypeId: { in: serviceIds },
-        },
-      });
-      const priceMap = new Map<string, number>();
-      for (const p of prices) {
-        const key = `${p.garmentCatalogId}_${p.serviceTypeId}`;
-        // Store-specific price takes precedence over global default
-        if (!priceMap.has(key) || p.storeId === storeId) {
-          priceMap.set(key, p.price);
-        }
-      }
-
-      // Validate items
-      const orderItemsData = [];
-      const serviceCounts = new Map<string, number>();
-      const pricingInputs: PricingItemInput[] = [];
-      let maxEstimatedDays = 0;
-
-      for (const item of dto.items) {
-        const garment = garmentMap.get(item.garmentCatalogId);
-        const service = serviceMap.get(item.serviceTypeId);
-
-        if (!garment) {
-          throw new NotFoundException(`Garment with ID "${item.garmentCatalogId}" not found`);
-        }
-        if (!garment.isActive) {
-          throw new BadRequestException(`Garment "${garment.name}" is not active`);
-        }
-        if (!service) {
-          throw new NotFoundException(`Service type with ID "${item.serviceTypeId}" not found`);
-        }
-        if (!service.isActive) {
-          throw new BadRequestException(`Service type "${service.name}" is not active`);
-        }
-
-        const isWeightException =
-          dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
-
-        if (dto.workflow) {
-          if (!isWeightException && !isServiceAllowedInWorkflow(service, dto.workflow)) {
-            throw new BadRequestException(
-              `Service "${service.name}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
-            );
-          }
-          if (!isCategoryAllowedInWorkflow(garment.category, dto.workflow)) {
-            throw new BadRequestException(
-              `Category "${garment.category}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
-            );
-          }
-        }
-
-        if (dto.entryMode === 'WEIGHT') {
-          if (dto.workflow === 'DRY_CLEANING') {
-            throw new BadRequestException(
-              'Dry Cleaning is strictly per-piece and cannot be entered per weight.',
-            );
-          }
-        }
-
-        // Dry Cleaning is strictly per-piece — never weight-based
-        const isDryClean =
-          service.category === ServiceCategory.DRY_CLEAN ||
-          service.name.trim().toLowerCase() === 'dry clean';
-
-        if (isDryClean && item.weight != null && item.weight > 0) {
-          throw new BadRequestException(
-            `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
-          );
-        }
-
-        if (
-          dto.workflow === 'DRY_CLEANING' &&
-          !isWeightException &&
-          item.weight != null &&
-          item.weight > 0
-        ) {
-          throw new BadRequestException(
-            `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
-          );
-        }
-
-        // Per-piece exception: In DRY_CLEANING workflow or PIECES entry mode,
-        // when either the garment or service has WEIGHT_BASED category but no
-        // weight is provided, treat it as a per-piece order line.
-        const hasWeightBasedFlag =
-          garment.category === GarmentCategory.WEIGHT_BASED ||
-          service.category === ServiceCategory.WEIGHT_BASED;
-
-        const isWeightPieceException =
-          hasWeightBasedFlag &&
-          (dto.workflow === 'DRY_CLEANING' ||
-            dto.entryMode === 'PIECES' ||
-            service.category === ServiceCategory.DRY_CLEAN ||
-            service.name.toLowerCase().includes('dry clean') ||
-            (item.unitPrice !== undefined && item.unitPrice > 0)) &&
-          (item.weight == null || item.weight === undefined);
-
-        const isWeightBased =
-          !isWeightPieceException &&
-          (dto.workflow !== 'DRY_CLEANING' || isWeightException) &&
-          dto.entryMode !== 'PIECES' &&
-          (dto.entryMode === 'WEIGHT' ||
-            (item.weight != null && item.weight > 0) ||
-            hasWeightBasedFlag);
-
-        if (isWeightBased) {
-          if (item.weight == null || isNaN(item.weight) || item.weight < 2.0) {
-            throw new BadRequestException(
-              `Weight in kg is required and minimum permitted weight is 2.00 kg for weight-based item "${garment.name}".`,
-            );
-          }
-          if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
-            throw new BadRequestException(
-              `Number of garments must be a positive integer for weight-based item "${garment.name}".`,
-            );
-          }
-        }
-
-        if (isWeightPieceException) {
-          if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
-            throw new BadRequestException('Quantity must be a positive whole number of pieces.');
-          }
-          if (item.unitPrice !== undefined && (isNaN(item.unitPrice) || item.unitPrice <= 0)) {
-            throw new BadRequestException('Price per piece must be greater than zero.');
-          }
-        }
-
-        const priceKey = `${garment.id}_${service.id}`;
-        let unitPrice = priceMap.get(priceKey) ?? 0;
-
-        if (isWeightPieceException) {
-          if (item.unitPrice !== undefined && item.unitPrice > 0) {
-            unitPrice = item.unitPrice;
-          } else if (unitPrice === 0) {
-            unitPrice = 40;
-          }
-        } else if (isWeightBased) {
-          if (unitPrice === 0) {
-            const sName = service.name.toLowerCase();
-            if (sName.includes('woolen')) unitPrice = 140;
-            else if (sName.includes('premium')) unitPrice = 120;
-            else if (sName.includes('white')) unitPrice = 110;
-            else if (sName.includes('iron') || sName.includes('steam')) unitPrice = 95;
-            else unitPrice = 80;
-          }
-
-          if (item.unitPrice !== undefined && (isNaN(item.unitPrice) || item.unitPrice <= 0)) {
-            throw new BadRequestException('Per-kg rate must be a valid positive number.');
-          }
-
-          // Enforce role-based pricing permissions on the server
-          if (
-            item.unitPrice !== undefined &&
-            unitPrice > 0 &&
-            Math.abs(item.unitPrice - unitPrice) > 0.001
-          ) {
-            const isAdmin = userRole === Role.OWNER || userRole === Role.MANAGER;
-            if (!isAdmin) {
-              throw new ForbiddenException(
-                'Only Admin or Owner can edit or override the per-kg rate for weight-based orders.',
+          if (existingOrder) {
+            if (
+              existingOrder.draftPayloadHash &&
+              existingOrder.draftPayloadHash !== draftPayloadHash
+            ) {
+              throw new ConflictException(
+                `Client draft ID "${dto.clientDraftId}" has already been used with a different order payload.`,
               );
             }
-            // Authorized rate update: use updated rate and persist to store-level pricing
-            unitPrice = item.unitPrice;
-            await tx.serviceGarmentPrice.upsert({
-              where: {
-                garmentCatalogId_serviceTypeId_storeId: {
+            isIdempotentReplay = true;
+            return this.mapToDetailDto(existingOrder);
+          }
+        }
+
+        // 1. Validate customer
+        const customer = await tx.customer.findUnique({
+          where: { id: dto.customerId },
+        });
+        if (!customer) {
+          throw new NotFoundException(`Customer with ID "${dto.customerId}" not found`);
+        }
+
+        const orderDate = new Date();
+
+        // 1.5 Fetch Store config
+        const store = await tx.store.findUnique({ where: { id: storeId } });
+        if (!store) {
+          throw new NotFoundException(`Store with ID "${storeId}" not found`);
+        }
+        const isExpress =
+          dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY ||
+          dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING ||
+          (Boolean(dto.isExpress) && dto.expressDeliveryOption !== ExpressDeliveryOption.REGULAR);
+
+        if (isExpress) {
+          if (store.expressSurchargePercent == null) {
+            throw new BadRequestException(`Express service is not configured for this store`);
+          }
+
+          // Validate schedule compatibility with store operations (Thursday weekly off)
+          const orderDay = getDayOfWeekInTimezone(orderDate, 'Asia/Kolkata');
+          if (dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY && orderDay === 4) {
+            throw new BadRequestException(
+              'Same-day express delivery is not available on Thursdays because Thursdays are store weekly off',
+            );
+          }
+          if (
+            dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING &&
+            orderDay === 3
+          ) {
+            throw new BadRequestException(
+              'Tomorrow / next-day evening express delivery is not available on Wednesdays because Thursdays are store weekly off',
+            );
+          }
+        }
+
+        // 2. Fetch all garments and services to validate them and get properties
+        const garmentIds = [...new Set(dto.items.map((item) => item.garmentCatalogId))];
+        const serviceIds = [...new Set(dto.items.map((item) => item.serviceTypeId))];
+
+        const garments = await tx.garmentCatalog.findMany({
+          where: { id: { in: garmentIds } },
+        });
+        const services = await tx.serviceType.findMany({
+          where: { id: { in: serviceIds } },
+        });
+
+        const garmentMap = new Map(garments.map((g) => [g.id, g]));
+        const serviceMap = new Map(services.map((s) => [s.id, s]));
+
+        // 3. Fetch Pricing
+        const prices = await tx.serviceGarmentPrice.findMany({
+          where: {
+            garmentCatalogId: { in: garmentIds },
+            serviceTypeId: { in: serviceIds },
+          },
+        });
+        const priceMap = new Map<string, number>();
+        for (const p of prices) {
+          const key = `${p.garmentCatalogId}_${p.serviceTypeId}`;
+          // Store-specific price takes precedence over global default
+          if (!priceMap.has(key) || p.storeId === storeId) {
+            priceMap.set(key, p.price);
+          }
+        }
+
+        // Validate items
+        const orderItemsData = [];
+        const serviceCounts = new Map<string, number>();
+        const pricingInputs: PricingItemInput[] = [];
+        let maxEstimatedDays = 0;
+
+        for (const item of dto.items) {
+          const garment = garmentMap.get(item.garmentCatalogId);
+          const service = serviceMap.get(item.serviceTypeId);
+
+          if (!garment) {
+            throw new NotFoundException(`Garment with ID "${item.garmentCatalogId}" not found`);
+          }
+          if (!garment.isActive) {
+            throw new BadRequestException(`Garment "${garment.name}" is not active`);
+          }
+          if (!service) {
+            throw new NotFoundException(`Service type with ID "${item.serviceTypeId}" not found`);
+          }
+          if (!service.isActive) {
+            throw new BadRequestException(`Service type "${service.name}" is not active`);
+          }
+
+          const isWeightException =
+            dto.workflow === 'DRY_CLEANING' && garment.category === GarmentCategory.WEIGHT_BASED;
+
+          if (dto.workflow) {
+            if (!isWeightException && !isServiceAllowedInWorkflow(service, dto.workflow)) {
+              throw new BadRequestException(
+                `Service "${service.name}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
+              );
+            }
+            if (!isCategoryAllowedInWorkflow(garment.category, dto.workflow)) {
+              throw new BadRequestException(
+                `Category "${garment.category}" is not permitted in ${dto.workflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} workflow.`,
+              );
+            }
+          }
+
+          if (dto.entryMode === 'WEIGHT') {
+            if (dto.workflow === 'DRY_CLEANING') {
+              throw new BadRequestException(
+                'Dry Cleaning is strictly per-piece and cannot be entered per weight.',
+              );
+            }
+          }
+
+          // Dry Cleaning is strictly per-piece — never weight-based
+          const isDryClean =
+            service.category === ServiceCategory.DRY_CLEAN ||
+            service.name.trim().toLowerCase() === 'dry clean';
+
+          if (isDryClean && item.weight != null && item.weight > 0) {
+            throw new BadRequestException(
+              `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+            );
+          }
+
+          if (
+            dto.workflow === 'DRY_CLEANING' &&
+            !isWeightException &&
+            item.weight != null &&
+            item.weight > 0
+          ) {
+            throw new BadRequestException(
+              `Dry Cleaning is strictly per-piece and does not support weight-based processing.`,
+            );
+          }
+
+          // Per-piece exception: In DRY_CLEANING workflow or PIECES entry mode,
+          // when either the garment or service has WEIGHT_BASED category but no
+          // weight is provided, treat it as a per-piece order line.
+          const hasWeightBasedFlag =
+            garment.category === GarmentCategory.WEIGHT_BASED ||
+            service.category === ServiceCategory.WEIGHT_BASED;
+
+          const isWeightPieceException =
+            hasWeightBasedFlag &&
+            (dto.workflow === 'DRY_CLEANING' ||
+              dto.entryMode === 'PIECES' ||
+              service.category === ServiceCategory.DRY_CLEAN ||
+              service.name.toLowerCase().includes('dry clean') ||
+              (item.unitPrice !== undefined && item.unitPrice > 0)) &&
+            (item.weight == null || item.weight === undefined);
+
+          const isWeightBased =
+            !isWeightPieceException &&
+            (dto.workflow !== 'DRY_CLEANING' || isWeightException) &&
+            dto.entryMode !== 'PIECES' &&
+            (dto.entryMode === 'WEIGHT' ||
+              (item.weight != null && item.weight > 0) ||
+              hasWeightBasedFlag);
+
+          if (isWeightBased) {
+            if (item.weight == null || isNaN(item.weight) || item.weight < 2.0) {
+              throw new BadRequestException(
+                `Weight in kg is required and minimum permitted weight is 2.00 kg for weight-based item "${garment.name}".`,
+              );
+            }
+            if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+              throw new BadRequestException(
+                `Number of garments must be a positive integer for weight-based item "${garment.name}".`,
+              );
+            }
+          }
+
+          if (isWeightPieceException) {
+            if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+              throw new BadRequestException('Quantity must be a positive whole number of pieces.');
+            }
+            if (item.unitPrice !== undefined && (isNaN(item.unitPrice) || item.unitPrice <= 0)) {
+              throw new BadRequestException('Price per piece must be greater than zero.');
+            }
+          }
+
+          const priceKey = `${garment.id}_${service.id}`;
+          let unitPrice = priceMap.get(priceKey) ?? 0;
+
+          if (isWeightPieceException) {
+            if (item.unitPrice !== undefined && item.unitPrice > 0) {
+              unitPrice = item.unitPrice;
+            } else if (unitPrice === 0) {
+              unitPrice = 40;
+            }
+          } else if (isWeightBased) {
+            if (unitPrice === 0) {
+              const sName = service.name.toLowerCase();
+              if (sName.includes('woolen')) unitPrice = 140;
+              else if (sName.includes('premium')) unitPrice = 120;
+              else if (sName.includes('white')) unitPrice = 110;
+              else if (sName.includes('iron') || sName.includes('steam')) unitPrice = 95;
+              else unitPrice = 80;
+            }
+
+            if (item.unitPrice !== undefined && (isNaN(item.unitPrice) || item.unitPrice <= 0)) {
+              throw new BadRequestException('Per-kg rate must be a valid positive number.');
+            }
+
+            // Enforce role-based pricing permissions on the server
+            if (
+              item.unitPrice !== undefined &&
+              unitPrice > 0 &&
+              Math.abs(item.unitPrice - unitPrice) > 0.001
+            ) {
+              const isAdmin = userRole === Role.OWNER || userRole === Role.MANAGER;
+              if (!isAdmin) {
+                throw new ForbiddenException(
+                  'Only store owners and managers have permission to override catalog prices.',
+                );
+              }
+              // Authorized rate update: use updated rate and persist to store-level pricing
+              unitPrice = item.unitPrice;
+              await tx.serviceGarmentPrice.upsert({
+                where: {
+                  garmentCatalogId_serviceTypeId_storeId: {
+                    garmentCatalogId: garment.id,
+                    serviceTypeId: service.id,
+                    storeId,
+                  },
+                },
+                update: { price: item.unitPrice },
+                create: {
                   garmentCatalogId: garment.id,
                   serviceTypeId: service.id,
                   storeId,
+                  price: item.unitPrice,
                 },
-              },
-              update: { price: item.unitPrice },
-              create: {
-                garmentCatalogId: garment.id,
-                serviceTypeId: service.id,
-                storeId,
-                price: item.unitPrice,
-              },
-            });
-          }
-        } else if (unitPrice === 0 && item.unitPrice !== undefined && item.unitPrice > 0) {
-          unitPrice = item.unitPrice;
-        }
-
-        // Validate and compute supported store add-ons
-        const rawAddonIds: string[] =
-          item.addOnIds ||
-          (Array.isArray((item as any).addOns)
-            ? (item as any).addOns.map((a: any) => (typeof a === 'string' ? a : a.id))
-            : []);
-        const addonIds: string[] = Array.from(new Set(rawAddonIds));
-
-        let addOnsUnitPrice = 0;
-        if (addonIds.length > 0) {
-          const storeTopUps: TopUpServiceItem[] =
-            (store.topUpServices as any) ?? DEFAULT_TOP_UP_SERVICES;
-          const topUpMap = new Map<string, TopUpServiceItem>(storeTopUps.map((t) => [t.id, t]));
-
-          for (const addonId of addonIds) {
-            const matchedAddon = topUpMap.get(addonId);
-            if (!matchedAddon) {
-              throw new BadRequestException(
-                `Invalid or unsupported add-on "${addonId}" selected for item "${garment.name}".`,
-              );
+              });
             }
-            addOnsUnitPrice += matchedAddon.price;
+          } else if (unitPrice === 0 && item.unitPrice !== undefined && item.unitPrice > 0) {
+            unitPrice = item.unitPrice;
+          }
+
+          // Validate and compute supported store add-ons
+          const rawAddonIds: string[] =
+            item.addOnIds ||
+            (Array.isArray((item as any).addOns)
+              ? (item as any).addOns.map((a: any) => (typeof a === 'string' ? a : a.id))
+              : []);
+          const addonIds: string[] = Array.from(new Set(rawAddonIds));
+
+          let addOnsUnitPrice = 0;
+          if (addonIds.length > 0) {
+            const storeTopUps: TopUpServiceItem[] =
+              (store.topUpServices as any) ?? DEFAULT_TOP_UP_SERVICES;
+            const topUpMap = new Map<string, TopUpServiceItem>(storeTopUps.map((t) => [t.id, t]));
+
+            for (const addonId of addonIds) {
+              const matchedAddon = topUpMap.get(addonId);
+              if (!matchedAddon) {
+                throw new BadRequestException(
+                  `Invalid or unsupported add-on "${addonId}" selected for item "${garment.name}".`,
+                );
+              }
+              addOnsUnitPrice += matchedAddon.price;
+            }
+          }
+
+          const effectiveUnitPrice = unitPrice + addOnsUnitPrice;
+
+          const lineTotal = isWeightBased
+            ? Math.round((unitPrice * item.weight! + addOnsUnitPrice) * 100) / 100
+            : Math.round(effectiveUnitPrice * item.quantity * 100) / 100;
+
+          // For summary
+          serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
+
+          const orderItemData: any = {
+            garmentCatalogId: garment.id,
+            serviceTypeId: service.id,
+            quantity: item.quantity,
+            weight: isWeightBased ? item.weight : null,
+            unitPrice: effectiveUnitPrice,
+            lineTotal,
+            colorTags: item.colorTags || [],
+            defectNotes: item.defectNotes,
+          };
+
+          // Every physical garment gets an individual PhysicalGarment record and a permanent, unique tag identity.
+          // For weight-based laundry orders, item.quantity is the declared garment count.
+          orderItemData.physicalGarments = {
+            create: Array.from({ length: item.quantity }, (_, i) => ({
+              unitNumber: i + 1,
+              tagId: this.generateTagId(),
+              isReady: false,
+            })),
+          };
+
+          orderItemsData.push(orderItemData);
+
+          pricingInputs.push({
+            unitPrice: isWeightBased
+              ? Math.round((lineTotal / item.weight!) * 100) / 100
+              : effectiveUnitPrice,
+            quantity: item.quantity,
+            weight: isWeightBased ? item.weight : null,
+          });
+
+          if (service.estimatedDays > maxEstimatedDays) {
+            maxEstimatedDays = service.estimatedDays;
           }
         }
 
-        const effectiveUnitPrice = unitPrice + addOnsUnitPrice;
+        // 3.5 Photo requirement validation
+        const isWalkIn = dto.pickupType === PickupType.STORE_PICKUP;
+        let totalPieces = 0;
 
-        const lineTotal = isWeightBased
-          ? Math.round((unitPrice * item.weight! + addOnsUnitPrice) * 100) / 100
-          : Math.round(effectiveUnitPrice * item.quantity * 100) / 100;
+        for (const item of dto.items) {
+          totalPieces += item.quantity;
+        }
 
-        // For summary
-        serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
+        const isWeightBasedOrder =
+          dto.entryMode === 'WEIGHT' ||
+          (dto.entryMode !== 'PIECES' &&
+            dto.workflow !== 'DRY_CLEANING' &&
+            orderItemsData.some((oi) => oi.weight != null && oi.weight > 0));
 
-        const orderItemData: any = {
-          garmentCatalogId: garment.id,
-          serviceTypeId: service.id,
-          quantity: item.quantity,
-          weight: isWeightBased ? item.weight : null,
-          unitPrice: effectiveUnitPrice,
-          lineTotal,
-          colorTags: item.colorTags || [],
-          defectNotes: item.defectNotes,
-        };
-
-        // Every physical garment gets an individual PhysicalGarment record and a permanent, unique tag identity.
-        // For weight-based laundry orders, item.quantity is the declared garment count.
-        orderItemData.physicalGarments = {
-          create: Array.from({ length: item.quantity }, (_, i) => ({
-            unitNumber: i + 1,
-            tagId: this.generateTagId(),
-            isReady: false,
-          })),
-        };
-
-        orderItemsData.push(orderItemData);
-
-        pricingInputs.push({
-          unitPrice: isWeightBased
-            ? Math.round((lineTotal / item.weight!) * 100) / 100
-            : effectiveUnitPrice,
-          quantity: item.quantity,
-          weight: isWeightBased ? item.weight : null,
+        const photosRequired = isPhotoRequiredForOrder({
+          isWalkIn,
+          totalPieces,
+          isWeightBased: isWeightBasedOrder,
         });
 
-        if (service.estimatedDays > maxEstimatedDays) {
-          maxEstimatedDays = service.estimatedDays;
-        }
-      }
+        if (photosRequired) {
+          for (const item of dto.items) {
+            const garment = garmentMap.get(item.garmentCatalogId);
+            const garmentName = garment ? garment.name : item.garmentCatalogId;
 
-      // 3.5 Photo requirement validation
-      const isWalkIn = dto.pickupType === PickupType.STORE_PICKUP;
-      let totalPieces = 0;
-
-      for (const item of dto.items) {
-        totalPieces += item.quantity;
-      }
-
-      const isWeightBasedOrder =
-        dto.entryMode === 'WEIGHT' ||
-        (dto.entryMode !== 'PIECES' &&
-          dto.workflow !== 'DRY_CLEANING' &&
-          orderItemsData.some((oi) => oi.weight != null && oi.weight > 0));
-
-      const photosRequired = isPhotoRequiredForOrder({
-        isWalkIn,
-        totalPieces,
-        isWeightBased: isWeightBasedOrder,
-      });
-
-      if (photosRequired) {
-        for (const item of dto.items) {
-          const garment = garmentMap.get(item.garmentCatalogId);
-          const garmentName = garment ? garment.name : item.garmentCatalogId;
-
-          for (let u = 1; u <= item.quantity; u++) {
-            const pieceData = item.pieces?.find((p) => p.unitNumber === u);
-            const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
-            if (photoCount < 1) {
-              throw new BadRequestException(
-                `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
-              );
+            for (let u = 1; u <= item.quantity; u++) {
+              const pieceData = item.pieces?.find((p) => p.unitNumber === u);
+              const photoCount = pieceData?.photoCount ?? pieceData?.photos?.length ?? 0;
+              if (photoCount < 1) {
+                throw new BadRequestException(
+                  `Photos are required for all pieces in this order. Item "${garmentName}", Piece #${u} is missing photos.`,
+                );
+              }
             }
           }
         }
-      }
 
-      // Calculate Totals (B5 canonical pricing + B7 express surcharge + Express Multipliers)
-      const totals = calculateOrderTotals(pricingInputs, {
-        isExpress,
-        expressSurchargePercent: store.expressSurchargePercent ?? undefined,
-        expressDeliveryOption: dto.expressDeliveryOption,
-      });
-
-      // 4. Due date placeholder (Deferred to B6)
-
-      // 5. Generate Order Number (Sequential short business ID)
-      let orderNumber: string;
-      if (this.businessSequenceService) {
-        orderNumber = await this.businessSequenceService.nextOrderNumber();
-      } else {
-        const count = await tx.order.count();
-        orderNumber = `ORD-${String(count + 1).padStart(6, '0')}`;
-      }
-
-      // 6. Build summary string
-      const serviceSummaryParts = [];
-      for (const [name, qty] of serviceCounts.entries()) {
-        serviceSummaryParts.push(`${name} × ${qty}`);
-      }
-      const serviceSummary = serviceSummaryParts.join(', ');
-
-      // 7. Calculate Due Date (B6 normal / B7 express)
-      const calculatedDue = new Date(orderDate);
-      if (isExpress) {
-        if (dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY) {
-          // Same day delivery: due on orderDate
-        } else if (dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING) {
-          // Tomorrow / next-day evening delivery: 1 day turnaround
-          calculatedDue.setDate(calculatedDue.getDate() + 1);
-        } else {
-          // B7: Express orders get halved turnaround (rounded up)
-          calculatedDue.setDate(calculatedDue.getDate() + Math.ceil(maxEstimatedDays / 2));
-        }
-      } else {
-        calculatedDue.setDate(calculatedDue.getDate() + maxEstimatedDays);
-      }
-      // Thursday is weekly off: adjust to Friday
-      const systemDueDate = adjustDueDateForThursday(calculatedDue);
-
-      const itemsForStatus = orderItemsData.map((_item) => ({
-        status: ItemStatus.RECEIVED,
-      }));
-      const orderStatus = deriveOrderStatus({
-        items: itemsForStatus,
-        hasActiveTransitDelivery: false,
-      });
-
-      // 8. Create Order
-      const order = await tx.order.create({
-        data: {
-          orderNumber,
-          customerId: dto.customerId,
-          orderDate,
-          systemDueDate,
-          effectiveDueDate: systemDueDate,
+        // Calculate Totals (B5 canonical pricing + B7 express surcharge + Express Multipliers)
+        const totals = calculateOrderTotals(pricingInputs, {
           isExpress,
-          expressDeliveryOption: isExpress
-            ? dto.expressDeliveryOption || ExpressDeliveryOption.NEXT_DAY_EVENING
-            : ExpressDeliveryOption.REGULAR,
-          serviceSummary,
-          status: orderStatus,
-          subtotal: totals.subtotal,
-          discountAmount: totals.discountAmount,
-          expressSurcharge: totals.expressSurcharge,
-          taxAmount: totals.taxAmount,
-          totalAmount: totals.totalAmount,
-          amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
-          paymentStatus: PaymentStatus.PENDING,
-          pickupType: dto.pickupType,
-          priority: isExpress ? OrderPriority.EXPRESS : OrderPriority.STANDARD,
-          notes: dto.notes,
-          createdById: employeeId,
-          storeId,
-          items: {
-            create: orderItemsData,
-          },
-        },
-        include: {
-          items: {
-            include: {
-              garmentCatalog: true,
-              serviceType: true,
-              photos: true,
-              physicalGarments: {
-                include: { photos: true },
-                orderBy: { unitNumber: 'asc' },
-              },
+          expressSurchargePercent: store.expressSurchargePercent ?? undefined,
+          expressDeliveryOption: dto.expressDeliveryOption,
+        });
+
+        // 4. Due date placeholder (Deferred to B6)
+
+        // 5. Generate Order Number (Sequential short business ID)
+        let orderNumber: string;
+        if (this.businessSequenceService) {
+          orderNumber = await this.businessSequenceService.nextOrderNumber();
+        } else {
+          const count = await tx.order.count();
+          orderNumber = `ORD-${String(count + 1).padStart(6, '0')}`;
+        }
+
+        // 6. Build summary string
+        const serviceSummaryParts = [];
+        for (const [name, qty] of serviceCounts.entries()) {
+          serviceSummaryParts.push(`${name} × ${qty}`);
+        }
+        const serviceSummary = serviceSummaryParts.join(', ');
+
+        // 7. Calculate Due Date (B6 normal / B7 express)
+        const calculatedDue = new Date(orderDate);
+        if (isExpress) {
+          if (dto.expressDeliveryOption === ExpressDeliveryOption.SAME_DAY) {
+            // Same day delivery: due on orderDate
+          } else if (dto.expressDeliveryOption === ExpressDeliveryOption.NEXT_DAY_EVENING) {
+            // Tomorrow / next-day evening delivery: 1 day turnaround
+            calculatedDue.setDate(calculatedDue.getDate() + 1);
+          } else {
+            // B7: Express orders get halved turnaround (rounded up)
+            calculatedDue.setDate(calculatedDue.getDate() + Math.ceil(maxEstimatedDays / 2));
+          }
+        } else {
+          calculatedDue.setDate(calculatedDue.getDate() + maxEstimatedDays);
+        }
+        // Thursday is weekly off: adjust to Friday
+        const systemDueDate = adjustDueDateForThursday(calculatedDue);
+
+        const itemsForStatus = orderItemsData.map((_item) => ({
+          status: ItemStatus.RECEIVED,
+        }));
+        const orderStatus = deriveOrderStatus({
+          items: itemsForStatus,
+          hasActiveTransitDelivery: false,
+        });
+
+        // 8. Create Order
+        const order = await tx.order.create({
+          data: {
+            orderNumber,
+            customerId: dto.customerId,
+            orderDate,
+            systemDueDate,
+            effectiveDueDate: systemDueDate,
+            isExpress,
+            expressDeliveryOption: isExpress
+              ? dto.expressDeliveryOption || ExpressDeliveryOption.NEXT_DAY_EVENING
+              : ExpressDeliveryOption.REGULAR,
+            serviceSummary,
+            status: orderStatus,
+            subtotal: totals.subtotal,
+            discountAmount: totals.discountAmount,
+            expressSurcharge: totals.expressSurcharge,
+            taxAmount: totals.taxAmount,
+            totalAmount: totals.totalAmount,
+            amountDue: totals.totalAmount, // Assuming no payment collected during creation in this phase
+            paymentStatus: PaymentStatus.PENDING,
+            pickupType: dto.pickupType,
+            priority: isExpress ? OrderPriority.EXPRESS : OrderPriority.STANDARD,
+            notes: dto.notes,
+            clientDraftId: dto.clientDraftId || null,
+            draftPayloadHash,
+            createdById: employeeId,
+            storeId,
+            items: {
+              create: orderItemsData,
             },
           },
-          customer: true,
-          createdBy: true,
-        },
-      });
-
-      let hasDirectPhotos = false;
-      for (const createdItem of order.items) {
-        const inputItem = dto.items.find(
-          (i) =>
-            i.garmentCatalogId === createdItem.garmentCatalogId &&
-            i.serviceTypeId === createdItem.serviceTypeId,
-        );
-        if (!inputItem?.pieces) continue;
-
-        if (createdItem.physicalGarments && createdItem.physicalGarments.length > 0) {
-          for (const pg of createdItem.physicalGarments) {
-            const pieceInput = inputItem.pieces.find((p) => p.unitNumber === pg.unitNumber);
-            if (pieceInput?.photos && pieceInput.photos.length > 0) {
-              hasDirectPhotos = true;
-              for (const url of pieceInput.photos) {
-                await tx.orderPhoto.create({
-                  data: {
-                    orderId: order.id,
-                    orderItemId: createdItem.id,
-                    physicalGarmentId: pg.id,
-                    type: PhotoType.FRONT,
-                    url,
-                  },
-                });
-              }
-            }
-          }
-        } else {
-          // Weight-based item: attach photos directly to the order item
-          for (const pieceInput of inputItem.pieces) {
-            if (pieceInput?.photos && pieceInput.photos.length > 0) {
-              hasDirectPhotos = true;
-              for (const url of pieceInput.photos) {
-                await tx.orderPhoto.create({
-                  data: {
-                    orderId: order.id,
-                    orderItemId: createdItem.id,
-                    type: PhotoType.FRONT,
-                    url,
-                  },
-                });
-              }
-            }
-          }
-        }
-      }
-
-      if (hasDirectPhotos) {
-        const refreshedOrder = await tx.order.findUnique({
-          where: { id: order.id },
           include: {
             items: {
               include: {
@@ -594,14 +624,141 @@ export class OrderService {
             createdBy: true,
           },
         });
-        return this.mapToDetailDto(refreshedOrder || order);
+
+        let hasDirectPhotos = false;
+        for (const createdItem of order.items) {
+          const inputItem = dto.items.find(
+            (i) =>
+              i.garmentCatalogId === createdItem.garmentCatalogId &&
+              i.serviceTypeId === createdItem.serviceTypeId,
+          );
+          if (!inputItem?.pieces) continue;
+
+          if (createdItem.physicalGarments && createdItem.physicalGarments.length > 0) {
+            for (const pg of createdItem.physicalGarments) {
+              const pieceInput = inputItem.pieces.find((p) => p.unitNumber === pg.unitNumber);
+              if (pieceInput?.photos && pieceInput.photos.length > 0) {
+                hasDirectPhotos = true;
+                for (const url of pieceInput.photos) {
+                  await tx.orderPhoto.create({
+                    data: {
+                      orderId: order.id,
+                      orderItemId: createdItem.id,
+                      physicalGarmentId: pg.id,
+                      type: PhotoType.FRONT,
+                      url,
+                    },
+                  });
+                }
+              }
+            }
+          } else {
+            // Weight-based item: attach photos directly to the order item
+            for (const pieceInput of inputItem.pieces) {
+              if (pieceInput?.photos && pieceInput.photos.length > 0) {
+                hasDirectPhotos = true;
+                for (const url of pieceInput.photos) {
+                  await tx.orderPhoto.create({
+                    data: {
+                      orderId: order.id,
+                      orderItemId: createdItem.id,
+                      type: PhotoType.FRONT,
+                      url,
+                    },
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        if (hasDirectPhotos) {
+          const refreshedOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            include: {
+              items: {
+                include: {
+                  garmentCatalog: true,
+                  serviceType: true,
+                  photos: true,
+                  physicalGarments: {
+                    include: { photos: true },
+                    orderBy: { unitNumber: 'asc' },
+                  },
+                },
+              },
+              customer: true,
+              createdBy: true,
+            },
+          });
+          return this.mapToDetailDto(refreshedOrder || order);
+        }
+
+        return this.mapToDetailDto(order);
+      });
+    } catch (err: any) {
+      if (err.code === 'P2002' && dto.clientDraftId) {
+        // Unique constraint failed on (store_id, client_draft_id) due to concurrent submission
+        const existingOrder = await this.prisma.order.findUnique({
+          where: {
+            storeId_clientDraftId: {
+              storeId,
+              clientDraftId: dto.clientDraftId,
+            },
+          },
+          include: {
+            items: {
+              include: {
+                garmentCatalog: true,
+                serviceType: true,
+                photos: true,
+                physicalGarments: {
+                  include: { photos: true },
+                  orderBy: { unitNumber: 'asc' },
+                },
+              },
+            },
+            customer: true,
+            createdBy: true,
+            deliveredBy: true,
+            store: true,
+            payments: {
+              include: { receivedBy: true },
+              orderBy: { createdAt: 'desc' },
+            },
+            adjustments: {
+              include: { createdBy: true },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+        });
+
+        if (existingOrder) {
+          if (
+            existingOrder.draftPayloadHash &&
+            existingOrder.draftPayloadHash !== draftPayloadHash
+          ) {
+            throw new ConflictException(
+              `Client draft ID "${dto.clientDraftId}" has already been used with a different order payload.`,
+            );
+          }
+          isIdempotentReplay = true;
+          result = this.mapToDetailDto(existingOrder);
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
       }
+    }
 
-      return this.mapToDetailDto(order);
-    });
-
-    // C6: Trigger ORDER_CREATED notification outside transaction
-    if (result && result.customerPhone && this.notificationService?.createNotificationEvent) {
+    // C6: Trigger ORDER_CREATED notification outside transaction (only on new orders)
+    if (
+      !isIdempotentReplay &&
+      result &&
+      result.customerPhone &&
+      this.notificationService?.createNotificationEvent
+    ) {
       Promise.resolve(
         this.notificationService.createNotificationEvent(
           storeId,
@@ -618,6 +775,49 @@ export class OrderService {
     }
 
     return await this.resolveOrderPhotoUrls(result);
+  }
+
+  async findOrderByDraftId(draftId: string, storeId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: {
+        storeId_clientDraftId: {
+          storeId,
+          clientDraftId: draftId,
+        },
+      },
+      include: {
+        items: {
+          include: {
+            garmentCatalog: true,
+            serviceType: true,
+            photos: true,
+            physicalGarments: {
+              include: { photos: true },
+              orderBy: { unitNumber: 'asc' },
+            },
+          },
+        },
+        customer: true,
+        createdBy: true,
+        deliveredBy: true,
+        store: true,
+        payments: {
+          include: { receivedBy: true },
+          orderBy: { createdAt: 'desc' },
+        },
+        adjustments: {
+          include: { createdBy: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order with draft ID "${draftId}" not found`);
+    }
+
+    const dto = this.mapToDetailDto(order);
+    return await this.resolveOrderPhotoUrls(dto);
   }
 
   async findOrderById(id: string, storeId?: string) {
@@ -2209,6 +2409,7 @@ export class OrderService {
       createdByName: order.createdBy?.name || 'Staff',
       deliveredById: order.deliveredById || null,
       deliveredByName: order.deliveredBy?.name || null,
+      clientDraftId: order.clientDraftId || null,
       items: order.items.map((item: any) => ({
         id: item.id,
         garmentName: item.garmentCatalog.name,

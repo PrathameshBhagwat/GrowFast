@@ -80,6 +80,10 @@ export class CreateOrderItemDto implements CreateOrderItemRequest {
 }
 
 export class CreateOrderDto implements CreateOrderRequest {
+  @IsOptional()
+  @IsString()
+  clientDraftId?: string;
+
   @IsString()
   customerId!: string;
 

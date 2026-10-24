@@ -180,7 +180,42 @@ export class PaymentService {
       );
     }
 
+    let isIdempotentReplay = false;
+
     const runInTx = async (tx: Prisma.TransactionClient) => {
+      // 0c. Idempotency check if key provided
+      if (dto.idempotencyKey) {
+        const existingPayment = await tx.payment.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+          include: { receivedBy: true },
+        });
+
+        if (existingPayment) {
+          const isSameOrder = existingPayment.orderId === dto.orderId;
+          const isSameAmount = Math.abs(existingPayment.amount - dto.amount) < 0.001;
+          const isSameMode = existingPayment.mode === (dto.mode as unknown);
+
+          if (!isSameOrder || !isSameAmount || !isSameMode) {
+            throw new ConflictException(
+              `Idempotency key "${dto.idempotencyKey}" has already been used with different payment details.`,
+            );
+          }
+
+          isIdempotentReplay = true;
+          return {
+            id: existingPayment.id,
+            orderId: existingPayment.orderId,
+            amount: existingPayment.amount,
+            mode: existingPayment.mode as unknown as SharedPaymentMode,
+            reference: existingPayment.reference,
+            receivedById: existingPayment.receivedById,
+            receivedByName: existingPayment.receivedBy?.name || '',
+            createdAt: existingPayment.createdAt.toISOString(),
+            idempotencyKey: existingPayment.idempotencyKey,
+          };
+        }
+      }
+
       // 1. Fetch order — Serializable isolation prevents concurrent races
       const order = await tx.order.findUnique({
         where: { id: dto.orderId },
@@ -230,6 +265,7 @@ export class PaymentService {
           mode: dto.mode,
           reference: dto.reference || null,
           receivedById: employeeId,
+          idempotencyKey: dto.idempotencyKey || null,
         },
         include: {
           receivedBy: true,
@@ -256,6 +292,7 @@ export class PaymentService {
         receivedById: payment.receivedById,
         receivedByName: payment.receivedBy.name,
         createdAt: payment.createdAt.toISOString(),
+        idempotencyKey: payment.idempotencyKey,
       };
     };
 
@@ -263,35 +300,74 @@ export class PaymentService {
     if (externalTx) {
       paymentDto = await runInTx(externalTx);
     } else {
-      paymentDto = await this.executeWithRetry(() =>
-        this.prisma.$transaction(runInTx, {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        }),
-      );
+      try {
+        paymentDto = await this.executeWithRetry(() =>
+          this.prisma.$transaction(runInTx, {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          }),
+        );
+      } catch (error: any) {
+        if (error.code === 'P2002' && dto.idempotencyKey) {
+          // Unique constraint violation due to concurrent payment submission with the same idempotency key
+          const existing = await this.prisma.payment.findUnique({
+            where: { idempotencyKey: dto.idempotencyKey },
+            include: { receivedBy: true },
+          });
+          if (existing) {
+            const isSameOrder = existing.orderId === dto.orderId;
+            const isSameAmount = Math.abs(existing.amount - dto.amount) < 0.001;
+            const isSameMode = existing.mode === (dto.mode as unknown);
 
-      // C6: Trigger PAYMENT_RECEIVED notification outside transaction
-      const order = await this.prisma.order.findUnique({
-        where: { id: dto.orderId },
-        include: { customer: true },
-      });
+            if (!isSameOrder || !isSameAmount || !isSameMode) {
+              throw new ConflictException(
+                `Idempotency key "${dto.idempotencyKey}" has already been used with different payment details.`,
+              );
+            }
+            isIdempotentReplay = true;
+            paymentDto = {
+              id: existing.id,
+              orderId: existing.orderId,
+              amount: existing.amount,
+              mode: existing.mode as unknown as SharedPaymentMode,
+              reference: existing.reference,
+              receivedById: existing.receivedById,
+              receivedByName: existing.receivedBy?.name || '',
+              createdAt: existing.createdAt.toISOString(),
+              idempotencyKey: existing.idempotencyKey,
+            };
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
 
-      if (order && order.customer?.phone) {
-        this.notificationService
-          .createNotificationEvent(
-            storeId,
-            NotificationEventType.PAYMENT_RECEIVED,
-            NotificationChannel.SMS,
-            order.customer.phone,
-            order.id,
-            order.customer.id,
-            {
-              orderNumber: order.orderNumber,
-              amountPaid: dto.amount,
-              totalAmount: order.totalAmount,
-              amountDue: order.amountDue,
-            },
-          )
-          .catch(() => {});
+      // C6: Trigger PAYMENT_RECEIVED notification outside transaction only on new payments
+      if (!isIdempotentReplay) {
+        const order = await this.prisma.order.findUnique({
+          where: { id: dto.orderId },
+          include: { customer: true },
+        });
+
+        if (order && order.customer?.phone) {
+          this.notificationService
+            .createNotificationEvent(
+              storeId,
+              NotificationEventType.PAYMENT_RECEIVED,
+              NotificationChannel.SMS,
+              order.customer.phone,
+              order.id,
+              order.customer.id,
+              {
+                orderNumber: order.orderNumber,
+                amountPaid: dto.amount,
+                totalAmount: order.totalAmount,
+                amountDue: order.amountDue,
+              },
+            )
+            .catch(() => {});
+        }
       }
     }
 
@@ -391,6 +467,7 @@ export class PaymentService {
       receivedById: p.receivedById,
       receivedByName: p.receivedBy.name,
       createdAt: p.createdAt.toISOString(),
+      idempotencyKey: p.idempotencyKey,
     }));
   }
 
