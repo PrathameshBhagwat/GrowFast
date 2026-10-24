@@ -55,6 +55,7 @@ const mockPrismaService: any = {
     findMany: jest.fn(),
     findUnique: jest.fn(),
     findFirst: jest.fn(),
+    upsert: jest.fn().mockResolvedValue({}),
   },
   store: {
     findUnique: jest.fn(),

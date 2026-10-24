@@ -19,7 +19,6 @@ export const DEFAULT_CATEGORIES: string[] = [
   GarmentCategory.WOMEN,
   GarmentCategory.KIDS,
   GarmentCategory.HOUSEHOLD,
-  GarmentCategory.HOME_CLEANING,
   GarmentCategory.SHOES,
   GarmentCategory.OTHERS,
   GarmentCategory.WEIGHT_BASED,
@@ -175,13 +174,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
             key={service.id}
             type="button"
             onClick={() => onServiceChange(service.id)}
-            className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97] transition-all"
+            className="flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97] transition-all duration-200"
             style={{
               height: '34px',
               minHeight: '34px',
-              paddingLeft: '14px',
-              paddingRight: '14px',
-              borderRadius: '8px',
+              paddingLeft: '16px',
+              paddingRight: '16px',
+              borderRadius: '9999px',
               fontSize: '12.5px',
               fontWeight: isActive ? 600 : 500,
               whiteSpace: 'nowrap',
@@ -190,9 +189,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
               justifyContent: 'center',
               cursor: 'pointer',
               border: isActive ? '1px solid #2563eb' : '1px solid var(--border)',
-              background: isActive ? '#2563eb' : 'var(--bg-surface)',
+              background: isActive
+                ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                : 'var(--bg-surface)',
               color: isActive ? '#ffffff' : 'var(--text-primary)',
-              boxShadow: isActive ? '0 1px 3px 0 rgba(37, 99, 235, 0.25)' : 'none',
+              boxShadow: isActive
+                ? '0 3px 10px rgba(37, 99, 235, 0.35)'
+                : 'var(--shadow-neu-card-sm, 0 1px 2px rgba(0,0,0,0.05))',
               flexShrink: 0,
             }}
           >
@@ -215,13 +218,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
             key={cat}
             type="button"
             onClick={() => onCategoryChange(cat)}
-            className="rounded-lg flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97] transition-all"
+            className="flex items-center justify-center text-center cursor-pointer select-none active:scale-[0.97] transition-all duration-200"
             style={{
               height: '34px',
               minHeight: '34px',
-              paddingLeft: '14px',
-              paddingRight: '14px',
-              borderRadius: '8px',
+              paddingLeft: '16px',
+              paddingRight: '16px',
+              borderRadius: '9999px',
               fontSize: '12.5px',
               fontWeight: isActive ? 600 : 500,
               whiteSpace: 'nowrap',
@@ -235,12 +238,14 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
                   ? '1px dashed #d97706'
                   : '1px solid var(--border)',
               background: isActive
-                ? '#2563eb'
+                ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                 : isWeightException
                   ? 'rgba(245, 158, 11, 0.08)'
                   : 'var(--bg-surface)',
               color: isActive ? '#ffffff' : isWeightException ? '#b45309' : 'var(--text-primary)',
-              boxShadow: isActive ? '0 1px 3px 0 rgba(37, 99, 235, 0.25)' : 'none',
+              boxShadow: isActive
+                ? '0 3px 10px rgba(37, 99, 235, 0.35)'
+                : 'var(--shadow-neu-card-sm, 0 1px 2px rgba(0,0,0,0.05))',
               flexShrink: 0,
             }}
           >
@@ -264,7 +269,7 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
+        gap: '8px',
         width: '100%',
         ...style,
       }}
@@ -274,13 +279,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
         <div
           ref={singleRowScrollRef}
           onWheel={handleSingleRowWheel}
-          className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
+          className="w-full flex items-center overflow-x-auto select-none no-scrollbar"
           style={{
             background: 'var(--bg-surface)',
             border: '1px solid var(--border)',
-            borderRadius: '10px',
-            padding: '5px 8px',
-            boxShadow: '0 1px 2px 0 var(--shadow-color)',
+            borderRadius: '16px',
+            padding: '6px 10px',
+            boxShadow: 'var(--shadow-neu-card-sm)',
             width: '100%',
             display: 'flex',
             alignItems: 'center',
@@ -327,13 +332,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
           <div
             ref={serviceScrollRef}
             onWheel={handleServiceWheel}
-            className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
+            className="w-full flex items-center overflow-x-auto select-none no-scrollbar"
             style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border)',
-              borderRadius: '10px',
-              padding: '5px 8px',
-              boxShadow: '0 1px 2px 0 var(--shadow-color)',
+              borderRadius: '16px',
+              padding: '6px 10px',
+              boxShadow: 'var(--shadow-neu-card-sm)',
               width: '100%',
               display: 'flex',
               alignItems: 'center',
@@ -360,13 +365,13 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
           <div
             ref={categoryScrollRef}
             onWheel={handleCategoryWheel}
-            className="rounded-xl w-full flex items-center overflow-x-auto select-none no-scrollbar"
+            className="w-full flex items-center overflow-x-auto select-none no-scrollbar"
             style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border)',
-              borderRadius: '10px',
-              padding: '5px 8px',
-              boxShadow: '0 1px 2px 0 var(--shadow-color)',
+              borderRadius: '16px',
+              padding: '6px 10px',
+              boxShadow: 'var(--shadow-neu-card-sm)',
               width: '100%',
               display: 'flex',
               alignItems: 'center',
@@ -404,15 +409,15 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
       >
         {/* Left: Search Input Box */}
         <div
-          className="relative flex-1 rounded-lg"
+          className="relative flex-1"
           style={{
             position: 'relative',
             flex: 1,
             minWidth: '180px',
-            background: 'var(--bg-surface)',
+            background: 'var(--bg-surface-inset)',
             border: '1px solid var(--border)',
-            borderRadius: '8px',
-            boxShadow: '0 1px 2px 0 var(--shadow-color)',
+            borderRadius: '14px',
+            boxShadow: 'var(--shadow-neu-inset)',
             transition: 'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
           }}
         >
@@ -421,7 +426,7 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
               position: 'absolute',
               top: 0,
               bottom: 0,
-              left: '10px',
+              left: '12px',
               display: 'flex',
               alignItems: 'center',
               pointerEvents: 'none',
@@ -436,10 +441,10 @@ export const CatalogNavFilter: React.FC<CatalogNavFilterProps> = ({
             className="w-full bg-transparent focus:outline-none"
             style={{
               width: '100%',
-              height: '36px',
-              paddingLeft: '34px',
-              paddingRight: '40px',
-              borderRadius: '8px',
+              height: '38px',
+              paddingLeft: '38px',
+              paddingRight: '44px',
+              borderRadius: '14px',
               border: 'none',
               background: 'transparent',
               fontSize: '13px',

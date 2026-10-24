@@ -5,6 +5,7 @@ import {
   filterServicesForCategory,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
+  resolveCatalogSelectionOnServiceSelect,
   isCategoryAllowedInWorkflow,
   isServiceAllowedInWorkflow,
   isDryCleanService,
@@ -213,15 +214,15 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
   };
 
   const handleServiceSelect = (serviceId: string) => {
-    setSelectedServiceId(serviceId);
-    const newCategory = resolveCatalogSelectionOnServiceChange(
+    const result = resolveCatalogSelectionOnServiceSelect(
       serviceId,
       selectedCategory,
       activeServices,
       workflow,
     );
-    if (newCategory !== selectedCategory) {
-      setSelectedCategory(newCategory as string);
+    setSelectedServiceId(result.serviceId);
+    if (result.category !== selectedCategory) {
+      setSelectedCategory(result.category as string);
     }
   };
 
@@ -504,21 +505,23 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
               <div
                 key={garment.id}
                 onClick={() => handleGarmentClick(garment)}
-                className={`border rounded-lg flex flex-col justify-between group transition-all shadow-2xs cursor-pointer ${
+                className={`flex flex-col justify-between group transition-all cursor-pointer ${
                   isSelected
-                    ? 'ring-2 ring-blue-500 border-blue-500 shadow-xs'
-                    : 'hover:border-blue-300 hover:shadow-xs'
+                    ? 'ring-2 ring-blue-500 shadow-md scale-[1.01]'
+                    : 'hover:scale-[1.01]'
                 }`}
                 style={{
-                  background: isSelected ? 'var(--bg-surface-hover)' : 'var(--bg-surface)',
-                  border: isSelected ? '1px solid #2563eb' : '1px solid var(--border)',
-                  borderRadius: '8px',
-                  padding: '8px 7px 7px 7px',
+                  background: 'var(--bg-surface)',
+                  border: isSelected ? '1.5px solid #2563eb' : '1px solid var(--border)',
+                  borderRadius: '16px',
+                  padding: '12px 10px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  minHeight: '184px',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+                  minHeight: '200px',
+                  boxShadow: isSelected
+                    ? '0 4px 14px rgba(37, 99, 235, 0.25)'
+                    : 'var(--shadow-neu-card-sm)',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
@@ -534,12 +537,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   }}
                 >
                   <span
-                    className="text-[10px] font-mono font-medium tracking-wide select-none"
+                    className="text-[10px] font-mono font-semibold tracking-wide select-none"
                     style={{
                       fontSize: '10px',
                       fontFamily: 'monospace',
                       color: 'var(--text-muted)',
-                      fontWeight: 500,
+                      fontWeight: 600,
                       userSelect: 'none',
                     }}
                   >
@@ -558,12 +561,13 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                       <span
                         className="font-bold whitespace-nowrap shrink-0"
                         style={{
-                          background: 'rgba(239, 246, 255, 0.95)',
+                          background: 'rgba(37, 99, 235, 0.1)',
                           color: '#2563eb',
                           fontWeight: 700,
                           fontSize: '11px',
-                          padding: '1.5px 6px',
-                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '9999px',
+                          border: '1px solid rgba(37, 99, 235, 0.25)',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -584,8 +588,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                           color: 'var(--text-muted)',
                           fontSize: '10px',
                           fontWeight: 500,
-                          padding: '1px 5px',
-                          borderRadius: '4px',
+                          padding: '2px 7px',
+                          borderRadius: '9999px',
+                          border: '1px solid var(--border)',
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
                         }}
@@ -596,10 +601,16 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                   </div>
                 </div>
 
-                {/* Center Icon */}
+                {/* Center Icon Box */}
                 <div
-                  className="w-9 h-9 min-w-[36px] min-h-[36px] mx-auto flex items-center justify-center group-hover:text-blue-600 transition-colors my-1 shrink-0"
+                  className="w-12 h-12 min-w-[48px] min-h-[48px] mx-auto flex items-center justify-center group-hover:text-blue-600 transition-colors my-1.5 shrink-0"
                   style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-surface-inset)',
+                    border: '1px solid var(--border)',
+                    boxShadow: 'var(--shadow-neu-inset)',
                     color: 'var(--text-secondary)',
                   }}
                 >
@@ -609,12 +620,12 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 {/* Garment Title & Subtitle */}
                 <div
                   className="text-center w-full mb-1"
-                  style={{ textAlign: 'center', width: '100%', marginBottom: '3px' }}
+                  style={{ textAlign: 'center', width: '100%', marginBottom: '4px' }}
                 >
                   <h3
                     className="text-xs font-bold truncate leading-tight"
                     style={{
-                      fontSize: '11.5px',
+                      fontSize: '12px',
                       fontWeight: 700,
                       color: 'var(--text-primary)',
                       lineHeight: 1.25,
@@ -627,9 +638,9 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     {garment.name}
                   </h3>
                   <p
-                    className="text-[10px] truncate mt-0.5"
+                    className="text-[10.5px] truncate mt-0.5"
                     style={{
-                      fontSize: '10px',
+                      fontSize: '10.5px',
                       color: 'var(--text-muted)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -649,16 +660,17 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                     e.stopPropagation();
                     handleGarmentClick(garment);
                   }}
-                  className="w-full mt-1 py-1 px-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs active:scale-[0.98]"
+                  className="w-full mt-1 py-1 px-2 font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-[0.98]"
                   style={{
-                    height: '28px',
-                    minHeight: '28px',
-                    borderRadius: '6px',
+                    height: '30px',
+                    minHeight: '30px',
+                    borderRadius: '9999px',
                     fontSize: '11.5px',
                     fontWeight: 600,
-                    border: '1px solid rgba(191, 219, 254, 0.7)',
-                    background: 'rgba(239, 246, 255, 0.9)',
+                    border: '1px solid rgba(37, 99, 235, 0.3)',
+                    background: 'rgba(37, 99, 235, 0.08)',
                     color: '#2563eb',
+                    boxShadow: 'var(--shadow-neu-card-sm)',
                   }}
                 >
                   <Plus size={12} strokeWidth={2.5} />

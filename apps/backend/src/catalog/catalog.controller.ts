@@ -35,11 +35,11 @@ export class CatalogController {
 
   /**
    * POST /api/garments
-   * Create a new garment. OWNER, MANAGER, or COUNTER (Employee) role required.
+   * Create a new garment. OWNER role required.
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'MANAGER', 'COUNTER')
+  @Roles('OWNER')
   async create(@Req() req: any, @Body() dto: CreateGarmentDto) {
     const storeId = req.user.storeId;
     const garment = await this.catalogService.createGarment(storeId, dto);
@@ -51,11 +51,11 @@ export class CatalogController {
 
   /**
    * PATCH /api/garments/:id
-   * Update a garment catalog item. OWNER, MANAGER, or COUNTER (Employee) role required.
+   * Update a garment catalog item. OWNER role required.
    */
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'MANAGER', 'COUNTER')
+  @Roles('OWNER')
   async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateGarmentDto) {
     const storeId = req.user.storeId;
     const garment = await this.catalogService.updateGarment(id, storeId, dto);

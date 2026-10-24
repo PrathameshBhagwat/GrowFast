@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { StoreController } from './store.controller';
 import { StoreService } from './store.service';
-import { DEFAULT_TAG_DESIGN, TagDesignConfig } from '@growfast/shared-types';
+import { DEFAULT_TAG_DESIGN, TagDesignConfig, Role } from '@growfast/shared-types';
 import { StreamableFile } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from '../auth/roles.decorator';
 
 describe('StoreController (Phase T4: Tag Designer & Owner Settings)', () => {
   let controller: StoreController;
@@ -165,6 +167,14 @@ describe('StoreController (Phase T4: Tag Designer & Owner Settings)', () => {
 
       expect(storeService.updateStoreConfig).toHaveBeenCalledWith('store-alpha', dto);
       expect(res.topUpServices).toEqual(dto.topUpServices);
+    });
+
+    it('updateStoreConfig is restricted to OWNER role only and excludes COUNTER', () => {
+      const reflector = new Reflector();
+      const roles = reflector.get<Role[]>(ROLES_KEY, StoreController.prototype.updateStoreConfig);
+
+      expect(roles).toEqual([Role.OWNER]);
+      expect(roles).not.toContain(Role.COUNTER);
     });
   });
 });

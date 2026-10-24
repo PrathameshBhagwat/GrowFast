@@ -20,6 +20,8 @@ export interface DropdownProps {
   required?: boolean;
   className?: string;
   optionClassName?: string;
+  prefixIcon?: React.ReactNode;
+  buttonStyleOverrides?: React.CSSProperties;
 }
 
 const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
@@ -38,6 +40,8 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
       required,
       className = '',
       optionClassName = '',
+      prefixIcon,
+      buttonStyleOverrides,
     },
     ref,
   ) => {
@@ -238,12 +242,24 @@ const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
             disabled={disabled}
             onClick={handleButtonClick}
             onKeyDown={handleKeyDown}
-            style={buttonStyle}
+            style={{ ...buttonStyle, ...buttonStyleOverrides }}
             aria-expanded={isOpen}
             aria-haspopup="listbox"
             aria-labelledby={label ? selectId : undefined}
             aria-disabled={disabled}
           >
+            {prefixIcon && (
+              <span
+                style={{
+                  marginRight: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {prefixIcon}
+              </span>
+            )}
             <span
               style={{
                 flex: 1,

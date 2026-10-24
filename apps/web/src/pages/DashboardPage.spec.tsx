@@ -12,9 +12,10 @@ vi.mock('react-router-dom', () => ({
 }));
 
 // Mock AuthContext
+let mockEmployee = { id: 'emp-1', name: 'Ramesh Patel', role: 'OWNER', storeId: 'store-1' };
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
-    employee: { id: 'emp-1', name: 'Ramesh Patel', role: 'OWNER', storeId: 'store-1' },
+    employee: mockEmployee,
     isAuthenticated: true,
   }),
 }));
@@ -105,6 +106,7 @@ describe('DashboardPage - Phase 2: Date Filters & Period Selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEmployee = { id: 'emp-1', name: 'Ramesh Patel', role: 'OWNER', storeId: 'store-1' };
     fetchSpy = vi
       .spyOn(dashboardApi, 'fetchDashboardSummary')
       .mockResolvedValue(mockDashboardData as any);
@@ -112,6 +114,14 @@ describe('DashboardPage - Phase 2: Date Filters & Period Selection', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('redirects unauthorized COUNTER role away from dashboard to / without fetching data', async () => {
+    mockEmployee = { id: 'emp-2', name: 'Counter Staff', role: 'COUNTER', storeId: 'store-1' };
+    render(<DashboardPage />);
+
+    expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   // 1. Default Today selection

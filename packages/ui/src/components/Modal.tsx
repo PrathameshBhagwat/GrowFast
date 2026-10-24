@@ -54,14 +54,14 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const dialogStyle: React.CSSProperties = {
-    background: 'var(--bg-surface-elevated)',
-    borderRadius: '16px',
+    background: 'var(--bg-surface)',
+    borderRadius: '20px',
     width: '100%',
     maxWidth: width,
     maxHeight: '90vh',
     overflow: 'auto',
     border: '1px solid var(--border)',
-    boxShadow: `0 20px 25px -5px var(--shadow-lg), 0 8px 10px -6px var(--shadow-color)`,
+    boxShadow: 'var(--shadow-neu-card)',
     animation: 'slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1)',
   };
 
@@ -101,15 +101,17 @@ export const Modal: React.FC<ModalProps> = ({
                 onClick={onClose}
                 aria-label="Close"
                 style={{
-                  background: 'var(--bg-surface-muted)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '8px',
+                  background: 'var(--bg-surface-inset)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '9999px',
+                  boxShadow: 'var(--shadow-neu-card-sm)',
+                  padding: '6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--text-muted)',
+                  transition: 'all 0.15s ease',
                 }}
               >
                 <X size={18} />

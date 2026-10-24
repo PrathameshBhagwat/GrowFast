@@ -45,25 +45,11 @@ async function main() {
       pin: '111111',
     },
     {
-      id: 'emp-mgr-001',
-      name: 'Rajesh Nair',
-      email: 'rajesh@growfast.in',
-      role: 'MANAGER' as const,
-      pin: '222222',
-    },
-    {
       id: 'emp-counter-001',
       name: 'Swapnil Shinde',
       email: 'swapnil@growfast.in',
       role: 'COUNTER' as const,
       pin: '333333',
-    },
-    {
-      id: 'emp-delivery-001',
-      name: 'Kiran More',
-      email: 'kiran@growfast.in',
-      role: 'DELIVERY' as const,
-      pin: '444444',
     },
   ];
 
@@ -705,7 +691,12 @@ async function main() {
     { garmentId: 'g-wb-8', serviceId: 'svc-weight', price: 220 },
     { garmentId: 'g-wb-9', serviceId: 'svc-weight', price: 130 },
     { garmentId: 'g-wb-10', serviceId: 'svc-weight', price: 300 },
-    // ── INITIAL LAUNDRY SERVICES: WEIGHT_BASED (BULK LAUNDRY) ──
+    // ── INITIAL LAUNDRY SERVICES: WEIGHT_BASED (BULK LAUNDRY & WEIGHT BASED) ──
+    { garmentId: 'g-wb-1', serviceId: 'svc-wash-iron', price: 95 },
+    { garmentId: 'g-wb-1', serviceId: 'svc-wash-fold', price: 80 },
+    { garmentId: 'g-wb-1', serviceId: 'svc-laundry-premium', price: 120 },
+    { garmentId: 'g-wb-1', serviceId: 'svc-laundry-woolen', price: 140 },
+    { garmentId: 'g-wb-1', serviceId: 'svc-laundry-white', price: 110 },
     { garmentId: 'g-wb-10', serviceId: 'svc-wash-iron', price: 95 },
     { garmentId: 'g-wb-10', serviceId: 'svc-wash-fold', price: 80 },
     { garmentId: 'g-wb-10', serviceId: 'svc-laundry-premium', price: 120 },

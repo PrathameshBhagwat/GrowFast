@@ -27,31 +27,33 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
 }) => {
   return (
     <header
-      className={`bg-white border border-slate-200 rounded-[6px] shadow-xs flex items-center justify-between shrink-0 box-border ${className}`}
+      className={`flex items-center justify-between shrink-0 box-border ${className}`}
       style={{
         background: 'var(--bg-surface, #ffffff)',
         border: '1px solid var(--border, #e2e8f0)',
-        borderRadius: '6px',
-        padding: '8px 16px',
-        minHeight: '52px',
-        boxShadow: '0 1px 2px 0 var(--shadow-color, rgba(0, 0, 0, 0.05))',
+        borderRadius: '16px',
+        padding: '12px 20px',
+        minHeight: '56px',
+        boxShadow: 'var(--shadow-neu-card-sm)',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         ...style,
       }}
     >
       {/* Left: Back Button + Logo + Title & Subtitle */}
       <div
         className="flex items-center gap-3"
-        style={{ display: 'flex', alignItems: 'center', gap: '12px' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '14px' }}
       >
         {onBack && (
           <button
             type="button"
+            id="catalog-back-btn"
+            aria-label="Back"
             onClick={onBack}
-            className="w-8 h-8 rounded-[3px] border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-colors cursor-pointer shadow-xs shrink-0"
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '3px',
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
               border: '1px solid var(--border, #e2e8f0)',
               background: 'var(--bg-surface, #ffffff)',
               display: 'flex',
@@ -60,6 +62,8 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
               color: 'var(--text-secondary, #475569)',
               cursor: 'pointer',
               flexShrink: 0,
+              boxShadow: 'var(--shadow-neu-card-sm)',
+              transition: 'all 0.15s ease',
             }}
             title="Go back"
           >
@@ -73,16 +77,16 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({
             style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}
           >
             <span
-              className="bg-[#2563eb] text-white text-[11px] font-black px-2 py-0.5 rounded-[3px] tracking-wider uppercase shadow-xs select-none"
               style={{
-                background: 'var(--accent, #2563eb)',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                 color: '#ffffff',
                 fontSize: '11px',
                 fontWeight: 900,
-                padding: '2px 7px',
-                borderRadius: '3px',
+                padding: '4px 9px',
+                borderRadius: '6px',
                 letterSpacing: '0.06em',
                 userSelect: 'none',
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)',
               }}
             >
               GROWFAST

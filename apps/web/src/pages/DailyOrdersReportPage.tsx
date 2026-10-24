@@ -13,7 +13,6 @@ import {
   ChevronRight,
   ChevronsRight,
   RefreshCw,
-  ArrowLeft,
   Check,
 } from 'lucide-react';
 import { DailyOrderReportRowDTO, DailyOrdersReportSummaryDTO, Role } from '@growfast/shared-types';
@@ -48,8 +47,8 @@ export const DailyOrdersReportPage: React.FC = () => {
   const navigate = useNavigate();
   const { employee } = useAuth();
 
-  // Role validation: OWNER and MANAGER have access
-  const isAuthorized = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
+  // Role validation: OWNER has access
+  const isAuthorized = employee?.role === Role.OWNER;
 
   // View expansion toggle
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -390,20 +389,11 @@ export const DailyOrdersReportPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans flex flex-col">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans flex flex-col">
       {/* ─── Top Navbar ─────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-xs">
+      <header className="bg-[var(--bg-surface)] border-b border-[var(--border)] relative z-10 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-[var(--shadow-neu-card-sm)]">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            id="back-to-home-btn"
-            onClick={() => navigate('/')}
-            title="Return to Home"
-            className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">
             Daily Orders
           </h1>
         </div>
@@ -411,18 +401,18 @@ export const DailyOrdersReportPage: React.FC = () => {
         {/* Right Corner Controls: Language & Profile Avatar */}
         <div className="flex items-center gap-3">
           {/* Language Indicator matching reference screenshot */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-md select-none">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] bg-[var(--bg-surface-inset)] border border-[var(--border)] rounded-full select-none shadow-[var(--shadow-neu-inset)]">
             <span className="text-sm" role="img" aria-label="UK flag">
               🇬🇧
             </span>
             <span>English</span>
-            <ChevronDown size={13} className="text-slate-400" />
+            <ChevronDown size={13} className="text-[var(--text-muted)]" />
           </div>
 
           {/* User Initial Avatar matching reference screenshot */}
           <div
             title={`${employee?.name || 'User'} (${employee?.role || 'Staff'})`}
-            className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center border border-slate-300 select-none shadow-xs"
+            className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center select-none shadow-sm"
           >
             {employee?.name ? employee.name.charAt(0).toUpperCase() : 'T'}
           </div>
@@ -668,37 +658,40 @@ export const DailyOrdersReportPage: React.FC = () => {
         )}
 
         {/* ─── Report Table Container ───────────────────────────────────── */}
-        <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden flex flex-col">
+        <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl shadow-[var(--shadow-neu-card-sm)] overflow-hidden flex flex-col">
           {/* Scrollable table viewport matching reference screenshot 3 */}
           <div className="overflow-x-auto w-full min-h-[380px]">
-            <table className="w-full text-left text-xs text-slate-800 border-collapse whitespace-nowrap">
+            <table className="w-full text-left text-xs text-[var(--text-primary)] border-collapse whitespace-nowrap">
               {/* Table Header matching Screenshot 3 exact columns */}
-              <thead className="bg-[#F8FAFC] border-b border-slate-200 text-slate-600 font-semibold select-none">
+              <thead className="bg-[var(--bg-surface-inset)] border-b border-[var(--border)] text-[var(--text-secondary)] font-semibold select-none">
                 <tr>
-                  <th className="py-3 px-4">Order Date / Time</th>
-                  <th className="py-3 px-4">Order No.</th>
-                  <th className="py-3 px-4">Customer Code</th>
-                  <th className="py-3 px-4">Name</th>
-                  <th className="py-3 px-4 max-w-xs truncate">Address</th>
-                  <th className="py-3 px-4">Phone</th>
-                  <th className="py-3 px-4">Due Date</th>
-                  <th className="py-3 px-3 text-center">Pcs.</th>
-                  <th className="py-3 px-3 text-center">Weight</th>
-                  <th className="py-3 px-4 text-right">Gross Amount</th>
-                  <th className="py-3 px-4 text-right">Discount</th>
-                  <th className="py-3 px-4 text-right">Net Amount</th>
-                  <th className="py-3 px-4 text-right">Advance</th>
-                  <th className="py-3 px-4 text-right pr-6">Balance</th>
+                  <th className="py-3.5 px-4">Order Date / Time</th>
+                  <th className="py-3.5 px-4">Order No.</th>
+                  <th className="py-3.5 px-4">Customer Code</th>
+                  <th className="py-3.5 px-4">Name</th>
+                  <th className="py-3.5 px-4 max-w-xs truncate">Address</th>
+                  <th className="py-3.5 px-4">Phone</th>
+                  <th className="py-3.5 px-4">Due Date</th>
+                  <th className="py-3.5 px-3 text-center">Pcs.</th>
+                  <th className="py-3.5 px-3 text-center">Weight</th>
+                  <th className="py-3.5 px-4 text-right">Gross Amount</th>
+                  <th className="py-3.5 px-4 text-right">Discount</th>
+                  <th className="py-3.5 px-4 text-right">Net Amount</th>
+                  <th className="py-3.5 px-4 text-right">Advance</th>
+                  <th className="py-3.5 px-4 text-right pr-6">Balance</th>
                 </tr>
               </thead>
 
               {/* Table Body */}
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--border)]">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={14} className="py-16 text-center text-slate-400">
+                    <td colSpan={14} className="py-16 text-center text-[var(--text-muted)]">
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <RefreshCw size={24} className="animate-spin text-slate-400" />
+                        <RefreshCw
+                          size={24}
+                          className="animate-spin text-blue-600 dark:text-blue-400"
+                        />
                         <span className="text-xs font-medium">Loading orders report...</span>
                       </div>
                     </td>
@@ -707,19 +700,24 @@ export const DailyOrdersReportPage: React.FC = () => {
                   /* Empty state matching Screenshot 2 */
                   <tr>
                     <td colSpan={14} className="py-24 text-center">
-                      <p className="text-base sm:text-lg font-bold text-slate-700">
+                      <p className="text-base sm:text-lg font-bold text-[var(--text-primary)]">
                         No Orders found
                       </p>
                     </td>
                   </tr>
                 ) : (
                   orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr
+                      key={order.id}
+                      className="hover:bg-[var(--bg-surface-hover)] transition-colors"
+                    >
                       {/* 1. Order Date / Time */}
-                      <td className="py-3.5 px-4 text-slate-700">{order.formattedOrderDate}</td>
+                      <td className="py-3.5 px-4 text-[var(--text-secondary)]">
+                        {order.formattedOrderDate}
+                      </td>
 
                       {/* 2. Order No. (Clickable blue link) */}
-                      <td className="py-3.5 px-4 font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
+                      <td className="py-3.5 px-4 font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer">
                         <button
                           type="button"
                           onClick={() => navigate(`/orders/${order.id}`)}
@@ -730,63 +728,69 @@ export const DailyOrdersReportPage: React.FC = () => {
                       </td>
 
                       {/* 3. Customer Code */}
-                      <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
+                      <td className="py-3.5 px-4 text-[var(--text-secondary)] font-mono text-[11px]">
                         {order.customerCode || '-'}
                       </td>
 
                       {/* 4. Name */}
-                      <td className="py-3.5 px-4 font-medium text-slate-900 capitalize">
+                      <td className="py-3.5 px-4 font-medium text-[var(--text-primary)] capitalize">
                         {order.customerName}
                       </td>
 
                       {/* 5. Address */}
                       <td
-                        className="py-3.5 px-4 text-slate-500 max-w-xs truncate"
+                        className="py-3.5 px-4 text-[var(--text-muted)] max-w-xs truncate"
                         title={order.customerAddress}
                       >
                         {order.customerAddress}
                       </td>
 
                       {/* 6. Phone */}
-                      <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
+                      <td className="py-3.5 px-4 text-[var(--text-secondary)] font-mono text-[11px]">
                         {order.customerPhone}
                       </td>
 
                       {/* 7. Due Date */}
-                      <td className="py-3.5 px-4 text-slate-700">{order.formattedDueDate}</td>
+                      <td className="py-3.5 px-4 text-[var(--text-secondary)]">
+                        {order.formattedDueDate}
+                      </td>
 
                       {/* 8. Pcs. */}
-                      <td className="py-3.5 px-3 text-center text-slate-800 font-medium">
+                      <td className="py-3.5 px-3 text-center text-[var(--text-primary)] font-medium">
                         {order.pieces}
                       </td>
 
                       {/* 9. Weight */}
-                      <td className="py-3.5 px-3 text-center text-slate-600">
+                      <td className="py-3.5 px-3 text-center text-[var(--text-secondary)]">
                         {order.weight != null ? order.weight : '-'}
                       </td>
 
                       {/* 10. Gross Amount */}
-                      <td className="py-3.5 px-4 text-right font-medium text-slate-800">
+                      <td className="py-3.5 px-4 text-right font-medium text-[var(--text-primary)]">
                         {order.grossAmount}
                       </td>
 
                       {/* 11. Discount */}
-                      <td className="py-3.5 px-4 text-right text-slate-600">{order.discount}</td>
+                      <td className="py-3.5 px-4 text-right text-[var(--text-secondary)]">
+                        {order.discount}
+                      </td>
 
                       {/* 12. Net Amount */}
-                      <td className="py-3.5 px-4 text-right font-semibold text-slate-900">
+                      <td className="py-3.5 px-4 text-right font-semibold text-[var(--text-primary)]">
                         {order.netAmount}
                       </td>
 
                       {/* 13. Advance */}
-                      <td className="py-3.5 px-4 text-right text-emerald-700 font-medium">
+                      <td className="py-3.5 px-4 text-right text-emerald-600 dark:text-emerald-400 font-medium">
                         {order.advance}
                       </td>
 
                       {/* 14. Balance */}
                       <td
                         className={`py-3.5 px-4 text-right pr-6 font-semibold ${
-                          order.balance > 0 ? 'text-rose-600' : 'text-slate-500'
+                          order.balance > 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-[var(--text-muted)]'
                         }`}
                       >
                         {order.balance}
@@ -800,43 +804,56 @@ export const DailyOrdersReportPage: React.FC = () => {
 
           {/* ─── Table Summary Totals Row (when data present) ────────────── */}
           {summary && totalOrders > 0 && !isLoading && (
-            <div className="bg-[#F8FAFC] border-t border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-slate-700">
+            <div className="bg-[var(--bg-surface-inset)] border-t border-[var(--border)] px-4 py-3 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-[var(--text-secondary)]">
               <div className="flex items-center gap-4">
                 <span>
-                  Total Orders: <strong className="text-slate-900">{summary.totalOrders}</strong>
+                  Total Orders:{' '}
+                  <strong className="text-[var(--text-primary)]">{summary.totalOrders}</strong>
                 </span>
                 <span>
-                  Total Pcs: <strong className="text-slate-900">{summary.totalPieces}</strong>
+                  Total Pcs:{' '}
+                  <strong className="text-[var(--text-primary)]">{summary.totalPieces}</strong>
                 </span>
                 {summary.totalWeight > 0 && (
                   <span>
                     Total Weight:{' '}
-                    <strong className="text-slate-900">{summary.totalWeight} kg</strong>
+                    <strong className="text-[var(--text-primary)]">{summary.totalWeight} kg</strong>
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-4 text-right">
                 <span>
-                  Gross: <strong className="text-slate-900">₹{summary.totalGrossAmount}</strong>
+                  Gross:{' '}
+                  <strong className="text-[var(--text-primary)]">
+                    ₹{summary.totalGrossAmount}
+                  </strong>
                 </span>
                 <span>
-                  Discount: <strong className="text-slate-900">₹{summary.totalDiscount}</strong>
+                  Discount:{' '}
+                  <strong className="text-[var(--text-primary)]">₹{summary.totalDiscount}</strong>
                 </span>
                 <span>
-                  Net: <strong className="text-slate-900">₹{summary.totalNetAmount}</strong>
+                  Net:{' '}
+                  <strong className="text-[var(--text-primary)]">₹{summary.totalNetAmount}</strong>
                 </span>
                 <span>
-                  Advance: <strong className="text-emerald-700">₹{summary.totalAdvance}</strong>
+                  Advance:{' '}
+                  <strong className="text-emerald-600 dark:text-emerald-400">
+                    ₹{summary.totalAdvance}
+                  </strong>
                 </span>
                 <span>
-                  Balance: <strong className="text-rose-600">₹{summary.totalBalance}</strong>
+                  Balance:{' '}
+                  <strong className="text-rose-600 dark:text-rose-400">
+                    ₹{summary.totalBalance}
+                  </strong>
                 </span>
               </div>
             </div>
           )}
 
           {/* ─── Pagination Footer matching Screenshot 2 & 3 ─────────────── */}
-          <div className="border-t border-slate-200 px-4 py-3 bg-white flex flex-col sm:flex-row items-center justify-between sm:justify-end gap-3 text-xs text-slate-600 select-none">
+          <div className="border-t border-[var(--border)] px-4 py-3 bg-[var(--bg-surface)] flex flex-col sm:flex-row items-center justify-between sm:justify-end gap-3 text-xs text-[var(--text-secondary)] select-none">
             {/* Rows Per Page Dropdown */}
             <div className="flex items-center gap-2">
               <span>Rows per page</span>

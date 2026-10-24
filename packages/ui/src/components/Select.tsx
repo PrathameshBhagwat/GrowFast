@@ -35,10 +35,11 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       padding: '10px 14px',
       fontSize: '0.925rem',
       fontFamily: "'Inter', sans-serif",
-      border: `1px solid ${error ? 'var(--danger-text)' : 'var(--border-input)'}`,
-      borderRadius: '8px',
+      border: `1px solid ${error ? 'var(--danger-text)' : 'var(--border)'}`,
+      borderRadius: '12px',
       outline: 'none',
-      background: 'var(--bg-input)',
+      background: 'var(--bg-surface-inset)',
+      boxShadow: 'var(--shadow-neu-inset)',
       color: 'var(--text-primary)',
       minHeight: '44px',
       width: '100%',
@@ -49,6 +50,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       backgroundRepeat: 'no-repeat',
       backgroundPosition: 'right 12px center',
       paddingRight: '36px',
+      transition: 'all 200ms ease',
       ...style,
     };
 

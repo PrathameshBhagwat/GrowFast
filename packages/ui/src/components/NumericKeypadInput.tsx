@@ -116,15 +116,16 @@ export const NumericKeypadInput: React.FC<NumericKeypadInputProps> = ({
     fontSize: key === 'clear' || key === 'del' ? '0.8rem' : '1.25rem',
     fontWeight: 600,
     fontFamily: "'Inter', sans-serif",
-    border: '1px solid var(--border, #E2E8F0)',
-    borderRadius: '12px',
+    border: '1px solid var(--border)',
+    borderRadius: '14px',
+    boxShadow: 'var(--shadow-neu-card-sm)',
     background:
       key === 'clear'
-        ? 'var(--keypad-clear-bg, #FEF2F2)'
+        ? 'rgba(239, 68, 68, 0.1)'
         : key === 'del'
-          ? 'var(--keypad-del-bg, #F1F5F9)'
-          : 'var(--keypad-key-bg, #FFFFFF)',
-    color: key === 'clear' ? 'var(--keypad-clear-text, #991B1B)' : 'var(--text-primary, #0F172A)',
+          ? 'var(--bg-surface-inset)'
+          : 'var(--bg-surface)',
+    color: key === 'clear' ? '#dc2626' : 'var(--text-primary)',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',

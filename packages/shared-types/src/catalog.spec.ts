@@ -6,7 +6,13 @@ import {
   filterCategoriesForService,
   formatCatalogServiceName,
   resolveCatalogSelectionOnCategoryChange,
+  resolveServiceOnServiceChange,
   resolveCatalogSelectionOnServiceChange,
+  resolveCatalogSelectionOnServiceSelect,
+  isShoeCategory,
+  isHouseholdCategory,
+  isOtherCategory,
+  isSteamIronService,
   isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
   isItemCompatibleWithWorkflow,
@@ -105,23 +111,24 @@ describe('filterCategoriesForService', () => {
     ]);
   });
 
-  it('preserves Weight Based category as an exception when Dry Clean is selected', () => {
+  it('preserves Weight Based category as an exception and filters out Home Cleaning when Dry Clean is selected', () => {
     const dryCleanResult = filterCategoriesForService(allCategories, '2', mockServices);
-    assert.strictEqual(dryCleanResult.length, 8);
+    assert.strictEqual(dryCleanResult.length, 7);
     assert.ok(dryCleanResult.includes(GarmentCategory.WEIGHT_BASED));
     assert.ok(dryCleanResult.includes(GarmentCategory.MEN));
     assert.ok(dryCleanResult.includes(GarmentCategory.WOMEN));
     assert.ok(dryCleanResult.includes(GarmentCategory.KIDS));
     assert.ok(dryCleanResult.includes(GarmentCategory.HOUSEHOLD));
-    assert.ok(dryCleanResult.includes(GarmentCategory.HOME_CLEANING));
+    assert.ok(!dryCleanResult.includes(GarmentCategory.HOME_CLEANING));
     assert.ok(dryCleanResult.includes(GarmentCategory.SHOES));
     assert.ok(dryCleanResult.includes(GarmentCategory.OTHERS));
   });
 
-  it('restores all categories when switching to Standard Wash', () => {
+  it('restores all categories except Home Cleaning when switching to Standard Wash', () => {
     const washResult = filterCategoriesForService(allCategories, '1', mockServices);
-    assert.strictEqual(washResult.length, 8);
+    assert.strictEqual(washResult.length, 7);
     assert.ok(washResult.includes(GarmentCategory.WEIGHT_BASED));
+    assert.ok(!washResult.includes(GarmentCategory.HOME_CLEANING));
   });
 });
 
@@ -189,17 +196,40 @@ describe('resolveCatalogSelectionOnCategoryChange', () => {
     assert.strictEqual(result, '5'); // Shoe Cleaning
   });
 
-  it('auto-selects Standard Wash when leaving Shoe with Shoe Cleaning selected', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '5', mockServices);
-    assert.strictEqual(result, '1'); // Standard Wash
-  });
-
-  it('auto-selects Standard Wash when switching to Household while Starching is active', () => {
-    const result = resolveCatalogSelectionOnCategoryChange(
+  it('auto-selects Dry Clean when switching to Household category', () => {
+    const fromStarching = resolveCatalogSelectionOnCategoryChange(
       GarmentCategory.HOUSEHOLD,
       '8',
       mockServices,
     );
+    assert.strictEqual(fromStarching, '2'); // Dry Clean
+
+    const fromSteamIron = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.HOUSEHOLD,
+      '3',
+      mockServices,
+    );
+    assert.strictEqual(fromSteamIron, '2'); // Dry Clean
+  });
+
+  it('auto-selects Dry Clean when switching to Other category', () => {
+    const fromStarching = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.OTHERS,
+      '8',
+      mockServices,
+    );
+    assert.strictEqual(fromStarching, '2'); // Dry Clean
+
+    const fromSteamIron = resolveCatalogSelectionOnCategoryChange(
+      GarmentCategory.OTHERS,
+      '3',
+      mockServices,
+    );
+    assert.strictEqual(fromSteamIron, '2'); // Dry Clean
+  });
+
+  it('auto-selects Standard Wash when leaving Shoe with Shoe Cleaning selected', () => {
+    const result = resolveCatalogSelectionOnCategoryChange(GarmentCategory.MEN, '5', mockServices);
     assert.strictEqual(result, '1'); // Standard Wash
   });
 
@@ -222,34 +252,52 @@ describe('resolveCatalogSelectionOnCategoryChange', () => {
   });
 });
 
-describe('resolveCatalogSelectionOnServiceChange', () => {
-  it('auto-selects Shoe category when switching to Shoe Cleaning service', () => {
-    const result = resolveCatalogSelectionOnServiceChange('5', GarmentCategory.MEN, mockServices);
-    assert.strictEqual(result, GarmentCategory.SHOES);
-  });
+describe('resolveServiceOnServiceChange and resolveCatalogSelectionOnServiceSelect', () => {
+  it('automatically switches service to Dry Clean when Steam Iron is clicked while Household is active', () => {
+    const resolvedService = resolveServiceOnServiceChange('3', GarmentCategory.HOUSEHOLD, mockServices);
+    assert.strictEqual(resolvedService, '2'); // Dry Clean
 
-  it('auto-switches to Men when Shoe is selected and user picks an incompatible service (Dry Clean)', () => {
-    const result = resolveCatalogSelectionOnServiceChange('2', GarmentCategory.SHOES, mockServices);
-    assert.strictEqual(result, GarmentCategory.MEN);
-  });
-
-  it('auto-switches to Men when Shoe is selected and user picks Standard Wash', () => {
-    const result = resolveCatalogSelectionOnServiceChange('1', GarmentCategory.SHOES, mockServices);
-    assert.strictEqual(result, GarmentCategory.MEN);
-  });
-
-  it('auto-switches to Men when Weight Based is selected and user picks Dry Clean', () => {
-    const result = resolveCatalogSelectionOnServiceChange(
-      '2',
-      GarmentCategory.WEIGHT_BASED,
+    const result = resolveCatalogSelectionOnServiceSelect(
+      '3',
+      GarmentCategory.HOUSEHOLD,
       mockServices,
     );
-    assert.strictEqual(result, GarmentCategory.MEN);
+    assert.strictEqual(result.serviceId, '2'); // Switched to Dry Clean
+    assert.strictEqual(result.category, GarmentCategory.HOUSEHOLD); // Retains Household
   });
 
-  it('keeps Women when switching between standard piece services (Dry Clean -> Steam Iron)', () => {
-    const result = resolveCatalogSelectionOnServiceChange('3', GarmentCategory.WOMEN, mockServices);
-    assert.strictEqual(result, GarmentCategory.WOMEN);
+  it('automatically switches service to Dry Clean when Steam Iron is clicked while Other is active', () => {
+    const resolvedService = resolveServiceOnServiceChange('3', GarmentCategory.OTHERS, mockServices);
+    assert.strictEqual(resolvedService, '2'); // Dry Clean
+
+    const result = resolveCatalogSelectionOnServiceSelect(
+      '3',
+      GarmentCategory.OTHERS,
+      mockServices,
+    );
+    assert.strictEqual(result.serviceId, '2'); // Switched to Dry Clean
+    assert.strictEqual(result.category, GarmentCategory.OTHERS); // Retains Other
+  });
+
+  it('preserves Steam Iron when Steam Iron is clicked while Men is active', () => {
+    const resolvedService = resolveServiceOnServiceChange('3', GarmentCategory.MEN, mockServices);
+    assert.strictEqual(resolvedService, '3');
+
+    const result = resolveCatalogSelectionOnServiceSelect('3', GarmentCategory.MEN, mockServices);
+    assert.strictEqual(result.serviceId, '3');
+    assert.strictEqual(result.category, GarmentCategory.MEN);
+  });
+
+  it('auto-selects Shoe category when Shoe Cleaning is selected', () => {
+    const result = resolveCatalogSelectionOnServiceSelect('5', GarmentCategory.MEN, mockServices);
+    assert.strictEqual(result.serviceId, '5');
+    assert.strictEqual(result.category, GarmentCategory.SHOES);
+  });
+
+  it('auto-switches to Men when Shoe is selected and user picks Dry Clean', () => {
+    const result = resolveCatalogSelectionOnServiceSelect('2', GarmentCategory.SHOES, mockServices);
+    assert.strictEqual(result.serviceId, '2');
+    assert.strictEqual(result.category, GarmentCategory.MEN);
   });
 });
 
@@ -337,6 +385,14 @@ describe('Order Creation Workflows - Laundry vs Dry Cleaning Separation', () => 
     const result = filterCategoriesForService(allCategories, '1', mockServices, 'DRY_CLEANING');
     assert.ok(result.includes(GarmentCategory.WEIGHT_BASED));
     assert.ok(result.includes(GarmentCategory.MEN));
+  });
+
+  it('isCategoryAllowedInWorkflow disallows Home Cleaning in all workflows', () => {
+    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'DRY_CLEANING'), false);
+    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'LAUNDRY'), false);
+    assert.strictEqual(isCategoryAllowedInWorkflow('HOME_CLEANING', 'DRY_CLEANING'), false);
+    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.HOUSEHOLD, 'DRY_CLEANING'), true);
+    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.OTHERS, 'DRY_CLEANING'), true);
   });
 
   it('isItemCompatibleWithWorkflow identifies incompatible items when switching workflows', () => {

@@ -115,7 +115,7 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
         <div className="grid grid-cols-2 gap-4">
           {isWeightBased ? (
             <div>
-              <label htmlFor="item-weight" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="item-weight" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
                 Weight (kg)
               </label>
               <div className="relative">
@@ -129,15 +129,15 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
                     const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
                     setWeight(val);
                   }}
-                  className="w-full rounded-md border border-gray-300 p-2 pr-10 min-h-[44px]"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-2.5 pr-10 min-h-[44px] text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <span className="absolute right-3 top-2.5 text-xs text-gray-500 font-semibold pointer-events-none">
+                <span className="absolute right-3 top-3 text-xs text-[var(--text-secondary)] font-semibold pointer-events-none">
                   kg
                 </span>
               </div>
-              <div className="mt-1 flex flex-col text-xs text-gray-600">
+              <div className="mt-1.5 flex flex-col text-xs text-[var(--text-secondary)]">
                 <span>Rate: ₹{item.unitPrice}/kg</span>
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-[var(--text-primary)]">
                   New Total: ₹{((weight ?? 0) * item.unitPrice).toFixed(2)}
                 </span>
               </div>
@@ -146,7 +146,7 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
             <div>
               <label
                 htmlFor="item-quantity"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5"
               >
                 Quantity
               </label>
@@ -157,17 +157,17 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
                 value={quantity}
                 disabled={hasPhysicalGarments}
                 onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full rounded-md border border-gray-300 p-2 min-h-[44px] disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-2.5 min-h-[44px] text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-[var(--bg-surface-hover)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed"
               />
               {hasPhysicalGarments && (
-                <span className="text-xs text-gray-500 mt-1 block">Fixed by physical garments</span>
+                <span className="text-xs text-[var(--text-muted)] mt-1 block">Fixed by physical garments</span>
               )}
             </div>
           )}
           <div>
             <label
               htmlFor="item-delivered-quantity"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5"
             >
               {isWeightBased ? 'Delivered Batch' : 'Delivered Quantity'}
             </label>
@@ -178,23 +178,23 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
               max={quantity}
               value={deliveredQuantity}
               onChange={(e) => setDeliveredQuantity(Number(e.target.value))}
-              className="w-full rounded-md border border-gray-300 p-2 min-h-[44px]"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-2.5 min-h-[44px] text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
             {isWeightBased && (
-              <span className="text-xs text-gray-500 mt-1 block">1 = full batch delivered</span>
+              <span className="text-xs text-[var(--text-muted)] mt-1 block">1 = full batch delivered</span>
             )}
           </div>
         </div>
 
         {hasPhysicalGarments ? (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Status</label>
             <div
               id="derived-item-status"
-              className="w-full rounded-md border border-gray-200 bg-gray-50 p-2.5 text-sm font-medium text-gray-800 min-h-[44px] flex items-center justify-between"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-3 text-sm font-medium text-[var(--text-primary)] min-h-[44px] flex items-center justify-between shadow-[var(--shadow-neu-inset)]"
             >
-              <span className="font-semibold text-gray-900">{item.itemStatus}</span>
-              <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded font-normal">
+              <span className="font-semibold text-[var(--text-primary)]">{item.itemStatus}</span>
+              <span className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 px-2.5 py-0.5 rounded-full font-semibold">
                 Derived from garments
               </span>
             </div>
@@ -218,11 +218,11 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Defect Notes</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Defect Notes</label>
           <textarea
             value={defectNotes}
             onChange={(e) => setDefectNotes(e.target.value)}
-            className="w-full rounded-md border border-gray-300 p-2 min-h-[44px]"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-3 min-h-[44px] text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:ring-2 focus:ring-blue-500 focus:outline-none"
             placeholder="e.g. Missing button, torn collar..."
             rows={3}
           />

@@ -221,10 +221,11 @@ export const CustomerOrderHistory: React.FC<CustomerOrderHistoryProps> = ({
               <div
                 key={order.id}
                 style={{
-                  padding: '14px 16px',
-                  borderRadius: '10px',
+                  padding: '16px 18px',
+                  borderRadius: '16px',
                   border: '1px solid var(--border)',
                   background: 'var(--bg-surface)',
+                  boxShadow: 'var(--shadow-neu-card-sm)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',

@@ -14,9 +14,17 @@ import {
   Camera,
   Upload,
   RefreshCw,
+  Lock,
+  Save,
 } from 'lucide-react';
-import { formatCatalogServiceName, DEFAULT_TOP_UP_SERVICES } from '@growfast/shared-types';
+import {
+  formatCatalogServiceName,
+  DEFAULT_TOP_UP_SERVICES,
+  GarmentCategory,
+  Role,
+} from '@growfast/shared-types';
 import type { TopUpServiceItem } from '@growfast/shared-types';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface GarmentPhotoSlot {
   unitNumber: number;
@@ -73,11 +81,51 @@ export interface LaundryWeightOrderEntryProps {
   onRemoveBatchPhotoFromItem?: (itemIndex: number, photoId: string) => void;
   isSubmitting?: boolean;
   pendingPickupsCount?: number;
-  className?: string;
   topUpServices?: TopUpServiceItem[];
+  canEditPrice?: boolean;
+  onPriceUpdated?: (garmentCatalogId: string, serviceTypeId: string, newPrice: number) => void;
+  className?: string;
 }
 
 export const AVAILABLE_ADDONS: TopUpServiceItem[] = DEFAULT_TOP_UP_SERVICES;
+
+export const CANONICAL_WEIGHT_SERVICES = [
+  {
+    id: 'svc-wash-iron',
+    name: 'Wash and Steam Iron',
+    category: 'WASH_IRON',
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-wash-fold',
+    name: 'Wash and Fold',
+    category: 'WASH',
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-white',
+    name: 'Laundry for White',
+    category: 'WASH',
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-premium',
+    name: 'Premium Laundry',
+    category: 'WASH',
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-woolen',
+    name: 'Woolen Laundry',
+    category: 'WASH',
+    estimatedDays: 3,
+    isActive: true,
+  },
+] as const;
 
 export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = ({
   services,
@@ -92,6 +140,8 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
   isSubmitting = false,
   className = '',
   topUpServices,
+  canEditPrice,
+  onPriceUpdated,
 }) => {
   // Canonical priority for Per-Weight Laundry service selection display:
   // 1. Wash and Steam Iron
@@ -131,90 +181,109 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
     return 999;
   };
 
-  // Available Laundry Services: Strictly wash-related services excluding Standard Wash
+  // Available Laundry Services: All 5 canonical services guaranteed in specified order
   const laundryServices = useMemo(() => {
-    const validWeightServiceNames = [
-      'wash and steam iron',
-      'wash + steam iron',
-      'wash & steam iron',
-      'wash and fold',
-      'wash & fold',
-      'laundry for white',
-      'premium laundry',
-      'woolen laundry',
-    ];
-    const filtered = services.filter((s) => {
-      const id = s.id?.toLowerCase() || '';
-      const name = s.name.trim().toLowerCase();
+    return CANONICAL_WEIGHT_SERVICES.map((canonical) => {
+      const match = services.find((s) => {
+        const sId = (s.id || '').toLowerCase();
+        const sName = (s.name || '').trim().toLowerCase();
 
-      // Explicitly exclude Standard Wash from Per-Weight creation workflow
-      if (id === 'svc-wash' || name === 'standard wash') {
+        // Standard Wash is never a match
+        if (sId === 'svc-wash' || sName === 'standard wash') return false;
+
+        if (canonical.id === 'svc-wash-iron') {
+          return (
+            sId === 'svc-wash-iron' ||
+            sName === 'wash and steam iron' ||
+            sName === 'wash & steam iron' ||
+            sName === 'wash + steam iron' ||
+            (sName.includes('steam') && sName.includes('iron'))
+          );
+        }
+        if (canonical.id === 'svc-wash-fold') {
+          return (
+            sId === 'svc-wash-fold' ||
+            sName === 'wash and fold' ||
+            sName === 'wash & fold' ||
+            (sName.includes('fold') && !sName.includes('iron'))
+          );
+        }
+        if (canonical.id === 'svc-laundry-white') {
+          return sId === 'svc-laundry-white' || sName.includes('white');
+        }
+        if (canonical.id === 'svc-laundry-premium') {
+          return sId === 'svc-laundry-premium' || sName.includes('premium');
+        }
+        if (canonical.id === 'svc-laundry-woolen') {
+          return sId === 'svc-laundry-woolen' || sName.includes('woolen');
+        }
         return false;
+      });
+
+      if (match) {
+        return {
+          ...match,
+          name: match.name || canonical.name,
+        };
       }
-
-      return (
-        s.isActive !== false &&
-        (validWeightServiceNames.includes(name) ||
-          s.category === 'WASH' ||
-          s.category === 'WASH_IRON' ||
-          s.category === 'WEIGHT_BASED') &&
-        name !== 'dry clean' &&
-        s.category !== 'DRY_CLEAN' &&
-        name !== 'free shoe' &&
-        name !== 'reprocess cleaning' &&
-        name !== 'shoe cleaning' &&
-        s.category !== 'SHOE_CLEAN' &&
-        s.category !== 'LEATHER_CLEAN' &&
-        s.category !== 'STAIN_REMOVAL' &&
-        s.category !== 'STEAM_PRESS' &&
-        !name.includes('starch')
-      );
-    });
-
-    // Enforce specified order:
-    // 1. Wash and Steam Iron
-    // 2. Wash and Fold
-    // 3. Laundry for White
-    // 4. Premium Laundry
-    // 5. Woolen Laundry
-    return [...filtered].sort((a, b) => {
-      const pA = getWeightServicePriority(a);
-      const pB = getWeightServicePriority(b);
-      return pA - pB;
+      return { ...canonical };
     });
   }, [services]);
 
   // Selected Service state (default to first available: Wash and Steam Iron)
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
-    return laundryServices[0]?.id || '';
+    return laundryServices[0]?.id || 'svc-wash-iron';
   });
 
   // Ensure valid selectedServiceId
   const activeService = useMemo(() => {
     return (
       laundryServices.find((s) => s.id === selectedServiceId) ||
-      laundryServices[0] || { id: 'svc-wash-iron', name: 'Wash and Steam Iron' }
+      laundryServices[0] ||
+      CANONICAL_WEIGHT_SERVICES[0]
     );
   }, [laundryServices, selectedServiceId]);
 
-  // Bulk Laundry / Weight Garment
+  let authContext: any = null;
+  try {
+    authContext = useAuth();
+  } catch {
+    authContext = null;
+  }
+  const employee = authContext?.employee;
+  const token = authContext?.token;
+  const isRoleAuthorized = employee?.role === Role.OWNER;
+  const isPriceEditable = canEditPrice !== undefined ? canEditPrice : isRoleAuthorized;
+
+  // Canonical Authoritative Weight Garment (Weight Based, g-wb-1)
   const activeWeightGarment = useMemo(() => {
     return (
-      weightGarments.find((g) => g.name.toLowerCase().includes('bulk')) ||
+      weightGarments.find(
+        (g) =>
+          (g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED) &&
+          (g.id === 'g-wb-1' || g.name === 'Weight Based'),
+      ) ||
+      weightGarments.find((g) => g.id === 'g-wb-1' || g.name === 'Weight Based') ||
+      weightGarments.find(
+        (g) => g.category === 'WEIGHT_BASED' || g.category === GarmentCategory.WEIGHT_BASED,
+      ) ||
       weightGarments[0] || {
-        id: 'g-wb-10',
-        name: 'Bulk Laundry',
+        id: 'g-wb-1',
+        name: 'Weight Based',
         category: 'WEIGHT_BASED',
       }
     );
   }, [weightGarments]);
 
-  // Price per KG for the active service
-  const pricePerKg = useMemo(() => {
+  // Configured price per KG from authoritative store pricing
+  const configuredPricePerKg = useMemo(() => {
+    const targetGarmentId = activeWeightGarment?.id || 'g-wb-1';
     const match = prices.find(
       (p) =>
         p.serviceTypeId === activeService.id &&
-        (p.garmentCatalogId === activeWeightGarment?.id || !p.garmentCatalogId),
+        (p.garmentCatalogId === targetGarmentId ||
+          p.garmentCatalogId === 'g-wb-1' ||
+          !p.garmentCatalogId),
     );
     if (match && match.price > 0) return match.price;
 
@@ -226,6 +295,90 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
     if (name.includes('iron') || name.includes('steam')) return 95;
     return 80;
   }, [prices, activeService, activeWeightGarment]);
+
+  // Track session overrides and editable rate state
+  const [rateOverrides, setRateOverrides] = useState<Record<string, number>>({});
+  const [rateInput, setRateInput] = useState<string>(() => String(configuredPricePerKg));
+  const [rateError, setRateError] = useState<string | null>(null);
+  const [isSavingRate, setIsSavingRate] = useState<boolean>(false);
+  const [rateSaveSuccess, setRateSaveSuccess] = useState<boolean>(false);
+
+  // Price per KG for the active service (effective unit rate)
+  const pricePerKg = useMemo(() => {
+    if (
+      rateOverrides[activeService.id] !== undefined &&
+      rateOverrides[activeService.id] > 0
+    ) {
+      return rateOverrides[activeService.id];
+    }
+    return configuredPricePerKg;
+  }, [rateOverrides, activeService.id, configuredPricePerKg]);
+
+  // Synchronize rate input when active service changes
+  useEffect(() => {
+    const currentRate =
+      rateOverrides[activeService.id] !== undefined && rateOverrides[activeService.id] > 0
+        ? rateOverrides[activeService.id]
+        : configuredPricePerKg;
+    setRateInput(String(currentRate));
+    setRateError(null);
+    setRateSaveSuccess(false);
+  }, [activeService.id, configuredPricePerKg]);
+
+  const handleSaveRate = async (rateToPersist?: number) => {
+    if (!isPriceEditable) return;
+    const num = rateToPersist !== undefined ? rateToPersist : parseFloat(rateInput);
+    if (isNaN(num) || num <= 0) {
+      setRateError('Rate must be greater than 0');
+      return;
+    }
+    setRateError(null);
+    setIsSavingRate(true);
+    setRateSaveSuccess(false);
+
+    try {
+      const authToken =
+        token || localStorage.getItem('token') || localStorage.getItem('growfast_token');
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const targetGarmentId = activeWeightGarment?.id || 'g-wb-1';
+
+      const res = await fetch(`${apiUrl}/pricing/${targetGarmentId}/${activeService.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ price: num }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `Failed to save pricing (${res.status})`);
+      }
+
+      setRateOverrides((prev) => ({ ...prev, [activeService.id]: num }));
+      setRateSaveSuccess(true);
+      if (onPriceUpdated) {
+        onPriceUpdated(targetGarmentId, activeService.id, num);
+      }
+      setTimeout(() => setRateSaveSuccess(false), 3000);
+    } catch (err: any) {
+      setRateError(err.message || 'Failed to persist pricing update');
+    } finally {
+      setIsSavingRate(false);
+    }
+  };
+
+  const handleRateInputChange = (val: string) => {
+    setRateInput(val);
+    const num = parseFloat(val);
+    if (val.trim() === '' || isNaN(num) || num <= 0) {
+      setRateError('Rate must be greater than 0');
+    } else {
+      setRateError(null);
+      setRateOverrides((prev) => ({ ...prev, [activeService.id]: num }));
+    }
+  };
 
   // Dynamic Top Up Services
   const [availableAddons, setAvailableAddons] = useState<TopUpServiceItem[]>(
@@ -429,6 +582,17 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
       return;
     }
 
+    if (isPriceEditable) {
+      const currentInputRate = parseFloat(rateInput);
+      if (isNaN(currentInputRate) || currentInputRate <= 0) {
+        setRateError('Please enter a valid rate greater than 0.');
+        return;
+      }
+      if (currentInputRate !== configuredPricePerKg) {
+        handleSaveRate(currentInputRate);
+      }
+    }
+
     const count = Math.max(1, garmentsCountInput || 1);
     const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + a.price, 0);
     const baseTotal = Math.round(wt * pricePerKg * 100) / 100;
@@ -503,9 +667,9 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
     const name = serviceName.trim().toLowerCase();
     if (name.includes('iron') || name.includes('steam')) {
       return (
-        <div className="w-12 h-12 rounded-full border border-pink-200 bg-pink-50 flex items-center justify-center text-pink-600 transition-transform group-hover:scale-105">
+        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-pink-100 bg-pink-50 flex items-center justify-center text-pink-500 transition-transform group-hover:scale-105">
           <svg
-            className="w-6 h-6 stroke-current"
+            className="w-5 h-5 sm:w-6 sm:h-6 stroke-current"
             viewBox="0 0 24 24"
             fill="none"
             strokeWidth="1.8"
@@ -522,16 +686,16 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
     }
     if (name.includes('fold')) {
       return (
-        <div className="w-12 h-12 rounded-full border border-pink-200 bg-pink-50 flex items-center justify-center text-pink-600 transition-transform group-hover:scale-105">
-          <Shirt size={24} strokeWidth={1.8} />
+        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-pink-100 bg-pink-50 flex items-center justify-center text-pink-500 transition-transform group-hover:scale-105">
+          <Shirt className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
         </div>
       );
     }
     // Washing Machine for Premium, Woolen, and Whites
     return (
-      <div className="w-12 h-12 rounded-full border border-slate-300 bg-slate-100 flex items-center justify-center text-slate-600 transition-transform group-hover:scale-105">
+      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-slate-200 bg-slate-100 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-105">
         <svg
-          className="w-6 h-6 stroke-current"
+          className="w-5 h-5 sm:w-6 sm:h-6 stroke-current"
           viewBox="0 0 24 24"
           fill="none"
           strokeWidth="1.8"
@@ -550,20 +714,29 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
 
   return (
     <div
-      className={`flex flex-col w-full h-full min-h-0 bg-white font-sans ${className}`}
-      style={{ background: 'var(--bg-surface, #ffffff)' }}
+      className={`flex flex-col w-full h-full min-h-0 font-sans ${className}`}
+      style={{ background: 'var(--bg-app)' }}
     >
       {/* ─── MAIN SPLIT INTERFACE ─── */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         {/* LEFT PANEL: Service Cards + Weight Form Controls */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 sm:p-6 border-r border-slate-200">
+        <div
+          className="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 sm:p-6 border-r"
+          style={{
+            background: 'var(--bg-surface)',
+            borderColor: 'var(--border)',
+          }}
+        >
           {/* Service Cards Row */}
           <div className="mb-6">
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+            <label
+              className="block text-xs font-bold uppercase tracking-wider mb-2.5"
+              style={{ color: 'var(--text-muted)' }}
+            >
               Select Laundry Service:
             </label>
             <div
-              className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3"
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3"
               role="radiogroup"
               aria-label="Laundry Services"
             >
@@ -577,27 +750,40 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => setSelectedServiceId(svc.id)}
-                    className={`group relative flex flex-col items-center justify-between p-3 rounded-sm border transition-all text-center min-h-[110px] cursor-pointer select-none ${
-                      isSelected
-                        ? 'border-2 border-slate-800 bg-slate-50 shadow-xs'
-                        : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50/50'
-                    }`}
+                    className="group relative flex flex-col items-center justify-between p-2.5 sm:p-3 transition-all text-center min-h-[115px] sm:min-h-[120px] cursor-pointer select-none"
+                    style={{
+                      borderRadius: '16px',
+                      background: 'var(--bg-surface)',
+                      border: isSelected ? '2px solid #2563eb' : '1px solid var(--border)',
+                      boxShadow: isSelected
+                        ? '0 4px 14px rgba(37, 99, 235, 0.25)'
+                        : 'var(--shadow-neu-card-sm)',
+                    }}
                   >
                     {/* Service Name */}
                     <span
-                      className={`text-xs font-semibold leading-tight line-clamp-2 h-8 flex items-center justify-center ${
-                        isSelected ? 'text-slate-900 font-bold' : 'text-slate-700'
-                      }`}
+                      className="text-xs font-semibold leading-tight line-clamp-2 h-8 flex items-center justify-center"
+                      style={{
+                        color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        fontWeight: isSelected ? 700 : 600,
+                      }}
                     >
                       {formattedName}
                     </span>
 
                     {/* Circular Icon */}
-                    <div className="my-1.5">{renderServiceIcon(svc.name)}</div>
+                    <div className="my-1.5 flex items-center justify-center">
+                      {renderServiceIcon(svc.name)}
+                    </div>
 
                     {/* Selection Indicator Dot/Tag */}
-                    {isSelected && (
+                    {isSelected ? (
                       <span className="inline-block w-2 h-2 rounded-full bg-blue-600 mt-1" />
+                    ) : (
+                      <span
+                        className="inline-block w-2 h-2 mt-1 opacity-0 pointer-events-none"
+                        aria-hidden="true"
+                      />
                     )}
                   </button>
                 );
@@ -677,14 +863,81 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
               </div>
 
               {/* Row 2: Price/ KG */}
-              <div className="flex items-stretch shadow-2xs">
-                <div className="w-36 sm:w-44 bg-slate-200 text-slate-700 font-semibold text-sm sm:text-base flex items-center justify-center border border-slate-300 rounded-l-sm select-none">
-                  Price/ KG
+              {isPriceEditable ? (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-stretch shadow-2xs">
+                    <div className="w-36 sm:w-44 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-base flex items-center justify-center border border-slate-300 dark:border-slate-700 rounded-l-sm select-none gap-1.5">
+                      <span>Price/ KG</span>
+                      <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded tracking-wide">
+                        Admin
+                      </span>
+                    </div>
+                    <div className="relative flex-1 flex items-center">
+                      <input
+                        id="laundry-price-per-kg-input"
+                        type="number"
+                        min="1"
+                        step="any"
+                        value={rateInput}
+                        onChange={(e) => handleRateInputChange(e.target.value)}
+                        onBlur={() => {
+                          const num = parseFloat(rateInput);
+                          if (!isNaN(num) && num > 0 && num !== configuredPricePerKg) {
+                            handleSaveRate(num);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSaveRate();
+                          }
+                        }}
+                        aria-label="Price per kilogram (Admin editable)"
+                        className="w-full h-13 px-4 bg-white dark:bg-slate-900 border border-l-0 border-slate-300 dark:border-slate-700 rounded-r-sm text-2xl sm:text-3xl font-extrabold text-center text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-16"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1">
+                        {isSavingRate ? (
+                          <RefreshCw size={16} className="text-blue-500 animate-spin" />
+                        ) : rateSaveSuccess ? (
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                            <Check size={13} /> Saved
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSaveRate()}
+                            title="Save updated rate to store catalog pricing"
+                            className="h-8 px-2 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50 rounded border border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition-colors cursor-pointer"
+                          >
+                            Save
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {rateError && (
+                    <span className="text-xs font-bold text-red-600 flex items-center gap-1 pl-1">
+                      <AlertCircle size={13} /> {rateError}
+                    </span>
+                  )}
                 </div>
-                <div className="flex-1 h-13 px-4 bg-white border border-l-0 border-slate-300 rounded-r-sm text-2xl sm:text-3xl font-extrabold text-center text-slate-800 flex items-center justify-center select-all">
-                  {pricePerKg}
+              ) : (
+                <div className="flex items-stretch shadow-2xs">
+                  <div className="w-36 sm:w-44 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-sm sm:text-base flex items-center justify-center border border-slate-300 dark:border-slate-700 rounded-l-sm select-none gap-1.5">
+                    <Lock size={14} className="text-slate-500" />
+                    <span>Price/ KG</span>
+                  </div>
+                  <div
+                    id="laundry-price-per-kg-display"
+                    className="flex-1 h-13 px-4 bg-slate-50 dark:bg-slate-800/60 border border-l-0 border-slate-300 dark:border-slate-700 rounded-r-sm text-2xl sm:text-3xl font-extrabold text-center text-slate-800 dark:text-slate-100 flex items-center justify-center select-all relative"
+                  >
+                    <span>{pricePerKg}</span>
+                    <span className="absolute right-3 text-[11px] font-medium text-slate-500 hidden sm:inline-block">
+                      (Configured Rate)
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Row 3: No. of Garments */}
               <div className="flex items-stretch shadow-2xs">
@@ -1013,11 +1266,18 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                   id="laundry-add-to-cart-btn"
                   onClick={handleAddToCart}
                   disabled={!isWeightValid}
-                  className={`w-full h-12 rounded-sm font-bold text-base tracking-wide flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer min-h-[44px] ${
-                    isWeightValid
-                      ? 'bg-[#2563eb] hover:bg-blue-700 text-white active:scale-[0.99]'
-                      : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
-                  }`}
+                  className="w-full h-12 font-bold text-base tracking-wide flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[44px] active:scale-[0.99]"
+                  style={{
+                    borderRadius: '9999px',
+                    background: isWeightValid
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                      : 'var(--border)',
+                    boxShadow: isWeightValid
+                      ? '0 4px 12px rgba(37, 99, 235, 0.35)'
+                      : 'none',
+                    color: isWeightValid ? '#ffffff' : 'var(--text-muted)',
+                    border: 'none',
+                  }}
                 >
                   <Plus size={18} strokeWidth={2.5} />
                   <span>Add to Cart</span>
@@ -1029,8 +1289,8 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
 
         {/* RIGHT PANEL: Selected Garments & Checkout (Matching Screenshot 1) */}
         <div
-          className="w-full lg:w-[420px] xl:w-[450px] shrink-0 flex flex-col bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 h-full min-h-0"
-          style={{ background: '#f8fafc' }}
+          className="w-full lg:w-[420px] xl:w-[450px] shrink-0 flex flex-col border-t lg:border-t-0 lg:border-l h-full min-h-0"
+          style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}
         >
           {/* Header */}
           <div className="px-5 pt-4 pb-2">
@@ -1199,21 +1459,21 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
           </div>
 
           {/* Bottom Summary Box (Dual cell matching Screenshot 1) */}
-          <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0 space-y-3">
+          <div className="p-4 bg-[var(--bg-surface)] border-t border-[var(--border)] shrink-0 space-y-3">
             {/* Boxed Summary Table */}
-            <div className="border border-slate-300 rounded-sm bg-white grid grid-cols-2 divide-x divide-slate-300 overflow-hidden shadow-2xs">
+            <div className="border border-[var(--border)] rounded-2xl bg-[var(--bg-surface-inset)] grid grid-cols-2 divide-x divide-[var(--border)] overflow-hidden shadow-[var(--shadow-neu-inset)]">
               {/* Left Cell: Weight & Garments */}
-              <div className="p-3 flex flex-col justify-center space-y-1 text-xs sm:text-sm font-bold text-slate-800">
+              <div className="p-3.5 flex flex-col justify-center space-y-1 text-xs sm:text-sm font-bold text-[var(--text-secondary)]">
                 <div>
-                  Weight (KG) : <span className="font-extrabold text-blue-600">{totalWeight}</span>
+                  Weight (KG) : <span className="font-extrabold text-blue-600 dark:text-blue-400">{totalWeight}</span>
                 </div>
                 <div>
-                  Garments : <span className="font-extrabold text-slate-900">{totalGarments}</span>
+                  Garments : <span className="font-extrabold text-[var(--text-primary)]">{totalGarments}</span>
                 </div>
               </div>
 
               {/* Right Cell: Total Amount in INR */}
-              <div className="p-3 flex items-center justify-center font-extrabold text-xl sm:text-2xl text-slate-900 select-all">
+              <div className="p-3.5 flex items-center justify-center font-extrabold text-xl sm:text-2xl text-[var(--text-primary)] select-all">
                 INR {totalAmount.toFixed(0)}
               </div>
             </div>
@@ -1224,10 +1484,10 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
               id="laundry-weight-checkout-btn"
               onClick={onCheckout}
               disabled={items.length === 0 || isSubmitting}
-              className={`w-full h-12 rounded-sm font-bold text-base text-white tracking-wide transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer min-h-[44px] ${
+              className={`w-full h-12 rounded-full font-bold text-base text-white tracking-wide transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[44px] ${
                 items.length > 0 && !isSubmitting
-                  ? 'bg-[#2563eb] hover:bg-blue-700 active:scale-[0.99]'
-                  : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] shadow-blue-500/25'
+                  : 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-80'
               }`}
             >
               {isSubmitting ? (
@@ -1248,18 +1508,18 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
           role="dialog"
           aria-modal="true"
           aria-label="Select Add-ons"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
         >
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <Tag size={17} className="text-blue-600" />
+          <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl shadow-[var(--shadow-neu-card)] border border-[var(--border)] overflow-hidden animate-in fade-in-50 zoom-in-95">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+              <h3 className="font-bold text-base text-[var(--text-primary)] flex items-center gap-2">
+                <Tag size={17} className="text-blue-600 dark:text-blue-400" />
                 Select Supported Add-ons
               </h3>
               <button
                 type="button"
                 onClick={() => setIsAddonModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-surface-inset)] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1271,10 +1531,10 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                 return (
                   <label
                     key={addon.id}
-                    className={`flex items-center justify-between p-3 rounded border cursor-pointer transition-colors ${
+                    className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
                       isSelected
-                        ? 'border-blue-600 bg-blue-50/70'
-                        : 'border-slate-200 hover:bg-slate-50'
+                        ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 shadow-xs'
+                        : 'border-[var(--border)] hover:bg-[var(--bg-surface-inset)]'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1291,21 +1551,21 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                         className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                       />
                       <div>
-                        <p className="text-sm font-bold text-slate-800">{addon.name}</p>
-                        <p className="text-xs text-slate-500">{addon.description}</p>
+                        <p className="text-sm font-bold text-[var(--text-primary)]">{addon.name}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{addon.description}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-extrabold text-slate-900">+₹{addon.price}</span>
+                    <span className="text-sm font-extrabold text-[var(--text-primary)]">+₹{addon.price}</span>
                   </label>
                 );
               })}
             </div>
 
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+            <div className="px-5 py-3.5 bg-[var(--bg-surface-inset)] border-t border-[var(--border)] flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsAddonModalOpen(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700 cursor-pointer"
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 cursor-pointer"
               >
                 Done
               </button>
@@ -1320,18 +1580,18 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
           role="dialog"
           aria-modal="true"
           aria-label="Garment Details & Notes"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
         >
-          <div className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <FileText size={17} className="text-blue-600" />
+          <div className="w-full max-w-md bg-[var(--bg-surface)] rounded-2xl shadow-[var(--shadow-neu-card)] border border-[var(--border)] overflow-hidden animate-in fade-in-50 zoom-in-95">
+            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
+              <h3 className="font-bold text-base text-[var(--text-primary)] flex items-center gap-2">
+                <FileText size={17} className="text-blue-600 dark:text-blue-400" />
                 Garment Details &amp; Notes
               </h3>
               <button
                 type="button"
                 onClick={() => setIsGarmentDetailsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-surface-inset)] transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1339,7 +1599,7 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
 
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">
                   Item Breakdown (e.g. 3 Shirts, 2 Pants, 1 Kurta)
                 </label>
                 <textarea
@@ -1347,12 +1607,12 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                   value={garmentBreakdown}
                   onChange={(e) => setGarmentBreakdown(e.target.value)}
                   placeholder="Note specific garments inside this laundry bag..."
-                  className="w-full p-2.5 text-xs sm:text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full p-3 text-xs sm:text-sm border border-[var(--border)] rounded-xl bg-[var(--bg-surface-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-[var(--shadow-neu-inset)]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">
                   Fabric Condition / Defect Notes
                 </label>
                 <textarea
@@ -1360,16 +1620,16 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                   value={defectNotes}
                   onChange={(e) => setDefectNotes(e.target.value)}
                   placeholder="E.g. Color bleed risk, collar stain, missing button..."
-                  className="w-full p-2.5 text-xs sm:text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full p-3 text-xs sm:text-sm border border-[var(--border)] rounded-xl bg-[var(--bg-surface-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-[var(--shadow-neu-inset)]"
                 />
               </div>
             </div>
 
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+            <div className="px-5 py-3.5 bg-[var(--bg-surface-inset)] border-t border-[var(--border)] flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsGarmentDetailsModalOpen(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700 cursor-pointer"
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 cursor-pointer"
               >
                 Save Details
               </button>

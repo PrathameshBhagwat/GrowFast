@@ -289,37 +289,37 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
         )}
 
         {/* 1. Authoritative Financial Summary Bar */}
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-sm">
+        <div className="p-4 bg-[var(--bg-surface-inset)] border border-[var(--border)] rounded-2xl shadow-[var(--shadow-neu-inset)] space-y-2.5 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-semibold text-gray-700">Financial Balance</span>
+            <span className="font-semibold text-[var(--text-primary)]">Financial Balance</span>
             <span
-              className={`px-2.5 py-0.5 text-xs font-bold rounded-full border ${
+              className={`px-3 py-0.5 text-xs font-bold rounded-full border ${
                 order.paymentStatus === 'PAID'
-                  ? 'bg-green-100 text-green-800 border-green-200'
+                  ? 'bg-green-100 dark:bg-emerald-950/60 text-green-800 dark:text-emerald-300 border-green-200 dark:border-emerald-800'
                   : order.paymentStatus === 'PARTIAL'
-                    ? 'bg-amber-100 text-amber-800 border-amber-200'
-                    : 'bg-red-100 text-red-800 border-red-200'
+                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                    : 'bg-red-100 dark:bg-rose-950/60 text-red-800 dark:text-rose-300 border-red-200 dark:border-rose-800'
               }`}
             >
               {order.paymentStatus}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-gray-200/80 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-[var(--border)] text-xs">
             <div>
-              <span className="text-gray-500 block">Total Amount</span>
-              <span className="font-bold text-gray-900 text-sm">₹{order.totalAmount}</span>
+              <span className="text-[var(--text-secondary)] block">Total Amount</span>
+              <span className="font-bold text-[var(--text-primary)] text-sm">₹{order.totalAmount}</span>
             </div>
             <div>
-              <span className="text-gray-500 block">Amount Paid</span>
-              <span className="font-bold text-green-700 text-sm">₹{order.amountPaid}</span>
+              <span className="text-[var(--text-secondary)] block">Amount Paid</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">₹{order.amountPaid}</span>
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <span className="text-gray-500 block">Amount Due</span>
+              <span className="text-[var(--text-secondary)] block">Amount Due</span>
               <span
                 id="modal-amount-due"
                 className={`font-bold text-sm ${
-                  order.amountDue === 0 ? 'text-green-600' : 'text-red-600'
+                  order.amountDue === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                 }`}
               >
                 ₹{order.amountDue}
@@ -328,12 +328,12 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
           </div>
 
           {order.amountDue === 0 ? (
-            <div className="text-xs text-green-700 dark:text-emerald-400 font-semibold flex items-center gap-1.5 pt-1">
-              <CheckCircle2 size={15} className="text-green-600 dark:text-emerald-400" />
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1.5 pt-1">
+              <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400" />
               Order fully settled — No handover payment required.
             </div>
           ) : (
-            <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 p-2 rounded border border-amber-200 dark:border-amber-900/50 flex items-start gap-1.5">
+            <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 flex items-start gap-1.5">
               <AlertTriangle
                 size={15}
                 className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
@@ -347,17 +347,17 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
         </div>
 
         {/* 2. Selection Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-[var(--bg-surface-inset)] border border-[var(--border)] rounded-2xl shadow-[var(--shadow-neu-inset)]">
           <div>
             <div className="text-xs text-blue-800 dark:text-blue-300 font-semibold uppercase tracking-wider">
               Handover Selection
             </div>
-            <div className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">
-              <span id="selected-handover-count" className="text-blue-700 dark:text-blue-400">
+            <div className="text-sm font-bold text-[var(--text-primary)] mt-0.5">
+              <span id="selected-handover-count" className="text-blue-600 dark:text-blue-400">
                 {totalSelectedCount} selected
               </span>{' '}
-              <span className="text-gray-400 font-normal">/</span>{' '}
-              <span id="remaining-handover-count" className="text-gray-600 dark:text-slate-400">
+              <span className="text-[var(--text-muted)] font-normal">/</span>{' '}
+              <span id="remaining-handover-count" className="text-[var(--text-secondary)]">
                 {remainingAfterHandover} remaining
               </span>
             </div>
@@ -370,7 +370,7 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
                   type="button"
                   onClick={handleSelectAllReady}
                   disabled={isSubmitting}
-                  className="px-3 py-1.5 text-xs font-bold text-blue-700 dark:text-blue-300 bg-white dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/60 rounded-lg min-h-[44px] flex items-center gap-1 transition-colors"
+                  className="px-4 py-2 text-xs font-bold text-blue-700 dark:text-blue-300 bg-[var(--bg-surface)] border border-[var(--border)] hover:bg-[var(--bg-surface-hover)] rounded-full min-h-[44px] flex items-center gap-1.5 transition-all shadow-[var(--shadow-neu-card-sm)] cursor-pointer"
                   id="select-all-ready-btn"
                 >
                   <Sparkles size={14} /> Select All Ready
@@ -380,7 +380,7 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
                     type="button"
                     onClick={handleDeselectAll}
                     disabled={isSubmitting}
-                    className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg min-h-[44px] flex items-center transition-colors"
+                    className="px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border)] hover:bg-[var(--bg-surface-hover)] rounded-full min-h-[44px] flex items-center transition-all shadow-[var(--shadow-neu-card-sm)] cursor-pointer"
                     id="deselect-all-btn"
                   >
                     Clear

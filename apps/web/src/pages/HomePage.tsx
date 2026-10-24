@@ -494,25 +494,25 @@ export const HomePage: React.FC = () => {
           >
             <div
               style={{
-                width: '40px',
-                height: '40px',
-                minWidth: '40px',
-                minHeight: '40px',
-                borderRadius: '10px',
-                background: `linear-gradient(135deg, ${config.color} 0%, ${config.color}CC 100%)`,
+                width: '42px',
+                height: '42px',
+                minWidth: '42px',
+                minHeight: '42px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#FFFFFF',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
               }}
             >
-              <Shirt size={20} />
+              <Shirt size={22} />
             </div>
             <div style={{ minWidth: 0 }}>
               <h1
                 style={{
-                  fontSize: '1.05rem',
+                  fontSize: '1.1rem',
                   fontWeight: 800,
                   margin: 0,
                   color: 'var(--text-primary, #0F172A)',
@@ -529,10 +529,10 @@ export const HomePage: React.FC = () => {
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  maxWidth: '300px',
+                  maxWidth: '320px',
                 }}
               >
-                {employee.name} · {employee.role === 'COUNTER' ? 'Counter' : employee.role} (
+                {employee.name} • {employee.role === 'COUNTER' ? 'COUNTER' : employee.role} (
                 {employee.storeName})
               </span>
             </div>
@@ -548,9 +548,7 @@ export const HomePage: React.FC = () => {
               flexShrink: 0,
             }}
           >
-            {(employee.role === 'OWNER' ||
-              employee.role === 'MANAGER' ||
-              employee.role === 'COUNTER') && (
+            {employee.role === 'OWNER' && (
               <Button
                 id="home-dashboard"
                 variant="outline"
@@ -738,7 +736,7 @@ export const HomePage: React.FC = () => {
               onClick={() => setIsFindOrderModalOpen(true)}
               icon={<Search size={15} />}
               aria-label="Find / Edit Order"
-              style={{ minHeight: '38px', whiteSpace: 'nowrap' }}
+              style={{ minHeight: '38px', whiteSpace: 'nowrap', borderRadius: '9999px', fontSize: '0.825rem' }}
             >
               <span className="hidden sm:inline">Find / Edit Order</span>
               <span className="sm:hidden">Find Order</span>
@@ -781,29 +779,29 @@ export const HomePage: React.FC = () => {
             style={{
               background: 'var(--bg-surface, #FFFFFF)',
               border: '1px solid var(--border, #E2E8F0)',
-              borderLeft: '4px solid var(--accent, #2563EB)',
-              borderRadius: '12px',
-              padding: '14px 18px',
+              borderRadius: '16px',
+              padding: '16px 20px',
               marginBottom: '20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+              gap: '14px',
+              boxShadow: 'var(--shadow-neu-card-sm)',
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '240px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '240px' }}>
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: 'var(--accent-muted, #EFF6FF)',
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'var(--accent, #2563EB)',
+                  color: '#FFFFFF',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.25)',
                   flexShrink: 0,
                 }}
               >
@@ -812,23 +810,25 @@ export const HomePage: React.FC = () => {
               <div>
                 <strong
                   style={{
-                    fontSize: '0.9rem',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
                     color: 'var(--text-primary, #0F172A)',
                     display: 'block',
                   }}
                 >
                   Counter Operational Screen
                 </strong>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748B)' }}>
+                <span style={{ fontSize: '0.825rem', color: 'var(--text-muted, #64748B)' }}>
                   {dueOrdersCount != null && dueOrdersCount > 0
-                    ? `${dueOrdersCount} orders requiring attention today. Click below to inspect.`
+                    ? `${dueOrdersCount} orders requiring attention today. Click below to inspect #`
                     : "Ready for walk-in customer lookup, new order intake, and today's due order handovers."}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Button
+                id="view-due-orders-alert-btn"
                 variant="outline"
                 size="sm"
                 onClick={() => {
@@ -837,7 +837,12 @@ export const HomePage: React.FC = () => {
                     fetchDueTodayOrders();
                   }
                 }}
-                style={{ minHeight: '38px', fontSize: '0.8rem' }}
+                style={{
+                  minHeight: '38px',
+                  borderRadius: '9999px',
+                  fontSize: '0.825rem',
+                  fontWeight: 600,
+                }}
                 aria-label="Quick inspect due orders"
               >
                 View Due Orders
@@ -856,7 +861,7 @@ export const HomePage: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--text-muted, #64748B)',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                 }}
               >
                 <X size={18} />
@@ -866,34 +871,63 @@ export const HomePage: React.FC = () => {
         )}
 
         {/* ─── 2. Customer Search / Invoice Section ───────────────────────── */}
-        <Card padding="lg" elevated style={{ marginBottom: '20px' }}>
+        <Card
+          padding="lg"
+          elevated
+          style={{
+            marginBottom: '20px',
+            borderRadius: '20px',
+            border: '1px solid var(--border, #E2E8F0)',
+            background: 'var(--bg-surface, #FFFFFF)',
+            boxShadow: 'var(--shadow-neu-card)',
+            padding: '24px 28px',
+          }}
+        >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '16px',
+              marginBottom: '20px',
               flexWrap: 'wrap',
-              gap: '12px',
+              gap: '14px',
             }}
           >
-            <div>
-              <h2
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div
                 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  margin: '0 0 4px',
-                  color: 'var(--text-primary, #0F172A)',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.25)',
+                  flexShrink: 0,
                 }}
               >
-                Search Customer / Invoice
-              </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748B)', margin: 0 }}>
-                Lookup customer by name, mobile, ID, address, or search invoice #
-              </p>
+                <Calendar size={20} />
+              </div>
+              <div>
+                <h2
+                  style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    margin: '0 0 2px',
+                    color: 'var(--text-primary, #0F172A)',
+                  }}
+                >
+                  Search Customer / Invoice
+                </h2>
+                <p style={{ fontSize: '0.825rem', color: 'var(--text-muted, #64748B)', margin: 0 }}>
+                  Lookup customer by name, mobile, ID, address, or search invoice #
+                </p>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
                 id="find-edit-order-action-btn"
                 variant="outline"
@@ -901,7 +935,12 @@ export const HomePage: React.FC = () => {
                 icon={<Search size={16} />}
                 onClick={() => setIsFindOrderModalOpen(true)}
                 aria-label="Find / Edit Order"
-                style={{ minHeight: '44px', fontWeight: 600 }}
+                style={{
+                  minHeight: '44px',
+                  borderRadius: '9999px',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}
               >
                 Find / Edit Order
               </Button>
@@ -913,39 +952,50 @@ export const HomePage: React.FC = () => {
                 icon={<Plus size={18} />}
                 onClick={() => setIsCreateModalOpen(true)}
                 aria-label="Add New Customer"
-                style={{ minHeight: '44px', fontWeight: 600 }}
+                style={{
+                  minHeight: '44px',
+                  borderRadius: '9999px',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                }}
               >
                 Add New Customer
               </Button>
             </div>
           </div>
 
-          {/* Search Controls: [ Search icon ] [ Filter Select ▼ ] [ Search Input... ] [ Clear X ] */}
+          {/* Search Controls: [ Filter Select ▼ ] | [ Search icon ] [ Search Input... ] [ Clear X ] */}
           <div
             style={{
               display: 'flex',
-              gap: '10px',
               alignItems: 'center',
+              background: 'var(--bg-surface-inset, #F8FAFC)',
+              border: '1px solid var(--border, #E2E8F0)',
+              borderRadius: '14px',
+              boxShadow: 'var(--shadow-neu-inset)',
+              padding: '4px 8px',
+              gap: '6px',
               flexWrap: 'wrap',
-              marginBottom: debouncedQuery ? '12px' : '0',
+              marginBottom: debouncedQuery ? '14px' : '0',
             }}
           >
             {/* Filter Mode Selector */}
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
               <select
                 id="search-filter-mode"
                 aria-label="Search criteria filter"
                 value={filterMode}
                 onChange={(e) => setFilterMode(e.target.value as SearchFilterMode)}
                 style={{
-                  height: '44px',
-                  padding: '0 32px 0 12px',
+                  height: '42px',
+                  padding: '0 28px 0 10px',
                   fontSize: '0.875rem',
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 600,
-                  border: '1px solid var(--border-input, #CBD5E1)',
-                  borderRadius: '10px',
-                  background: 'var(--bg-input, #FFFFFF)',
+                  border: 'none',
+                  background: 'transparent',
                   color: 'var(--text-primary, #0F172A)',
                   cursor: 'pointer',
                   appearance: 'none',
@@ -959,11 +1009,11 @@ export const HomePage: React.FC = () => {
                 <option value="INVOICE">Invoice #</option>
               </select>
               <ChevronDown
-                size={16}
+                size={14}
                 color="var(--text-muted, #64748B)"
                 style={{
                   position: 'absolute',
-                  right: '10px',
+                  right: '8px',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
@@ -971,14 +1021,30 @@ export const HomePage: React.FC = () => {
               />
             </div>
 
+            <div
+              style={{
+                width: '1px',
+                height: '24px',
+                background: 'var(--border, #CBD5E1)',
+                flexShrink: 0,
+              }}
+            />
+
             {/* Search Input Box */}
-            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+            <div
+              style={{
+                position: 'relative',
+                flex: '1 1 240px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
               <Search
                 size={18}
                 color="var(--text-placeholder, #94A3B8)"
                 style={{
                   position: 'absolute',
-                  left: '14px',
+                  left: '10px',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
@@ -1003,15 +1069,14 @@ export const HomePage: React.FC = () => {
                 aria-label="Search Customer or Invoice"
                 style={{
                   width: '100%',
-                  padding: '11px 40px 11px 42px',
-                  fontSize: '0.95rem',
+                  padding: '11px 36px 11px 36px',
+                  fontSize: '0.925rem',
                   fontFamily: "'Inter', sans-serif",
-                  border: '1px solid var(--border-input, #CBD5E1)',
-                  borderRadius: '10px',
+                  border: 'none',
                   outline: 'none',
                   boxSizing: 'border-box',
-                  minHeight: '44px',
-                  background: 'var(--bg-input, #FFFFFF)',
+                  minHeight: '42px',
+                  background: 'transparent',
                   color: 'var(--text-primary, #0F172A)',
                 }}
               />
@@ -1515,10 +1580,14 @@ export const HomePage: React.FC = () => {
           className="todays-due-orders-card"
           style={{
             marginBottom: '24px',
+            borderRadius: '20px',
             border: isDueOrdersExpanded
               ? '1px solid var(--accent, #2563EB)'
               : '1px solid var(--border, #E2E8F0)',
-            transition: 'border-color 0.2s ease',
+            background: 'var(--bg-surface, #FFFFFF)',
+            boxShadow: 'var(--shadow-neu-card)',
+            padding: '22px 28px',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
           }}
         >
           {/* Action Header Banner */}
@@ -1531,19 +1600,20 @@ export const HomePage: React.FC = () => {
               gap: '14px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div
                 style={{
                   width: '44px',
                   height: '44px',
                   minWidth: '44px',
                   minHeight: '44px',
-                  borderRadius: '10px',
-                  background: 'var(--accent-muted, #EFF6FF)',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'var(--accent, #2563EB)',
+                  color: '#FFFFFF',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
                 }}
               >
                 <Clock size={22} />
@@ -1568,11 +1638,8 @@ export const HomePage: React.FC = () => {
                         borderRadius: '9999px',
                         fontSize: '0.75rem',
                         fontWeight: 700,
-                        background:
-                          dueOrdersCount > 0
-                            ? 'var(--accent, #2563EB)'
-                            : 'var(--bg-surface-muted, #F1F5F9)',
-                        color: dueOrdersCount > 0 ? '#FFFFFF' : 'var(--text-secondary, #475569)',
+                        background: '#2563eb',
+                        color: '#FFFFFF',
                       }}
                     >
                       {dueOrdersCount}
@@ -1592,7 +1659,7 @@ export const HomePage: React.FC = () => {
             </div>
 
             {/* Primary Action Button: [ View Today's Due Orders ] */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {isDueOrdersExpanded && (
                 <Button
                   variant="outline"
@@ -1601,7 +1668,7 @@ export const HomePage: React.FC = () => {
                   disabled={isLoadingDueOrders}
                   icon={<RotateCw size={14} className={isLoadingDueOrders ? 'animate-spin' : ''} />}
                   aria-label="Refresh today's due orders"
-                  style={{ minHeight: '44px' }}
+                  style={{ minHeight: '44px', borderRadius: '9999px' }}
                 >
                   Refresh
                 </Button>
@@ -1614,7 +1681,17 @@ export const HomePage: React.FC = () => {
                 icon={isDueOrdersExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 aria-expanded={isDueOrdersExpanded}
                 aria-controls="todays-due-orders-list-container"
-                style={{ minHeight: '44px', fontWeight: 600 }}
+                style={{
+                  minHeight: '44px',
+                  borderRadius: '9999px',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  padding: '0 20px',
+                  background: isDueOrdersExpanded
+                    ? undefined
+                    : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  boxShadow: isDueOrdersExpanded ? undefined : '0 4px 14px rgba(37, 99, 235, 0.35)',
+                }}
               >
                 {isDueOrdersExpanded ? 'Hide Due Orders' : "View Today's Due Orders"}
               </Button>

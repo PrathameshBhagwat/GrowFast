@@ -38,25 +38,11 @@ async function main() {
       pin: '111111',
     },
     {
-      id: 'emp-mgr-001',
-      name: 'Rajesh Nair',
-      email: 'rajesh@growfast.in',
-      role: 'MANAGER',
-      pin: '222222',
-    },
-    {
       id: 'emp-counter-001',
       name: 'Swapnil Shinde',
       email: 'swapnil@growfast.in',
       role: 'COUNTER',
       pin: '333333',
-    },
-    {
-      id: 'emp-delivery-001',
-      name: 'Kiran More',
-      email: 'kiran@growfast.in',
-      role: 'DELIVERY',
-      pin: '444444',
     },
   ];
   for (const emp of employees) {
@@ -106,8 +92,32 @@ async function main() {
     { id: 'svc-wash', name: 'Standard Wash', category: 'WASH', estimatedDays: 2 },
     {
       id: 'svc-wash-iron',
-      name: 'Wash + Steam Iron',
+      name: 'Wash and Steam Iron',
       category: 'WASH_IRON',
+      estimatedDays: 2,
+    },
+    {
+      id: 'svc-wash-fold',
+      name: 'Wash and Fold',
+      category: 'WASH',
+      estimatedDays: 2,
+    },
+    {
+      id: 'svc-laundry-premium',
+      name: 'Premium Laundry',
+      category: 'WASH',
+      estimatedDays: 2,
+    },
+    {
+      id: 'svc-laundry-woolen',
+      name: 'Woolen Laundry',
+      category: 'WASH',
+      estimatedDays: 3,
+    },
+    {
+      id: 'svc-laundry-white',
+      name: 'Laundry for White',
+      category: 'WASH',
       estimatedDays: 2,
     },
     {

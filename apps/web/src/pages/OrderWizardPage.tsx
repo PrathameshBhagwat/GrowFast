@@ -54,7 +54,7 @@ export function OrderWizardPage() {
   const navigate = useNavigate();
   const initialCustomerId = searchParams.get('customerId');
   const { token, employee } = useAuth();
-  const canModifyPrice = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
+  const canModifyPrice = employee?.role === Role.OWNER;
 
   // Entry mode state: Weight vs Pieces (Decision B)
   const paramMode = searchParams.get('mode')?.toUpperCase();
@@ -597,6 +597,28 @@ export function OrderWizardPage() {
     });
   };
 
+  const handlePriceUpdated = (
+    garmentCatalogId: string,
+    serviceTypeId: string,
+    newPrice: number,
+  ) => {
+    setPrices((prev) => {
+      const idx = prev.findIndex(
+        (p) =>
+          (p.garmentCatalogId === garmentCatalogId ||
+            (garmentCatalogId === 'g-wb-1' &&
+              (!p.garmentCatalogId || p.garmentCatalogId === 'g-wb-1'))) &&
+          p.serviceTypeId === serviceTypeId,
+      );
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], price: newPrice };
+        return next;
+      }
+      return [...prev, { garmentCatalogId, serviceTypeId, price: newPrice }];
+    });
+  };
+
   // Pricing calculations via canonical calculateOrderTotals from @growfast/shared-types
   const pricingInputs = useMemo(() => {
     return items.map((item) => {
@@ -1012,7 +1034,7 @@ export function OrderWizardPage() {
         </div>
 
         {/* Center: Mode Switcher (Matching Reference Screenshot) */}
-        <div aria-label="Order Entry Mode Selection" className="flex items-center gap-2.5">
+        <div aria-label="Order Entry Mode Selection" className="flex items-center gap-1.5 p-1 rounded-full bg-[var(--bg-surface-inset)] border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
           {/* CREATE ORDER PER PIECE */}
           <button
             type="button"
@@ -1021,33 +1043,33 @@ export function OrderWizardPage() {
             aria-label="Create Order Per Pieces (Dry Clean)"
             aria-pressed={activeEntryMode === 'PIECES'}
             onClick={() => handleSelectEntryMode('PIECES')}
-            className={`h-10 px-3.5 rounded-xl border transition-all text-left flex items-center justify-between gap-3 cursor-pointer ${
+            className={`h-10 px-4 rounded-full transition-all text-left flex items-center justify-between gap-2.5 cursor-pointer ${
               activeEntryMode === 'PIECES'
-                ? 'bg-purple-50/90 border-purple-600 shadow-2xs text-purple-950 font-bold ring-1 ring-purple-600/30'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-md shadow-purple-500/25'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
             }`}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                   activeEntryMode === 'PIECES'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
                 }`}
               >
-                <Sparkles size={14} />
+                <Sparkles size={13} />
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-bold leading-tight">
                   Create Order Per Piece<span className="sr-only">s</span>
                 </span>
-                <span className="text-[10.5px] text-purple-600 font-medium leading-tight">
+                <span className={`text-[10px] font-medium leading-tight ${activeEntryMode === 'PIECES' ? 'text-purple-200' : 'text-purple-600 dark:text-purple-400'}`}>
                   (Dry Clean)
                 </span>
               </div>
             </div>
             {activeEntryMode === 'PIECES' && (
-              <div className="w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center shrink-0 ml-1">
+              <div className="w-4 h-4 rounded-full bg-white/25 text-white flex items-center justify-center shrink-0 ml-1">
                 <Check size={11} strokeWidth={3} />
               </div>
             )}
@@ -1061,31 +1083,31 @@ export function OrderWizardPage() {
             aria-pressed={activeEntryMode === 'WEIGHT'}
             onClick={() => handleSelectEntryMode('WEIGHT')}
             title="Weight-based Laundry order entry (min 2.00 kg)"
-            className={`h-10 px-3.5 rounded-xl border transition-all text-left flex items-center justify-between gap-3 cursor-pointer ${
+            className={`h-10 px-4 rounded-full transition-all text-left flex items-center justify-between gap-2.5 cursor-pointer ${
               activeEntryMode === 'WEIGHT'
-                ? 'bg-blue-50/90 border-blue-600 shadow-2xs text-blue-950 font-bold ring-1 ring-blue-600/30'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-500/25'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
             }`}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                   activeEntryMode === 'WEIGHT'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)]'
                 }`}
               >
-                <Scale size={14} />
+                <Scale size={13} />
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-bold leading-tight">Create Order Per Weight</span>
-                <span className="text-[10.5px] text-slate-500 font-medium leading-tight">
+                <span className={`text-[10px] font-medium leading-tight ${activeEntryMode === 'WEIGHT' ? 'text-blue-200' : 'text-[var(--text-muted)]'}`}>
                   (Laundry / kg)
                 </span>
               </div>
             </div>
             {activeEntryMode === 'WEIGHT' && (
-              <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 ml-1">
+              <div className="w-4 h-4 rounded-full bg-white/25 text-white flex items-center justify-center shrink-0 ml-1">
                 <Check size={11} strokeWidth={3} />
               </div>
             )}
@@ -1098,24 +1120,13 @@ export function OrderWizardPage() {
           {customer ? (
             <div
               onClick={() => setShowCustomerModal(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                background: 'var(--bg-surface, #ffffff)',
-                border: '1px solid var(--border, #e2e8f0)',
-                borderRadius: '12px',
-                padding: '4px 12px 4px 6px',
-                boxShadow: '0 1px 2px 0 var(--shadow-color, rgba(0,0,0,0.04))',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
+              className="flex items-center gap-2.5 bg-[var(--bg-surface)] border border-[var(--border)] rounded-full pl-1.5 pr-3 py-1 shadow-[var(--shadow-neu-card-sm)] cursor-pointer transition-all hover:shadow-md"
             >
               {/* Initials Circle */}
               <div
                 style={{
-                  width: '34px',
-                  height: '34px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
                   background: 'var(--accent-muted, #dbeafe)',
                   color: 'var(--accent, #2563eb)',
@@ -1123,7 +1134,7 @@ export function OrderWizardPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 700,
-                  fontSize: '13px',
+                  fontSize: '12px',
                   flexShrink: 0,
                   letterSpacing: '0.02em',
                 }}
@@ -1147,7 +1158,7 @@ export function OrderWizardPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <span
                     style={{
-                      fontSize: '13.5px',
+                      fontSize: '13px',
                       fontWeight: 700,
                       color: 'var(--text-primary, #0f172a)',
                     }}
@@ -1181,7 +1192,7 @@ export function OrderWizardPage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    fontSize: '11.5px',
+                    fontSize: '11px',
                     color: 'var(--text-muted, #64748b)',
                   }}
                 >
@@ -1206,28 +1217,14 @@ export function OrderWizardPage() {
                   color: 'var(--text-placeholder, #94a3b8)',
                 }}
               >
-                <ChevronDown size={16} />
+                <ChevronDown size={15} />
               </div>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setShowCustomerModal(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'var(--accent-muted, #eff6ff)',
-                border: '1px solid var(--accent, #bfdbfe)',
-                color: 'var(--accent, #2563eb)',
-                padding: '7px 14px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: '0 1px 2px 0 var(--shadow-color, rgba(37, 99, 235, 0.08))',
-              }}
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-full text-xs font-bold shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-indigo-700 cursor-pointer transition-all"
             >
               <UserPlus size={15} />
               <span>+ Select Customer</span>
@@ -1256,23 +1253,22 @@ export function OrderWizardPage() {
             onRemoveBatchPhotoFromItem={handleRemoveBatchPhoto}
             isSubmitting={isSubmitting}
             topUpServices={storeConfig?.topUpServices}
+            canEditPrice={canModifyPrice}
+            onPriceUpdated={handlePriceUpdated}
           />
         </div>
       ) : (
-        <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden p-2.5 lg:p-3 gap-3 bg-slate-50/60 dark:bg-slate-950/60">
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-x-hidden max-lg:overflow-y-auto lg:overflow-hidden p-2.5 lg:p-3 gap-3 bg-[var(--bg-app)]">
           {/* LEFT COLUMN: Garment Catalog */}
           <div
-            className="w-full lg:w-[68%] lg:flex-1 min-w-0 flex flex-col min-h-0 rounded-xl overflow-hidden shadow-2xs border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 max-lg:min-h-[460px] h-full"
+            className="w-full lg:w-[68%] lg:flex-1 min-w-0 flex flex-col min-h-0 rounded-2xl overflow-hidden shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)] bg-[var(--bg-surface)] max-lg:min-h-[460px] h-full"
             style={{
               transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
           >
             {/* Per-Piece Dry Cleaning Catalog Header */}
             <div
-              className="shrink-0 px-3 py-1.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800"
-              style={{
-                background: 'var(--bg-surface-muted, #f8fafc)',
-              }}
+              className="shrink-0 px-3.5 py-2 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-surface-inset)]"
             >
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
@@ -1280,7 +1276,7 @@ export function OrderWizardPage() {
                   <span>Per-Piece Garments (Dry Cleaning)</span>
                 </span>
               </div>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              <span className="text-[10px] text-[var(--text-secondary)] font-medium">
                 Tip: Select "Weight Based (Exception)" category for weight-measured items
               </span>
             </div>
@@ -1296,22 +1292,21 @@ export function OrderWizardPage() {
 
           {/* RIGHT COLUMN: Current Order Panel (Wider width, maximum vertical height) */}
           <div
-            className="w-full lg:w-[32%] lg:min-w-[390px] xl:min-w-[410px] shrink-0 flex flex-col rounded-xl shadow-xs overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-full min-h-0"
+            className="w-full lg:w-[32%] lg:min-w-[390px] xl:min-w-[410px] shrink-0 flex flex-col rounded-2xl shadow-[var(--shadow-neu-card-sm)] overflow-hidden border border-[var(--border)] bg-[var(--bg-surface)] h-full min-h-0"
             style={{
               transition: 'background-color 0.2s ease, border-color 0.2s ease',
             }}
           >
             {/* ─── SECTION A: PANEL HEADER ─────────────────── */}
             <div
-              className="px-3.5 py-2.5 flex items-center justify-between shrink-0 border-b border-slate-100 dark:border-slate-800"
-              style={{ background: 'var(--bg-surface)', transition: 'background-color 0.2s ease' }}
+              className="px-4 py-3 flex items-center justify-between shrink-0 border-b border-[var(--border)] bg-[var(--bg-surface-inset)]"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <ShoppingBag size={18} className="text-[#2563eb] shrink-0" strokeWidth={2} />
-                <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 tracking-tight shrink-0">
+                <ShoppingBag size={18} className="text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={2} />
+                <h3 className="font-bold text-sm sm:text-base text-[var(--text-primary)] tracking-tight shrink-0">
                   Current Order
                 </h3>
-                <span className="bg-[#eff6ff] dark:bg-blue-950/60 text-[#2563eb] dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-[#dbeafe] dark:border-blue-900 shrink-0">
+                <span className="bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900 shrink-0">
                   {totalGarmentCount} {totalGarmentCount === 1 ? 'item' : 'items'}
                 </span>
                 <span
@@ -1330,14 +1325,14 @@ export function OrderWizardPage() {
                 <button
                   type="button"
                   onClick={() => setItems([])}
-                  className="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 transition-colors cursor-pointer shrink-0 min-h-[32px] px-1.5 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                  className="flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 transition-colors cursor-pointer shrink-0 min-h-[32px] px-2 py-1 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/40"
                   title="Clear all items from order"
                 >
                   <Trash2 size={13} className="text-rose-500 dark:text-rose-400" strokeWidth={2} />
                   <span>Clear All</span>
                 </button>
               ) : (
-                <span className="text-xs font-medium text-slate-400 select-none shrink-0">
+                <span className="text-xs font-medium text-[var(--text-muted)] select-none shrink-0">
                   Order #NEW
                 </span>
               )}
@@ -1976,18 +1971,13 @@ export function OrderWizardPage() {
 
               {/* Highlighted Total Box */}
               <div
-                className="rounded-xl px-4 py-2.5 flex items-center justify-between"
-                style={{
-                  background: 'rgba(239, 246, 255, 0.75)',
-                  border: '1px solid rgba(191, 219, 254, 0.8)',
-                  transition: 'background-color 0.2s ease, border-color 0.2s ease',
-                }}
+                className="rounded-2xl px-4 py-3 flex items-center justify-between border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)]"
               >
                 <div>
-                  <div className="text-base font-bold tracking-tight text-blue-950 dark:text-blue-100">
+                  <div className="text-base font-bold tracking-tight text-[var(--text-primary)]">
                     Total
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <div className="text-xs text-[var(--text-secondary)] mt-0.5">
                     Inclusive of taxes
                   </div>
                 </div>
@@ -2006,13 +1996,13 @@ export function OrderWizardPage() {
                   !selectedCustomerId ||
                   (isPhotoRequired && !allPiecesCovered)
                 }
-                className={`w-full min-h-[44px] h-[44px] py-2.5 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
+                className={`w-full min-h-[44px] h-[44px] py-2.5 px-4 rounded-full font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-md ${
                   isSubmitting ||
                   items.length === 0 ||
                   !selectedCustomerId ||
                   (isPhotoRequired && !allPiecesCovered)
-                    ? 'bg-[#bfdbfe] text-white cursor-not-allowed opacity-90'
-                    : 'bg-[#2563eb] hover:bg-blue-700 text-white cursor-pointer shadow-xs active:scale-[0.99]'
+                    ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-90'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white cursor-pointer shadow-blue-500/25 active:scale-[0.99]'
                 }`}
                 title={
                   !selectedCustomerId

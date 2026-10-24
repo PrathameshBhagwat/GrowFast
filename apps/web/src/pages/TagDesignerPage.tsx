@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, LoadingState, Modal } from '@growfast/ui';
-import { ThemeToggle } from '../components/ThemeToggle';
 import { PhysicalTag, PhysicalTagData } from '../components/PhysicalTag';
 import { TagCalibrationCard } from '../components/TagCalibrationCard';
 import { TagPrintLayout } from '../components/TagPrintLayout';
@@ -21,7 +20,6 @@ import {
   type TagDesignAuditEntry,
 } from '@growfast/shared-types';
 import {
-  ArrowLeft,
   Save,
   RotateCcw,
   Printer,
@@ -401,19 +399,19 @@ export const TagDesignerPage: React.FC = () => {
 
   if (!isOwner) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full p-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400 flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-6 text-center rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400 flex items-center justify-center mx-auto mb-4 shadow-sm">
             <ShieldAlert size={24} />
           </div>
-          <h1 className="text-lg font-bold text-gray-900 dark:text-slate-100 mb-2">
+          <h1 className="text-lg font-bold text-[var(--text-primary)] mb-2">
             Owner Access Required
           </h1>
-          <p className="text-sm text-gray-600 dark:text-slate-400 mb-6">
+          <p className="text-sm text-[var(--text-secondary)] mb-6">
             Only authenticated Store Owners have permission to view, customize, or save Design Tags
             and font settings.
           </p>
-          <Button variant="primary" onClick={() => navigate('/')} className="w-full">
+          <Button variant="primary" onClick={() => navigate('/')} className="w-full rounded-full">
             Return to Dashboard
           </Button>
         </Card>
@@ -428,33 +426,24 @@ export const TagDesignerPage: React.FC = () => {
   const activeSample = SAMPLE_PRESETS[sampleIndex].data;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 p-3 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] p-3 sm:p-6 lg:p-8">
       {/* ─── Top Header Navigation ──────────────────────────────────── */}
       <div className="no-print max-w-7xl mx-auto mb-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              id="tag-designer-back-btn"
-              onClick={() => navigate(-1)}
-              aria-label="Go back"
-              className="p-2.5 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-            >
-              <ArrowLeft size={20} />
-            </button>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Sliders size={20} className="text-blue-600 dark:text-blue-400" />
-                <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-slate-100 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight">
                   Design Tags
                 </h1>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                <span className="text-xs font-bold px-3 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shadow-xs">
                   {design.width || '1.5 in'} × {design.height || '1.5 in'}
                 </span>
                 {isDirty ? (
                   <span
                     id="unsaved-changes-badge"
-                    className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300 dark:border-amber-700 flex items-center gap-1"
+                    className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300 dark:border-amber-700 flex items-center gap-1 shadow-xs"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                     Unsaved Changes
@@ -462,17 +451,17 @@ export const TagDesignerPage: React.FC = () => {
                 ) : (
                   <span
                     id="saved-config-badge"
-                    className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-900 dark:bg-green-950/80 dark:text-green-200 border border-green-300 dark:border-green-700 flex items-center gap-1"
+                    className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-green-100 text-green-900 dark:bg-green-950/80 dark:text-green-200 border border-green-300 dark:border-green-700 flex items-center gap-1 shadow-xs"
                   >
                     <CheckCircle2 size={12} className="text-green-600 dark:text-green-400" />
                     Saved
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-slate-400 mt-1">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)] mt-1">
                 <span>Configure layout & typography for physical cloth tags</span>
                 {design.lastUpdatedAt && (
-                  <span className="flex items-center gap-1 text-[11px] font-mono text-gray-600 dark:text-slate-400">
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-[var(--text-secondary)]">
                     <Clock size={12} />
                     Last saved: {new Date(design.lastUpdatedAt).toLocaleDateString()} at{' '}
                     {new Date(design.lastUpdatedAt).toLocaleTimeString([], {
@@ -482,7 +471,7 @@ export const TagDesignerPage: React.FC = () => {
                   </span>
                 )}
                 {design.lastUpdatedBy?.name && (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-gray-600 dark:text-slate-400">
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--text-secondary)]">
                     <User size={12} />
                     by {design.lastUpdatedBy.name} (Owner)
                   </span>
@@ -492,14 +481,13 @@ export const TagDesignerPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <ThemeToggle />
             <Button
               id="tag-design-history-btn"
               variant="outline"
               size="sm"
               onClick={handleOpenHistory}
               style={{ minHeight: '44px' }}
-              className="min-h-[44px] text-xs font-semibold px-3"
+              className="min-h-[44px] text-xs font-semibold px-3.5 rounded-full shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)]"
               icon={<History size={16} />}
               aria-label="View design change history"
             >
@@ -512,7 +500,7 @@ export const TagDesignerPage: React.FC = () => {
               onClick={handleDownloadFont}
               disabled={isDownloadingFont}
               style={{ minHeight: '44px' }}
-              className="min-h-[44px] text-xs font-semibold px-3"
+              className="min-h-[44px] text-xs font-semibold px-3.5 rounded-full shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)]"
               icon={<Download size={16} />}
               aria-label="Download Font"
             >
@@ -525,7 +513,7 @@ export const TagDesignerPage: React.FC = () => {
               onClick={handleReset}
               disabled={isSaving}
               style={{ minHeight: '44px' }}
-              className="min-h-[44px] text-xs font-semibold px-3"
+              className="min-h-[44px] text-xs font-semibold px-3.5 rounded-full shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)]"
               icon={<RotateCcw size={16} />}
             >
               Reset Default
@@ -537,7 +525,7 @@ export const TagDesignerPage: React.FC = () => {
               onClick={handleSave}
               disabled={isSaving}
               style={{ minHeight: '44px' }}
-              className="min-h-[44px] text-xs font-bold px-4 shadow-sm"
+              className="min-h-[44px] text-xs font-bold px-5 rounded-full shadow-[var(--shadow-neu-card-sm)] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
               icon={<Save size={16} />}
             >
               {isSaving ? 'Saving...' : 'Save Design'}
@@ -549,7 +537,7 @@ export const TagDesignerPage: React.FC = () => {
         {successMessage && (
           <div
             id="designer-success-alert"
-            className="mt-4 p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-lg text-xs font-medium flex items-center gap-2"
+            className="mt-4 p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 rounded-xl text-xs font-medium flex items-center gap-2 shadow-sm"
           >
             <CheckCircle2 size={16} className="text-green-600 dark:text-green-400 shrink-0" />
             <span>{successMessage}</span>
@@ -559,7 +547,7 @@ export const TagDesignerPage: React.FC = () => {
         {errorMessage && (
           <div
             id="designer-error-alert"
-            className="mt-4 p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg text-xs font-medium flex items-center gap-2"
+            className="mt-4 p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-xl text-xs font-medium flex items-center gap-2 shadow-sm"
           >
             <AlertCircle size={16} className="text-red-600 dark:text-red-400 shrink-0" />
             <span>{errorMessage}</span>
@@ -572,13 +560,13 @@ export const TagDesignerPage: React.FC = () => {
         {/* ─── Left Column: Controls (lg:col-span-7) ───────────────────── */}
         <div className="lg:col-span-7 space-y-6">
           {/* Card 1: General Tag Settings (Reference Image Section A) */}
-          <Card className="p-4 sm:p-5">
-            <div className="pb-3 mb-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
-              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+          <Card className="p-4 sm:p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
+            <div className="pb-3 mb-4 border-b border-[var(--border)] flex items-center justify-between">
+              <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <Maximize2 size={18} className="text-blue-600 dark:text-blue-400" />
                 General Tag Settings
               </h2>
-              <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+              <span className="text-xs text-[var(--text-secondary)] font-medium">
                 Physical Geometry
               </span>
             </div>
@@ -588,7 +576,7 @@ export const TagDesignerPage: React.FC = () => {
               <div>
                 <label
                   htmlFor="tag-width-select"
-                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                  className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5"
                 >
                   Width
                 </label>
@@ -596,7 +584,7 @@ export const TagDesignerPage: React.FC = () => {
                   id="tag-width-select"
                   value={design.width || '1.5 in'}
                   onChange={(e) => handleWidthChange(e.target.value)}
-                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   {SUPPORTED_TAG_DIMENSIONS.map((dim) => (
                     <option key={dim} value={dim}>
@@ -610,7 +598,7 @@ export const TagDesignerPage: React.FC = () => {
               <div>
                 <label
                   htmlFor="tag-height-select"
-                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                  className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5"
                 >
                   Height
                 </label>
@@ -618,7 +606,7 @@ export const TagDesignerPage: React.FC = () => {
                   id="tag-height-select"
                   value={design.height || '1.5 in'}
                   onChange={(e) => handleHeightChange(e.target.value)}
-                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   {SUPPORTED_TAG_DIMENSIONS.map((dim) => (
                     <option key={dim} value={dim}>
@@ -632,7 +620,7 @@ export const TagDesignerPage: React.FC = () => {
               <div>
                 <label
                   htmlFor="tag-printer-select"
-                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                  className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5"
                 >
                   Printer
                 </label>
@@ -640,7 +628,7 @@ export const TagDesignerPage: React.FC = () => {
                   id="tag-printer-select"
                   value={design.printer || 'TSC TE244'}
                   onChange={(e) => handlePrinterChange(e.target.value)}
-                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   {SUPPORTED_TAG_PRINTERS.map((p) => (
                     <option key={p} value={p}>
@@ -654,7 +642,7 @@ export const TagDesignerPage: React.FC = () => {
               <div>
                 <label
                   htmlFor="tag-overall-align-select"
-                  className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+                  className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5"
                 >
                   Align
                 </label>
@@ -662,7 +650,7 @@ export const TagDesignerPage: React.FC = () => {
                   id="tag-overall-align-select"
                   value={design.align || 'center'}
                   onChange={(e) => handleOverallAlignChange(e.target.value as TagTextAlign)}
-                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full min-h-[44px] px-3 py-2 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 font-medium"
                 >
                   <option value="center">Center</option>
                   <option value="left">Left</option>
@@ -672,7 +660,7 @@ export const TagDesignerPage: React.FC = () => {
 
               {/* Wet Strength Paper Checkbox */}
               <div className="sm:col-span-2 flex items-center pt-2 sm:pt-6">
-                <label className="flex items-center gap-2.5 cursor-pointer min-h-[44px] px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-850 w-full transition-colors">
+                <label className="flex items-center gap-2.5 cursor-pointer min-h-[44px] px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] hover:border-blue-400 w-full transition-colors">
                   <input
                     type="checkbox"
                     id="wet-strength-paper-checkbox"
@@ -681,10 +669,10 @@ export const TagDesignerPage: React.FC = () => {
                     className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
                   />
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
+                    <span className="text-xs font-bold text-[var(--text-primary)]">
                       Wet Strength Paper
                     </span>
-                    <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                    <span className="text-[11px] text-[var(--text-secondary)]">
                       Optimizes thermal heat settings for non-tear washable cloth tags
                     </span>
                   </div>
@@ -694,15 +682,15 @@ export const TagDesignerPage: React.FC = () => {
           </Card>
 
           {/* Card 2: Tag Field Configuration Table (Reference Image Section B & C) */}
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
+          <Card className="p-4 sm:p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <Layers size={18} className="text-blue-600 dark:text-blue-400" />
-                <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
+                <h2 className="text-base font-bold text-[var(--text-primary)]">
                   Tag Field Configuration
                 </h2>
               </div>
-              <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+              <span className="text-xs text-[var(--text-secondary)] font-medium">
                 11 Reference Fields
               </span>
             </div>
@@ -727,10 +715,10 @@ export const TagDesignerPage: React.FC = () => {
                   <div
                     key={fieldCfg.field}
                     id={`field-row-${fieldCfg.field}`}
-                    className={`p-3 rounded-lg border transition-all ${
+                    className={`p-3.5 rounded-xl border transition-all ${
                       fieldCfg.enabled
-                        ? 'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 shadow-sm'
-                        : 'bg-gray-50 dark:bg-slate-950/50 border-gray-200 dark:border-slate-850 opacity-60'
+                        ? 'bg-[var(--bg-surface)] border-[var(--border)] shadow-[var(--shadow-neu-card-sm)]'
+                        : 'bg-[var(--bg-surface-inset)] border-[var(--border)] opacity-60'
                     }`}
                   >
                     {/* Header Row: Reorder, Name, Print Yes/No */}
@@ -744,10 +732,10 @@ export const TagDesignerPage: React.FC = () => {
                             onClick={() => handleMoveUp(index)}
                             disabled={isFirst}
                             aria-label={`Move ${fieldCfg.label || fieldCfg.field} up`}
-                            className={`p-1.5 rounded border min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                            className={`p-1.5 rounded-xl border min-h-[44px] min-w-[44px] flex items-center justify-center transition-all cursor-pointer ${
                               isFirst
-                                ? 'opacity-30 cursor-not-allowed border-gray-200 dark:border-slate-800'
-                                : 'bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200'
+                                ? 'opacity-30 cursor-not-allowed border-[var(--border)]'
+                                : 'bg-[var(--bg-surface)] border-[var(--border)] shadow-[var(--shadow-neu-card-sm)] hover:border-blue-400 text-[var(--text-primary)]'
                             }`}
                           >
                             <ChevronUp size={18} />
@@ -758,10 +746,10 @@ export const TagDesignerPage: React.FC = () => {
                             onClick={() => handleMoveDown(index)}
                             disabled={isLast}
                             aria-label={`Move ${fieldCfg.label || fieldCfg.field} down`}
-                            className={`p-1.5 rounded border min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                            className={`p-1.5 rounded-xl border min-h-[44px] min-w-[44px] flex items-center justify-center transition-all cursor-pointer ${
                               isLast
-                                ? 'opacity-30 cursor-not-allowed border-gray-200 dark:border-slate-800'
-                                : 'bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200'
+                                ? 'opacity-30 cursor-not-allowed border-[var(--border)]'
+                                : 'bg-[var(--bg-surface)] border-[var(--border)] shadow-[var(--shadow-neu-card-sm)] hover:border-blue-400 text-[var(--text-primary)]'
                             }`}
                           >
                             <ChevronDown size={18} />
@@ -769,10 +757,10 @@ export const TagDesignerPage: React.FC = () => {
                         </div>
 
                         <div>
-                          <span className="text-xs font-bold text-gray-900 dark:text-slate-100 block">
+                          <span className="text-xs font-bold text-[var(--text-primary)] block">
                             {fieldCfg.label || fieldCfg.field}
                           </span>
-                          <span className="text-[10px] font-mono text-gray-500 dark:text-slate-400">
+                          <span className="text-[10px] font-mono text-[var(--text-secondary)]">
                             Key: {fieldCfg.field}
                           </span>
                         </div>
@@ -785,12 +773,12 @@ export const TagDesignerPage: React.FC = () => {
                         onClick={() => handleFieldToggle(index)}
                         disabled={isFixedKey}
                         aria-label={`Toggle Print for ${fieldCfg.label || fieldCfg.field}`}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border min-h-[44px] transition-colors cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-full border min-h-[44px] transition-all cursor-pointer shadow-[var(--shadow-neu-card-sm)] ${
                           isFixedKey
                             ? 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 opacity-90 cursor-default'
                             : fieldCfg.enabled
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                              : 'bg-gray-100 text-gray-500 border-gray-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                              : 'bg-[var(--bg-surface-inset)] text-[var(--text-secondary)] border-[var(--border)]'
                         }`}
                       >
                         {fieldCfg.enabled ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -800,18 +788,18 @@ export const TagDesignerPage: React.FC = () => {
 
                     {/* Controls Row: Font, Align, Size, Style (Visible when enabled) */}
                     {fieldCfg.enabled && (
-                      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs items-center">
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs items-center">
                         {/* Font Family Dropdown */}
                         {supportsFont ? (
                           <div>
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                            <span className="text-[10px] font-bold text-[var(--text-secondary)] block mb-1">
                               Font:
                             </span>
                             <select
                               id={`font-select-${fieldCfg.field}`}
                               value={fieldCfg.font || 'Arial'}
                               onChange={(e) => handleFieldFontChange(index, e.target.value)}
-                              className="w-full min-h-[44px] px-2 py-1 text-xs rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 font-medium"
+                              className="w-full min-h-[44px] px-2.5 py-1 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] font-medium"
                             >
                               {SUPPORTED_TAG_FONTS.map((font) => (
                                 <option key={font} value={font}>
@@ -822,10 +810,10 @@ export const TagDesignerPage: React.FC = () => {
                           </div>
                         ) : (
                           <div>
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                            <span className="text-[10px] font-bold text-[var(--text-secondary)] block mb-1">
                               Renderer:
                             </span>
-                            <span className="inline-block px-2 py-2 text-xs text-gray-500 dark:text-slate-400 font-mono">
+                            <span className="inline-block px-2 py-2 text-xs text-[var(--text-secondary)] font-mono">
                               Vector Engine
                             </span>
                           </div>
@@ -833,19 +821,19 @@ export const TagDesignerPage: React.FC = () => {
 
                         {/* Alignment Selector */}
                         <div>
-                          <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] block mb-1">
                             Align:
                           </span>
-                          <div className="inline-flex rounded-md shadow-sm w-full">
+                          <div className="inline-flex p-0.5 rounded-xl bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] border border-[var(--border)] w-full">
                             <button
                               type="button"
                               id={`align-left-btn-${fieldCfg.field}`}
                               onClick={() => handleFieldAlignmentChange(index, 'left')}
                               aria-label="Align left"
-                              className={`flex-1 p-2 rounded-l-md border min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`flex-1 p-2 rounded-lg min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                                 fieldCfg.alignment === 'left'
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                               }`}
                             >
                               <AlignLeft size={16} />
@@ -855,10 +843,10 @@ export const TagDesignerPage: React.FC = () => {
                               id={`align-center-btn-${fieldCfg.field}`}
                               onClick={() => handleFieldAlignmentChange(index, 'center')}
                               aria-label="Align center"
-                              className={`flex-1 p-2 border-t border-b border-r min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`flex-1 p-2 rounded-lg min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                                 fieldCfg.alignment === 'center'
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                               }`}
                             >
                               <AlignCenter size={16} />
@@ -868,10 +856,10 @@ export const TagDesignerPage: React.FC = () => {
                               id={`align-right-btn-${fieldCfg.field}`}
                               onClick={() => handleFieldAlignmentChange(index, 'right')}
                               aria-label="Align right"
-                              className={`flex-1 p-2 rounded-r-md border border-t border-b border-r min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`flex-1 p-2 rounded-lg min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                                 fieldCfg.alignment === 'right'
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                               }`}
                             >
                               <AlignRight size={16} />
@@ -881,7 +869,7 @@ export const TagDesignerPage: React.FC = () => {
 
                         {/* Font Size Stepper */}
                         <div>
-                          <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] block mb-1">
                             Size:
                           </span>
                           <div className="flex items-center gap-1">
@@ -891,13 +879,13 @@ export const TagDesignerPage: React.FC = () => {
                               onClick={() => handleFieldFontSizeChange(index, -1)}
                               disabled={fieldCfg.fontSize <= 6}
                               aria-label="Decrease font size"
-                              className="px-2.5 py-1 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                              className="px-2.5 py-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)] min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-[var(--text-primary)] hover:border-blue-400"
                             >
                               -
                             </button>
                             <span
                               id={`fontsize-display-${fieldCfg.field}`}
-                              className="font-mono font-bold text-xs min-w-[36px] text-center"
+                              className="font-mono font-bold text-xs min-w-[36px] text-center text-[var(--text-primary)]"
                             >
                               {fieldCfg.fontSize}px
                             </span>
@@ -907,7 +895,7 @@ export const TagDesignerPage: React.FC = () => {
                               onClick={() => handleFieldFontSizeChange(index, 1)}
                               disabled={fieldCfg.fontSize >= 28}
                               aria-label="Increase font size"
-                              className="px-2.5 py-1 rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                              className="px-2.5 py-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)] min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-[var(--text-primary)] hover:border-blue-400"
                             >
                               +
                             </button>
@@ -917,20 +905,20 @@ export const TagDesignerPage: React.FC = () => {
                         {/* Style Checkboxes (Bold, Italic, Underline) */}
                         {supportsStyle ? (
                           <div>
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                            <span className="text-[10px] font-bold text-[var(--text-secondary)] block mb-1">
                               Style:
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 p-0.5 rounded-xl bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] border border-[var(--border)]">
                               {/* Bold */}
                               <button
                                 type="button"
                                 id={`bold-toggle-btn-${fieldCfg.field}`}
                                 onClick={() => handleFieldStyleToggle(index, 'bold')}
                                 aria-label="Toggle bold"
-                                className={`flex-1 py-1 rounded border min-h-[44px] font-bold text-xs cursor-pointer transition-colors ${
+                                className={`flex-1 py-1 rounded-lg min-h-[44px] font-bold text-xs cursor-pointer transition-colors ${
                                   fieldCfg.isBold !== false
-                                    ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
-                                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                               >
                                 B
@@ -941,10 +929,10 @@ export const TagDesignerPage: React.FC = () => {
                                 id={`italic-toggle-btn-${fieldCfg.field}`}
                                 onClick={() => handleFieldStyleToggle(index, 'italic')}
                                 aria-label="Toggle italic"
-                                className={`flex-1 py-1 rounded border min-h-[44px] italic font-serif text-xs cursor-pointer transition-colors ${
+                                className={`flex-1 py-1 rounded-lg min-h-[44px] italic font-serif text-xs cursor-pointer transition-colors ${
                                   fieldCfg.isItalic
-                                    ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
-                                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                               >
                                 I
@@ -955,10 +943,10 @@ export const TagDesignerPage: React.FC = () => {
                                 id={`underline-toggle-btn-${fieldCfg.field}`}
                                 onClick={() => handleFieldStyleToggle(index, 'underline')}
                                 aria-label="Toggle underline"
-                                className={`flex-1 py-1 rounded border min-h-[44px] underline text-xs cursor-pointer transition-colors ${
+                                className={`flex-1 py-1 rounded-lg min-h-[44px] underline text-xs cursor-pointer transition-colors ${
                                   fieldCfg.isUnderline
-                                    ? 'bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700'
-                                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-300 dark:border-slate-700'
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                 }`}
                               >
                                 U
@@ -967,10 +955,10 @@ export const TagDesignerPage: React.FC = () => {
                           </div>
                         ) : (
                           <div>
-                            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 block mb-1">
+                            <span className="text-[10px] font-bold text-[var(--text-secondary)] block mb-1">
                               Style:
                             </span>
-                            <span className="text-[11px] text-gray-400 dark:text-slate-500">
+                            <span className="text-[11px] text-[var(--text-secondary)]">
                               Auto-Formatted
                             </span>
                           </div>
@@ -983,7 +971,7 @@ export const TagDesignerPage: React.FC = () => {
             </div>
 
             {/* Section D: Additional Reference Option (Bottom Checkbox & Input) */}
-            <div className="mt-5 pt-4 border-t border-gray-200 dark:border-slate-800 bg-blue-50/40 dark:bg-blue-950/20 p-3.5 rounded-lg border border-blue-100 dark:border-blue-900/40">
+            <div className="mt-5 pt-4 border-t border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] p-3.5 rounded-xl border border-[var(--border)]">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
@@ -994,10 +982,10 @@ export const TagDesignerPage: React.FC = () => {
                     className="w-4 h-4 mt-0.5 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
                   />
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-gray-900 dark:text-slate-100">
+                    <span className="text-xs font-bold text-[var(--text-primary)]">
                       Select to bring forward/Prepone Due Date for Workshop tags only.
                     </span>
-                    <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                    <span className="text-[11px] text-[var(--text-secondary)]">
                       Shifts the printed due date forward for factory/workshop processing without
                       altering stored customer order dates.
                     </span>
@@ -1005,7 +993,7 @@ export const TagDesignerPage: React.FC = () => {
                 </label>
 
                 <div className="flex items-center gap-2 pl-6 sm:pl-0">
-                  <span className="text-xs text-gray-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                  <span className="text-xs text-[var(--text-secondary)] font-medium whitespace-nowrap">
                     Prepone by:
                   </span>
                   <input
@@ -1016,22 +1004,22 @@ export const TagDesignerPage: React.FC = () => {
                     value={design.workshopPreponeDays ?? 1}
                     onChange={(e) => handleWorkshopDaysChange(parseInt(e.target.value, 10))}
                     disabled={!design.preponeWorkshopDueDate}
-                    className="w-16 min-h-[44px] px-2.5 py-1 text-xs font-bold text-center rounded border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 disabled:opacity-40"
+                    className="w-16 min-h-[44px] px-2.5 py-1 text-xs font-bold text-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] disabled:opacity-40"
                   />
-                  <span className="text-xs text-gray-500 dark:text-slate-400">day(s)</span>
+                  <span className="text-xs text-[var(--text-secondary)]">day(s)</span>
                 </div>
               </div>
             </div>
           </Card>
 
           {/* Card 3: Boundary Inset Padding & Perimeter Guide */}
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
-              <h2 className="text-base font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+          <Card className="p-4 sm:p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border)]">
+              <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <Maximize2 size={18} className="text-blue-600 dark:text-blue-400" />
                 Tag Padding & Boundary Guideline
               </h2>
-              <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
+              <span className="text-xs text-[var(--text-secondary)] font-medium">
                 Physical Edge Margins
               </span>
             </div>
@@ -1042,14 +1030,14 @@ export const TagDesignerPage: React.FC = () => {
                 return (
                   <div
                     key={side}
-                    className="p-2.5 rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col items-center"
+                    className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)] flex flex-col items-center"
                   >
-                    <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase">
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">
                       {side}
                     </span>
                     <span
                       id={`padding-display-${side}`}
-                      className="text-sm font-black text-gray-900 dark:text-slate-100 my-1 font-mono"
+                      className="text-sm font-black text-[var(--text-primary)] my-1 font-mono"
                     >
                       {padVal} mm
                     </span>
@@ -1060,7 +1048,7 @@ export const TagDesignerPage: React.FC = () => {
                         onClick={() => handlePaddingChange(side, -0.5)}
                         disabled={padVal <= 1.5}
                         aria-label={`Decrease ${side} padding`}
-                        className="px-2 py-1 rounded border border-gray-300 dark:border-slate-700 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs disabled:opacity-30 cursor-pointer"
+                        className="px-2 py-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs disabled:opacity-30 cursor-pointer text-[var(--text-primary)] hover:border-blue-400"
                       >
                         -
                       </button>
@@ -1070,7 +1058,7 @@ export const TagDesignerPage: React.FC = () => {
                         onClick={() => handlePaddingChange(side, 0.5)}
                         disabled={padVal >= 4.0}
                         aria-label={`Increase ${side} padding`}
-                        className="px-2 py-1 rounded border border-gray-300 dark:border-slate-700 min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs disabled:opacity-30 cursor-pointer"
+                        className="px-2 py-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] min-h-[44px] min-w-[44px] flex items-center justify-center font-bold text-xs disabled:opacity-30 cursor-pointer text-[var(--text-primary)] hover:border-blue-400"
                       >
                         +
                       </button>
@@ -1081,26 +1069,20 @@ export const TagDesignerPage: React.FC = () => {
             </div>
 
             <div>
-              <span className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-2">
+              <span className="text-xs font-bold text-[var(--text-secondary)] block mb-2">
                 Perimeter Guide Line:
               </span>
-              <div className="inline-flex rounded-md shadow-sm">
-                {(['dashed', 'solid', 'none'] as const).map((style, idx) => (
+              <div className="inline-flex p-1 rounded-xl bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] border border-[var(--border)]">
+                {(['dashed', 'solid', 'none'] as const).map((style) => (
                   <button
                     key={style}
                     type="button"
                     id={`border-style-btn-${style}`}
                     onClick={() => handleBorderStyleChange(style)}
-                    className={`px-4 py-2 text-xs font-semibold border min-h-[44px] flex items-center gap-1.5 transition-colors cursor-pointer ${
-                      idx === 0
-                        ? 'rounded-l-md'
-                        : idx === 2
-                          ? 'rounded-r-md border-l-0'
-                          : 'border-l-0'
-                    } ${
+                    className={`px-4 py-2 text-xs font-semibold rounded-lg min-h-[44px] flex items-center gap-1.5 transition-colors cursor-pointer ${
                       design.borderStyle === style
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-300 dark:border-slate-700 hover:bg-gray-50'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     <span className="capitalize">{style}</span>
@@ -1113,15 +1095,13 @@ export const TagDesignerPage: React.FC = () => {
 
         {/* ─── Right Column: Live Tag Preview (lg:col-span-5) ───────────── */}
         <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
-          <Card className="p-4 sm:p-5">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800">
+          <Card className="p-4 sm:p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <Printer size={18} className="text-blue-600 dark:text-blue-400" />
-                <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
-                  Live Tag Preview
-                </h2>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">Live Tag Preview</h2>
               </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shadow-xs">
                 Live Rendering
               </span>
             </div>
@@ -1130,7 +1110,7 @@ export const TagDesignerPage: React.FC = () => {
             <div className="mb-4">
               <label
                 htmlFor="preview-sample-select"
-                className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1"
+                className="block text-xs font-bold text-[var(--text-secondary)] mb-1"
               >
                 Sample Data Scenario:
               </label>
@@ -1138,7 +1118,7 @@ export const TagDesignerPage: React.FC = () => {
                 id="preview-sample-select"
                 value={sampleIndex}
                 onChange={(e) => setSampleIndex(Number(e.target.value))}
-                className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 font-medium"
+                className="w-full min-h-[44px] px-3 py-2 text-xs rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] font-medium"
               >
                 {SAMPLE_PRESETS.map((preset, idx) => (
                   <option key={preset.label} value={idx}>
@@ -1149,9 +1129,9 @@ export const TagDesignerPage: React.FC = () => {
             </div>
 
             {/* Physical Tag Visual Sandbox */}
-            <div className="bg-slate-100 dark:bg-slate-900/80 rounded-xl p-6 flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-slate-800 min-h-[260px] relative overflow-hidden">
+            <div className="bg-[var(--bg-surface-inset)] rounded-2xl p-6 flex flex-col items-center justify-center border border-dashed border-[var(--border)] shadow-[var(--shadow-neu-inset)] min-h-[260px] relative overflow-hidden">
               {/* Sample Data Watermark Notice */}
-              <div className="absolute top-2 left-2 right-2 flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 rounded px-2 py-0.5 uppercase tracking-wider">
+              <div className="absolute top-2 left-2 right-2 flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/60 rounded-lg px-2 py-0.5 uppercase tracking-wider">
                 <Info size={11} />
                 <span>Preview Sample Data • Not real customer data</span>
               </div>
@@ -1162,15 +1142,15 @@ export const TagDesignerPage: React.FC = () => {
               </div>
 
               {/* Tag Spec Badge */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-gray-500 dark:text-slate-400">
-                <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                <span className="font-mono bg-[var(--bg-surface)] px-2.5 py-0.5 rounded-full border border-[var(--border)] shadow-xs">
                   Size: {design.width || '1.5 in'} × {design.height || '1.5 in'}
                 </span>
-                <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
+                <span className="font-mono bg-[var(--bg-surface)] px-2.5 py-0.5 rounded-full border border-[var(--border)] shadow-xs">
                   Printer: {design.printer || 'TSC TE244'}
                 </span>
                 {design.preponeWorkshopDueDate && activeSample.isWorkshop && (
-                  <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                  <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800 shadow-xs">
                     Workshop Preponed: -{design.workshopPreponeDays || 1} day(s)
                   </span>
                 )}
@@ -1178,10 +1158,10 @@ export const TagDesignerPage: React.FC = () => {
             </div>
 
             {/* Test Print Action */}
-            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-slate-800">
+            <div className="mt-4 pt-3 border-t border-[var(--border)]">
               <Button
                 variant="outline"
-                className="w-full min-h-[44px] text-xs font-semibold"
+                className="w-full min-h-[44px] text-xs font-semibold rounded-full shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)]"
                 icon={<Printer size={16} />}
                 onClick={() => window.print()}
               >

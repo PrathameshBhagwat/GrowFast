@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingState, EmptyState, ErrorState } from '@growfast/ui';
 import {
@@ -9,6 +9,7 @@ import {
   formatCatalogServiceName,
   resolveCatalogSelectionOnCategoryChange,
   resolveCatalogSelectionOnServiceChange,
+  resolveCatalogSelectionOnServiceSelect,
   DEFAULT_TOP_UP_SERVICES,
 } from '@growfast/shared-types';
 import type { GarmentCatalogDTO, TopUpServiceItem } from '@growfast/shared-types';
@@ -57,7 +58,6 @@ const CATEGORIES = [
   GarmentCategory.WOMEN,
   GarmentCategory.KIDS,
   GarmentCategory.HOUSEHOLD,
-  GarmentCategory.HOME_CLEANING,
   GarmentCategory.SHOES,
   GarmentCategory.OTHERS,
   GarmentCategory.WEIGHT_BASED,
@@ -518,16 +518,33 @@ const sortOwnerCatalogServices = <T extends { name: string }>(list: T[]): T[] =>
   return [...list].sort((a, b) => getOrder(a.name) - getOrder(b.name));
 };
 
-export const CatalogSettingsPage: React.FC = () => {
+export interface CatalogSettingsPageProps {
+  onBack?: () => void;
+}
+
+export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack: onBackProp }) => {
   const { token, employee } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Role checks — COUNTER (Employee) can add/edit garments but not configure pricing
-  const canManage =
-    employee?.role === Role.OWNER ||
-    employee?.role === Role.MANAGER ||
-    employee?.role === Role.COUNTER;
-  const canConfigurePricing = employee?.role === Role.OWNER || employee?.role === Role.MANAGER;
+  // Role checks — only OWNER can create/edit garments and configure pricing
+  const canManage = employee?.role === Role.OWNER;
+  const canConfigurePricing = employee?.role === Role.OWNER;
+
+  // Show back button on the Counter Catalog (when accessed at /catalog, or outside owner settings, or by COUNTER)
+  const isInsideOwnerSettings = location.pathname.startsWith('/owner/settings');
+  const showBackButton =
+    onBackProp !== undefined || !isInsideOwnerSettings || employee?.role === Role.COUNTER;
+
+  const handleBack = () => {
+    if (onBackProp) {
+      onBackProp();
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<PageTab>('garments');
 
@@ -829,15 +846,15 @@ export const CatalogSettingsPage: React.FC = () => {
   };
 
   const handleActiveServiceChange = (serviceId: string) => {
-    setActiveServiceId(serviceId);
-    const newCategory = resolveCatalogSelectionOnServiceChange(
+    const result = resolveCatalogSelectionOnServiceSelect(
       serviceId,
       activeCategory,
       services,
       'DRY_CLEANING',
     );
-    if (newCategory !== activeCategory) {
-      setActiveCategory(newCategory as string);
+    setActiveServiceId(result.serviceId);
+    if (result.category !== activeCategory) {
+      setActiveCategory(result.category as string);
     }
   };
 
@@ -856,16 +873,16 @@ export const CatalogSettingsPage: React.FC = () => {
   };
 
   const handlePricingServiceChange = (serviceId: string) => {
-    setPricingServiceId(serviceId);
-    setEditedPrices({});
-    const newCategory = resolveCatalogSelectionOnServiceChange(
+    const result = resolveCatalogSelectionOnServiceSelect(
       serviceId,
       pricingCategory,
       services,
       'DRY_CLEANING',
     );
-    if (newCategory !== pricingCategory) {
-      setPricingCategory(newCategory as string);
+    setPricingServiceId(result.serviceId);
+    setEditedPrices({});
+    if (result.category !== pricingCategory) {
+      setPricingCategory(result.category as string);
     }
   };
 
@@ -1482,13 +1499,17 @@ export const CatalogSettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-slate-50 font-sans">
+    <div
+      className="flex-1 flex flex-col min-h-0 font-sans"
+      style={{ background: 'var(--bg-app)' }}
+    >
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
       <div
         className="w-full max-w-[1600px] mx-auto shrink-0"
         style={{ maxWidth: '1600px', margin: '0 auto', padding: '6px 16px 0 16px', width: '100%' }}
       >
         <CatalogHeader
+          onBack={showBackButton ? handleBack : undefined}
           title="Garment Catalog"
           statusBadge={
             <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium select-none ml-2">
@@ -1503,15 +1524,30 @@ export const CatalogSettingsPage: React.FC = () => {
             <>
               {/* Catalog View / Service Pricing Tab Switcher */}
               {canConfigurePricing && (
-                <div className="flex items-center bg-slate-100 p-0.5 rounded-[3px] border border-slate-200 text-xs font-semibold">
+                <div
+                  className="flex items-center p-1 rounded-full text-xs font-semibold"
+                  style={{
+                    background: 'var(--bg-surface-inset)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '9999px',
+                    boxShadow: 'var(--shadow-neu-inset)',
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => setActiveTab('garments')}
-                    className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'garments'
-                        ? 'bg-white text-blue-600 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className="px-3.5 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5"
+                    style={{
+                      borderRadius: '9999px',
+                      background:
+                        activeTab === 'garments'
+                          ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                          : 'transparent',
+                      color: activeTab === 'garments' ? '#ffffff' : 'var(--text-secondary)',
+                      boxShadow:
+                        activeTab === 'garments' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+                      fontWeight: activeTab === 'garments' ? 700 : 500,
+                    }}
                   >
                     <LayoutGrid size={14} />
                     <span>Catalog View</span>
@@ -1519,11 +1555,18 @@ export const CatalogSettingsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveTab('pricing')}
-                    className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'pricing'
-                        ? 'bg-white text-blue-600 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className="px-3.5 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5"
+                    style={{
+                      borderRadius: '9999px',
+                      background:
+                        activeTab === 'pricing'
+                          ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                          : 'transparent',
+                      color: activeTab === 'pricing' ? '#ffffff' : 'var(--text-secondary)',
+                      boxShadow:
+                        activeTab === 'pricing' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+                      fontWeight: activeTab === 'pricing' ? 700 : 500,
+                    }}
                   >
                     <Tag size={14} />
                     <span>Service Pricing</span>
@@ -1532,11 +1575,18 @@ export const CatalogSettingsPage: React.FC = () => {
                     type="button"
                     id="tab-topup"
                     onClick={() => setActiveTab('topup')}
-                    className={`px-3 py-1.5 rounded-[3px] transition-all cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'topup'
-                        ? 'bg-white text-blue-600 shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className="px-3.5 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5"
+                    style={{
+                      borderRadius: '9999px',
+                      background:
+                        activeTab === 'topup'
+                          ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                          : 'transparent',
+                      color: activeTab === 'topup' ? '#ffffff' : 'var(--text-secondary)',
+                      boxShadow:
+                        activeTab === 'topup' ? '0 2px 8px rgba(37, 99, 235, 0.35)' : 'none',
+                      fontWeight: activeTab === 'topup' ? 700 : 500,
+                    }}
                   >
                     <Sparkles size={14} />
                     <span>Top Up Services</span>
@@ -1548,7 +1598,14 @@ export const CatalogSettingsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="hidden sm:flex items-center gap-1.5 border border-slate-200 bg-white rounded-[3px] px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer shadow-xs"
+                className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-xs font-semibold transition-all cursor-pointer active:scale-98"
+                style={{
+                  borderRadius: '9999px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  boxShadow: 'var(--shadow-neu-card-sm)',
+                  color: 'var(--text-primary)',
+                }}
                 title="Export catalog as CSV"
               >
                 <Upload size={14} />
@@ -1560,7 +1617,13 @@ export const CatalogSettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={openCreateModal}
-                  className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 active:scale-98 text-white rounded-[3px] text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-4 py-2 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-98"
+                  style={{
+                    borderRadius: '9999px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+                    border: 'none',
+                  }}
                 >
                   <Plus size={16} />
                   <span>Add Garment</span>
@@ -1572,7 +1635,10 @@ export const CatalogSettingsPage: React.FC = () => {
       </div>
 
       {/* ─── MAIN CONTENT VIEWPORT ────────────────────────── */}
-      <main className="flex-1 flex flex-col min-h-0 bg-slate-50">
+      <main
+        className="flex-1 flex flex-col min-h-0"
+        style={{ background: 'var(--bg-app)' }}
+      >
         {loading && <LoadingState message="Loading catalog data..." fullPage={false} />}
         {error && <ErrorState message={error} onRetry={fetchAllData} />}
 
@@ -1583,8 +1649,8 @@ export const CatalogSettingsPage: React.FC = () => {
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'garments' && (
               <div
-                className="flex-1 overflow-y-auto bg-slate-50 min-h-0"
-                style={{ background: '#f8fafc' }}
+                className="flex-1 overflow-y-auto min-h-0"
+                style={{ background: 'var(--bg-app)' }}
               >
                 <div
                   className="flex flex-col max-w-[1600px] mx-auto w-full"
@@ -1631,15 +1697,15 @@ export const CatalogSettingsPage: React.FC = () => {
                               aria-label="Sort garments"
                               style={{
                                 appearance: 'none',
-                                background: 'var(--bg-surface, #ffffff)',
-                                border: '1px solid var(--border, #e2e8f0)',
-                                borderRadius: '6px',
-                                padding: '5px 24px 5px 8px',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '9999px',
+                                padding: '5px 28px 5px 12px',
                                 fontSize: '12px',
                                 fontWeight: 500,
-                                color: 'var(--text-primary, #0f172a)',
+                                color: 'var(--text-primary)',
                                 cursor: 'pointer',
-                                boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)',
+                                boxShadow: 'var(--shadow-neu-card-sm)',
                                 outline: 'none',
                               }}
                             >
@@ -1653,10 +1719,10 @@ export const CatalogSettingsPage: React.FC = () => {
                               size={13}
                               style={{
                                 position: 'absolute',
-                                right: '7px',
+                                right: '10px',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
-                                color: 'var(--text-secondary, #64748b)',
+                                color: 'var(--text-secondary)',
                                 pointerEvents: 'none',
                               }}
                             />
@@ -1671,7 +1737,7 @@ export const CatalogSettingsPage: React.FC = () => {
                             gap: '6px',
                             fontSize: '12px',
                             fontWeight: 600,
-                            color: 'var(--text-primary, #0f172a)',
+                            color: 'var(--text-primary)',
                             cursor: 'pointer',
                             userSelect: 'none',
                           }}
@@ -1683,7 +1749,7 @@ export const CatalogSettingsPage: React.FC = () => {
                             style={{
                               width: '14px',
                               height: '14px',
-                              borderRadius: '3px',
+                              borderRadius: '4px',
                               accentColor: '#2563eb',
                               cursor: 'pointer',
                             }}
@@ -1697,11 +1763,11 @@ export const CatalogSettingsPage: React.FC = () => {
                   {/* ─── 4. GARMENT CATALOG GRID ──────────────────── */}
                   {filteredGarments.length === 0 ? (
                     <div
-                      className="bg-white border border-slate-200 rounded-[3px] p-8 shadow-xs"
                       style={{
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '3px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '16px',
+                        boxShadow: 'var(--shadow-neu-card-sm)',
                         padding: '32px',
                       }}
                     >
@@ -1769,24 +1835,21 @@ export const CatalogSettingsPage: React.FC = () => {
                           return (
                             <div
                               key={garment.id}
-                              className={`border border-slate-200 rounded-[3px] bg-white p-3 flex flex-col justify-between group transition-all shadow-xs ${
-                                !garment.isActive
-                                  ? 'opacity-60 grayscale bg-slate-50/60 border-slate-300'
-                                  : 'hover:border-blue-300 hover:shadow-sm'
+                              className={`group transition-all duration-200 ${
+                                !garment.isActive ? 'opacity-65 grayscale' : 'hover:scale-[1.01]'
                               }`}
                               style={{
-                                background: garment.isActive ? '#ffffff' : '#f8fafc',
-                                border: garment.isActive
-                                  ? '1px solid #e2e8f0'
-                                  : '1px solid #cbd5e1',
-                                borderRadius: '3px',
-                                padding: '12px 10px',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '16px',
+                                padding: '14px 12px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                minHeight: '215px',
-                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                minHeight: '220px',
+                                boxShadow: 'var(--shadow-neu-card-sm)',
                                 opacity: garment.isActive ? 1 : 0.65,
+                                transition: 'all 0.2s ease',
                               }}
                             >
                               {/* Top Row: SKU + Price Badge */}
@@ -1801,12 +1864,11 @@ export const CatalogSettingsPage: React.FC = () => {
                                 }}
                               >
                                 <span
-                                  className="text-[11px] font-mono text-slate-400 font-medium tracking-wider select-none"
+                                  className="text-[11px] font-mono tracking-wider select-none font-semibold"
                                   style={{
                                     fontSize: '11px',
                                     fontFamily: 'monospace',
-                                    color: '#94a3b8',
-                                    fontWeight: 500,
+                                    color: 'var(--text-muted)',
                                     letterSpacing: '0.05em',
                                     userSelect: 'none',
                                   }}
@@ -1824,14 +1886,15 @@ export const CatalogSettingsPage: React.FC = () => {
                                 >
                                   {!garment.isActive && (
                                     <span
-                                      className="bg-slate-100 text-slate-500 text-[10px] font-semibold px-1.5 py-0.5 rounded-[2px]"
+                                      className="text-[10px] font-semibold"
                                       style={{
-                                        background: '#f1f5f9',
-                                        color: '#64748b',
+                                        background: 'var(--bg-surface-inset)',
+                                        color: 'var(--text-muted)',
                                         fontSize: '10px',
                                         fontWeight: 600,
-                                        padding: '2px 5px',
-                                        borderRadius: '2px',
+                                        padding: '2px 8px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid var(--border)',
                                       }}
                                     >
                                       Inactive
@@ -1839,15 +1902,15 @@ export const CatalogSettingsPage: React.FC = () => {
                                   )}
                                   {hasPrice ? (
                                     <span
-                                      className="bg-[#eff6ff] text-[#2563eb] font-bold text-xs px-2.5 py-0.5 rounded-[3px] border border-[#bfdbfe] whitespace-nowrap shrink-0"
+                                      className="font-bold text-xs whitespace-nowrap shrink-0"
                                       style={{
-                                        background: '#eff6ff',
+                                        background: 'rgba(37, 99, 235, 0.1)',
                                         color: '#2563eb',
                                         fontWeight: 700,
                                         fontSize: '12px',
-                                        padding: '2px 8px',
-                                        borderRadius: '3px',
-                                        border: '1px solid #bfdbfe',
+                                        padding: '2px 10px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid rgba(37, 99, 235, 0.25)',
                                         whiteSpace: 'nowrap',
                                         flexShrink: 0,
                                       }}
@@ -1857,15 +1920,15 @@ export const CatalogSettingsPage: React.FC = () => {
                                     </span>
                                   ) : (
                                     <span
-                                      className="bg-slate-50 text-slate-400 text-[11px] font-medium px-2 py-0.5 rounded-[3px] border border-slate-200 whitespace-nowrap shrink-0"
+                                      className="text-[11px] font-medium whitespace-nowrap shrink-0"
                                       style={{
-                                        background: '#f8fafc',
-                                        color: '#94a3b8',
+                                        background: 'var(--bg-surface-inset)',
+                                        color: 'var(--text-muted)',
                                         fontSize: '11px',
                                         fontWeight: 500,
-                                        padding: '2px 6px',
-                                        borderRadius: '3px',
-                                        border: '1px solid #e2e8f0',
+                                        padding: '2px 8px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid var(--border)',
                                         whiteSpace: 'nowrap',
                                         flexShrink: 0,
                                       }}
@@ -1878,18 +1941,19 @@ export const CatalogSettingsPage: React.FC = () => {
 
                               {/* Center Icon Box */}
                               <div
-                                className="w-12 h-12 mx-auto rounded-[3px] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50/60 transition-colors my-2 shrink-0"
+                                className="w-14 h-14 mx-auto flex items-center justify-center transition-colors my-2 shrink-0 group-hover:text-blue-600"
                                 style={{
-                                  width: '48px',
-                                  height: '48px',
+                                  width: '56px',
+                                  height: '56px',
                                   margin: '8px auto',
-                                  borderRadius: '3px',
-                                  background: '#f8fafc',
-                                  border: '1px solid #f1f5f9',
+                                  borderRadius: '12px',
+                                  background: 'var(--bg-surface-inset)',
+                                  border: '1px solid var(--border)',
+                                  boxShadow: 'var(--shadow-neu-inset)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  color: '#64748b',
+                                  color: 'var(--text-secondary)',
                                   flexShrink: 0,
                                 }}
                               >
@@ -1902,11 +1966,11 @@ export const CatalogSettingsPage: React.FC = () => {
                                 style={{ textAlign: 'center', width: '100%', marginBottom: '8px' }}
                               >
                                 <h3
-                                  className="text-xs font-bold text-slate-900 truncate leading-snug"
+                                  className="text-xs font-bold truncate leading-snug"
                                   style={{
-                                    fontSize: '12px',
+                                    fontSize: '12.5px',
                                     fontWeight: 700,
-                                    color: '#0f172a',
+                                    color: 'var(--text-primary)',
                                     lineHeight: 1.3,
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
@@ -1917,10 +1981,10 @@ export const CatalogSettingsPage: React.FC = () => {
                                   {garment.name}
                                 </h3>
                                 <p
-                                  className="text-[11px] text-slate-400 truncate mt-0.5"
+                                  className="text-[11px] truncate mt-0.5"
                                   style={{
                                     fontSize: '11px',
-                                    color: '#94a3b8',
+                                    color: 'var(--text-muted)',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
                                     whiteSpace: 'nowrap',
@@ -1934,11 +1998,11 @@ export const CatalogSettingsPage: React.FC = () => {
 
                               {/* Subtle Divider Line above Edit Button */}
                               <div
-                                className="w-full border-t border-slate-100 my-2"
+                                className="w-full my-2"
                                 style={{
                                   width: '100%',
-                                  borderTop: '1px solid #f1f5f9',
-                                  margin: '8px 0',
+                                  borderTop: '1px solid var(--border)',
+                                  margin: '6px 0',
                                 }}
                               ></div>
 
@@ -1947,16 +2011,17 @@ export const CatalogSettingsPage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => openEditModal(garment)}
-                                  className="w-full h-8 border border-slate-200 rounded-[3px] text-xs font-medium text-slate-700 hover:text-blue-600 hover:border-blue-300 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                                  className="w-full h-8 text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-98"
                                   style={{
                                     width: '100%',
                                     height: '32px',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '3px',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '9999px',
                                     fontSize: '12px',
                                     fontWeight: 500,
-                                    color: '#334155',
-                                    background: '#ffffff',
+                                    color: 'var(--text-secondary)',
+                                    background: 'var(--bg-surface)',
+                                    boxShadow: 'var(--shadow-neu-card-sm)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -1967,7 +2032,7 @@ export const CatalogSettingsPage: React.FC = () => {
                                 >
                                   <Edit2
                                     size={12}
-                                    className="text-slate-400 group-hover:text-blue-600"
+                                    style={{ color: 'var(--text-muted)' }}
                                   />
                                   <span>Edit</span>
                                 </button>
@@ -1986,10 +2051,13 @@ export const CatalogSettingsPage: React.FC = () => {
             {/* ══ TAB 2: SERVICE PRICING MATRIX (ADMIN) ═════════ */}
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'pricing' && canConfigurePricing && (
-              <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+              <div
+                className="flex-1 flex flex-col min-h-0"
+                style={{ background: 'var(--bg-app)' }}
+              >
                 <div
-                  className="flex-1 overflow-y-auto bg-slate-50 min-h-0 flex flex-col justify-between"
-                  style={{ background: '#f8fafc' }}
+                  className="flex-1 overflow-y-auto min-h-0 flex flex-col justify-between"
+                  style={{ background: 'var(--bg-app)' }}
                 >
                   <div
                     className="flex flex-col max-w-[1600px] mx-auto w-full"
@@ -2106,7 +2174,15 @@ export const CatalogSettingsPage: React.FC = () => {
                           }
                         />
                       ) : (
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                        <div
+                          className="overflow-hidden"
+                          style={{
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '16px',
+                            boxShadow: 'var(--shadow-neu-card-sm)',
+                          }}
+                        >
                           <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm border-collapse">
                               <thead className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -2353,10 +2429,13 @@ export const CatalogSettingsPage: React.FC = () => {
             {/* ══ TAB 3: TOP UP SERVICES CONFIGURATION (ADMIN) ════ */}
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'topup' && canConfigurePricing && (
-              <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+              <div
+                className="flex-1 flex flex-col min-h-0"
+                style={{ background: 'var(--bg-app)' }}
+              >
                 <div
-                  className="flex-1 overflow-y-auto bg-slate-50 min-h-0 flex flex-col justify-between"
-                  style={{ background: '#f8fafc' }}
+                  className="flex-1 overflow-y-auto min-h-0 flex flex-col justify-between"
+                  style={{ background: 'var(--bg-app)' }}
                 >
                   <div
                     className="flex flex-col max-w-[1100px] mx-auto w-full"
@@ -2371,17 +2450,39 @@ export const CatalogSettingsPage: React.FC = () => {
                     }}
                   >
                     {/* Header info banner */}
-                    <div className="bg-white border border-slate-200 rounded-[3px] p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div
+                      className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      style={{
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '16px',
+                        boxShadow: 'var(--shadow-neu-card-sm)',
+                      }}
+                    >
                       <div>
                         <div className="flex items-center gap-2">
-                          <h2 className="text-base font-bold text-slate-900">
+                          <h2
+                            className="text-base font-bold"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
                             Top Up & Add-on Services
                           </h2>
-                          <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-[3px] uppercase tracking-wide">
+                          <span
+                            className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                            style={{
+                              background: 'rgba(37, 99, 235, 0.1)',
+                              color: '#2563eb',
+                              border: '1px solid rgba(37, 99, 235, 0.25)',
+                              borderRadius: '9999px',
+                            }}
+                          >
                             Configurable Rates
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p
+                          className="text-xs mt-1"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
                           Configure add-on service rates (e.g. Starching, Stain Treatment, Fragrance
                           Booster, Antiseptic Wash) used across Laundry & Dry Cleaning order
                           workflows.
@@ -2393,7 +2494,14 @@ export const CatalogSettingsPage: React.FC = () => {
                           type="button"
                           id="reset-topup-defaults-btn"
                           onClick={handleResetTopUpDefaults}
-                          className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-[3px] text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                          className="px-4 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer active:scale-98"
+                          style={{
+                            borderRadius: '9999px',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border)',
+                            boxShadow: 'var(--shadow-neu-card-sm)',
+                            color: 'var(--text-primary)',
+                          }}
                         >
                           <RotateCcw size={13} />
                           <span>Reset Defaults</span>
@@ -2402,7 +2510,13 @@ export const CatalogSettingsPage: React.FC = () => {
                           type="button"
                           id="add-topup-service-btn"
                           onClick={handleAddTopUpService}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-[3px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                          className="px-4 py-2 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-98"
+                          style={{
+                            borderRadius: '9999px',
+                            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
+                            border: 'none',
+                          }}
                         >
                           <Plus size={14} />
                           <span>Add Service</span>
@@ -2412,20 +2526,44 @@ export const CatalogSettingsPage: React.FC = () => {
 
                     {/* Alerts */}
                     {topUpSaveSuccess && (
-                      <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-[3px] flex items-center gap-2">
+                      <div
+                        className="p-3 text-xs font-semibold flex items-center gap-2"
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          color: '#059669',
+                          borderRadius: '12px',
+                        }}
+                      >
                         <Check size={16} className="text-emerald-600 shrink-0" />
                         <span>{topUpSaveSuccess}</span>
                       </div>
                     )}
                     {topUpSaveError && (
-                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold rounded-[3px] flex items-center gap-2">
+                      <div
+                        className="p-3 text-xs font-semibold flex items-center gap-2"
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#dc2626',
+                          borderRadius: '12px',
+                        }}
+                      >
                         <X size={16} className="text-rose-600 shrink-0" />
                         <span>{topUpSaveError}</span>
                       </div>
                     )}
 
                     {/* Services Table */}
-                    <div className="bg-white border border-slate-200 rounded-[3px] shadow-xs overflow-hidden">
+                    <div
+                      className="overflow-hidden"
+                      style={{
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '16px',
+                        boxShadow: 'var(--shadow-neu-card-sm)',
+                      }}
+                    >
                       <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 grid grid-cols-12 gap-3 text-xs font-bold text-slate-600 uppercase tracking-wider">
                         <div className="col-span-4 sm:col-span-3">Service Name</div>
                         <div className="col-span-5 sm:col-span-6">Description / Notes</div>

@@ -112,18 +112,20 @@ describe('CatalogController', () => {
   });
 
   describe('Authorization metadata', () => {
-    it('should have OWNER, MANAGER, and COUNTER role metadata on the create method', () => {
+    it('should have OWNER role metadata on the create method and exclude COUNTER', () => {
       const reflector = new Reflector();
       const roles = reflector.get<string[]>(ROLES_KEY, CatalogController.prototype.create);
 
-      expect(roles).toEqual(['OWNER', 'MANAGER', 'COUNTER']);
+      expect(roles).toEqual(['OWNER']);
+      expect(roles).not.toContain('COUNTER');
     });
 
-    it('should have OWNER, MANAGER, and COUNTER role metadata on the update method', () => {
+    it('should have OWNER role metadata on the update method and exclude COUNTER', () => {
       const reflector = new Reflector();
       const roles = reflector.get<string[]>(ROLES_KEY, CatalogController.prototype.update);
 
-      expect(roles).toEqual(['OWNER', 'MANAGER', 'COUNTER']);
+      expect(roles).toEqual(['OWNER']);
+      expect(roles).not.toContain('COUNTER');
     });
 
     it('should NOT have roles metadata on the findAll method (accessible to all authenticated)', () => {
@@ -132,16 +134,6 @@ describe('CatalogController', () => {
 
       // No @Roles decorator on findAll means roles should be undefined
       expect(roles).toBeUndefined();
-    });
-
-    it('should restrict PATCH to OWNER, MANAGER, and COUNTER — not DELIVERY', () => {
-      const reflector = new Reflector();
-      const roles = reflector.get<string[]>(ROLES_KEY, CatalogController.prototype.update);
-
-      expect(roles).toContain('OWNER');
-      expect(roles).toContain('MANAGER');
-      expect(roles).toContain('COUNTER');
-      expect(roles).not.toContain('DELIVERY');
     });
   });
 });

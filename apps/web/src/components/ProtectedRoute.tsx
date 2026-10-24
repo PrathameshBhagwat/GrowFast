@@ -6,6 +6,7 @@ import { LoadingState } from '@growfast/ui';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: string[];
+  redirectTo?: string;
 }
 
 /**
@@ -16,7 +17,11 @@ interface ProtectedRouteProps {
  * NOTE: This is a UX convenience only. Server-side authorization
  * is the real security boundary.
  */
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  allowedRoles,
+  redirectTo,
+}) => {
   const { isAuthenticated, isLoading, employee } = useAuth();
 
   if (isLoading) {
@@ -28,6 +33,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowe
   }
 
   if (allowedRoles && employee && !allowedRoles.includes(employee.role)) {
+    if (redirectTo) {
+      return <Navigate to={redirectTo} replace />;
+    }
     return (
       <div
         style={{
