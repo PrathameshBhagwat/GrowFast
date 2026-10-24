@@ -13,6 +13,10 @@ import {
   GarmentCategory,
   ServiceCategory,
   PaginatedResponse,
+  DeliveryRecordDTO,
+  CompleteDeliveryRequest,
+  UpdateCustomerRequest,
+  DashboardSummaryDTO,
 } from '@growfast/shared-types';
 import { getAuthToken } from '../storage/secure-store';
 
@@ -256,6 +260,13 @@ export const apiClient = {
     getById: async (id: string): Promise<CustomerDTO> => {
       return await request<CustomerDTO>(`/api/customers/${id}`);
     },
+
+    update: async (id: string, payload: UpdateCustomerRequest): Promise<CustomerDTO> => {
+      return await request<CustomerDTO>(`/api/customers/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    },
   },
 
   catalog: {
@@ -297,16 +308,38 @@ export const apiClient = {
     list: async (params?: {
       search?: string;
       status?: string;
+      customerId?: string;
+      paymentStatus?: string;
       page?: number;
       limit?: number;
+      pageSize?: number;
     }): Promise<PaginatedResponse<OrderSummaryDTO>> => {
       const searchParams = new URLSearchParams();
       if (params?.search) searchParams.append('search', params.search);
       if (params?.status) searchParams.append('status', params.status);
+      if (params?.customerId) searchParams.append('customerId', params.customerId);
+      if (params?.paymentStatus) searchParams.append('paymentStatus', params.paymentStatus);
       if (params?.page) searchParams.append('page', String(params.page));
-      if (params?.limit) searchParams.append('limit', String(params.limit));
+      const size = params?.pageSize || params?.limit;
+      if (size) {
+        searchParams.append('limit', String(size));
+        searchParams.append('pageSize', String(size));
+      }
       const qs = searchParams.toString();
       return await request<PaginatedResponse<OrderSummaryDTO>>(`/api/orders${qs ? `?${qs}` : ''}`);
+    },
+
+    dueToday: async (options?: {
+      countOnly?: boolean;
+      date?: string;
+    }): Promise<{ count: number; orders?: OrderSummaryDTO[] }> => {
+      const searchParams = new URLSearchParams();
+      if (options?.countOnly) searchParams.append('countOnly', 'true');
+      if (options?.date) searchParams.append('date', options.date);
+      const qs = searchParams.toString();
+      return await request<{ count: number; orders?: OrderSummaryDTO[] }>(
+        `/api/orders/due-today${qs ? `?${qs}` : ''}`,
+      );
     },
 
     recordPickup: async (orderId: string, payload: OrderPickupRequest): Promise<OrderDetailDTO> => {
@@ -424,6 +457,49 @@ export const apiClient = {
     },
   },
 
+  deliveries: {
+    list: async (status?: string): Promise<DeliveryRecordDTO[]> => {
+      const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+      return await request<DeliveryRecordDTO[]>(`/api/deliveries${qs}`);
+    },
+
+    getById: async (id: string): Promise<DeliveryRecordDTO> => {
+      return await request<DeliveryRecordDTO>(`/api/deliveries/${id}`);
+    },
+
+    updateStatus: async (
+      id: string,
+      status: string,
+      notes?: string,
+    ): Promise<DeliveryRecordDTO> => {
+      return await request<DeliveryRecordDTO>(`/api/deliveries/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, notes }),
+      });
+    },
+
+    complete: async (
+      id: string,
+      payload: { proofPhotoUrl?: string; notes?: string; deliveredItems?: any[] },
+    ): Promise<DeliveryRecordDTO> => {
+      return await request<DeliveryRecordDTO>(`/api/deliveries/${id}/complete`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    assign: async (
+      id: string,
+      riderId: string,
+      scheduledAt?: string,
+    ): Promise<DeliveryRecordDTO> => {
+      return await request<DeliveryRecordDTO>(`/api/deliveries/${id}/assign`, {
+        method: 'PATCH',
+        body: JSON.stringify({ riderId, scheduledAt }),
+      });
+    },
+  },
+
   store: {
     getConfig: async (): Promise<{
       id: string;
@@ -437,6 +513,16 @@ export const apiClient = {
         expressSurchargePercent?: number | null;
         topUpServices?: any[];
       }>('/api/store/config');
+    },
+  },
+
+  dashboard: {
+    getSummary: async (startDate?: string, endDate?: string): Promise<DashboardSummaryDTO> => {
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      const qs = params.toString();
+      return await request<DashboardSummaryDTO>(`/api/dashboard/summary${qs ? `?${qs}` : ''}`);
     },
   },
 };
