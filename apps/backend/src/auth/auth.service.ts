@@ -92,8 +92,8 @@ export class AuthService {
    * Excludes sensitive data like PINs, emails, and phones.
    * Optionally filters by specific employee roles (e.g. OWNER, COUNTER).
    */
-  async getDirectory(roles?: string[]) {
-    const targetRoles = roles && roles.length > 0 ? roles : [Role.OWNER, Role.COUNTER];
+  async getDirectory(roles?: (Role | string)[]) {
+    const targetRoles = roles && roles.length > 0 ? (roles as Role[]) : [Role.OWNER, Role.COUNTER];
 
     const employees = await this.prisma.employee.findMany({
       where: {
