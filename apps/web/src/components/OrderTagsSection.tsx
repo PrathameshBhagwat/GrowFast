@@ -218,8 +218,8 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleOpenCalibration}
-            style={{ minHeight: '44px' }}
-            className="text-xs font-semibold px-3 min-h-[44px] flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-850 cursor-pointer"
+            style={{ minHeight: '44px', borderRadius: '9999px', boxShadow: 'var(--shadow-neu-card-sm)' }}
+            className="text-xs font-semibold px-3.5 min-h-[44px] flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-300/80 dark:border-slate-700 bg-white dark:bg-slate-850 cursor-pointer"
             icon={<Compass size={15} />}
             title="Test 40×40 mm printer calibration"
           >
@@ -231,7 +231,8 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
               type="button"
               id="select-all-tags-btn"
               onClick={handleSelectAllToggle}
-              className="text-xs font-semibold text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] transition-colors cursor-pointer"
+              style={{ minHeight: '44px', borderRadius: '9999px', boxShadow: 'var(--shadow-neu-card-sm)' }}
+              className="text-xs font-semibold text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1.5 px-3.5 py-2 border border-gray-300/80 dark:border-slate-700 bg-white dark:bg-slate-800 min-h-[44px] transition-colors cursor-pointer"
             >
               {allActiveSelected ? (
                 <>
@@ -251,8 +252,8 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
               variant="primary"
               size="sm"
               onClick={handlePreviewSelected}
-              style={{ minHeight: '44px' }}
-              className="text-xs font-bold px-3 min-h-[44px] flex items-center gap-1.5 shadow-sm"
+              style={{ minHeight: '44px', borderRadius: '9999px' }}
+              className="text-xs font-bold px-4 min-h-[44px] flex items-center gap-1.5 shadow-sm"
               icon={<Printer size={16} />}
             >
               Print Selected ({selectedCount})
@@ -266,8 +267,8 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
               size="sm"
               disabled={activeEntries.length === 0}
               onClick={handlePrintAll}
-              style={{ minHeight: '44px' }}
-              className="text-xs font-semibold px-3 min-h-[44px] flex items-center gap-1.5"
+              style={{ minHeight: '44px', borderRadius: '9999px', boxShadow: 'var(--shadow-neu-card-sm)' }}
+              className="text-xs font-semibold px-4 min-h-[44px] flex items-center gap-1.5"
               icon={<Printer size={16} />}
             >
               Print All Tags ({activeEntries.length})
@@ -280,7 +281,12 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
       {tagEntries.length === 0 && (
         <div
           id="no-tags-empty-state"
-          className="text-center py-8 px-4 bg-gray-50 dark:bg-slate-900/40 rounded-lg border border-dashed border-gray-300 dark:border-slate-800"
+          style={{
+            borderRadius: '16px',
+            boxShadow: 'var(--shadow-neu-inset)',
+            background: 'var(--bg-surface-inset)',
+          }}
+          className="text-center py-8 px-4 border border-gray-200/60 dark:border-slate-800/80"
         >
           <TagIcon className="mx-auto text-gray-400 dark:text-slate-500 mb-2" size={32} />
           <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-200">
@@ -308,12 +314,16 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                 key={entry.garmentId}
                 id={`tag-card-${entry.garmentId}`}
                 data-testid={`tag-card-${entry.unitNumber}`}
-                className={`relative flex flex-col justify-between p-3.5 rounded-xl border transition-all ${
+                style={{
+                  borderRadius: '16px',
+                  boxShadow: isSelected ? 'var(--shadow-neu-card)' : 'var(--shadow-neu-card-sm)',
+                }}
+                className={`relative flex flex-col justify-between p-3.5 border transition-all ${
                   entry.isCancelled
-                    ? 'bg-gray-50/70 border-gray-200 border-dashed dark:bg-slate-900/40 dark:border-slate-800 opacity-75'
+                    ? 'bg-gray-50/70 border-gray-200/80 border-dashed dark:bg-slate-900/40 dark:border-slate-800 opacity-75'
                     : isSelected
-                      ? 'bg-blue-50/60 border-blue-400 dark:bg-blue-950/40 dark:border-blue-600 shadow-sm ring-1 ring-blue-400'
-                      : 'bg-white border-gray-200 dark:bg-slate-850 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700 shadow-xs'
+                      ? 'bg-blue-50/70 border-blue-400 dark:bg-blue-950/40 dark:border-blue-600 ring-1 ring-blue-400'
+                      : 'bg-white border-gray-200/80 dark:bg-slate-850 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700'
                 }`}
               >
                 {/* ─── Top: Checkbox, Piece Info & Status ───────── */}
@@ -371,7 +381,14 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                 </div>
 
                 {/* ─── Middle: Tag Identity Box ────────────────────────────── */}
-                <div className="bg-gray-50 dark:bg-slate-900/80 p-2.5 rounded-lg border border-gray-100 dark:border-slate-800 my-2 space-y-1.5">
+                <div
+                  style={{
+                    borderRadius: '12px',
+                    boxShadow: 'var(--shadow-neu-inset)',
+                    background: 'var(--bg-surface-inset)',
+                  }}
+                  className="p-2.5 border border-gray-100 dark:border-slate-800/80 my-2 space-y-1.5"
+                >
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-slate-500">
                       Order / Piece
@@ -389,7 +406,7 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                     </span>
                     <span
                       id={`tag-id-display-${entry.garmentId}`}
-                      className="font-mono text-xs font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-slate-700 select-all"
+                      className="font-mono text-xs font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-gray-200/80 dark:border-slate-700 select-all shadow-xs"
                     >
                       {entry.tagId}
                     </span>
@@ -430,8 +447,8 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handlePreviewSingle(entry)}
-                    style={{ minHeight: '44px' }}
-                    className="w-full text-xs min-h-[44px] flex items-center justify-center gap-1.5 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
+                    style={{ minHeight: '44px', borderRadius: '12px', boxShadow: 'var(--shadow-neu-card-sm)' }}
+                    className="w-full text-xs min-h-[44px] flex items-center justify-center gap-1.5 border border-gray-200/80 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
                     title="Preview 40×40 mm tag"
                     icon={<Eye size={14} />}
                   >
@@ -443,7 +460,7 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
                     size="sm"
                     disabled={entry.isCancelled}
                     onClick={() => handlePrintSingle(entry)}
-                    style={{ minHeight: '44px' }}
+                    style={{ minHeight: '44px', borderRadius: '12px', boxShadow: 'var(--shadow-neu-card-sm)' }}
                     className={`w-full text-xs min-h-[44px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
                       entry.isCancelled
                         ? 'opacity-40 cursor-not-allowed'

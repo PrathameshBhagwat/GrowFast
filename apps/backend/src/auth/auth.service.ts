@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { Role } from '@growfast/shared-types';
 
 export interface JwtPayload {
   sub: string;
@@ -92,7 +93,10 @@ export class AuthService {
    */
   async getDirectory() {
     const employees = await this.prisma.employee.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        role: { in: [Role.OWNER, Role.COUNTER] },
+      },
       select: {
         id: true,
         name: true,

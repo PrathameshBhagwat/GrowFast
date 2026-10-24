@@ -34,11 +34,11 @@ export class ServicesController {
 
   /**
    * PATCH /api/services/:id
-   * Update a service type. OWNER or MANAGER role required.
+   * Update a service type. OWNER role required.
    */
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('OWNER', 'MANAGER')
+  @Roles('OWNER')
   async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateServiceDto) {
     const storeId = req.user.storeId;
     const service = await this.catalogService.updateService(id, storeId, dto);

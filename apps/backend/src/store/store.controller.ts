@@ -37,7 +37,7 @@ export class StoreController {
   }
 
   @Patch('config')
-  @Roles(Role.OWNER, Role.MANAGER)
+  @Roles(Role.OWNER)
   updateStoreConfig(@Request() req: any, @Body() updateStoreConfigDto: UpdateStoreConfigDto) {
     return this.storeService.updateStoreConfig(req.user.storeId, updateStoreConfigDto);
   }

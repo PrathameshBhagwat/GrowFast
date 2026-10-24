@@ -111,7 +111,7 @@ describe('CatalogNavFilter Service & Category Rules', () => {
     expect(screen.getByRole('button', { name: /^women$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^kids$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^household$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^home cleaning$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^home cleaning$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^shoe$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^other$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /weight based/i })).toBeInTheDocument();

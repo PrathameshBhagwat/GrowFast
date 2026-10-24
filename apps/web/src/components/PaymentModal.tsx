@@ -192,27 +192,27 @@ export function PaymentModal({
       <form onSubmit={handleSubmit} className="space-y-4 pt-2">
         {error && <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">{error}</div>}
 
-        <div className="bg-gray-50 p-4 rounded-md space-y-2 mb-4 border border-gray-200">
+        <div className="bg-[var(--bg-surface-inset)] p-4 rounded-2xl space-y-2 mb-4 border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Order Total</span>
-            <span className="font-medium font-mono">₹{order.totalAmount.toFixed(2)}</span>
+            <span className="text-[var(--text-secondary)]">Order Total</span>
+            <span className="font-medium font-mono text-[var(--text-primary)]">₹{order.totalAmount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Already Paid</span>
-            <span className="font-medium text-green-600 font-mono">
+            <span className="text-[var(--text-secondary)]">Already Paid</span>
+            <span className="font-medium text-emerald-600 dark:text-emerald-400 font-mono">
               ₹{order.amountPaid.toFixed(2)}
             </span>
           </div>
-          <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-            <span className="font-bold text-gray-700">Current Balance Due</span>
-            <span className="font-bold text-red-600 font-mono">₹{order.amountDue.toFixed(2)}</span>
+          <div className="flex justify-between text-sm pt-2 border-t border-[var(--border)]">
+            <span className="font-bold text-[var(--text-primary)]">Current Balance Due</span>
+            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">₹{order.amountDue.toFixed(2)}</span>
           </div>
         </div>
 
         <div>
           <label
             htmlFor="payment-amount-input"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5"
           >
             Payment Amount (₹)
           </label>
@@ -223,7 +223,7 @@ export function PaymentModal({
             max={order.amountDue}
             step="0.01"
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+            className="w-full px-4 py-2.5 border border-[var(--border)] bg-[var(--bg-surface-inset)] rounded-xl text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             disabled={loading}

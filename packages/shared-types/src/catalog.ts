@@ -25,12 +25,64 @@ export const STARCHING_ALLOWED_CATEGORIES: GarmentCategory[] = [
 /**
  * Returns whether a category value represents the Shoe category.
  */
-function isShoeCategory(category: string | GarmentCategory): boolean {
+export function isShoeCategory(category: string | GarmentCategory): boolean {
+  if (!category) return false;
+  const upper = String(category).trim().toUpperCase();
   return (
-    category === GarmentCategory.SHOES ||
-    category.toLowerCase() === 'shoe' ||
-    category.toLowerCase() === 'shoes'
+    upper === GarmentCategory.SHOES ||
+    upper === 'SHOE' ||
+    upper === 'SHOES'
   );
+}
+
+/**
+ * Returns whether a category value represents the Household category.
+ */
+export function isHouseholdCategory(category: string | GarmentCategory): boolean {
+  if (!category) return false;
+  const upper = String(category).trim().toUpperCase();
+  return upper === GarmentCategory.HOUSEHOLD || upper === 'HOUSEHOLD';
+}
+
+/**
+ * Returns whether a category value represents the Other / Others category.
+ */
+export function isOtherCategory(category: string | GarmentCategory): boolean {
+  if (!category) return false;
+  const upper = String(category).trim().toUpperCase();
+  return (
+    upper === GarmentCategory.OTHERS ||
+    upper === 'OTHERS' ||
+    upper === 'OTHER'
+  );
+}
+
+/**
+ * Returns whether a service name represents the Steam Iron service.
+ */
+export function isSteamIronService<T extends { id?: string; name: string; category?: string }>(
+  serviceIdOrName: string,
+  services?: T[],
+): boolean {
+  if (!serviceIdOrName) return false;
+  if (services) {
+    const svc = services.find(
+      (s) =>
+        s.id === serviceIdOrName ||
+        s.name.trim().toLowerCase() === serviceIdOrName.trim().toLowerCase(),
+    );
+    if (svc) {
+      const lower = svc.name.trim().toLowerCase();
+      return (
+        lower === 'steam iron' ||
+        lower === 'steam press' ||
+        lower.includes('steam iron') ||
+        svc.category === 'STEAM_PRESS'
+      );
+    }
+  }
+  const lower = serviceIdOrName.trim().toLowerCase();
+  return lower === 'steam iron' || lower === 'steam press' || lower.includes('steam iron');
 }
 
 /**
@@ -82,10 +134,16 @@ export function isDryCleanService<T extends { id?: string; name: string }>(
         s.name.trim().toLowerCase() === serviceIdOrName.trim().toLowerCase(),
     );
     if (svc) {
-      return svc.name.trim().toLowerCase() === 'dry clean';
+      const lower = svc.name.trim().toLowerCase();
+      return (
+        lower === 'dry clean' ||
+        lower === 'dry cleaning' ||
+        (svc as { category?: string }).category === 'DRY_CLEAN'
+      );
     }
   }
-  return serviceIdOrName.trim().toLowerCase() === 'dry clean';
+  const lower = serviceIdOrName.trim().toLowerCase();
+  return lower === 'dry clean' || lower === 'dry cleaning';
 }
 
 /**
@@ -183,8 +241,14 @@ export function isServiceAllowedInWorkflow<T extends { name: string; category?: 
  */
 export function isCategoryAllowedInWorkflow(
   category: string | GarmentCategory,
-  workflow: OrderWorkflowType,
+  _workflow: OrderWorkflowType,
 ): boolean {
+  if (
+    category === GarmentCategory.HOME_CLEANING ||
+    String(category).trim().toUpperCase() === 'HOME_CLEANING'
+  ) {
+    return false;
+  }
   // WEIGHT_BASED is allowed in DRY_CLEANING as a weight-based exception category
   return true;
 }
@@ -304,7 +368,11 @@ export function filterCategoriesForService<T extends string>(
   services: Array<{ id: string; name: string }>,
   _workflow?: OrderWorkflowType,
 ): T[] {
-  let result = categories;
+  let result = categories.filter(
+    (c) =>
+      String(c).trim().toUpperCase() !== GarmentCategory.HOME_CLEANING &&
+      String(c).trim().toUpperCase() !== 'HOME_CLEANING',
+  );
 
   if (isStarchingService(activeServiceId, services)) {
     const allowed = [GarmentCategory.MEN, GarmentCategory.WOMEN, GarmentCategory.KIDS].map((c) =>
@@ -375,9 +443,11 @@ export function resolveCatalogSelectionOnWorkflowChange<
  * Resolves the service selection when the user changes the category.
  * Business Rules:
  * 1. When Category becomes Shoe: keep current service if it is one of the valid shoe services (Standard Wash, Dry Clean, Shoe Cleaning); otherwise auto-select Shoe Cleaning.
- * 2. When leaving Shoe category with Shoe Cleaning selected: switch to Standard Wash.
- * 3. When switching to a category not compatible with Starching (e.g. non-Men/Women/Kids while Starching is active): switch to Standard Wash.
- * 4. When switching to Weight Based category while Dry Clean is active: switch to Standard Wash (Dry Clean cannot be weight-based).
+ * 2. When Category becomes Household: automatically select Dry Clean.
+ * 3. When Category becomes Other: automatically select Dry Clean.
+ * 4. When leaving Shoe category with Shoe Cleaning selected: switch to Standard Wash.
+ * 5. When switching to a category not compatible with Starching (e.g. non-Men/Women/Kids while Starching is active): switch to Standard Wash.
+ * 6. When switching to Weight Based category while Dry Clean is active: switch to Standard Wash (Dry Clean cannot be weight-based).
  */
 export function resolveCatalogSelectionOnCategoryChange<
   T extends { id: string; name: string; category?: string },
@@ -390,7 +460,7 @@ export function resolveCatalogSelectionOnCategoryChange<
   const getFallbackService = (): T | undefined => {
     if (workflow === 'DRY_CLEANING') {
       return (
-        services.find((s) => isDryCleanService(s.name) || s.category === 'DRY_CLEAN') ||
+        services.find((s) => isDryCleanService(s.name, services) || s.category === 'DRY_CLEAN') ||
         services.find((s) => isServiceAllowedInWorkflow(s, 'DRY_CLEANING'))
       );
     }
@@ -410,6 +480,7 @@ export function resolveCatalogSelectionOnCategoryChange<
     return services.find((s) => isServiceAllowedInWorkflow(s, 'LAUNDRY'));
   };
 
+  // Rule 1: Shoe category -> Shoe Cleaning
   if (isShoeCategory(newCategory)) {
     const currentService = services.find((s) => s.id === currentServiceId);
     if (currentService && SHOE_VALID_SERVICES.includes(currentService.name.trim().toLowerCase())) {
@@ -418,6 +489,26 @@ export function resolveCatalogSelectionOnCategoryChange<
     const shoeCleaning = services.find((s) => s.name.trim().toLowerCase() === 'shoe cleaning');
     if (shoeCleaning) {
       return shoeCleaning.id;
+    }
+  }
+
+  // Rule 2: Household category -> Automatically select Dry Clean
+  if (isHouseholdCategory(newCategory)) {
+    const dryClean = services.find(
+      (s) => isDryCleanService(s.name, services) || s.category === 'DRY_CLEAN',
+    );
+    if (dryClean) {
+      return dryClean.id;
+    }
+  }
+
+  // Rule 3: Other category -> Automatically select Dry Clean
+  if (isOtherCategory(newCategory)) {
+    const dryClean = services.find(
+      (s) => isDryCleanService(s.name, services) || s.category === 'DRY_CLEAN',
+    );
+    if (dryClean) {
+      return dryClean.id;
     }
   }
 
@@ -476,6 +567,31 @@ export function resolveCatalogSelectionOnCategoryChange<
 }
 
 /**
+ * Resolves the service selection when user clicks a service, enforcing category-service constraints:
+ * - If Steam Iron is selected while Household or Other category is active: automatically switch service to Dry Clean.
+ */
+export function resolveServiceOnServiceChange<
+  T extends { id: string; name: string; category?: string },
+>(
+  newServiceId: string,
+  currentCategory: string | GarmentCategory,
+  services: T[],
+): string {
+  if (
+    isSteamIronService(newServiceId, services) &&
+    (isHouseholdCategory(currentCategory) || isOtherCategory(currentCategory))
+  ) {
+    const dryClean = services.find(
+      (s) => isDryCleanService(s.name, services) || s.category === 'DRY_CLEAN',
+    );
+    if (dryClean) {
+      return dryClean.id;
+    }
+  }
+  return newServiceId;
+}
+
+/**
  * Resolves the category selection when the user changes the service.
  * Business Rules:
  * 1. When Service becomes Shoe Cleaning or Free Shoe: auto-select Shoe category.
@@ -523,6 +639,36 @@ export function resolveCatalogSelectionOnServiceChange<T extends { id: string; n
   }
 
   return currentCategory;
+}
+
+export interface CatalogSelectionResult {
+  serviceId: string;
+  category: string | GarmentCategory;
+}
+
+/**
+ * Resolves both the active service and category when a service is selected by the user.
+ * - If Steam Iron is selected while Household or Other is active: automatically switches service to Dry Clean.
+ * - If Shoe Cleaning is selected: automatically switches category to Shoe.
+ * - If Starching is selected from an incompatible category: automatically switches category to Men.
+ * - If an incompatible service is selected from Shoe: automatically switches category to Men.
+ */
+export function resolveCatalogSelectionOnServiceSelect<
+  T extends { id: string; name: string; category?: string },
+>(
+  selectedServiceId: string,
+  currentCategory: string | GarmentCategory,
+  services: T[],
+  workflow?: OrderWorkflowType,
+): CatalogSelectionResult {
+  const serviceId = resolveServiceOnServiceChange(selectedServiceId, currentCategory, services);
+  const category = resolveCatalogSelectionOnServiceChange(
+    serviceId,
+    currentCategory,
+    services,
+    workflow,
+  );
+  return { serviceId, category };
 }
 
 /**

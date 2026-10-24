@@ -93,10 +93,10 @@ describe('CatalogSettingsPage', () => {
     });
   });
 
-  const renderComponent = () => {
+  const renderComponent = (props?: { onBack?: () => void; initialEntries?: string[] }) => {
     return render(
-      <MemoryRouter>
-        <CatalogSettingsPage />
+      <MemoryRouter initialEntries={props?.initialEntries || ['/catalog']}>
+        <CatalogSettingsPage onBack={props?.onBack} />
       </MemoryRouter>,
     );
   };
@@ -173,7 +173,7 @@ describe('CatalogSettingsPage', () => {
     });
   });
 
-  it('allows COUNTER role to add garments but NOT configure pricing matrix', async () => {
+  it('restricts COUNTER role from adding garments or configuring pricing matrix', async () => {
     mockEmployee = {
       id: 'emp-counter-001',
       name: 'Swapnil',
@@ -188,8 +188,8 @@ describe('CatalogSettingsPage', () => {
       expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
     });
 
-    // Counter sees Add Garment button but NO Service Pricing tab
-    expect(screen.getByText('Add Garment')).toBeInTheDocument();
+    // Counter cannot see Add Garment button and cannot see Service Pricing tab
+    expect(screen.queryByText('Add Garment')).not.toBeInTheDocument();
     expect(screen.queryByText('Service Pricing')).not.toBeInTheDocument();
     expect(screen.queryByText(/View Only \(Counter\)/i)).not.toBeInTheDocument();
   });
@@ -429,5 +429,65 @@ describe('CatalogSettingsPage', () => {
         body: expect.stringContaining('"price":45'),
       }),
     );
+  });
+
+  describe('Role-based pricing and catalog restrictions', () => {
+    it('restricts COUNTER from creating garments, editing garments, or configuring prices, but allows viewing and has back button', async () => {
+      mockEmployee = {
+        id: 'emp-counter-001',
+        name: 'Swapnil Shinde',
+        role: Role.COUNTER,
+        storeId: 'store-kp-001',
+      };
+      const onBackMock = vi.fn();
+      renderComponent({ onBack: onBackMock, initialEntries: ['/catalog'] });
+
+      // COUNTER can view catalog garments
+      await waitFor(() => {
+        expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
+        expect(screen.getByText('Jeans')).toBeInTheDocument();
+      });
+
+      // COUNTER cannot see "Add Garment" button
+      expect(screen.queryByRole('button', { name: /add garment/i })).not.toBeInTheDocument();
+
+      // COUNTER cannot see Edit buttons on garment cards
+      expect(screen.queryByTitle('Edit garment')).not.toBeInTheDocument();
+
+      // COUNTER cannot see Service Pricing or Top Up Services tabs
+      expect(screen.queryByText('Service Pricing')).not.toBeInTheDocument();
+      expect(screen.queryByText('Top Up Services')).not.toBeInTheDocument();
+
+      // COUNTER has a clearly visible back button matching GrowFast design
+      const backBtn = screen.getByRole('button', { name: /back/i });
+      expect(backBtn).toBeInTheDocument();
+
+      // Clicking back button invokes the navigation / back handler
+      fireEvent.click(backBtn);
+      expect(onBackMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows OWNER to see Add Garment, Edit controls, Service Pricing, and Top Up Services', async () => {
+      mockEmployee = {
+        id: 'emp-owner-001',
+        name: 'Prathamesh',
+        role: Role.OWNER,
+        storeId: 'store-kp-001',
+      };
+      renderComponent({ initialEntries: ['/catalog'] });
+
+      await waitFor(() => {
+        expect(screen.getByText('Formal Shirt')).toBeInTheDocument();
+      });
+
+      // OWNER sees Add Garment button
+      expect(screen.getByRole('button', { name: /add garment/i })).toBeInTheDocument();
+
+      // OWNER sees Service Pricing tab
+      expect(screen.getByText('Service Pricing')).toBeInTheDocument();
+
+      // OWNER sees Top Up Services tab
+      expect(screen.getByText('Top Up Services')).toBeInTheDocument();
+    });
   });
 });

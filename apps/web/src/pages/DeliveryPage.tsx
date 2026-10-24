@@ -282,15 +282,31 @@ export const DeliveryPage: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<ArrowLeft size={16} />}
+            <button
+              type="button"
+              id="delivery-back-btn"
               onClick={() => navigate('/')}
               aria-label="Back to Dashboard"
+              title="Return to Dashboard"
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                border: '1px solid var(--border, #e2e8f0)',
+                background: 'var(--bg-surface, #ffffff)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary, #475569)',
+                cursor: 'pointer',
+                flexShrink: 0,
+                boxShadow: 'var(--shadow-neu-card-sm)',
+                transition: 'all 0.15s ease',
+              }}
+              className="relative hover:text-[var(--text-primary)] hover:border-blue-400 active:scale-95 before:absolute before:-inset-1 before:content-['']"
             >
-              Dashboard
-            </Button>
+              <ArrowLeft size={16} />
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
               <div
                 style={{
@@ -348,41 +364,17 @@ export const DeliveryPage: React.FC = () => {
         ) : (
           <>
             {/* Filter Tabs */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                marginBottom: 20,
-                overflowX: 'auto',
-                paddingBottom: 4,
-              }}
-            >
+            <div className="flex items-center gap-1.5 p-1 rounded-full bg-[var(--bg-surface-inset)] border border-[var(--border)] shadow-[var(--shadow-neu-inset)] mb-6 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab}
+                  type="button"
                   onClick={() => setActiveTab(tab)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    border:
-                      activeTab === tab
-                        ? '2px solid var(--accent, #3B82F6)'
-                        : '1px solid var(--border, #E5E7EB)',
-                    background:
-                      activeTab === tab
-                        ? 'var(--accent-muted, #EFF6FF)'
-                        : 'var(--bg-surface, #FFF)',
-                    color:
-                      activeTab === tab
-                        ? 'var(--accent, #1E40AF)'
-                        : 'var(--text-secondary, #6B7280)',
-                    fontWeight: activeTab === tab ? 600 : 400,
-                    fontSize: 14,
-                    cursor: 'pointer',
-                    minHeight: 40,
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease',
-                  }}
+                  className={`px-4 py-2 rounded-full font-bold text-xs transition-all whitespace-nowrap min-h-[36px] cursor-pointer ${
+                    activeTab === tab
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
+                  }`}
                 >
                   {tab.replace('_', ' ')}
                 </button>
@@ -393,9 +385,12 @@ export const DeliveryPage: React.FC = () => {
             {filtered.length === 0 ? (
               <EmptyState message="No deliveries found" />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {filtered.map((d) => (
-                  <Card key={d.id} style={{ padding: 16 }}>
+                  <Card
+                    key={d.id}
+                    className="p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)] transition-all"
+                  >
                     <div
                       style={{
                         display: 'flex',
@@ -406,7 +401,7 @@ export const DeliveryPage: React.FC = () => {
                     >
                       <div>
                         <div
-                          style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}
+                          style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-primary)' }}
                         >
                           {d.orderNumber}
                         </div>
@@ -415,6 +410,7 @@ export const DeliveryPage: React.FC = () => {
                             color: 'var(--text-muted, #6B7280)',
                             fontSize: 14,
                             marginTop: 2,
+                            fontWeight: 500,
                           }}
                         >
                           {d.customerName}
@@ -427,11 +423,12 @@ export const DeliveryPage: React.FC = () => {
                           gap: '6px',
                           padding: '4px 12px',
                           fontSize: '0.8rem',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           borderRadius: '9999px',
                           background: (STATUS_COLORS[d.status] || STATUS_COLORS.SCHEDULED).bg,
                           color: (STATUS_COLORS[d.status] || STATUS_COLORS.SCHEDULED).text,
                           border: `1px solid ${(STATUS_COLORS[d.status] || STATUS_COLORS.SCHEDULED).border}`,
+                          boxShadow: 'var(--shadow-neu-card-sm)',
                           whiteSpace: 'nowrap',
                         }}
                       >
@@ -496,13 +493,13 @@ export const DeliveryPage: React.FC = () => {
                     )}
 
                     {/* Action Buttons */}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
                       {d.status === DeliveryStatus.ASSIGNED && (
                         <Button
                           variant="primary"
                           onClick={() => handleStartDelivery(d.id)}
                           disabled={actionLoading === d.id}
-                          style={{ minHeight: 44, flex: 1 }}
+                          className="min-h-[44px] flex-1 rounded-full shadow-[var(--shadow-neu-card-sm)] font-bold text-xs"
                         >
                           {actionLoading === d.id ? 'Starting...' : '🚚 Start Delivery'}
                         </Button>
@@ -514,7 +511,7 @@ export const DeliveryPage: React.FC = () => {
                             variant="primary"
                             onClick={() => handleOpenCompleteModal(d)}
                             disabled={actionLoading === d.id}
-                            style={{ minHeight: 44, flex: 1 }}
+                            className="min-h-[44px] flex-1 rounded-full shadow-[var(--shadow-neu-card-sm)] font-bold text-xs"
                           >
                             ✅ Mark Delivered
                           </Button>
@@ -522,7 +519,7 @@ export const DeliveryPage: React.FC = () => {
                             variant="secondary"
                             onClick={() => handleMarkFailed(d.id)}
                             disabled={actionLoading === d.id}
-                            style={{ minHeight: 44 }}
+                            className="min-h-[44px] rounded-full shadow-xs text-xs font-semibold"
                           >
                             ❌ Failed
                           </Button>
@@ -549,7 +546,7 @@ export const DeliveryPage: React.FC = () => {
               </p>
 
               {completingDelivery.items?.length ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {completingDelivery.items.map((item) => {
                     const maxAllowed = item.quantity - item.deliveredQuantity;
                     if (item.itemStatus === 'CANCELLED' || maxAllowed <= 0) return null;
@@ -561,15 +558,16 @@ export const DeliveryPage: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '8px',
+                          padding: '12px 14px',
                           background: 'var(--bg-surface-inset, #F9FAFB)',
-                          borderRadius: '8px',
+                          borderRadius: '14px',
                           border: '1px solid var(--border, #E5E7EB)',
+                          boxShadow: 'var(--shadow-neu-inset)',
                         }}
                       >
                         <div>
                           <div
-                            style={{ fontWeight: 500, fontSize: 14, color: 'var(--text-primary)' }}
+                            style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}
                           >
                             Item #{item.id.slice(-4)}
                           </div>
@@ -589,12 +587,15 @@ export const DeliveryPage: React.FC = () => {
                             }))
                           }
                           style={{
-                            width: 60,
-                            padding: '6px',
-                            borderRadius: '4px',
+                            width: 68,
+                            padding: '6px 10px',
+                            borderRadius: '10px',
                             border: '1px solid var(--border, #D1D5DB)',
-                            background: 'var(--bg-input, #FFFFFF)',
+                            background: 'var(--bg-surface-inset)',
+                            boxShadow: 'var(--shadow-neu-inset)',
                             color: 'var(--text-primary, #0F172A)',
+                            fontWeight: 700,
+                            textAlign: 'center',
                           }}
                         />
                       </div>
@@ -608,7 +609,7 @@ export const DeliveryPage: React.FC = () => {
                     background: 'var(--danger-bg, #FEF2F2)',
                     color: 'var(--danger-text, #991B1B)',
                     border: '1px solid var(--danger-border, #FECACA)',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     fontSize: 14,
                   }}
                 >
@@ -628,7 +629,7 @@ export const DeliveryPage: React.FC = () => {
                 <Button
                   variant="secondary"
                   onClick={() => setCompletingDelivery(null)}
-                  style={{ flex: 1 }}
+                  className="flex-1 rounded-full min-h-[44px]"
                 >
                   Cancel
                 </Button>
@@ -636,7 +637,7 @@ export const DeliveryPage: React.FC = () => {
                   variant="primary"
                   disabled={uploadingPhoto}
                   onClick={submitCompleteDelivery}
-                  style={{ flex: 1 }}
+                  className="flex-1 rounded-full min-h-[44px] shadow-[var(--shadow-neu-card-sm)]"
                 >
                   {uploadingPhoto ? 'Submitting...' : 'Confirm Delivery'}
                 </Button>

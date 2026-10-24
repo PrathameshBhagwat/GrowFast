@@ -18,18 +18,19 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
     background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
     color: 'var(--accent-foreground)',
     border: 'none',
-    boxShadow: '0 1px 3px rgba(37, 99, 235, 0.3)',
+    boxShadow: 'var(--shadow-neu-btn, 0 4px 14px rgba(37, 99, 235, 0.35))',
   },
   secondary: {
     background: 'var(--btn-secondary-bg)',
     color: 'var(--btn-secondary-text)',
     border: '1px solid var(--btn-secondary-border)',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
   },
   danger: {
     background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
     color: '#FFFFFF',
     border: 'none',
-    boxShadow: '0 1px 3px rgba(239, 68, 68, 0.3)',
+    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
   },
   ghost: {
     background: 'transparent',
@@ -37,16 +38,17 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
     border: 'none',
   },
   outline: {
-    background: 'transparent',
+    background: 'var(--bg-surface, transparent)',
     color: 'var(--accent)',
-    border: '1px solid var(--accent)',
+    border: '1px solid var(--border, var(--accent))',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
   },
 };
 
 const sizeStyles: Record<ButtonSize, React.CSSProperties> = {
-  sm: { padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', minHeight: '32px' },
-  md: { padding: '10px 20px', fontSize: '0.9rem', borderRadius: '8px', minHeight: '40px' },
-  lg: { padding: '14px 28px', fontSize: '1rem', borderRadius: '10px', minHeight: '48px' },
+  sm: { padding: '6px 14px', fontSize: '0.8rem', borderRadius: '8px', minHeight: '34px' },
+  md: { padding: '10px 20px', fontSize: '0.9rem', borderRadius: '10px', minHeight: '42px' },
+  lg: { padding: '14px 28px', fontSize: '1rem', borderRadius: '12px', minHeight: '48px' },
 };
 
 /**

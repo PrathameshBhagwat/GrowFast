@@ -29,7 +29,8 @@ export class OrderController {
   async createOrder(@Body() dto: CreateOrderDto, @Request() req: any) {
     const employeeId = req.user.id;
     const storeId = req.user.storeId;
-    const order = await this.orderService.createOrder(dto, employeeId, storeId);
+    const userRole = req.user.role;
+    const order = await this.orderService.createOrder(dto, employeeId, storeId, userRole);
     return {
       success: true,
       data: order,

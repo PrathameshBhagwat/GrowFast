@@ -71,7 +71,12 @@ export class OrderService {
     @Optional() private readonly businessSequenceService?: BusinessSequenceService,
   ) {}
 
-  async createOrder(dto: CreateOrderDto, employeeId: string, storeId: string) {
+  async createOrder(
+    dto: CreateOrderDto,
+    employeeId: string,
+    storeId: string,
+    userRole?: Role | string,
+  ) {
     const result = await this.prisma.$transaction(async (tx) => {
       // 1. Validate customer
       const customer = await tx.customer.findUnique({
@@ -136,9 +141,14 @@ export class OrderService {
           serviceTypeId: { in: serviceIds },
         },
       });
-      const priceMap = new Map(
-        prices.map((p) => [`${p.garmentCatalogId}_${p.serviceTypeId}`, p.price]),
-      );
+      const priceMap = new Map<string, number>();
+      for (const p of prices) {
+        const key = `${p.garmentCatalogId}_${p.serviceTypeId}`;
+        // Store-specific price takes precedence over global default
+        if (!priceMap.has(key) || p.storeId === storeId) {
+          priceMap.set(key, p.price);
+        }
+      }
 
       // Validate items
       const orderItemsData = [];
@@ -257,11 +267,57 @@ export class OrderService {
 
         const priceKey = `${garment.id}_${service.id}`;
         let unitPrice = priceMap.get(priceKey) ?? 0;
+
         if (isWeightPieceException) {
           if (item.unitPrice !== undefined && item.unitPrice > 0) {
             unitPrice = item.unitPrice;
           } else if (unitPrice === 0) {
             unitPrice = 40;
+          }
+        } else if (isWeightBased) {
+          if (unitPrice === 0) {
+            const sName = service.name.toLowerCase();
+            if (sName.includes('woolen')) unitPrice = 140;
+            else if (sName.includes('premium')) unitPrice = 120;
+            else if (sName.includes('white')) unitPrice = 110;
+            else if (sName.includes('iron') || sName.includes('steam')) unitPrice = 95;
+            else unitPrice = 80;
+          }
+
+          if (item.unitPrice !== undefined && (isNaN(item.unitPrice) || item.unitPrice <= 0)) {
+            throw new BadRequestException('Per-kg rate must be a valid positive number.');
+          }
+
+          // Enforce role-based pricing permissions on the server
+          if (
+            item.unitPrice !== undefined &&
+            unitPrice > 0 &&
+            Math.abs(item.unitPrice - unitPrice) > 0.001
+          ) {
+            const isAdmin = userRole === Role.OWNER || userRole === Role.MANAGER;
+            if (!isAdmin) {
+              throw new ForbiddenException(
+                'Only Admin or Owner can edit or override the per-kg rate for weight-based orders.',
+              );
+            }
+            // Authorized rate update: use updated rate and persist to store-level pricing
+            unitPrice = item.unitPrice;
+            await tx.serviceGarmentPrice.upsert({
+              where: {
+                garmentCatalogId_serviceTypeId_storeId: {
+                  garmentCatalogId: garment.id,
+                  serviceTypeId: service.id,
+                  storeId,
+                },
+              },
+              update: { price: item.unitPrice },
+              create: {
+                garmentCatalogId: garment.id,
+                serviceTypeId: service.id,
+                storeId,
+                price: item.unitPrice,
+              },
+            });
           }
         } else if (unitPrice === 0 && item.unitPrice !== undefined && item.unitPrice > 0) {
           unitPrice = item.unitPrice;

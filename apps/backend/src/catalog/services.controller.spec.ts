@@ -100,9 +100,10 @@ describe('ServicesController', () => {
       expect(mockCatalogService.updateService).toHaveBeenCalledWith('s1', 'store-1', updateDto);
     });
 
-    it('should have OWNER and MANAGER role metadata on the update method', () => {
+    it('should have OWNER role metadata on the update method and exclude COUNTER', () => {
       const rolesMetadata = Reflect.getMetadata('roles', controller.update);
-      expect(rolesMetadata).toEqual(['OWNER', 'MANAGER']);
+      expect(rolesMetadata).toEqual(['OWNER']);
+      expect(rolesMetadata).not.toContain('COUNTER');
     });
   });
 });

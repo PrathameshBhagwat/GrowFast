@@ -44,14 +44,18 @@ export const WizardShell: React.FC<WizardShellProps> = ({
         flexDirection: 'column',
         height: '100%',
         fontFamily: "'Inter', sans-serif",
+        background: 'var(--bg-app)',
       }}
     >
       {/* Step indicator */}
       <div
         style={{
-          padding: '16px 24px',
-          borderBottom: '1px solid var(--border, #E2E8F0)',
-          background: 'var(--bg-surface, #FFFFFF)',
+          margin: '16px 20px 0 20px',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          border: '1px solid var(--border)',
+          background: 'var(--bg-surface)',
+          boxShadow: 'var(--shadow-neu-card-sm)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -59,20 +63,27 @@ export const WizardShell: React.FC<WizardShellProps> = ({
             <React.Fragment key={i}>
               <div
                 style={{
-                  width: '28px',
-                  height: '28px',
+                  width: '30px',
+                  height: '30px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '0.75rem',
+                  fontSize: '0.8rem',
                   fontWeight: 700,
                   background:
-                    i <= currentStep ? 'var(--accent, #2563EB)' : 'var(--border, #E2E8F0)',
+                    i <= currentStep
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                      : 'var(--bg-surface-inset)',
+                  border: i <= currentStep ? '1px solid #2563eb' : '1px solid var(--border)',
+                  boxShadow:
+                    i <= currentStep
+                      ? '0 2px 6px rgba(37, 99, 235, 0.35)'
+                      : 'none',
                   color:
                     i <= currentStep
-                      ? 'var(--accent-foreground, #FFFFFF)'
-                      : 'var(--text-muted, #64748B)',
+                      ? '#ffffff'
+                      : 'var(--text-muted)',
                   transition: 'all 300ms ease',
                 }}
               >
@@ -84,7 +95,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                     flex: 1,
                     height: '2px',
                     background:
-                      i < currentStep ? 'var(--accent, #2563EB)' : 'var(--border, #E2E8F0)',
+                      i < currentStep ? '#2563eb' : 'var(--border)',
                     borderRadius: '1px',
                     transition: 'background 300ms ease',
                   }}
@@ -100,7 +111,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                 margin: 0,
                 fontSize: '1rem',
                 fontWeight: 700,
-                color: 'var(--text-primary, #0F172A)',
+                color: 'var(--text-primary)',
               }}
             >
               {currentStepInfo.title}
@@ -110,7 +121,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                 style={{
                   margin: '4px 0 0',
                   fontSize: '0.84rem',
-                  color: 'var(--text-muted, #64748B)',
+                  color: 'var(--text-muted)',
                 }}
               >
                 {currentStepInfo.description}
@@ -121,7 +132,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>{children}</div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>{children}</div>
 
       {/* Navigation */}
       <div
@@ -129,9 +140,12 @@ export const WizardShell: React.FC<WizardShellProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '16px 24px',
-          borderTop: '1px solid var(--border, #E2E8F0)',
-          background: 'var(--bg-surface, #FFFFFF)',
+          margin: '0 20px 16px 20px',
+          padding: '12px 20px',
+          borderRadius: '16px',
+          border: '1px solid var(--border)',
+          background: 'var(--bg-surface)',
+          boxShadow: 'var(--shadow-neu-card-sm)',
         }}
       >
         <Button

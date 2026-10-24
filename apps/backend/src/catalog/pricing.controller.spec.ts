@@ -79,10 +79,11 @@ describe('PricingController', () => {
       });
     });
 
-    it('should have OWNER and MANAGER role metadata on setPrice', () => {
+    it('should have OWNER role metadata on setPrice and exclude COUNTER', () => {
       const reflector = new Reflector();
       const roles = reflector.get<string[]>(ROLES_KEY, PricingController.prototype.setPrice);
-      expect(roles).toEqual(['OWNER', 'MANAGER']);
+      expect(roles).toEqual(['OWNER']);
+      expect(roles).not.toContain('COUNTER');
     });
   });
 });

@@ -112,7 +112,7 @@ export const App: React.FC = () => {
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER', 'COUNTER']}>
+          <ProtectedRoute allowedRoles={['OWNER']} redirectTo="/">
             <DashboardPage />
           </ProtectedRoute>
         }
@@ -148,7 +148,7 @@ export const App: React.FC = () => {
       <Route
         path="/reports/daily-orders"
         element={
-          <ProtectedRoute allowedRoles={['OWNER', 'MANAGER']}>
+          <ProtectedRoute allowedRoles={['OWNER']}>
             <DailyOrdersReportPage />
           </ProtectedRoute>
         }

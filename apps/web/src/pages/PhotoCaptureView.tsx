@@ -396,12 +396,37 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
 // ═════════════════════════════════════════════════════════════════════
 
 const StatusIndicator: React.FC<{ status: CaptureStatus }> = ({ status }) => {
-  const configs: Record<CaptureStatus, { bg: string; color: string; text: string }> = {
-    not_started: { bg: '#F1F5F9', color: '#64748B', text: 'Pending' },
-    uploading: { bg: '#DBEAFE', color: '#2563EB', text: 'Uploading' },
-    uploaded: { bg: '#D1FAE5', color: '#059669', text: 'Done' },
-    upload_failed: { bg: '#FEE2E2', color: '#DC2626', text: 'Failed' },
-    skipped: { bg: '#F1F5F9', color: '#94A3B8', text: 'Skipped' },
+  const configs: Record<CaptureStatus, { bg: string; color: string; border: string; text: string }> = {
+    not_started: {
+      bg: 'var(--bg-surface-inset, #F1F5F9)',
+      color: 'var(--text-secondary, #64748B)',
+      border: 'var(--border, #CBD5E1)',
+      text: 'Pending',
+    },
+    uploading: {
+      bg: 'rgba(37, 99, 235, 0.15)',
+      color: '#3b82f6',
+      border: 'rgba(37, 99, 235, 0.3)',
+      text: 'Uploading',
+    },
+    uploaded: {
+      bg: 'rgba(16, 185, 129, 0.15)',
+      color: '#10b981',
+      border: 'rgba(16, 185, 129, 0.3)',
+      text: 'Done',
+    },
+    upload_failed: {
+      bg: 'rgba(239, 68, 68, 0.15)',
+      color: '#ef4444',
+      border: 'rgba(239, 68, 68, 0.3)',
+      text: 'Failed',
+    },
+    skipped: {
+      bg: 'var(--bg-surface-inset, #F1F5F9)',
+      color: 'var(--text-muted, #94A3B8)',
+      border: 'var(--border, #CBD5E1)',
+      text: 'Skipped',
+    },
   };
 
   const config = configs[status];
@@ -411,15 +436,17 @@ const StatusIndicator: React.FC<{ status: CaptureStatus }> = ({ status }) => {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        padding: '4px 10px',
+        padding: '4px 12px',
         borderRadius: '9999px',
         fontSize: '0.72rem',
-        fontWeight: 600,
+        fontWeight: 700,
         background: config.bg,
         color: config.color,
+        border: `1px solid ${config.border}`,
         letterSpacing: '0.03em',
         textTransform: 'uppercase',
         whiteSpace: 'nowrap',
+        boxShadow: 'var(--shadow-neu-card-sm)',
       }}
     >
       {config.text}
@@ -460,8 +487,8 @@ const GalleryImage: React.FC<{ photo: OrderPhotoDTO }> = ({ photo }) => {
   if (broken) {
     return (
       <div style={styles.brokenImage}>
-        <ImageIcon size={28} color="#CBD5E1" />
-        <span style={{ fontSize: '0.7rem', color: '#94A3B8', textAlign: 'center' }}>
+        <ImageIcon size={28} color="var(--text-muted, #CBD5E1)" />
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #94A3B8)', textAlign: 'center' }}>
           Image unavailable
         </span>
       </div>
@@ -478,7 +505,7 @@ const GalleryImage: React.FC<{ photo: OrderPhotoDTO }> = ({ photo }) => {
         onError={() => setBroken(true)}
       />
       <div style={styles.galleryImageMeta}>
-        <span style={{ fontSize: '0.7rem', color: '#64748B' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #64748B)' }}>
           {new Date(photo.uploadedAt).toLocaleString()}
         </span>
       </div>
@@ -496,6 +523,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     minHeight: '100vh',
     background: 'var(--bg-app, #F8FAFC)',
+    color: 'var(--text-primary, #0F172A)',
     fontFamily: "'Inter', sans-serif",
     paddingBottom: '40px',
   },
@@ -508,6 +536,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '16px 20px',
     background: 'var(--bg-surface, #FFFFFF)',
     borderBottom: '1px solid var(--border, #E2E8F0)',
+    boxShadow: 'var(--shadow-neu-card-sm)',
     position: 'sticky',
     top: 0,
     zIndex: 10,
@@ -529,28 +558,34 @@ const styles: Record<string, React.CSSProperties> = {
   headerIcon: {
     width: '44px',
     height: '44px',
-    borderRadius: '12px',
+    borderRadius: '14px',
     background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#FFFFFF',
     flexShrink: 0,
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
   },
 
   // ── Sections ────────────────────────────────────────────────────
   section: {
     padding: '20px',
+    maxWidth: '960px',
+    margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   sectionTitle: {
-    fontSize: '1rem',
-    fontWeight: 700,
+    fontSize: '1.1rem',
+    fontWeight: 800,
     color: 'var(--text-primary, #0F172A)',
     margin: '0 0 4px',
+    letterSpacing: '-0.02em',
   },
   sectionSubtitle: {
-    fontSize: '0.84rem',
-    color: 'var(--text-muted, #64748B)',
+    fontSize: '0.85rem',
+    color: 'var(--text-secondary, #64748B)',
     margin: '0 0 16px',
   },
 
@@ -558,9 +593,13 @@ const styles: Record<string, React.CSSProperties> = {
   categoryList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '14px',
+    gap: '16px',
   },
   categoryCard: {
+    borderRadius: '20px',
+    border: '1px solid var(--border, #E2E8F0)',
+    background: 'var(--bg-surface, #FFFFFF)',
+    boxShadow: 'var(--shadow-neu-card-sm)',
     transition: 'all 200ms ease',
   },
 
@@ -609,7 +648,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   categoryDescription: {
     fontSize: '0.8rem',
-    color: 'var(--text-muted, #64748B)',
+    color: 'var(--text-secondary, #64748B)',
     margin: 0,
     lineHeight: 1.4,
   },
@@ -626,7 +665,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '8px 0',
+    padding: '12px 0',
   },
 
   // ── Status rows ────────────────────────────────────────────────
@@ -657,7 +696,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   skippedText: {
     fontSize: '0.84rem',
-    color: '#94A3B8',
+    color: 'var(--text-muted, #94A3B8)',
     fontStyle: 'italic',
   },
 
@@ -667,36 +706,39 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '280px',
     maxHeight: '180px',
     objectFit: 'cover' as const,
-    borderRadius: '8px',
+    borderRadius: '14px',
     marginTop: '12px',
     border: '1px solid var(--border, #E2E8F0)',
+    boxShadow: 'var(--shadow-neu-card-sm)',
   },
 
   // ── Gallery ────────────────────────────────────────────────────
   galleryContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '20px',
+    gap: '24px',
   },
   galleryGroup: {},
   galleryGroupTitle: {
     fontSize: '0.88rem',
-    fontWeight: 700,
+    fontWeight: 800,
     color: 'var(--text-secondary, #334155)',
-    margin: '0 0 10px',
+    margin: '0 0 12px',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.04em',
   },
   galleryGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-    gap: '10px',
+    gap: '12px',
   },
   galleryImageWrapper: {
-    borderRadius: '10px',
+    borderRadius: '16px',
     overflow: 'hidden',
     border: '1px solid var(--border, #E2E8F0)',
     background: 'var(--bg-surface, #FFFFFF)',
+    boxShadow: 'var(--shadow-neu-card-sm)',
+    transition: 'all 200ms ease',
   },
   galleryImage: {
     width: '100%',
@@ -705,8 +747,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'block',
   },
   galleryImageMeta: {
-    padding: '6px 8px',
-    borderTop: '1px solid var(--border-subtle, #F1F5F9)',
+    padding: '8px 10px',
+    borderTop: '1px solid var(--border, #F1F5F9)',
+    background: 'var(--bg-surface-inset)',
   },
   brokenImage: {
     width: '100%',
@@ -717,7 +760,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: '6px',
     background: 'var(--bg-surface-inset, #F8FAFC)',
-    borderRadius: '10px',
+    borderRadius: '16px',
     border: '1px solid var(--border, #E2E8F0)',
+    boxShadow: 'var(--shadow-neu-inset)',
   },
 };

@@ -118,12 +118,18 @@ export {
   filterServicesForCategory,
   filterCategoriesForService,
   formatCatalogServiceName,
+  isShoeCategory,
+  isHouseholdCategory,
+  isOtherCategory,
+  isSteamIronService,
   isStarchingService,
   isDryCleanService,
   isWeightBasedCategory,
   STARCHING_ALLOWED_CATEGORIES,
   resolveCatalogSelectionOnCategoryChange,
+  resolveServiceOnServiceChange,
   resolveCatalogSelectionOnServiceChange,
+  resolveCatalogSelectionOnServiceSelect,
   WORKFLOW_OPTIONS,
   isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
@@ -141,6 +147,7 @@ export type {
   OrderEntryMode,
   WorkflowOption,
   TopUpServiceItem,
+  CatalogSelectionResult,
 } from './catalog';
 
 // Tag Template & Designer Contract (Phase T4 & Owner Design Tags)

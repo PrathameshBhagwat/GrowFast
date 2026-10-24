@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 import { BadRequestException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from '../auth/roles.decorator';
+import { Role } from '@growfast/shared-types';
 
 describe('DashboardController', () => {
   let controller: DashboardController;
@@ -83,5 +86,15 @@ describe('DashboardController', () => {
     await expect(controller.getSummary(mockReq, '2026-09-05', '2026-09-01')).rejects.toThrow(
       new BadRequestException('startDate must be before or equal to endDate'),
     );
+  });
+
+  describe('Authorization metadata', () => {
+    it('should be restricted to OWNER role only and exclude COUNTER', () => {
+      const reflector = new Reflector();
+      const roles = reflector.get<Role[]>(ROLES_KEY, DashboardController.prototype.getSummary);
+
+      expect(roles).toEqual([Role.OWNER]);
+      expect(roles).not.toContain(Role.COUNTER);
+    });
   });
 });

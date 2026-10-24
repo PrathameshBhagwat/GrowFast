@@ -88,43 +88,43 @@ export function FinancialAdjustmentModal({
       <form onSubmit={handleSubmit} className="space-y-4 pt-2">
         {error && <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">{error}</div>}
 
-        <div className="bg-gray-50 p-4 rounded-md space-y-2 mb-2 border border-gray-200">
+        <div className="bg-[var(--bg-surface-inset)] p-4 rounded-2xl space-y-2 mb-2 border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Order Total</span>
-            <span className="font-medium text-gray-900">₹{order.totalAmount}</span>
+            <span className="text-[var(--text-secondary)]">Order Total</span>
+            <span className="font-medium text-[var(--text-primary)]">₹{order.totalAmount}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Total Paid</span>
-            <span className="font-medium text-green-600">₹{order.amountPaid}</span>
+            <span className="text-[var(--text-secondary)]">Total Paid</span>
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">₹{order.amountPaid}</span>
           </div>
           {existingRefunds > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Already Refunded</span>
-              <span className="font-medium text-orange-600">-₹{existingRefunds}</span>
+              <span className="text-[var(--text-secondary)]">Already Refunded</span>
+              <span className="font-medium text-amber-600 dark:text-amber-400">-₹{existingRefunds}</span>
             </div>
           )}
           {existingStoreCredits > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Already Credited</span>
-              <span className="font-medium text-blue-600">₹{existingStoreCredits}</span>
+              <span className="text-[var(--text-secondary)]">Already Credited</span>
+              <span className="font-medium text-blue-600 dark:text-blue-400">₹{existingStoreCredits}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-            <span className="font-bold text-gray-700">Maximum Eligible Adjustment</span>
-            <span className="font-bold text-blue-700">₹{maxEligible}</span>
+          <div className="flex justify-between text-sm pt-2 border-t border-[var(--border)]">
+            <span className="font-bold text-[var(--text-primary)]">Maximum Eligible Adjustment</span>
+            <span className="font-bold text-blue-600 dark:text-blue-400">₹{maxEligible}</span>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Adjustment Type</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Adjustment Type</label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setType(AdjustmentType.REFUND)}
-              className={`py-2 px-3 text-sm font-semibold rounded-md border min-h-[44px] transition-colors ${
+              className={`py-2 px-3 text-sm font-semibold rounded-xl border min-h-[44px] transition-all cursor-pointer ${
                 type === AdjustmentType.REFUND
-                  ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700'
+                  ? 'bg-blue-50/80 border-blue-500 text-blue-700 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300 shadow-xs ring-1 ring-blue-500/30'
+                  : 'bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
               }`}
             >
               Refund (Cash / Bank)
@@ -132,10 +132,10 @@ export function FinancialAdjustmentModal({
             <button
               type="button"
               onClick={() => setType(AdjustmentType.STORE_CREDIT)}
-              className={`py-2 px-3 text-sm font-semibold rounded-md border min-h-[44px] transition-colors ${
+              className={`py-2 px-3 text-sm font-semibold rounded-xl border min-h-[44px] transition-all cursor-pointer ${
                 type === AdjustmentType.STORE_CREDIT
-                  ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700'
+                  ? 'bg-blue-50/80 border-blue-500 text-blue-700 dark:bg-blue-950/40 dark:border-blue-500 dark:text-blue-300 shadow-xs ring-1 ring-blue-500/30'
+                  : 'bg-[var(--bg-surface)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
               }`}
             >
               Store Credit
@@ -144,7 +144,7 @@ export function FinancialAdjustmentModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Amount (₹)</label>
           <input
             id="adjustment-amount-input"
             type="number"
@@ -152,7 +152,7 @@ export function FinancialAdjustmentModal({
             max={maxEligible}
             step="0.01"
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+            className="w-full px-4 py-2.5 border border-[var(--border)] bg-[var(--bg-surface-inset)] rounded-xl text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             disabled={loading || maxEligible <= 0}
@@ -160,15 +160,15 @@ export function FinancialAdjustmentModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Reason <span className="text-red-500">*</span>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+            Reason <span className="text-rose-500">*</span>
           </label>
           <input
             id="adjustment-reason-input"
             type="text"
             required
             placeholder="e.g. Customer requested piece cancellation"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+            className="w-full px-4 py-2.5 border border-[var(--border)] bg-[var(--bg-surface-inset)] rounded-xl text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             disabled={loading}
@@ -176,14 +176,14 @@ export function FinancialAdjustmentModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
             Reference / Note (Optional)
           </label>
           <input
             id="adjustment-reference-input"
             type="text"
             placeholder="e.g. Voucher #1024 or UPI transaction ID"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[44px]"
+            className="w-full px-4 py-2.5 border border-[var(--border)] bg-[var(--bg-surface-inset)] rounded-xl text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px]"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             disabled={loading}

@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 const mockPrismaService = {
   employee: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
   },
 };
 
@@ -142,6 +143,34 @@ describe('AuthService', () => {
           name: 'Test User',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('getDirectory', () => {
+    it('should query active employees restricted to OWNER and COUNTER roles', async () => {
+      const mockDirectory = [
+        { id: 'emp-001', name: 'Prathamesh', role: 'OWNER' },
+        { id: 'emp-002', name: 'Swapnil', role: 'COUNTER' },
+      ];
+      mockPrismaService.employee.findMany.mockResolvedValue(mockDirectory);
+
+      const result = await service.getDirectory();
+
+      expect(result).toEqual(mockDirectory);
+      expect(mockPrismaService.employee.findMany).toHaveBeenCalledWith({
+        where: {
+          isActive: true,
+          role: { in: ['OWNER', 'COUNTER'] },
+        },
+        select: {
+          id: true,
+          name: true,
+          role: true,
+        },
+        orderBy: {
+          name: 'asc',
+        },
+      });
     });
   });
 });

@@ -19,7 +19,7 @@ export class DashboardController {
    * Read-only — no mutations.
    */
   @Get('summary')
-  @Roles(Role.OWNER, Role.MANAGER, Role.COUNTER)
+  @Roles(Role.OWNER)
   async getSummary(
     @Request() req: any,
     @Query('startDate') startDateStr?: string,

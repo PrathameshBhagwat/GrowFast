@@ -70,25 +70,25 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
       >
         <div className="space-y-4">
           {/* ─── Top Control Toolbar (Hidden in Print) ───────────────────── */}
-          <div className="no-print flex flex-wrap items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-slate-900/50 rounded-lg border border-gray-200 dark:border-slate-800">
+          <div className="no-print flex flex-wrap items-center justify-between gap-3 p-3.5 bg-[var(--bg-surface-inset)] rounded-2xl border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-gray-700 dark:text-slate-300">
+              <span className="text-xs font-semibold text-[var(--text-secondary)]">
                 {isCalibration
                   ? 'Calibration Mode'
                   : `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'} ready`}
               </span>
 
               {/* View Mode Switcher */}
-              <div className="inline-flex rounded-md shadow-sm ml-2">
+              <div className="inline-flex p-0.5 rounded-xl bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)] ml-2">
                 <button
                   type="button"
                   id="tag-view-single-btn"
                   onClick={() => setViewMode('single')}
                   aria-label="View single tag"
-                  className={`px-3 py-2 text-xs font-semibold rounded-l-md border min-h-[44px] flex items-center gap-1.5 transition-colors ${
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg min-h-[44px] flex items-center gap-1.5 transition-colors cursor-pointer ${
                     viewMode === 'single'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Eye size={14} /> Single
@@ -99,10 +99,10 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
                     id="tag-view-all-btn"
                     onClick={() => setViewMode('all')}
                     aria-label="View all tags"
-                    className={`px-3 py-2 text-xs font-semibold border-t border-b border-r min-h-[44px] flex items-center gap-1.5 transition-colors ${
+                    className={`px-3 py-2 text-xs font-semibold rounded-lg min-h-[44px] flex items-center gap-1.5 transition-colors cursor-pointer ${
                       viewMode === 'all'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     <Grid size={14} /> All ({tags.length})
@@ -113,10 +113,10 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
                   id="tag-view-calib-btn"
                   onClick={() => setViewMode('calibration')}
                   aria-label="Calibration test tag"
-                  className={`px-3 py-2 text-xs font-semibold rounded-r-md border border-l-0 min-h-[44px] flex items-center gap-1.5 transition-colors ${
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg min-h-[44px] flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isCalibration
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Compass size={14} /> Calibration
@@ -130,7 +130,7 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
                 id="close-tag-preview-btn"
                 onClick={onClose}
                 style={{ minHeight: '44px' }}
-                className="min-h-[44px] text-xs font-semibold"
+                className="min-h-[44px] text-xs font-semibold rounded-full shadow-[var(--shadow-neu-card-sm)] border border-[var(--border)]"
                 icon={<X size={16} />}
               >
                 Close
@@ -140,7 +140,7 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
                 id="trigger-tag-print-btn"
                 onClick={handlePrint}
                 style={{ minHeight: '44px' }}
-                className="min-h-[44px] font-bold text-xs px-5 shadow-sm flex items-center gap-2"
+                className="min-h-[44px] font-bold text-xs px-5 rounded-full shadow-[var(--shadow-neu-card-sm)] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-2"
                 icon={<Printer size={16} />}
               >
                 {isCalibration
@@ -151,11 +151,11 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
           </div>
 
           {/* ─── Real 40×40 mm Tag Specification Badge ──────────────────── */}
-          <div className="no-print flex items-center justify-between text-xs text-gray-500 dark:text-slate-400 px-1">
+          <div className="no-print flex items-center justify-between text-xs text-[var(--text-secondary)] px-1">
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
               Physical target:{' '}
-              <strong className="text-gray-700 dark:text-slate-200">40 mm × 40 mm</strong> (1:1
+              <strong className="text-[var(--text-primary)]">40 mm × 40 mm</strong> (1:1
               square washable cloth)
             </span>
             <span>Target Scale: 100% (No auto-shrink)</span>
@@ -163,13 +163,13 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
 
           {/* ─── Calibration Mode View ──────────────────────────────────── */}
           {isCalibration ? (
-            <div className="no-print flex flex-col items-center justify-center p-6 bg-gray-100 dark:bg-slate-950/70 rounded-xl border border-gray-200 dark:border-slate-800">
-              <div className="text-xs text-gray-600 dark:text-slate-300 mb-4 text-center max-w-sm">
+            <div className="no-print flex flex-col items-center justify-center p-6 bg-[var(--bg-surface-inset)] rounded-2xl border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
+              <div className="text-xs text-[var(--text-secondary)] mb-4 text-center max-w-sm">
                 Print this calibration pattern and measure with a physical ruler to verify exact
                 40×40 mm dimensions and printer alignment.
               </div>
               <div
-                className="relative bg-white shadow-md rounded-sm p-1 border border-gray-300"
+                className="relative bg-white shadow-xl rounded-sm p-1 border border-gray-300"
                 style={{
                   width: '42mm',
                   height: '42mm',
@@ -183,9 +183,9 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
             </div>
           ) : viewMode === 'single' && currentTag ? (
             /* ─── Single Tag Preview Surface ───────────────────────────── */
-            <div className="no-print flex flex-col items-center justify-center p-6 bg-gray-100 dark:bg-slate-950/70 rounded-xl border border-gray-200 dark:border-slate-800">
+            <div className="no-print flex flex-col items-center justify-center p-6 bg-[var(--bg-surface-inset)] rounded-2xl border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
               <div
-                className="relative bg-white shadow-md rounded-sm p-1 border border-gray-300"
+                className="relative bg-white shadow-xl rounded-sm p-1 border border-gray-300"
                 style={{
                   width: '42mm',
                   height: '42mm',
@@ -205,12 +205,12 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
                     id="prev-tag-preview-btn"
                     onClick={handlePrev}
                     aria-label="Previous tag"
-                    className="p-2 rounded-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-sm transition-colors"
+                    className="p-2 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] hover:border-blue-400 text-[var(--text-primary)] min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-[var(--shadow-neu-card-sm)] transition-all"
                   >
                     <ChevronLeft size={20} />
                   </button>
 
-                  <span className="text-sm font-semibold text-gray-700 dark:text-slate-300 min-w-[120px] text-center">
+                  <span className="text-sm font-bold text-[var(--text-primary)] min-w-[120px] text-center font-mono">
                     Piece {currentTag.unitNumber}/{currentTag.totalPieces} ({safeIndex + 1} of{' '}
                     {tags.length})
                   </span>
@@ -220,7 +220,7 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
                     id="next-tag-preview-btn"
                     onClick={handleNext}
                     aria-label="Next tag"
-                    className="p-2 rounded-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-sm transition-colors"
+                    className="p-2 rounded-full border border-[var(--border)] bg-[var(--bg-surface)] hover:border-blue-400 text-[var(--text-primary)] min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer shadow-[var(--shadow-neu-card-sm)] transition-all"
                   >
                     <ChevronRight size={20} />
                   </button>

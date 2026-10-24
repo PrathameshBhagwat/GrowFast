@@ -57,7 +57,14 @@ export const OwnerSettingsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100">
       {/* ─── Top Owner Settings Header ────────────────────────────────── */}
-      <div className="no-print border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-30 shadow-xs">
+      <div
+        className="no-print sticky top-0 z-30"
+        style={{
+          background: 'var(--bg-surface, #ffffff)',
+          borderBottom: '1px solid var(--border, #e2e8f0)',
+          boxShadow: 'var(--shadow-neu-card-sm)',
+        }}
+      >
         <div className="w-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
           {/* Left: Back button + Title & Role + Subtitle */}
           <div className="flex items-center gap-3">
@@ -66,11 +73,10 @@ export const OwnerSettingsPage: React.FC = () => {
               id="owner-settings-back-btn"
               onClick={() => navigate('/')}
               aria-label="Back to POS"
-              className="w-8 h-8 rounded-[3px] border border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center cursor-pointer transition-colors shrink-0"
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '3px',
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
                 border: '1px solid var(--border, #e2e8f0)',
                 background: 'var(--bg-surface, #ffffff)',
                 display: 'flex',
@@ -79,6 +85,8 @@ export const OwnerSettingsPage: React.FC = () => {
                 color: 'var(--text-secondary, #475569)',
                 cursor: 'pointer',
                 flexShrink: 0,
+                boxShadow: 'var(--shadow-neu-card-sm)',
+                transition: 'all 0.15s ease',
               }}
             >
               <ArrowLeft size={16} />
@@ -89,7 +97,20 @@ export const OwnerSettingsPage: React.FC = () => {
                 <h1 className="text-base sm:text-lg font-bold tracking-tight text-gray-900 dark:text-slate-100">
                   Owner Settings
                 </h1>
-                <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    background: 'rgba(37, 99, 235, 0.12)',
+                    color: 'var(--accent, #2563EB)',
+                    border: '1px solid rgba(37, 99, 235, 0.25)',
+                  }}
+                >
                   <ShieldCheck size={12} />
                   Owner Role
                 </span>
@@ -101,17 +122,32 @@ export const OwnerSettingsPage: React.FC = () => {
           </div>
 
           {/* Navigation Tabs: Staff, Design Tags, Catalog, Reports */}
-          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto flex-nowrap scrollbar-none">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto flex-nowrap scrollbar-none">
             {/* Section: Staff */}
             <button
               type="button"
               id="owner-nav-staff-tab"
               onClick={() => setTab('staff')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-[4px] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'staff'
-                  ? 'border border-blue-200 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
-                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-              }`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === 'staff' ? 700 : 500,
+                borderRadius: '9999px',
+                border: activeTab === 'staff' ? 'none' : '1px solid transparent',
+                background:
+                  activeTab === 'staff'
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                    : 'transparent',
+                color: activeTab === 'staff' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
+                boxShadow:
+                  activeTab === 'staff' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
             >
               <Users size={15} />
               <span>Staff</span>
@@ -122,11 +158,26 @@ export const OwnerSettingsPage: React.FC = () => {
               type="button"
               id="owner-nav-design-tags-tab"
               onClick={() => setTab('design-tags')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-[4px] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'design-tags'
-                  ? 'border border-blue-200 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
-                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-              }`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === 'design-tags' ? 700 : 500,
+                borderRadius: '9999px',
+                border: activeTab === 'design-tags' ? 'none' : '1px solid transparent',
+                background:
+                  activeTab === 'design-tags'
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                    : 'transparent',
+                color: activeTab === 'design-tags' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
+                boxShadow:
+                  activeTab === 'design-tags' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
             >
               <Tag size={15} />
               <span>Design Tags</span>
@@ -137,11 +188,26 @@ export const OwnerSettingsPage: React.FC = () => {
               type="button"
               id="owner-nav-catalog-tab"
               onClick={() => setTab('catalog')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-[4px] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'catalog'
-                  ? 'border border-blue-200 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
-                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-              }`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === 'catalog' ? 700 : 500,
+                borderRadius: '9999px',
+                border: activeTab === 'catalog' ? 'none' : '1px solid transparent',
+                background:
+                  activeTab === 'catalog'
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                    : 'transparent',
+                color: activeTab === 'catalog' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
+                boxShadow:
+                  activeTab === 'catalog' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
             >
               <Shirt size={15} />
               <span>Catalog</span>
@@ -152,11 +218,26 @@ export const OwnerSettingsPage: React.FC = () => {
               type="button"
               id="owner-nav-reports-tab"
               onClick={() => setTab('reports')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-[4px] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'reports'
-                  ? 'border border-blue-200 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
-                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-              }`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                fontSize: '0.85rem',
+                fontWeight: activeTab === 'reports' ? 700 : 500,
+                borderRadius: '9999px',
+                border: activeTab === 'reports' ? 'none' : '1px solid transparent',
+                background:
+                  activeTab === 'reports'
+                    ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                    : 'transparent',
+                color: activeTab === 'reports' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
+                boxShadow:
+                  activeTab === 'reports' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
             >
               <BarChart3 size={15} />
               <span>Reports</span>
@@ -165,7 +246,7 @@ export const OwnerSettingsPage: React.FC = () => {
 
           {/* Right: Theme Toggle */}
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            <ThemeToggle size="sm" />
           </div>
         </div>
       </div>

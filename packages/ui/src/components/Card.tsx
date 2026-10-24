@@ -40,12 +40,12 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const cardStyle: React.CSSProperties = {
     background: 'var(--bg-surface)',
-    borderRadius: '12px',
+    borderRadius: '16px',
     border: '1px solid var(--border)',
     padding: paddingMap[padding],
     boxShadow: elevated
-      ? `0 4px 6px -1px var(--shadow-color), 0 2px 4px -2px var(--shadow-color)`
-      : `0 1px 2px 0 var(--shadow-color)`,
+      ? 'var(--shadow-neu-card, 0 10px 30px -5px rgba(160, 175, 200, 0.25))'
+      : 'var(--shadow-neu-card-sm, 0 4px 14px -2px rgba(160, 175, 200, 0.15))',
     transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
     cursor: onClick ? 'pointer' : 'default',
     ...style,

@@ -400,21 +400,21 @@ export function OrderDetailPage() {
   if (!order) return <ErrorState message="Order not found" />;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto p-4">
+    <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6 bg-[var(--bg-app)] min-h-screen">
       <Button variant="ghost" onClick={() => navigate('/orders')} icon={<ArrowLeft size={16} />}>
         Back to Orders
       </Button>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{order.orderNumber}</h1>
-          <div className="flex gap-2">
+          <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight mb-2">{order.orderNumber}</h1>
+          <div className="flex gap-2 items-center flex-wrap">
             <StatusChip status={order.status} />
-            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
               {order.paymentStatus}
             </span>
             {order.isExpress && (
-              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                 {order.expressDeliveryOption === 'SAME_DAY'
                   ? '⚡ SAME DAY (2×)'
                   : order.expressDeliveryOption === 'NEXT_DAY_EVENING'
@@ -433,7 +433,7 @@ export function OrderDetailPage() {
                 id="counter-handover-btn"
                 onClick={() => setShowPickupModal(true)}
                 style={{ minHeight: '44px' }}
-                className="min-h-[44px] font-bold shadow-sm"
+                className="min-h-[44px] font-bold shadow-md shadow-blue-500/20"
                 icon={<PackageCheck size={18} />}
               >
                 Counter Handover ({eligiblePickupCount} Ready)
@@ -456,15 +456,15 @@ export function OrderDetailPage() {
       {order.status === 'DELIVERED' && (
         <div
           id="order-delivered-banner"
-          className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-900 flex flex-wrap items-center justify-between gap-3 shadow-sm"
+          className="p-4 bg-[var(--bg-surface)] border border-emerald-500/30 rounded-2xl text-[var(--text-primary)] flex flex-wrap items-center justify-between gap-3 shadow-[var(--shadow-neu-card-sm)]"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 shrink-0">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
               <CheckCircle2 size={24} />
             </div>
             <div>
-              <div className="font-bold text-base text-gray-900">Order Completely Delivered</div>
-              <div className="text-xs text-green-800 mt-0.5">
+              <div className="font-bold text-base text-[var(--text-primary)]">Order Completely Delivered</div>
+              <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
                 {order.deliveredAt
                   ? `Delivered on ${new Date(order.deliveredAt).toLocaleString()}`
                   : 'All garments handed over'}
@@ -472,7 +472,7 @@ export function OrderDetailPage() {
               </div>
             </div>
           </div>
-          <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-600 text-white shadow-sm">
+          <span className="px-3 py-1 text-xs font-bold rounded-full bg-emerald-600 text-white shadow-sm">
             DELIVERED
           </span>
         </div>
@@ -480,7 +480,7 @@ export function OrderDetailPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-lg font-semibold mb-4">Customer Details</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Customer Details</h2>
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-500">Name</span>
@@ -504,7 +504,7 @@ export function OrderDetailPage() {
                 <span className="font-medium text-gray-900">
                   {new Date(order.effectiveDueDate).toLocaleDateString()}
                 </span>
-                {(employee?.role === Role.OWNER || employee?.role === Role.MANAGER) && (
+                {employee?.role === Role.OWNER && (
                   <button
                     onClick={() => setEditDueDate(true)}
                     className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"

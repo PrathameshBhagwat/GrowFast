@@ -229,6 +229,7 @@ export const CustomerProfilePage: React.FC = () => {
             icon={<ArrowLeft size={16} />}
             onClick={() => navigate('/')}
             aria-label="Back to Customer Search"
+            className="rounded-full shadow-[var(--shadow-neu-card-sm)] px-4 font-semibold text-xs min-h-[44px]"
           >
             Back to Search
           </Button>
@@ -236,15 +237,16 @@ export const CustomerProfilePage: React.FC = () => {
             <h1
               style={{
                 fontSize: '1.25rem',
-                fontWeight: 700,
+                fontWeight: 800,
                 margin: 0,
                 color: 'var(--text-primary, #0F172A)',
+                letterSpacing: '-0.02em',
               }}
             >
               Customer Profile
             </h1>
             {customer && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748B)' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748B)' }}>
                 Customer ID: <strong>{customer.customerCode || customer.id}</strong>
               </span>
             )}
@@ -261,6 +263,7 @@ export const CustomerProfilePage: React.FC = () => {
                 icon={<Edit3 size={16} />}
                 onClick={() => setIsEditModalOpen(true)}
                 aria-label="Edit Customer Profile"
+                className="rounded-full shadow-[var(--shadow-neu-card-sm)] px-4 font-semibold text-xs min-h-[44px]"
               >
                 Edit Customer
               </Button>
@@ -270,6 +273,7 @@ export const CustomerProfilePage: React.FC = () => {
                 icon={<ArrowRight size={16} />}
                 onClick={() => navigate(`/orders/new?customerId=${customer.id}`)}
                 aria-label="Create Order for Customer"
+                className="rounded-full shadow-[var(--shadow-neu-card-sm)] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-5 min-h-[44px]"
               >
                 Create Order
               </Button>
@@ -281,29 +285,29 @@ export const CustomerProfilePage: React.FC = () => {
       {/* Main Content Area */}
       <main style={{ maxWidth: '960px', margin: '24px auto', padding: '0 16px' }}>
         {isLoading ? (
-          <Card style={{ padding: '40px' }}>
+          <Card className="p-8 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
             <LoadingState message="Loading customer profile..." />
           </Card>
         ) : isNotFound ? (
-          <Card style={{ padding: '40px', textAlign: 'center' }}>
+          <Card className="p-8 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)] text-center">
             <EmptyState
               title="Customer Not Found"
               message={`No customer record exists with ID "${customerId}". Please check the customer ID or perform a search.`}
               action={
-                <Button variant="primary" size="md" onClick={() => navigate('/')}>
+                <Button variant="primary" size="md" onClick={() => navigate('/')} className="rounded-full">
                   Back to Customer Search
                 </Button>
               }
             />
           </Card>
         ) : error ? (
-          <Card style={{ padding: '40px' }}>
+          <Card className="p-8 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
             <ErrorState title="Failed to Load Profile" message={error} onRetry={fetchCustomer} />
           </Card>
         ) : customer ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Identity Banner Card */}
-            <Card style={{ padding: '24px' }}>
+            <Card className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
                 <div
                   style={{
@@ -315,10 +319,10 @@ export const CustomerProfilePage: React.FC = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#FFFFFF',
-                    fontWeight: 700,
+                    fontWeight: 800,
                     fontSize: '1.5rem',
                     flexShrink: 0,
-                    boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                   }}
                 >
                   {customer.name.charAt(0).toUpperCase()}
@@ -331,9 +335,10 @@ export const CustomerProfilePage: React.FC = () => {
                     <h2
                       style={{
                         fontSize: '1.5rem',
-                        fontWeight: 700,
+                        fontWeight: 800,
                         margin: 0,
                         color: 'var(--text-primary, #0F172A)',
+                        letterSpacing: '-0.02em',
                       }}
                     >
                       {customer.name}
@@ -341,7 +346,7 @@ export const CustomerProfilePage: React.FC = () => {
 
                     {/* Membership Badge */}
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 transition-colors ${getMembershipBadgeClass(
+                      className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 transition-colors shadow-xs ${getMembershipBadgeClass(
                         customer.membership,
                       )}`}
                     >
@@ -358,6 +363,7 @@ export const CustomerProfilePage: React.FC = () => {
                         gap: '6px',
                         color: 'var(--text-secondary, #475569)',
                         fontSize: '0.9rem',
+                        fontWeight: 500,
                       }}
                     >
                       <Phone size={16} color="var(--accent, #2563EB)" />
@@ -377,7 +383,7 @@ export const CustomerProfilePage: React.FC = () => {
               }}
             >
               {/* Contact & Address Card */}
-              <Card style={{ padding: '20px' }}>
+              <Card className="p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)]">
                 <h3
                   style={{
                     fontSize: '1rem',
@@ -497,7 +503,7 @@ export const CustomerProfilePage: React.FC = () => {
               </Card>
 
               {/* Membership & Account Details Card */}
-              <Card style={{ padding: '20px' }}>
+              <Card className="p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card-sm)]">
                 <h3
                   style={{
                     fontSize: '1rem',

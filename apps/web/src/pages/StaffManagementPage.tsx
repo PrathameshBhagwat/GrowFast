@@ -107,18 +107,6 @@ export const StaffManagementPage: React.FC = () => {
           updatedAt: new Date('2026-01-01').toISOString(),
         },
         {
-          id: 'emp-mgr-002',
-          name: 'Sunita Rao',
-          role: Role.MANAGER,
-          phone: '+919822033445',
-          email: 'sunita.manager@growfast.in',
-          isActive: true,
-          storeId: 'store-001',
-          storeName: 'GrowFast Main Store',
-          createdAt: new Date('2026-01-05').toISOString(),
-          updatedAt: new Date('2026-01-05').toISOString(),
-        },
-        {
           id: 'emp-ctr-003',
           name: 'Ramesh Patel',
           role: Role.COUNTER,
@@ -129,18 +117,6 @@ export const StaffManagementPage: React.FC = () => {
           storeName: 'GrowFast Main Store',
           createdAt: new Date('2026-01-10').toISOString(),
           updatedAt: new Date('2026-01-10').toISOString(),
-        },
-        {
-          id: 'emp-drv-004',
-          name: 'Rajesh Kumar',
-          role: Role.DELIVERY,
-          phone: '+919822077889',
-          email: 'rajesh.driver@growfast.in',
-          isActive: true,
-          storeId: 'store-001',
-          storeName: 'GrowFast Main Store',
-          createdAt: new Date('2026-01-15').toISOString(),
-          updatedAt: new Date('2026-01-15').toISOString(),
         },
       ];
       setEmployees(fallbackEmployees);
@@ -408,9 +384,8 @@ export const StaffManagementPage: React.FC = () => {
           background: 'var(--bg-surface, #FFFFFF)',
           borderBottom: '1px solid var(--border, #E2E8F0)',
           padding: '16px 24px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
+          position: 'relative',
+          zIndex: 10,
           transition: 'background-color 0.2s ease, border-color 0.2s ease',
         }}
       >
@@ -425,39 +400,27 @@ export const StaffManagementPage: React.FC = () => {
             gap: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<ArrowLeft size={16} />}
-              onClick={() => navigate('/')}
-              aria-label="Back to Dashboard"
+          <div>
+            <h1
+              style={{
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                color: 'var(--text-primary, #0F172A)',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
             >
-              Dashboard
-            </Button>
-            <div>
-              <h1
-                style={{
-                  fontSize: '1.2rem',
-                  fontWeight: 800,
-                  color: 'var(--text-primary, #0F172A)',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <Users size={22} color="#7C3AED" />
-                Staff Management
-              </h1>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748B)' }}>
-                Store Staff Accounts & Access Roles ({employees.length} total)
-              </span>
-            </div>
+              <Users size={22} color="#7C3AED" />
+              Staff Management
+            </h1>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748B)' }}>
+              Store Staff Accounts & Access Roles ({employees.length} total)
+            </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ThemeToggle size="sm" />
+          <div>
             <Button
               variant="primary"
               size="sm"
@@ -507,10 +470,11 @@ export const StaffManagementPage: React.FC = () => {
                   minHeight: '44px',
                   paddingLeft: '36px',
                   paddingRight: '12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border, #CBD5E1)',
-                  background: 'var(--bg-input, #FFFFFF)',
-                  color: 'var(--text-primary, #0F172A)',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-surface-inset)',
+                  boxShadow: 'var(--shadow-neu-inset)',
+                  color: 'var(--text-primary)',
                   fontSize: '0.875rem',
                   outline: 'none',
                 }}
@@ -523,14 +487,16 @@ export const StaffManagementPage: React.FC = () => {
                 onChange={(e) => setFilterRole(e.target.value)}
                 style={{
                   minHeight: '44px',
-                  padding: '0 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border, #CBD5E1)',
+                  padding: '0 14px',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border)',
                   fontSize: '0.875rem',
-                  background: 'var(--bg-surface, #FFFFFF)',
-                  color: 'var(--text-primary, #334155)',
+                  background: 'var(--bg-surface-inset)',
+                  color: 'var(--text-primary)',
+                  boxShadow: 'var(--shadow-neu-inset)',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  outline: 'none',
                 }}
               >
                 <option value="ALL">All Roles</option>

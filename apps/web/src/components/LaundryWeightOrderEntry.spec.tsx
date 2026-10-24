@@ -4,6 +4,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LaundryWeightOrderEntry } from './LaundryWeightOrderEntry';
 import { GarmentCategory, ServiceCategory } from '@growfast/shared-types';
 
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    employee: { id: 'emp-1', role: 'OWNER', name: 'Admin Owner' },
+    token: 'mock-token',
+  }),
+}));
+
 describe('LaundryWeightOrderEntry - UI Cleanup & Photo Security Fix', () => {
   const mockServices = [
     {
@@ -94,6 +101,7 @@ describe('LaundryWeightOrderEntry - UI Cleanup & Photo Security Fix', () => {
         onCheckout={onCheckout}
         isSubmitting={false}
         pendingPickupsCount={10}
+        canEditPrice={props.canEditPrice !== undefined ? props.canEditPrice : false}
         {...props}
       />,
     );
@@ -278,5 +286,76 @@ describe('LaundryWeightOrderEntry - UI Cleanup & Photo Security Fix', () => {
     fireEvent.click(addToCartBtn);
 
     expect(onAddToCart).not.toHaveBeenCalled();
+  });
+
+  it('12. All five service cards can be selected, each dynamically updating rate and active state', async () => {
+    renderComponent();
+
+    const serviceRadios = screen.getAllByRole('radio');
+    expect(serviceRadios).toHaveLength(5);
+
+    // 1. Wash and Steam Iron -> 95
+    fireEvent.click(serviceRadios[0]);
+    expect(serviceRadios[0]).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('95')).toBeInTheDocument();
+
+    // 2. Wash and Fold -> 80
+    fireEvent.click(serviceRadios[1]);
+    expect(serviceRadios[1]).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('80')).toBeInTheDocument();
+
+    // 3. Laundry for White -> 110
+    fireEvent.click(serviceRadios[2]);
+    expect(serviceRadios[2]).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('110')).toBeInTheDocument();
+
+    // 4. Premium Laundry -> 120
+    fireEvent.click(serviceRadios[3]);
+    expect(serviceRadios[3]).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('120')).toBeInTheDocument();
+
+    // 5. Woolen Laundry -> 140
+    fireEvent.click(serviceRadios[4]);
+    expect(serviceRadios[4]).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('140')).toBeInTheDocument();
+  });
+
+  it('13. Enforces admin-only price editing and read-only mode for Counter', async () => {
+    // Counter (canEditPrice = false): read-only with lock icon
+    const { unmount } = renderComponent({ canEditPrice: false });
+    expect(document.getElementById('laundry-price-per-kg-display')).toBeInTheDocument();
+    expect(document.getElementById('laundry-price-per-kg-input')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Admin/i)).not.toBeInTheDocument();
+    unmount();
+
+    // Admin (canEditPrice = true): editable input with Admin badge and Save button
+    renderComponent({ canEditPrice: true });
+    const priceInput = document.getElementById('laundry-price-per-kg-input') as HTMLInputElement;
+    expect(priceInput).toBeInTheDocument();
+    expect(priceInput.value).toBe('95');
+    expect(screen.getByText('Admin')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save/i })).toBeInTheDocument();
+  });
+
+  it('14. Renders all five service cards even if services prop is minimal or missing some services', async () => {
+    // Only pass 1 service in services prop (reproducing Image 2 scenario)
+    renderComponent({
+      services: [
+        {
+          id: 'svc-wash-iron',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WEIGHT_BASED,
+          isActive: true,
+        },
+      ] as any,
+    });
+
+    const serviceRadios = screen.getAllByRole('radio');
+    expect(serviceRadios).toHaveLength(5);
+    expect(within(serviceRadios[0]).getByText('Wash and Steam Iron')).toBeInTheDocument();
+    expect(within(serviceRadios[1]).getByText('Wash and Fold')).toBeInTheDocument();
+    expect(within(serviceRadios[2]).getByText('Laundry for White')).toBeInTheDocument();
+    expect(within(serviceRadios[3]).getByText('Premium Laundry')).toBeInTheDocument();
+    expect(within(serviceRadios[4]).getByText('Woolen Laundry')).toBeInTheDocument();
   });
 });
