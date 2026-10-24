@@ -163,6 +163,7 @@ export interface OrderDetailDTO extends OrderSummaryDTO {
   createdByName: string;
   deliveredById?: string | null;
   deliveredByName?: string | null;
+  clientDraftId?: string | null;
   items: OrderItemDTO[];
   payments: PaymentDTO[];
   adjustments?: FinancialAdjustmentDTO[];
@@ -201,6 +202,7 @@ export interface PhysicalGarmentDTO {
 }
 
 export interface CreateOrderRequest {
+  clientDraftId?: string;
   customerId: string;
   isExpress: boolean;
   expressDeliveryOption?: ExpressDeliveryOption;
@@ -270,6 +272,7 @@ export interface PaymentDTO {
   receivedById: string;
   receivedByName: string;
   createdAt: string;
+  idempotencyKey?: string | null;
 }
 
 export interface RecordPaymentRequest {
@@ -277,6 +280,7 @@ export interface RecordPaymentRequest {
   amount: number;
   mode: PaymentMode;
   reference?: string;
+  idempotencyKey?: string;
 }
 
 export interface PaymentSummaryDTO {

@@ -89,10 +89,16 @@ export class AuthService {
   /**
    * GET a public directory of active employees for the login screen.
    * Excludes sensitive data like PINs, emails, and phones.
+   * Optionally filters by specific employee roles (e.g. OWNER, COUNTER).
    */
-  async getDirectory() {
+  async getDirectory(roles?: string[]) {
+    const where: any = { isActive: true };
+    if (roles && roles.length > 0) {
+      where.role = { in: roles };
+    }
+
     const employees = await this.prisma.employee.findMany({
-      where: { isActive: true },
+      where,
       select: {
         id: true,
         name: true,

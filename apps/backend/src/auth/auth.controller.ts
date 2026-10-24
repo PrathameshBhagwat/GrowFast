@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsString, IsNotEmpty } from 'class-validator';
 import { AuthService } from './auth.service';
@@ -25,7 +25,7 @@ export class AuthController {
    * Authenticate with employee ID + PIN, receive JWT.
    */
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: process.env.NODE_ENV === 'production' ? 5 : 100, ttl: 60000 } })
   async login(@Body() body: LoginDto) {
     return this.authService.login(body.employeeId, body.pin);
   }
@@ -62,13 +62,16 @@ export class AuthController {
   /**
    * GET /api/auth/directory
    * Public endpoint to get a list of active employees for the login screen.
+   * Optional query param ?roles=OWNER,COUNTER restricts results to specific roles.
    */
   @Get('directory')
-  async getDirectory() {
-    const employees = await this.authService.getDirectory();
+  async getDirectory(@Query('roles') roles?: string) {
+    const roleList = roles ? roles.split(',').map((r) => r.trim()) : undefined;
+    const employees = await this.authService.getDirectory(roleList);
     return {
       success: true,
       data: employees,
     };
   }
 }
+
