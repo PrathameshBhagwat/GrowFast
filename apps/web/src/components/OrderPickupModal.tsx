@@ -308,18 +308,24 @@ export function OrderPickupModal({ open, onClose, order, onSuccess }: OrderPicku
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-[var(--border)] text-xs">
             <div>
               <span className="text-[var(--text-secondary)] block">Total Amount</span>
-              <span className="font-bold text-[var(--text-primary)] text-sm">₹{order.totalAmount}</span>
+              <span className="font-bold text-[var(--text-primary)] text-sm">
+                ₹{order.totalAmount}
+              </span>
             </div>
             <div>
               <span className="text-[var(--text-secondary)] block">Amount Paid</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">₹{order.amountPaid}</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                ₹{order.amountPaid}
+              </span>
             </div>
             <div className="col-span-2 sm:col-span-1">
               <span className="text-[var(--text-secondary)] block">Amount Due</span>
               <span
                 id="modal-amount-due"
                 className={`font-bold text-sm ${
-                  order.amountDue === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                  order.amountDue === 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
                 }`}
               >
                 ₹{order.amountDue}

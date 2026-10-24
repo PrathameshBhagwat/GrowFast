@@ -57,7 +57,9 @@ export class MockSQLiteDatabase {
           }
         }
       } else if (lower.startsWith('alter table')) {
-        const match = stmt.match(/alter\s+table\s+([a-zA-Z0-9_]+)\s+add\s+column\s+([a-zA-Z0-9_]+)/i);
+        const match = stmt.match(
+          /alter\s+table\s+([a-zA-Z0-9_]+)\s+add\s+column\s+([a-zA-Z0-9_]+)/i,
+        );
         if (match && match[1] && match[2]) {
           const tableName = match[1];
           const colName = match[2];
@@ -73,12 +75,17 @@ export class MockSQLiteDatabase {
     }
   }
 
-  async runAsync(sql: string, params: any[] = []): Promise<{ lastInsertRowId: number; changes: number }> {
+  async runAsync(
+    sql: string,
+    params: any[] = [],
+  ): Promise<{ lastInsertRowId: number; changes: number }> {
     const trimmed = sql.trim();
     const lower = trimmed.toLowerCase();
 
     if (lower.startsWith('insert into')) {
-      const match = trimmed.match(/insert\s+into\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)\s*values\s*\((.+)\)/is);
+      const match = trimmed.match(
+        /insert\s+into\s+([a-zA-Z0-9_]+)\s*\(([^)]+)\)\s*values\s*\((.+)\)/is,
+      );
       if (match) {
         const tableName = match[1];
         const cols = splitSqlClauses(match[2]);
@@ -153,7 +160,9 @@ export class MockSQLiteDatabase {
         return { lastInsertRowId: 0, changes };
       }
     } else if (lower.startsWith('delete from')) {
-      const match = trimmed.match(/delete\s+from\s+([a-zA-Z0-9_]+)\s+where\s+([a-zA-Z0-9_]+)\s*=\s*\?/i);
+      const match = trimmed.match(
+        /delete\s+from\s+([a-zA-Z0-9_]+)\s+where\s+([a-zA-Z0-9_]+)\s*=\s*\?/i,
+      );
       if (match) {
         const tableName = match[1];
         const whereCol = match[2];

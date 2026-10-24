@@ -66,10 +66,7 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
     const filtered = rawDirectory.filter((emp) => mobileRoles.includes(emp.role));
 
     assert.equal(filtered.length, 2);
-    assert.deepEqual(
-      filtered.map((e) => e.role).sort(),
-      ['COUNTER', 'OWNER'],
-    );
+    assert.deepEqual(filtered.map((e) => e.role).sort(), ['COUNTER', 'OWNER']);
     assert.ok(!filtered.some((e) => e.role === 'MANAGER' || e.role === 'DELIVERY'));
   });
 
@@ -200,4 +197,3 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
     );
   });
 });
-

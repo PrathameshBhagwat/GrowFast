@@ -43,17 +43,61 @@ const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
   { id: 'cat-kurta', name: 'Kurta / Pyjama', category: GarmentCategory.MEN, isActive: true },
   { id: 'cat-saree', name: 'Saree (Silk/Cotton)', category: GarmentCategory.WOMEN, isActive: true },
   { id: 'cat-dress', name: 'Dress / Gown', category: GarmentCategory.WOMEN, isActive: true },
-  { id: 'cat-bedsheet', name: 'Bedsheet / Linen', category: GarmentCategory.HOUSEHOLD, isActive: true },
-  { id: 'cat-blanket', name: 'Blanket / Quilt', category: GarmentCategory.HOUSEHOLD, isActive: true },
-  { id: 'cat-kg-wash', name: 'Wash & Fold (Per Kg)', category: GarmentCategory.WEIGHT_BASED, isActive: true },
-  { id: 'cat-kg-iron', name: 'Wash & Iron (Per Kg)', category: GarmentCategory.WEIGHT_BASED, isActive: true },
+  {
+    id: 'cat-bedsheet',
+    name: 'Bedsheet / Linen',
+    category: GarmentCategory.HOUSEHOLD,
+    isActive: true,
+  },
+  {
+    id: 'cat-blanket',
+    name: 'Blanket / Quilt',
+    category: GarmentCategory.HOUSEHOLD,
+    isActive: true,
+  },
+  {
+    id: 'cat-kg-wash',
+    name: 'Wash & Fold (Per Kg)',
+    category: GarmentCategory.WEIGHT_BASED,
+    isActive: true,
+  },
+  {
+    id: 'cat-kg-iron',
+    name: 'Wash & Iron (Per Kg)',
+    category: GarmentCategory.WEIGHT_BASED,
+    isActive: true,
+  },
 ];
 
 const FALLBACK_SERVICES: ServiceTypeDTO[] = [
-  { id: 'srv-wash-iron', name: 'Wash & Iron', category: ServiceCategory.WASH_IRON, estimatedDays: 2, isActive: true },
-  { id: 'srv-dry-clean', name: 'Dry Clean', category: ServiceCategory.DRY_CLEAN, estimatedDays: 3, isActive: true },
-  { id: 'srv-steam-press', name: 'Steam Press Only', category: ServiceCategory.STEAM_PRESS, estimatedDays: 1, isActive: true },
-  { id: 'srv-premium-wash', name: 'Premium Wash & Fold', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
+  {
+    id: 'srv-wash-iron',
+    name: 'Wash & Iron',
+    category: ServiceCategory.WASH_IRON,
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'srv-dry-clean',
+    name: 'Dry Clean',
+    category: ServiceCategory.DRY_CLEAN,
+    estimatedDays: 3,
+    isActive: true,
+  },
+  {
+    id: 'srv-steam-press',
+    name: 'Steam Press Only',
+    category: ServiceCategory.STEAM_PRESS,
+    estimatedDays: 1,
+    isActive: true,
+  },
+  {
+    id: 'srv-premium-wash',
+    name: 'Premium Wash & Fold',
+    category: ServiceCategory.WASH,
+    estimatedDays: 2,
+    isActive: true,
+  },
 ];
 
 const FALLBACK_PRICES = [
@@ -71,7 +115,15 @@ const FALLBACK_PRICES = [
   { garmentCatalogId: 'cat-kg-iron', serviceTypeId: 'srv-wash-iron', price: 120 },
 ];
 
-const DEFECT_QUICK_TAGS = ['Collar Stain', 'Torn Hem', 'Missing Button', 'Color Bleed', 'Faded', 'Ink Mark', 'Oil Stain'];
+const DEFECT_QUICK_TAGS = [
+  'Collar Stain',
+  'Torn Hem',
+  'Missing Button',
+  'Color Bleed',
+  'Faded',
+  'Ink Mark',
+  'Oil Stain',
+];
 
 export function CatalogItemsStep({
   workflow,
@@ -178,13 +230,16 @@ export function CatalogItemsStep({
     setEditingItemIndex(null);
 
     // Pick appropriate default service
-    const isWeight = garment.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(garment.category);
+    const isWeight =
+      garment.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(garment.category);
     let defaultService = services[0]?.id || 'srv-wash-iron';
     if (workflow === 'DRY_CLEANING') {
       const dcSrv = services.find((s) => s.category === ServiceCategory.DRY_CLEAN);
       if (dcSrv) defaultService = dcSrv.id;
     } else if (isWeight) {
-      const washSrv = services.find((s) => s.category === ServiceCategory.WASH || s.category === ServiceCategory.WASH_IRON);
+      const washSrv = services.find(
+        (s) => s.category === ServiceCategory.WASH || s.category === ServiceCategory.WASH_IRON,
+      );
       if (washSrv) defaultService = washSrv.id;
     }
 
@@ -319,10 +374,7 @@ export function CatalogItemsStep({
       {/* Workflow Toggle (Laundry vs Dry Clean) */}
       <View style={styles.workflowSelector}>
         <TouchableOpacity
-          style={[
-            styles.workflowButton,
-            workflow === 'LAUNDRY' && styles.workflowButtonActive,
-          ]}
+          style={[styles.workflowButton, workflow === 'LAUNDRY' && styles.workflowButtonActive]}
           onPress={() => onWorkflowChange('LAUNDRY')}
           accessible={true}
           accessibilityLabel="Switch to Laundry workflow"
@@ -367,19 +419,13 @@ export function CatalogItemsStep({
         <Text style={styles.entryModeLabel}>Entry Mode:</Text>
         <View style={styles.modeToggleGroup}>
           <TouchableOpacity
-            style={[
-              styles.modeToggleBtn,
-              entryMode === 'PIECES' && styles.modeToggleBtnActive,
-            ]}
+            style={[styles.modeToggleBtn, entryMode === 'PIECES' && styles.modeToggleBtnActive]}
             onPress={() => onEntryModeChange('PIECES')}
             accessible={true}
             accessibilityLabel="Per piece mode"
           >
             <Text
-              style={[
-                styles.modeToggleText,
-                entryMode === 'PIECES' && styles.modeToggleTextActive,
-              ]}
+              style={[styles.modeToggleText, entryMode === 'PIECES' && styles.modeToggleTextActive]}
             >
               Per Piece
             </Text>
@@ -404,10 +450,7 @@ export function CatalogItemsStep({
             accessibilityLabel="By weight mode"
           >
             <Text
-              style={[
-                styles.modeToggleText,
-                entryMode === 'WEIGHT' && styles.modeToggleTextActive,
-              ]}
+              style={[styles.modeToggleText, entryMode === 'WEIGHT' && styles.modeToggleTextActive]}
             >
               By Weight (Kg)
             </Text>
@@ -424,10 +467,7 @@ export function CatalogItemsStep({
         {['ALL', 'MEN', 'WOMEN', 'KIDS', 'HOUSEHOLD', 'WEIGHT_BASED'].map((cat) => (
           <TouchableOpacity
             key={cat}
-            style={[
-              styles.categoryPill,
-              activeCategory === cat && styles.categoryPillActive,
-            ]}
+            style={[styles.categoryPill, activeCategory === cat && styles.categoryPillActive]}
             onPress={() => setActiveCategory(cat)}
             accessible={true}
             accessibilityLabel={`Filter by ${cat}`}
@@ -451,7 +491,8 @@ export function CatalogItemsStep({
       ) : (
         <View style={styles.garmentGrid}>
           {filteredGarments.map((g) => {
-            const isWeight = g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category);
+            const isWeight =
+              g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category);
             return (
               <TouchableOpacity
                 key={g.id}
@@ -477,14 +518,14 @@ export function CatalogItemsStep({
       <View style={styles.selectedItemsSection}>
         <View style={styles.selectedHeaderRow}>
           <Text style={styles.selectedSectionTitle}>Order Items ({items.length})</Text>
-          <Text style={styles.runningTotalText}>
-            Est: ₹{estimatedSubtotal.toFixed(2)}
-          </Text>
+          <Text style={styles.runningTotalText}>Est: ₹{estimatedSubtotal.toFixed(2)}</Text>
         </View>
 
         {items.length === 0 ? (
           <View style={styles.emptyItemsBox}>
-            <Text style={styles.emptyItemsText}>No items added yet. Tap garments above to build the order.</Text>
+            <Text style={styles.emptyItemsText}>
+              No items added yet. Tap garments above to build the order.
+            </Text>
           </View>
         ) : (
           items.map((item, index) => {
@@ -495,12 +536,12 @@ export function CatalogItemsStep({
             return (
               <View key={index} style={styles.itemRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemRowTitle}>
-                    {getGarmentName(item.garmentCatalogId)}
-                  </Text>
+                  <Text style={styles.itemRowTitle}>{getGarmentName(item.garmentCatalogId)}</Text>
                   <Text style={styles.itemRowSubtitle}>
                     {getServiceName(item.serviceTypeId)} •{' '}
-                    {item.weight ? `${item.weight} kg (${item.quantity} pcs)` : `${item.quantity} pc(s)`}
+                    {item.weight
+                      ? `${item.weight} kg (${item.quantity} pcs)`
+                      : `${item.quantity} pc(s)`}
                     {' • '}₹{item.unitPrice} each
                   </Text>
                   {item.defectNotes ? (
@@ -653,7 +694,11 @@ export function CatalogItemsStep({
               {/* Defect Notes & Quick Chips */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Garment Remarks / Defect Notes</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.chipsScroll}
+                >
                   {DEFECT_QUICK_TAGS.map((tag) => (
                     <TouchableOpacity
                       key={tag}

@@ -254,7 +254,11 @@ describe('resolveCatalogSelectionOnCategoryChange', () => {
 
 describe('resolveServiceOnServiceChange and resolveCatalogSelectionOnServiceSelect', () => {
   it('automatically switches service to Dry Clean when Steam Iron is clicked while Household is active', () => {
-    const resolvedService = resolveServiceOnServiceChange('3', GarmentCategory.HOUSEHOLD, mockServices);
+    const resolvedService = resolveServiceOnServiceChange(
+      '3',
+      GarmentCategory.HOUSEHOLD,
+      mockServices,
+    );
     assert.strictEqual(resolvedService, '2'); // Dry Clean
 
     const result = resolveCatalogSelectionOnServiceSelect(
@@ -267,7 +271,11 @@ describe('resolveServiceOnServiceChange and resolveCatalogSelectionOnServiceSele
   });
 
   it('automatically switches service to Dry Clean when Steam Iron is clicked while Other is active', () => {
-    const resolvedService = resolveServiceOnServiceChange('3', GarmentCategory.OTHERS, mockServices);
+    const resolvedService = resolveServiceOnServiceChange(
+      '3',
+      GarmentCategory.OTHERS,
+      mockServices,
+    );
     assert.strictEqual(resolvedService, '2'); // Dry Clean
 
     const result = resolveCatalogSelectionOnServiceSelect(
@@ -388,10 +396,19 @@ describe('Order Creation Workflows - Laundry vs Dry Cleaning Separation', () => 
   });
 
   it('isCategoryAllowedInWorkflow disallows Home Cleaning in all workflows', () => {
-    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'DRY_CLEANING'), false);
-    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'LAUNDRY'), false);
+    assert.strictEqual(
+      isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'DRY_CLEANING'),
+      false,
+    );
+    assert.strictEqual(
+      isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'LAUNDRY'),
+      false,
+    );
     assert.strictEqual(isCategoryAllowedInWorkflow('HOME_CLEANING', 'DRY_CLEANING'), false);
-    assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.HOUSEHOLD, 'DRY_CLEANING'), true);
+    assert.strictEqual(
+      isCategoryAllowedInWorkflow(GarmentCategory.HOUSEHOLD, 'DRY_CLEANING'),
+      true,
+    );
     assert.strictEqual(isCategoryAllowedInWorkflow(GarmentCategory.OTHERS, 'DRY_CLEANING'), true);
   });
 

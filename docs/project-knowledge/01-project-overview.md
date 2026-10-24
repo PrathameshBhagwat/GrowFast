@@ -2,7 +2,7 @@
 
 > **Module:** Domain Analysis, Personas & System Scope  
 > **Source Location:** `apps/`, `packages/`, `prisma/schema.prisma`, `docs/`  
-> **Status:** Fully Audited  
+> **Status:** Fully Audited
 
 ---
 
@@ -33,20 +33,20 @@ graph TD
     Store --> Manager["MANAGER<br/>Branch Operations"]
     Store --> Counter["COUNTER<br/>Intake & POS Staff"]
     Store --> Delivery["DELIVERY<br/>Doorstep Rider"]
-    
+
     Owner --> |Configures| Catalog["Catalog & Prices"]
     Owner --> |Configures| Staff["Staff & Stores"]
     Owner --> |Views| Analytics["Financial Analytics"]
-    
+
     Manager --> |Overrides| DueDate["Due-Date Overrides"]
     Manager --> |Dispatches| Riders["Rider Assignment"]
     Manager --> |Monitors| ActionCenter["Action Center Alerts"]
-    
+
     Counter --> |Creates| Orders["Order Intake Wizard"]
     Counter --> |Captures| Photos["Intake Photos"]
     Counter --> |Collects| Payments["Counter Payments"]
     Counter --> |Executes| Handover["Customer Pickup"]
-    
+
     Delivery --> |Executes| Dropoff["Doorstep Delivery"]
     Delivery --> |Captures| POD["Proof of Delivery Photo"]
     Delivery --> |Collects| COD["Cash / UPI on Delivery"]
@@ -54,19 +54,20 @@ graph TD
 
 ### Detailed Persona Profiles:
 
-| Persona | Role Enum | Primary Work Environment | Core Responsibilities |
-|---|---|---|---|
-| **Business Owner** | `OWNER` | Web Dashboard / Mobile | Strategic visibility, branch creation, master garment catalog and service pricing management, financial adjustment approval, employee lifecycle management. |
-| **Store Manager** | `MANAGER` | Web Portal / Desktop | Operational throughput, action-center triage, customer due-date overrides with audit logging, rider dispatching, daily order reconciliation reports. |
-| **Counter Staff** | `COUNTER` | Mobile POS / Web POS | Customer lookup and creation, multi-item order intake, defect tagging, intake photo capture, thermal tag generation, payment collection, customer pickup handovers. |
-| **Delivery Rider** | `DELIVERY` | Mobile App | Route execution, customer home pickup/delivery, capturing proof-of-delivery photos, collecting cash-on-delivery (COD) or recording UPI reference IDs. |
-| **Customer** | *(External)* | WhatsApp / SMS | Receives transactional notifications (Order Created, Ready for Pickup, Out for Delivery, Payment Receipt), views itemized digital bills with photo links. |
+| Persona            | Role Enum    | Primary Work Environment | Core Responsibilities                                                                                                                                               |
+| ------------------ | ------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Business Owner** | `OWNER`      | Web Dashboard / Mobile   | Strategic visibility, branch creation, master garment catalog and service pricing management, financial adjustment approval, employee lifecycle management.         |
+| **Store Manager**  | `MANAGER`    | Web Portal / Desktop     | Operational throughput, action-center triage, customer due-date overrides with audit logging, rider dispatching, daily order reconciliation reports.                |
+| **Counter Staff**  | `COUNTER`    | Mobile POS / Web POS     | Customer lookup and creation, multi-item order intake, defect tagging, intake photo capture, thermal tag generation, payment collection, customer pickup handovers. |
+| **Delivery Rider** | `DELIVERY`   | Mobile App               | Route execution, customer home pickup/delivery, capturing proof-of-delivery photos, collecting cash-on-delivery (COD) or recording UPI reference IDs.               |
+| **Customer**       | _(External)_ | WhatsApp / SMS           | Receives transactional notifications (Order Created, Ready for Pickup, Out for Delivery, Payment Receipt), views itemized digital bills with photo links.           |
 
 ---
 
 ## 3. End-to-End Business Processes Supported
 
 ### Process 1: Counter Order Intake & Inspection
+
 1. Counter staff searches customer by 10-digit mobile number or registers a new customer.
 2. Selects workflow: **Laundry** (Wash & Fold, Wash & Iron) or **Dry Cleaning**.
 3. Adds catalog items specifying service type, declared piece count, and weight (if weight-based laundry).
@@ -81,6 +82,7 @@ graph TD
 10. Server returns official sequential order number (e.g., `ORD-2026-000123`).
 
 ### Process 2: Physical Garment Tagging & Workshop Tracking
+
 1. For every physical unit in an order line item, the system generates an immutable `PhysicalGarment` entity with a unique tag ID:
    $$\text{Tag ID Format: } \text{GF-XXXXXX} \quad (\text{e.g., } \text{GF-7K9M2P})$$
 2. Web visual designer prints thermal tags (40×40 mm or 50×25 mm) with barcodes, customer initials, item sequence (e.g., `1/3`), and service indicator.
@@ -89,6 +91,7 @@ graph TD
 5. When all non-cancelled items reach `READY`, canonical order status automatically transitions from `PROCESSING` to `READY`.
 
 ### Process 3: Doorstep Pickup & Delivery Logistics
+
 1. Manager schedules home delivery from the web portal, creating a `DeliveryRecord`.
 2. Rider is assigned; system sends an automated WhatsApp message to the customer.
 3. Order transitions to `OUT_FOR_DELIVERY` while rider is in transit.
@@ -96,6 +99,7 @@ graph TD
 5. Order status transitions to `DELIVERED`.
 
 ### Process 4: Payment Settlement & Financial Reconciliation
+
 1. Every payment is tracked as an immutable transaction ledger entry (`Payment` entity).
 2. Supports partial payments, advance payments, and multiple payment methods (`CASH`, `UPI`, `CARD`, `ONLINE`, `STORE_CREDIT`).
 3. Server recalculates `amountPaid` and `amountDue = totalAmount - amountPaid`.
@@ -131,15 +135,15 @@ graph TD
 
 ### System Implementation Matrix:
 
-| Subsystem | Web Application | Mobile Application | Backend REST API | Database Schema |
-|---|---|---|---|---|
-| **Authentication** | Completed (`LoginPage`) | Completed (`login.tsx`, `AuthContext`) | Completed (`auth.module`) | Completed (`Employee`) |
-| **Customer Management** | Completed (`HomePage`, `CustomerProfile`) | Completed (`CustomerStep`) | Completed (`customer.module`) | Completed (`Customer`) |
-| **Catalog & Pricing** | Completed (`CatalogSettingsPage`) | Completed (`CatalogItemsStep`) | Completed (`catalog.module`) | Completed (`GarmentCatalog`, `ServiceGarmentPrice`) |
-| **Order Intake** | Completed (`OrderWizardPage`) | Completed (`OrderWizardModal`) | Completed (`order.module`) | Completed (`Order`, `OrderItem`, `PhysicalGarment`) |
-| **Photo Inspection** | Completed (`PhotoCaptureView`) | Completed (`RequirementsStep`) | Completed (`photo.module`) | Completed (`OrderPhoto`) |
-| **Offline Sync** | N/A (Online Web) | Completed (`sync-engine.ts`, SQLite) | Completed (Idempotency API) | Completed (`[storeId, clientDraftId]`) |
-| **Payment Collection** | Completed (`OrderDetailPage`) | Completed (`PaymentCollectionModal`) | Completed (`payment.module`) | Completed (`Payment`) |
-| **Thermal Tag Design** | Completed (`TagDesignerPage`) | N/A (Uses server tags) | Completed (`store.module`) | Completed (`TagTemplate`) |
-| **WhatsApp Messages** | N/A (Automated) | N/A (Automated) | Completed (`notification.module`) | Completed (`Notification`) |
-| **Analytics & KPIs** | Completed (`DashboardPage`) | Basic Overview (`index.tsx`) | Completed (`dashboard.module`) | Aggregated Queries |
+| Subsystem               | Web Application                           | Mobile Application                     | Backend REST API                  | Database Schema                                     |
+| ----------------------- | ----------------------------------------- | -------------------------------------- | --------------------------------- | --------------------------------------------------- |
+| **Authentication**      | Completed (`LoginPage`)                   | Completed (`login.tsx`, `AuthContext`) | Completed (`auth.module`)         | Completed (`Employee`)                              |
+| **Customer Management** | Completed (`HomePage`, `CustomerProfile`) | Completed (`CustomerStep`)             | Completed (`customer.module`)     | Completed (`Customer`)                              |
+| **Catalog & Pricing**   | Completed (`CatalogSettingsPage`)         | Completed (`CatalogItemsStep`)         | Completed (`catalog.module`)      | Completed (`GarmentCatalog`, `ServiceGarmentPrice`) |
+| **Order Intake**        | Completed (`OrderWizardPage`)             | Completed (`OrderWizardModal`)         | Completed (`order.module`)        | Completed (`Order`, `OrderItem`, `PhysicalGarment`) |
+| **Photo Inspection**    | Completed (`PhotoCaptureView`)            | Completed (`RequirementsStep`)         | Completed (`photo.module`)        | Completed (`OrderPhoto`)                            |
+| **Offline Sync**        | N/A (Online Web)                          | Completed (`sync-engine.ts`, SQLite)   | Completed (Idempotency API)       | Completed (`[storeId, clientDraftId]`)              |
+| **Payment Collection**  | Completed (`OrderDetailPage`)             | Completed (`PaymentCollectionModal`)   | Completed (`payment.module`)      | Completed (`Payment`)                               |
+| **Thermal Tag Design**  | Completed (`TagDesignerPage`)             | N/A (Uses server tags)                 | Completed (`store.module`)        | Completed (`TagTemplate`)                           |
+| **WhatsApp Messages**   | N/A (Automated)                           | N/A (Automated)                        | Completed (`notification.module`) | Completed (`Notification`)                          |
+| **Analytics & KPIs**    | Completed (`DashboardPage`)               | Basic Overview (`index.tsx`)           | Completed (`dashboard.module`)    | Aggregated Queries                                  |

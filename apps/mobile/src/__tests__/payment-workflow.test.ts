@@ -22,7 +22,14 @@ describe('GrowFast Mobile Phase F — Payments & Order Operations', () => {
   const originalOrdersGetById = apiClient.orders.getById;
   const originalRecordPickup = apiClient.orders.recordPickup;
 
-  const mockPaymentDTO = (overrides: Partial<PaymentDTO> & { id: string; orderId: string; amount: number; mode: PaymentMode }): PaymentDTO => ({
+  const mockPaymentDTO = (
+    overrides: Partial<PaymentDTO> & {
+      id: string;
+      orderId: string;
+      amount: number;
+      mode: PaymentMode;
+    },
+  ): PaymentDTO => ({
     reference: null,
     receivedById: 'user-staff-1',
     receivedByName: 'Priya Staff',

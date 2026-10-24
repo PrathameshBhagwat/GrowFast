@@ -1034,7 +1034,10 @@ export function OrderWizardPage() {
         </div>
 
         {/* Center: Mode Switcher (Matching Reference Screenshot) */}
-        <div aria-label="Order Entry Mode Selection" className="flex items-center gap-1.5 p-1 rounded-full bg-[var(--bg-surface-inset)] border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
+        <div
+          aria-label="Order Entry Mode Selection"
+          className="flex items-center gap-1.5 p-1 rounded-full bg-[var(--bg-surface-inset)] border border-[var(--border)] shadow-[var(--shadow-neu-inset)]"
+        >
           {/* CREATE ORDER PER PIECE */}
           <button
             type="button"
@@ -1063,7 +1066,9 @@ export function OrderWizardPage() {
                 <span className="text-xs font-bold leading-tight">
                   Create Order Per Piece<span className="sr-only">s</span>
                 </span>
-                <span className={`text-[10px] font-medium leading-tight ${activeEntryMode === 'PIECES' ? 'text-purple-200' : 'text-purple-600 dark:text-purple-400'}`}>
+                <span
+                  className={`text-[10px] font-medium leading-tight ${activeEntryMode === 'PIECES' ? 'text-purple-200' : 'text-purple-600 dark:text-purple-400'}`}
+                >
                   (Dry Clean)
                 </span>
               </div>
@@ -1101,7 +1106,9 @@ export function OrderWizardPage() {
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-bold leading-tight">Create Order Per Weight</span>
-                <span className={`text-[10px] font-medium leading-tight ${activeEntryMode === 'WEIGHT' ? 'text-blue-200' : 'text-[var(--text-muted)]'}`}>
+                <span
+                  className={`text-[10px] font-medium leading-tight ${activeEntryMode === 'WEIGHT' ? 'text-blue-200' : 'text-[var(--text-muted)]'}`}
+                >
                   (Laundry / kg)
                 </span>
               </div>
@@ -1267,9 +1274,7 @@ export function OrderWizardPage() {
             }}
           >
             {/* Per-Piece Dry Cleaning Catalog Header */}
-            <div
-              className="shrink-0 px-3.5 py-2 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-surface-inset)]"
-            >
+            <div className="shrink-0 px-3.5 py-2 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-surface-inset)]">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
                   <Sparkles size={13} />
@@ -1298,11 +1303,13 @@ export function OrderWizardPage() {
             }}
           >
             {/* ─── SECTION A: PANEL HEADER ─────────────────── */}
-            <div
-              className="px-4 py-3 flex items-center justify-between shrink-0 border-b border-[var(--border)] bg-[var(--bg-surface-inset)]"
-            >
+            <div className="px-4 py-3 flex items-center justify-between shrink-0 border-b border-[var(--border)] bg-[var(--bg-surface-inset)]">
               <div className="flex items-center gap-2 min-w-0">
-                <ShoppingBag size={18} className="text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={2} />
+                <ShoppingBag
+                  size={18}
+                  className="text-blue-600 dark:text-blue-400 shrink-0"
+                  strokeWidth={2}
+                />
                 <h3 className="font-bold text-sm sm:text-base text-[var(--text-primary)] tracking-tight shrink-0">
                   Current Order
                 </h3>
@@ -1970,9 +1977,7 @@ export function OrderWizardPage() {
               <div className="border-t border-slate-100 dark:border-slate-800" />
 
               {/* Highlighted Total Box */}
-              <div
-                className="rounded-2xl px-4 py-3 flex items-center justify-between border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)]"
-              >
+              <div className="rounded-2xl px-4 py-3 flex items-center justify-between border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)]">
                 <div>
                   <div className="text-base font-bold tracking-tight text-[var(--text-primary)]">
                     Total

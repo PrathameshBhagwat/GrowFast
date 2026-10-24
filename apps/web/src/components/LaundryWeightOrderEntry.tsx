@@ -305,10 +305,7 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
 
   // Price per KG for the active service (effective unit rate)
   const pricePerKg = useMemo(() => {
-    if (
-      rateOverrides[activeService.id] !== undefined &&
-      rateOverrides[activeService.id] > 0
-    ) {
+    if (rateOverrides[activeService.id] !== undefined && rateOverrides[activeService.id] > 0) {
       return rateOverrides[activeService.id];
     }
     return configuredPricePerKg;
@@ -1272,9 +1269,7 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                     background: isWeightValid
                       ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                       : 'var(--border)',
-                    boxShadow: isWeightValid
-                      ? '0 4px 12px rgba(37, 99, 235, 0.35)'
-                      : 'none',
+                    boxShadow: isWeightValid ? '0 4px 12px rgba(37, 99, 235, 0.35)' : 'none',
                     color: isWeightValid ? '#ffffff' : 'var(--text-muted)',
                     border: 'none',
                   }}
@@ -1465,10 +1460,14 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
               {/* Left Cell: Weight & Garments */}
               <div className="p-3.5 flex flex-col justify-center space-y-1 text-xs sm:text-sm font-bold text-[var(--text-secondary)]">
                 <div>
-                  Weight (KG) : <span className="font-extrabold text-blue-600 dark:text-blue-400">{totalWeight}</span>
+                  Weight (KG) :{' '}
+                  <span className="font-extrabold text-blue-600 dark:text-blue-400">
+                    {totalWeight}
+                  </span>
                 </div>
                 <div>
-                  Garments : <span className="font-extrabold text-[var(--text-primary)]">{totalGarments}</span>
+                  Garments :{' '}
+                  <span className="font-extrabold text-[var(--text-primary)]">{totalGarments}</span>
                 </div>
               </div>
 
@@ -1555,7 +1554,9 @@ export const LaundryWeightOrderEntry: React.FC<LaundryWeightOrderEntryProps> = (
                         <p className="text-xs text-[var(--text-secondary)]">{addon.description}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-extrabold text-[var(--text-primary)]">+₹{addon.price}</span>
+                    <span className="text-sm font-extrabold text-[var(--text-primary)]">
+                      +₹{addon.price}
+                    </span>
                   </label>
                 );
               })}

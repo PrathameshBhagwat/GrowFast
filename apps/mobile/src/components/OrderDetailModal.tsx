@@ -153,7 +153,10 @@ export function OrderDetailModal({
             try {
               const updated = await apiClient.orders.recordPickup(order.id, {});
               setOrder(updated);
-              Alert.alert('Pickup Recorded', 'Order has been successfully handed over to customer!');
+              Alert.alert(
+                'Pickup Recorded',
+                'Order has been successfully handed over to customer!',
+              );
               onOrderUpdated?.();
             } catch (err: any) {
               Alert.alert('Pickup Failed', err.message || 'Could not record pickup.');
@@ -191,7 +194,9 @@ export function OrderDetailModal({
   const effectiveDue = summary ? summary.amountDue : order?.amountDue || 0;
   const effectivePaid = summary ? summary.amountPaid : order?.amountPaid || 0;
   const effectiveTotal = summary ? summary.totalAmount : order?.totalAmount || 0;
-  const effectivePaymentStatus = summary ? summary.paymentStatus : order?.paymentStatus || PaymentStatus.PENDING;
+  const effectivePaymentStatus = summary
+    ? summary.paymentStatus
+    : order?.paymentStatus || PaymentStatus.PENDING;
 
   const isCancelledOrRefunded =
     derivedStatus === OrderStatus.CANCELLED || effectivePaymentStatus === PaymentStatus.REFUNDED;
@@ -318,10 +323,16 @@ export function OrderDetailModal({
 
             {/* Supported Operation: Ready for Pickup / Handover */}
             {derivedStatus === OrderStatus.READY && (
-              <View style={[styles.actionCard, { borderColor: '#86efac', backgroundColor: '#f0fdf4' }]}>
+              <View
+                style={[styles.actionCard, { borderColor: '#86efac', backgroundColor: '#f0fdf4' }]}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.actionCardTitle, { color: '#166534' }]}>Customer Pickup</Text>
-                  <Text style={styles.actionCardSubtitle}>All garments processed and ready for pickup.</Text>
+                  <Text style={[styles.actionCardTitle, { color: '#166534' }]}>
+                    Customer Pickup
+                  </Text>
+                  <Text style={styles.actionCardSubtitle}>
+                    All garments processed and ready for pickup.
+                  </Text>
                 </View>
 
                 <TouchableOpacity
@@ -351,7 +362,8 @@ export function OrderDetailModal({
                       <View>
                         <Text style={styles.itemName}>{item.garmentName}</Text>
                         <Text style={styles.itemService}>
-                          {item.serviceType} • {item.weight ? `${item.weight} kg` : `${item.quantity} pc(s)`}
+                          {item.serviceType} •{' '}
+                          {item.weight ? `${item.weight} kg` : `${item.quantity} pc(s)`}
                         </Text>
                       </View>
                       <Text style={styles.itemPrice}>₹{item.lineTotal.toFixed(2)}</Text>
@@ -368,9 +380,7 @@ export function OrderDetailModal({
                               <TouchableOpacity
                                 key={g.id}
                                 style={[styles.garmentTag, g.isReady && styles.garmentTagReady]}
-                                onPress={() =>
-                                  handleToggleGarmentReady(item.id, g.id, g.isReady)
-                                }
+                                onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
                                 disabled={isThisOperating}
                                 accessible={true}
                                 accessibilityLabel={`Toggle readiness for piece ${g.unitNumber}`}

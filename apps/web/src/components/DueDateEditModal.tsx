@@ -79,7 +79,9 @@ export function DueDateEditModal({
         {error && <div className="text-sm text-red-600 p-2 bg-red-50 rounded">{error}</div>}
 
         <div>
-          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">New Due Date</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+            New Due Date
+          </label>
           <Input
             type="datetime-local"
             value={effectiveDueDate}
@@ -88,14 +90,18 @@ export function DueDateEditModal({
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Override Reason</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+            Override Reason
+          </label>
           <Input
             type="text"
             placeholder="e.g., Customer requested early delivery"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
-          <p className="text-xs text-[var(--text-secondary)] mt-1">Required for audit log (min 5 characters)</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
+            Required for audit log (min 5 characters)
+          </p>
         </div>
       </div>
       <div className="flex justify-end gap-3 mt-4">

@@ -9,11 +9,12 @@ Building a high-throughput, multi-platform laundry management system across web,
 ## 2. Deep Dive: Top 6 Engineering Challenges
 
 ### Challenge 1: Dual React Version Coexistence in Monorepo (React 19 vs React 18)
+
 - **Problem**: The web portal (`apps/web`) leverages **React 19.2.8** and Vite 6 for cutting-edge web performance and Tailwind CSS v4 compatibility. However, **Expo SDK 52** and **React Native 0.76.9** strictly require **React 18.3.1**. Standard npm workspace hoisting attempted to hoist React 19 to the repository root, which caused React Native native module resolution to crash at runtime with missing symbol errors (`useHostRef`, incompatible dispatcher internals).
 - **Root Cause**: npm workspaces share a single root `node_modules` by default, hoisting the highest semantic version of duplicate packages unless explicitly prevented.
 - **Evaluated Alternatives**:
-  1. *Downgrade Web to React 18*: Rejected because it sacrificed web design-system features and modern React 19 actions.
-  2. *Split into Separate Repositories*: Rejected because it broke the requirement for shared TypeScript types (`@growfast/shared-types`) and unified git history.
+  1. _Downgrade Web to React 18_: Rejected because it sacrificed web design-system features and modern React 19 actions.
+  2. _Split into Separate Repositories_: Rejected because it broke the requirement for shared TypeScript types (`@growfast/shared-types`) and unified git history.
 - **Chosen Solution**: Configured isolated dependency boundaries. Pinned `react@18.3.1` in `apps/mobile/package.json` and customized Metro (`apps/mobile/metro.config.js`) using `getDefaultConfig(__dirname)` with explicit module resolution pinning:
   ```javascript
   config.resolver.extraNodeModules = {
@@ -27,6 +28,7 @@ Building a high-throughput, multi-platform laundry management system across web,
 ---
 
 ### Challenge 2: Expo Router Bundling Failure (`EXPO_ROUTER_APP_ROOT`)
+
 - **Problem**: When booting the mobile POS app via Expo Go on physical Android devices, Metro crashed with an HTTP 500 error:
   `expo-router/_ctx.android.js: Invalid call at line 2: process.env.EXPO_ROUTER_APP_ROOT`
   `First argument of require.context should be a string denoting the directory to require.`
@@ -40,6 +42,7 @@ Building a high-throughput, multi-platform laundry management system across web,
 ---
 
 ### Challenge 3: Physical Android LAN Connectivity & Cross-Origin Loopback
+
 - **Problem**: Metro ran on `http://192.168.1.38:8081` and loaded the mobile UI on a physical Android smartphone. However, all API requests failed with:
   `WARN Could not load employee directory: Network request failed`
 - **Root Cause**: Two contributing factors:
@@ -60,6 +63,7 @@ Building a high-throughput, multi-platform laundry management system across web,
 ---
 
 ### Challenge 4: Two-Phase Timeout-After-Commit Recovery in Sync Engine
+
 - **Problem**: In unstable cellular or edge Wi-Fi conditions, a mobile POS device submitting an offline order draft (`POST /orders`) frequently timed out after 15 seconds. If the backend had already committed the database transaction, a subsequent automatic retry would attempt to re-insert the draft and fail with a 409 Conflict, leaving the mobile client stuck in `FAILED` state while an orphaned order existed in PostgreSQL.
 - **Root Cause**: HTTP socket timeouts are client-side decisions; network drops can occur after the server commits the database transaction but before the response packet reaches the mobile antenna.
 - **Chosen Solution**: Developed a **Two-Phase Idempotency Probe**:
@@ -72,6 +76,7 @@ Building a high-throughput, multi-platform laundry management system across web,
 ---
 
 ### Challenge 5: Canonical Order Status Derivation vs Distributed State Drift
+
 - **Problem**: With multiple developers working in parallel, the delivery module began manually setting `order.status = DELIVERED`, while the payment module set `order.status = READY`, leading to invalid operational states (e.g. an order marked `DELIVERED` when 2 of 5 garments were still in `PROCESSING`).
 - **Root Cause**: Distributed write authority on a central entity status without a single deterministic state machine.
 - **Chosen Solution**:
@@ -83,6 +88,7 @@ Building a high-throughput, multi-platform laundry management system across web,
 ---
 
 ### Challenge 6: Payment Duplicate Protection & Concurrency Races
+
 - **Problem**: Cashiers rapidly tapping "Collect Payment" on touchscreen terminals caused duplicate HTTP requests, creating duplicate payment rows in the database and corrupting customer credit balances.
 - **Root Cause**: Non-atomic client click handlers coupled with absence of database-level idempotency enforcement on the `payments` table.
 - **Chosen Solution**:

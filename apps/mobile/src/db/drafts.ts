@@ -2,12 +2,7 @@ import { CreateOrderRequest } from '@growfast/shared-types';
 import { getDatabase } from './sqlite';
 
 export type DraftSyncStatus =
-  | 'DRAFT'
-  | 'QUEUED'
-  | 'SYNCING'
-  | 'SYNCED'
-  | 'FAILED_RETRYABLE'
-  | 'CONFLICT';
+  'DRAFT' | 'QUEUED' | 'SYNCING' | 'SYNCED' | 'FAILED_RETRYABLE' | 'CONFLICT';
 
 export interface OrderDraft {
   id: string;

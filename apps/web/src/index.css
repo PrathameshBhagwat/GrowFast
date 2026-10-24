@@ -66,8 +66,11 @@
   /* Shadows: Hybrid Neumorphic */
   --shadow-color: rgba(148, 163, 184, 0.22);
   --shadow-lg: rgba(148, 163, 184, 0.32);
-  --shadow-neu-card: 0 10px 30px -5px rgba(160, 175, 200, 0.25), 0 4px 12px -2px rgba(160, 175, 200, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.95);
-  --shadow-neu-card-sm: 0 4px 14px -2px rgba(160, 175, 200, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  --shadow-neu-card:
+    0 10px 30px -5px rgba(160, 175, 200, 0.25), 0 4px 12px -2px rgba(160, 175, 200, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  --shadow-neu-card-sm:
+    0 4px 14px -2px rgba(160, 175, 200, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.9);
   --shadow-neu-inset: inset 0 2px 4px rgba(160, 175, 200, 0.16), 0 1px 1px rgba(255, 255, 255, 0.8);
   --shadow-neu-btn: 0 4px 14px rgba(37, 99, 235, 0.35);
   --shadow-neu-pill: 0 2px 8px rgba(37, 99, 235, 0.3);
@@ -148,8 +151,11 @@
   /* Shadows: Hybrid Neumorphic Dark */
   --shadow-color: rgba(0, 0, 0, 0.45);
   --shadow-lg: rgba(0, 0, 0, 0.6);
-  --shadow-neu-card: 0 12px 32px -4px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.05);
-  --shadow-neu-card-sm: 0 4px 16px -2px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.04);
+  --shadow-neu-card:
+    0 12px 32px -4px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  --shadow-neu-card-sm:
+    0 4px 16px -2px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.04);
   --shadow-neu-inset: inset 0 2px 5px rgba(0, 0, 0, 0.45);
   --shadow-neu-btn: 0 4px 16px rgba(37, 99, 235, 0.5);
   --shadow-neu-pill: 0 2px 10px rgba(37, 99, 235, 0.45);

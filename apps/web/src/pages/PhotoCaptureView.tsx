@@ -396,7 +396,10 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
 // ═════════════════════════════════════════════════════════════════════
 
 const StatusIndicator: React.FC<{ status: CaptureStatus }> = ({ status }) => {
-  const configs: Record<CaptureStatus, { bg: string; color: string; border: string; text: string }> = {
+  const configs: Record<
+    CaptureStatus,
+    { bg: string; color: string; border: string; text: string }
+  > = {
     not_started: {
       bg: 'var(--bg-surface-inset, #F1F5F9)',
       color: 'var(--text-secondary, #64748B)',
@@ -488,7 +491,9 @@ const GalleryImage: React.FC<{ photo: OrderPhotoDTO }> = ({ photo }) => {
     return (
       <div style={styles.brokenImage}>
         <ImageIcon size={28} color="var(--text-muted, #CBD5E1)" />
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #94A3B8)', textAlign: 'center' }}>
+        <span
+          style={{ fontSize: '0.7rem', color: 'var(--text-muted, #94A3B8)', textAlign: 'center' }}
+        >
           Image unavailable
         </span>
       </div>

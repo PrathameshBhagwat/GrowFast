@@ -28,11 +28,7 @@ export const STARCHING_ALLOWED_CATEGORIES: GarmentCategory[] = [
 export function isShoeCategory(category: string | GarmentCategory): boolean {
   if (!category) return false;
   const upper = String(category).trim().toUpperCase();
-  return (
-    upper === GarmentCategory.SHOES ||
-    upper === 'SHOE' ||
-    upper === 'SHOES'
-  );
+  return upper === GarmentCategory.SHOES || upper === 'SHOE' || upper === 'SHOES';
 }
 
 /**
@@ -50,11 +46,7 @@ export function isHouseholdCategory(category: string | GarmentCategory): boolean
 export function isOtherCategory(category: string | GarmentCategory): boolean {
   if (!category) return false;
   const upper = String(category).trim().toUpperCase();
-  return (
-    upper === GarmentCategory.OTHERS ||
-    upper === 'OTHERS' ||
-    upper === 'OTHER'
-  );
+  return upper === GarmentCategory.OTHERS || upper === 'OTHERS' || upper === 'OTHER';
 }
 
 /**
@@ -572,11 +564,7 @@ export function resolveCatalogSelectionOnCategoryChange<
  */
 export function resolveServiceOnServiceChange<
   T extends { id: string; name: string; category?: string },
->(
-  newServiceId: string,
-  currentCategory: string | GarmentCategory,
-  services: T[],
-): string {
+>(newServiceId: string, currentCategory: string | GarmentCategory, services: T[]): string {
   if (
     isSteamIronService(newServiceId, services) &&
     (isHouseholdCategory(currentCategory) || isOtherCategory(currentCategory))

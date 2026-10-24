@@ -94,9 +94,7 @@ export function PaymentHistoryView({
                 <View style={styles.rowLeft}>
                   <View style={styles.modeAndAmount}>
                     <View style={[styles.modeBadge, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.modeBadgeText, { color: badge.text }]}>
-                        {item.mode}
-                      </Text>
+                      <Text style={[styles.modeBadgeText, { color: badge.text }]}>{item.mode}</Text>
                     </View>
                     <Text style={styles.amountText}>₹{item.amount.toFixed(2)}</Text>
                   </View>

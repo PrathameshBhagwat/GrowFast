@@ -35,17 +35,18 @@ graph TD
 
 Source: `git shortlog -sn --all` (Total: 183 commits)
 
-| Engineer | Git Identifier | Commit Count | Primary Ownership Areas | Verified Core Contributions |
-| :--- | :--- | :---: | :--- | :--- |
-| **Prathamesh Bhagwat** | `PrathameshBhagwat <bhagvatprathu@gmail.com>` | **126** | Developer C / Architecture Lead / Mobile Engineering | Monorepo architecture, Cloudflare R2 media storage, WhatsApp Baileys notifications, payment ledger & idempotency, delivery logistics, real-time analytics dashboard, thermal tag designer, Expo SDK 52 mobile POS, SQLite offline sync engine, and physical Android LAN verification. |
-| **Swapnil** | `Swapnil <swapnilofficial08@gmail.com>` | **41** | Developer B / Order & Catalog Domain Lead | Garment catalog matrices, 5-step order creation wizard (`OrderWizardPage.tsx`), per-piece vs weight-based workflows, 18% GST and express multiplier pricing, and canonical `deriveOrderStatus()` state machine. |
-| **Sarthak Gite** | `Sarthakgite06 <sarthakgite006@gmail.com>` | **16** | Developer A / Identity & Customer Specialist | PIN authentication with bcryptjs and JWT, employee directory picker, customer search, walk-in customer registration, customer profiles, and staff role management. |
+| Engineer               | Git Identifier                                | Commit Count | Primary Ownership Areas                              | Verified Core Contributions                                                                                                                                                                                                                                                           |
+| :--------------------- | :-------------------------------------------- | :----------: | :--------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Prathamesh Bhagwat** | `PrathameshBhagwat <bhagvatprathu@gmail.com>` |   **126**    | Developer C / Architecture Lead / Mobile Engineering | Monorepo architecture, Cloudflare R2 media storage, WhatsApp Baileys notifications, payment ledger & idempotency, delivery logistics, real-time analytics dashboard, thermal tag designer, Expo SDK 52 mobile POS, SQLite offline sync engine, and physical Android LAN verification. |
+| **Swapnil**            | `Swapnil <swapnilofficial08@gmail.com>`       |    **41**    | Developer B / Order & Catalog Domain Lead            | Garment catalog matrices, 5-step order creation wizard (`OrderWizardPage.tsx`), per-piece vs weight-based workflows, 18% GST and express multiplier pricing, and canonical `deriveOrderStatus()` state machine.                                                                       |
+| **Sarthak Gite**       | `Sarthakgite06 <sarthakgite006@gmail.com>`    |    **16**    | Developer A / Identity & Customer Specialist         | PIN authentication with bcryptjs and JWT, employee directory picker, customer search, walk-in customer registration, customer profiles, and staff role management.                                                                                                                    |
 
 ---
 
 ## 3. Detailed Contributions by Role
 
 ### 3.1 Developer A — Sarthak Gite
+
 - **Backend Modules**:
   - `apps/backend/src/auth/`: Built PIN comparison logic using `bcryptjs`, JWT payload signing, and `@Throttle` rate limiting.
   - `apps/backend/src/employee/`: Built employee CRUD, role filtering (`OWNER`, `MANAGER`, `COUNTER`, `DELIVERY`), and soft-deletion flags.
@@ -57,6 +58,7 @@ Source: `git shortlog -sn --all` (Total: 183 commits)
   - `StaffManagementPage.tsx`: Staff directory and credential management for Owners and Managers.
 
 ### 3.2 Developer B — Swapnil
+
 - **Backend Modules**:
   - `apps/backend/src/catalog/`: Built catalog category filters, service type SLA definitions, and `ServiceGarmentPrice` matrix endpoints.
   - `apps/backend/src/order/`: Built order creation pipeline, line item breakdown, physical garment tagging transactions, and due date calculators.
@@ -70,6 +72,7 @@ Source: `git shortlog -sn --all` (Total: 183 commits)
   - `CatalogSettingsPage.tsx` & `MasterDataPage.tsx`: Management tables for garments and service prices.
 
 ### 3.3 Developer C / Lead — Prathamesh Bhagwat
+
 - **Backend Modules**:
   - `apps/backend/src/payment/`: Built payment collection engine with enforced `idempotencyKey`, multi-mode tender (`CASH`, `UPI`, `CARD`), and manager financial adjustments (`FinancialAdjustment`).
   - `apps/backend/src/photo/`: Built presigned Cloudflare R2 / S3 storage pipeline with local disk fallback for air-gapped setups.
@@ -93,6 +96,7 @@ Source: `git shortlog -sn --all` (Total: 183 commits)
 ## 4. Cross-Team Integration & Shared Governance
 
 ### 4.1 Shared Code Governance (Rules 14–19)
+
 - `prisma/schema.prisma` was coordinated centrally under Developer C / Lead to ensure zero competing migration files.
 - `packages/shared-types` served as the single source of truth; any change to DTOs or enums required PR review across all three developers.
 - `packages/ui` provided standardized React 19 web primitives (`Button`, `Card`, `StatusChip`) to maintain visual consistency across Developer A, B, and C web pages.

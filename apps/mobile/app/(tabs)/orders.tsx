@@ -239,14 +239,9 @@ export default function OrdersScreen() {
       <View style={styles.topBar}>
         <View style={styles.networkStatusContainer}>
           <View
-            style={[
-              styles.networkDot,
-              { backgroundColor: isConnected ? '#16a34a' : '#ea580c' },
-            ]}
+            style={[styles.networkDot, { backgroundColor: isConnected ? '#16a34a' : '#ea580c' }]}
           />
-          <Text style={styles.networkStatusText}>
-            {isConnected ? 'Online' : 'Offline'}
-          </Text>
+          <Text style={styles.networkStatusText}>{isConnected ? 'Online' : 'Offline'}</Text>
         </View>
 
         <View style={styles.topActionsGroup}>
@@ -280,12 +275,7 @@ export default function OrdersScreen() {
             style={[styles.tabButton, filterTab === 'ALL' && styles.tabButtonActive]}
             onPress={() => setFilterTab('ALL')}
           >
-            <Text
-              style={[
-                styles.tabButtonText,
-                filterTab === 'ALL' && styles.tabButtonTextActive,
-              ]}
-            >
+            <Text style={[styles.tabButtonText, filterTab === 'ALL' && styles.tabButtonTextActive]}>
               All ({drafts.length})
             </Text>
           </TouchableOpacity>
@@ -294,10 +284,7 @@ export default function OrdersScreen() {
             onPress={() => setFilterTab('PENDING')}
           >
             <Text
-              style={[
-                styles.tabButtonText,
-                filterTab === 'PENDING' && styles.tabButtonTextActive,
-              ]}
+              style={[styles.tabButtonText, filterTab === 'PENDING' && styles.tabButtonTextActive]}
             >
               Queue ({drafts.filter((d) => d.syncStatus !== 'SYNCED').length})
             </Text>
@@ -307,10 +294,7 @@ export default function OrdersScreen() {
             onPress={() => setFilterTab('SYNCED')}
           >
             <Text
-              style={[
-                styles.tabButtonText,
-                filterTab === 'SYNCED' && styles.tabButtonTextActive,
-              ]}
+              style={[styles.tabButtonText, filterTab === 'SYNCED' && styles.tabButtonTextActive]}
             >
               Synced ({drafts.filter((d) => d.syncStatus === 'SYNCED').length})
             </Text>
@@ -585,7 +569,9 @@ export default function OrdersScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.resultOrderNum}>#{item.orderNumber}</Text>
-                    <Text style={styles.resultCustomer}>{item.customerName} • 📞 {item.customerPhone}</Text>
+                    <Text style={styles.resultCustomer}>
+                      {item.customerName} • 📞 {item.customerPhone}
+                    </Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.resultTotal}>₹{item.totalAmount.toFixed(2)}</Text>

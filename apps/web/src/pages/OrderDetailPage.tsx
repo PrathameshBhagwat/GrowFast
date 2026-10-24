@@ -407,7 +407,9 @@ export function OrderDetailPage() {
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight mb-2">{order.orderNumber}</h1>
+          <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight mb-2">
+            {order.orderNumber}
+          </h1>
           <div className="flex gap-2 items-center flex-wrap">
             <StatusChip status={order.status} />
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
@@ -463,7 +465,9 @@ export function OrderDetailPage() {
               <CheckCircle2 size={24} />
             </div>
             <div>
-              <div className="font-bold text-base text-[var(--text-primary)]">Order Completely Delivered</div>
+              <div className="font-bold text-base text-[var(--text-primary)]">
+                Order Completely Delivered
+              </div>
               <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
                 {order.deliveredAt
                   ? `Delivered on ${new Date(order.deliveredAt).toLocaleString()}`

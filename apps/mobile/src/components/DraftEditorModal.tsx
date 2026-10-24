@@ -10,11 +10,7 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import {
-  CreateOrderItemRequest,
-  ServiceCategory,
-  PickupType,
-} from '@growfast/shared-types';
+import { CreateOrderItemRequest, ServiceCategory, PickupType } from '@growfast/shared-types';
 import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../db/drafts';
 import { getPhotosForDraft, PendingPhoto } from '../db/photos';
 import { PhotoQueueView } from './PhotoQueueView';
@@ -191,9 +187,7 @@ export function DraftEditorModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {draft ? 'Edit Order Draft' : 'New Order Draft'}
-          </Text>
+          <Text style={styles.headerTitle}>{draft ? 'Edit Order Draft' : 'New Order Draft'}</Text>
           <TouchableOpacity
             style={styles.closeButton}
             onPress={onClose}
@@ -236,10 +230,7 @@ export function DraftEditorModal({
             <Text style={styles.toggleLabel}>Workflow: {workflowType}</Text>
             <View style={styles.badgeToggle}>
               <TouchableOpacity
-                style={[
-                  styles.badgeOption,
-                  workflowType === 'LAUNDRY' && styles.badgeOptionActive,
-                ]}
+                style={[styles.badgeOption, workflowType === 'LAUNDRY' && styles.badgeOptionActive]}
                 onPress={() => setWorkflowType('LAUNDRY')}
               >
                 <Text
@@ -314,10 +305,7 @@ export function DraftEditorModal({
                   {it.serviceTypeId} • {it.quantity} pc(s)
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.removeItemBtn}
-                onPress={() => handleRemoveItem(idx)}
-              >
+              <TouchableOpacity style={styles.removeItemBtn} onPress={() => handleRemoveItem(idx)}>
                 <Text style={styles.removeItemText}>Remove</Text>
               </TouchableOpacity>
             </View>

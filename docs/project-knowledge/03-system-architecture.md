@@ -2,7 +2,7 @@
 
 > **Module:** Architectural Topology, Request Lifecycles & State Transitions  
 > **Source Location:** `apps/`, `packages/`, `prisma/`  
-> **Status:** Fully Audited & Diagrammed  
+> **Status:** Fully Audited & Diagrammed
 
 ---
 
@@ -52,10 +52,10 @@ graph TB
     Mobile --> SecStore
     Mobile --> CORS
     Web --> CORS
-    
+
     CORS --> JWTAuth
     JWTAuth --> Backend
-    
+
     Backend -.-> SharedTypes
     Web -.-> SharedTypes
     Mobile -.-> SharedTypes
@@ -112,7 +112,7 @@ sequenceDiagram
     API->>AuthSvc: login(employeeId, pin)
     AuthSvc->>DB: findUnique({ where: { id: employeeId } })
     DB-->>AuthSvc: Employee Record (with pinHash, isActive, store)
-    
+
     alt Employee Not Found or Inactive
         AuthSvc-->>API: Throw UnauthorizedException (401)
         API-->>Mobile: HTTP 401 { message: "Invalid credentials" }
@@ -155,14 +155,14 @@ sequenceDiagram
     Staff->>Wizard: Complete Customer, Items & Options
     Wizard->>SQLite: saveDraft({ clientDraftId, payload, status: 'QUEUED' })
     Wizard->>Sync: syncDraft(clientDraftId)
-    
+
     Sync->>Sync: Acquire In-Memory Lock (clientDraftId)
     Sync->>OrderCtrl: HTTP POST /api/orders (Authorization: Bearer JWT)
     OrderCtrl->>OrderSvc: createOrder(dto, employeeId, storeId)
-    
+
     OrderSvc->>OrderSvc: Compute SHA-256 draftPayloadHash(dto)
     OrderSvc->>Tx: Begin Atomic Database Transaction
-    
+
     Tx->>DB: Check existing Order where [storeId, clientDraftId]
     alt Idempotent Replay (Same Hash)
         DB-->>Tx: Existing Order Found
@@ -199,25 +199,25 @@ stateDiagram-v2
     [*] --> DRAFT: Staff Creates / Edits Draft
     DRAFT --> DRAFT: Auto-Save Step Progress
     DRAFT --> QUEUED: Staff Taps Submit Order
-    
+
     state OnlineCheck <<choice>>
     QUEUED --> OnlineCheck: Check Device Network
-    
+
     OnlineCheck --> SYNCING: Online (NetInfo isConnected = true)
     OnlineCheck --> QUEUED: Offline (Wait for NetInfo Event)
-    
+
     state ServerCommit <<choice>>
     SYNCING --> ServerCommit: Post to /api/orders
-    
+
     ServerCommit --> SYNCED: 201 Created or Idempotent 200
     ServerCommit --> CONFLICT: 409 Payload Hash Mismatch
     ServerCommit --> FAILED_RETRYABLE: Network Drop / Timeout / 500
     ServerCommit --> FAILED_AUTH: 401 Session Expired
-    
+
     FAILED_RETRYABLE --> SYNCING: Exponential Backoff Retry
     FAILED_AUTH --> QUEUED: User Re-Authenticates
     CONFLICT --> DRAFT: Staff Resolves Payload Conflict
-    
+
     SYNCED --> UPLOADING_PHOTOS: Trigger Photo Queue
     UPLOADING_PHOTOS --> COMPLETED: All Photos Uploaded to R2
     COMPLETED --> [*]
@@ -246,12 +246,12 @@ sequenceDiagram
     Cam->>FS: Save 1200px JPEG to App Sandbox
     FS-->>Staff: Return localFileUri
     Staff->>SQLite: insertPendingPhoto({ localFileUri, clientDraftId, photoType: 'STAIN' })
-    
+
     Note over Staff,Sync: Order creation completes and obtains serverOrderId
-    
+
     Sync->>SQLite: getPhotosForDraft(clientDraftId)
     SQLite-->>Sync: [ { id, localFileUri, photoType, serverOrderId } ]
-    
+
     loop Each Pending Photo
         Sync->>FS: checkFileExists(localFileUri)
         Sync->>PhotoCtrl: Multipart Upload (orderId, type, file)
@@ -283,7 +283,7 @@ sequenceDiagram
     Customer->>Modal: Enters Payment Amount & Selects Mode (UPI / CASH)
     Modal->>Modal: generatePaymentIdempotencyKey(orderId)
     Modal->>Mgr: executePaymentWithIdempotency({ orderId, amount, mode, idempotencyKey })
-    
+
     Mgr->>Lock: inFlightKeys.has(idempotencyKey)
     alt Concurrent Duplicate Detected
         Mgr-->>Modal: Reject with duplicate submission warning
@@ -291,7 +291,7 @@ sequenceDiagram
         Mgr->>Lock: inFlightKeys.add(idempotencyKey)
         Mgr->>API: HTTP POST /api/payments
         API->>PaySvc: recordPayment(employeeId, storeId, body)
-        
+
         PaySvc->>DB: Check payment where idempotencyKey = key
         alt Idempotent Duplicate Request
             DB-->>PaySvc: Return Existing Payment
@@ -322,23 +322,23 @@ graph TD
     Items["Order Items Status Array"] --> CheckEmpty{"items.length == 0?"}
     CheckEmpty -->|Yes| Received["ORDER STATUS: RECEIVED"]
     CheckEmpty -->|No| FilterCancelled["Filter non-cancelled items"]
-    
+
     FilterCancelled --> CheckAllCancelled{"All items CANCELLED?"}
     CheckAllCancelled -->|Yes| Cancelled["ORDER STATUS: CANCELLED"]
     CheckAllCancelled -->|No| FindLowest["Determine Lowest Item Progress"]
-    
+
     FindLowest --> CheckDelivered{"Lowest == DELIVERED?"}
     CheckDelivered -->|Yes| Delivered["ORDER STATUS: DELIVERED"]
-    
+
     CheckDelivered -->|No| CheckTransit{"Active Rider Delivery?"}
     CheckTransit -->|Yes| OutForDelivery["ORDER STATUS: OUT_FOR_DELIVERY"]
-    
+
     CheckTransit -->|No| CheckReady{"Lowest == READY?"}
     CheckReady -->|Yes| Ready["ORDER STATUS: READY"]
-    
+
     CheckReady -->|No| CheckProcessing{"Lowest == PROCESSING?"}
     CheckProcessing -->|Yes| Processing["ORDER STATUS: PROCESSING"]
-    
+
     CheckProcessing -->|No| CheckQC{"Lowest == QUALITY_CHECK?"}
     CheckQC -->|Yes| QC["ORDER STATUS: QUALITY_CHECK"]
     CheckQC -->|No| Received

@@ -1499,10 +1499,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
   };
 
   return (
-    <div
-      className="flex-1 flex flex-col min-h-0 font-sans"
-      style={{ background: 'var(--bg-app)' }}
-    >
+    <div className="flex-1 flex flex-col min-h-0 font-sans" style={{ background: 'var(--bg-app)' }}>
       {/* ─── TOP APP HEADER ───────────────────────────────── */}
       <div
         className="w-full max-w-[1600px] mx-auto shrink-0"
@@ -1635,10 +1632,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
       </div>
 
       {/* ─── MAIN CONTENT VIEWPORT ────────────────────────── */}
-      <main
-        className="flex-1 flex flex-col min-h-0"
-        style={{ background: 'var(--bg-app)' }}
-      >
+      <main className="flex-1 flex flex-col min-h-0" style={{ background: 'var(--bg-app)' }}>
         {loading && <LoadingState message="Loading catalog data..." fullPage={false} />}
         {error && <ErrorState message={error} onRetry={fetchAllData} />}
 
@@ -2030,10 +2024,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
                                   }}
                                   title="Edit garment"
                                 >
-                                  <Edit2
-                                    size={12}
-                                    style={{ color: 'var(--text-muted)' }}
-                                  />
+                                  <Edit2 size={12} style={{ color: 'var(--text-muted)' }} />
                                   <span>Edit</span>
                                 </button>
                               )}
@@ -2051,10 +2042,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
             {/* ══ TAB 2: SERVICE PRICING MATRIX (ADMIN) ═════════ */}
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'pricing' && canConfigurePricing && (
-              <div
-                className="flex-1 flex flex-col min-h-0"
-                style={{ background: 'var(--bg-app)' }}
-              >
+              <div className="flex-1 flex flex-col min-h-0" style={{ background: 'var(--bg-app)' }}>
                 <div
                   className="flex-1 overflow-y-auto min-h-0 flex flex-col justify-between"
                   style={{ background: 'var(--bg-app)' }}
@@ -2429,10 +2417,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
             {/* ══ TAB 3: TOP UP SERVICES CONFIGURATION (ADMIN) ════ */}
             {/* ════════════════════════════════════════════════════ */}
             {activeTab === 'topup' && canConfigurePricing && (
-              <div
-                className="flex-1 flex flex-col min-h-0"
-                style={{ background: 'var(--bg-app)' }}
-              >
+              <div className="flex-1 flex flex-col min-h-0" style={{ background: 'var(--bg-app)' }}>
                 <div
                   className="flex-1 overflow-y-auto min-h-0 flex flex-col justify-between"
                   style={{ background: 'var(--bg-app)' }}
@@ -2479,10 +2464,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
                             Configurable Rates
                           </span>
                         </div>
-                        <p
-                          className="text-xs mt-1"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                           Configure add-on service rates (e.g. Starching, Stain Treatment, Fragrance
                           Booster, Antiseptic Wash) used across Laundry & Dry Cleaning order
                           workflows.

@@ -1,7 +1,13 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { apiClient, setApiConfig, ApiError } from '../api/client';
-import { saveAuthToken, removeAuthToken, getAuthToken, saveUserSession, getUserSession } from '../storage/secure-store';
+import {
+  saveAuthToken,
+  removeAuthToken,
+  getAuthToken,
+  saveUserSession,
+  getUserSession,
+} from '../storage/secure-store';
 import {
   PickupType,
   ExpressDeliveryOption,
@@ -147,7 +153,11 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
         });
       },
       (err: any) => {
-        assert.equal(err.statusCode, 409, 'Duplicate customer registration must return HTTP 409 Conflict');
+        assert.equal(
+          err.statusCode,
+          409,
+          'Duplicate customer registration must return HTTP 409 Conflict',
+        );
         return true;
       },
     );
@@ -167,10 +177,14 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     assert.ok(prices.length > 0, 'Pricing table must not be empty');
 
     // Find a standard per-piece garment (e.g. Shirt) and service (Wash & Iron or Dry Clean)
-    const shirt = garments.find((g) => g.name.toLowerCase().includes('shirt') && g.category === 'MEN');
+    const shirt = garments.find(
+      (g) => g.name.toLowerCase().includes('shirt') && g.category === 'MEN',
+    );
     perPieceGarmentId = shirt?.id || garments[0].id;
 
-    const washIron = services.find((s) => s.category === 'WASH_IRON' || s.name.toLowerCase().includes('iron'));
+    const washIron = services.find(
+      (s) => s.category === 'WASH_IRON' || s.name.toLowerCase().includes('iron'),
+    );
     laundryServiceId = washIron?.id || services[0].id;
 
     // Find a weight-based garment
@@ -213,9 +227,12 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
 
     assert.ok(serverOrder.id, 'Server must return internal order ID');
     assert.ok(serverOrder.orderNumber, 'Server must return official order number');
-    assert.ok(serverOrder.orderNumber.startsWith('ORD-'), `Order number must follow standard format: ${serverOrder.orderNumber}`);
+    assert.ok(
+      serverOrder.orderNumber.startsWith('ORD-'),
+      `Order number must follow standard format: ${serverOrder.orderNumber}`,
+    );
     assert.equal(serverOrder.customerId, testCustomerId);
-    assert.equal((serverOrder.status || (serverOrder as any).orderStatus), OrderStatus.RECEIVED);
+    assert.equal(serverOrder.status || (serverOrder as any).orderStatus, OrderStatus.RECEIVED);
     assert.equal(serverOrder.items.length, 1);
 
     confirmedOrderId = serverOrder.id;
@@ -245,7 +262,11 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
           serviceTypeId: laundryServiceId,
           quantity: 3,
           weight: 1.5, // Below 2.00 kg minimum
-          pieces: [{ unitNumber: 1, photoCount: 1 }, { unitNumber: 2, photoCount: 1 }, { unitNumber: 3, photoCount: 1 }],
+          pieces: [
+            { unitNumber: 1, photoCount: 1 },
+            { unitNumber: 2, photoCount: 1 },
+            { unitNumber: 3, photoCount: 1 },
+          ],
         },
       ],
     };
@@ -256,7 +277,10 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
       },
       (err: any) => {
         assert.equal(err.statusCode, 400);
-        assert.ok(err.message.includes('2.00 kg') || err.message.includes('minimum'), 'Error must cite 2.00 kg minimum weight');
+        assert.ok(
+          err.message.includes('2.00 kg') || err.message.includes('minimum'),
+          'Error must cite 2.00 kg minimum weight',
+        );
         return true;
       },
       'Weight below 2.00 kg must be rejected by backend',
@@ -306,7 +330,7 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
       })),
     });
 
-    assert.equal((fetchedOrder.status || (fetchedOrder as any).orderStatus), derived);
+    assert.equal(fetchedOrder.status || (fetchedOrder as any).orderStatus, derived);
     assert.equal(derived, OrderStatus.RECEIVED);
   });
 
@@ -386,8 +410,15 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
         await apiClient.orders.create(conflictingPayload);
       },
       (err: any) => {
-        assert.equal(err.statusCode, 409, 'Mutated payload on existing draft ID must return HTTP 409');
-        assert.ok(err.message.includes('Client draft ID') && err.message.includes('different order payload'));
+        assert.equal(
+          err.statusCode,
+          409,
+          'Mutated payload on existing draft ID must return HTTP 409',
+        );
+        assert.ok(
+          err.message.includes('Client draft ID') &&
+            err.message.includes('different order payload'),
+        );
         return true;
       },
     );
@@ -444,7 +475,10 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     assert.ok(order.items.length > 0, 'Items must be populated');
     assert.ok(order.items[0].garmentName, 'Garment relation must be populated');
     assert.ok(order.items[0].serviceType, 'ServiceType relation must be populated');
-    assert.ok(order.items[0].physicalGarments.length > 0, 'Physical garments must be created with tags');
+    assert.ok(
+      order.items[0].physicalGarments.length > 0,
+      'Physical garments must be created with tags',
+    );
     assert.ok(order.items[0].physicalGarments[0].tagId, 'Each piece must have a generated tagId');
     assert.ok(order.totalAmount > 0, 'Total amount must be present');
   });

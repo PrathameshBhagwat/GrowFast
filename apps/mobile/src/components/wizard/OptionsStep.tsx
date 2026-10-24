@@ -97,7 +97,9 @@ export function OptionsStep({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.pickupCardTitle}>🏪 Store Counter Pickup</Text>
-              <Text style={styles.pickupCardDesc}>Customer brings and collects at the store counter</Text>
+              <Text style={styles.pickupCardDesc}>
+                Customer brings and collects at the store counter
+              </Text>
             </View>
           </TouchableOpacity>
 
@@ -115,7 +117,9 @@ export function OptionsStep({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.pickupCardTitle}>🚚 Home Delivery</Text>
-              <Text style={styles.pickupCardDesc}>Order is dispatched to customer address by delivery rider</Text>
+              <Text style={styles.pickupCardDesc}>
+                Order is dispatched to customer address by delivery rider
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -143,7 +147,8 @@ export function OptionsStep({
                   if (opt.disabled) {
                     Alert.alert(
                       'Option Unavailable',
-                      opt.disabledReason || 'This delivery option is unavailable due to store schedule rules.',
+                      opt.disabledReason ||
+                        'This delivery option is unavailable due to store schedule rules.',
                     );
                     return;
                   }

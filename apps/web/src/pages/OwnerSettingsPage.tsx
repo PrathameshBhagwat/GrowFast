@@ -142,8 +142,7 @@ export const OwnerSettingsPage: React.FC = () => {
                     ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                     : 'transparent',
                 color: activeTab === 'staff' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
-                boxShadow:
-                  activeTab === 'staff' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                boxShadow: activeTab === 'staff' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',
@@ -202,8 +201,7 @@ export const OwnerSettingsPage: React.FC = () => {
                     ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                     : 'transparent',
                 color: activeTab === 'catalog' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
-                boxShadow:
-                  activeTab === 'catalog' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                boxShadow: activeTab === 'catalog' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',
@@ -232,8 +230,7 @@ export const OwnerSettingsPage: React.FC = () => {
                     ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                     : 'transparent',
                 color: activeTab === 'reports' ? '#FFFFFF' : 'var(--text-secondary, #475569)',
-                boxShadow:
-                  activeTab === 'reports' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+                boxShadow: activeTab === 'reports' ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',

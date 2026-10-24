@@ -95,28 +95,38 @@ export function FinancialAdjustmentModal({
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-[var(--text-secondary)]">Total Paid</span>
-            <span className="font-medium text-emerald-600 dark:text-emerald-400">₹{order.amountPaid}</span>
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">
+              ₹{order.amountPaid}
+            </span>
           </div>
           {existingRefunds > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-[var(--text-secondary)]">Already Refunded</span>
-              <span className="font-medium text-amber-600 dark:text-amber-400">-₹{existingRefunds}</span>
+              <span className="font-medium text-amber-600 dark:text-amber-400">
+                -₹{existingRefunds}
+              </span>
             </div>
           )}
           {existingStoreCredits > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-[var(--text-secondary)]">Already Credited</span>
-              <span className="font-medium text-blue-600 dark:text-blue-400">₹{existingStoreCredits}</span>
+              <span className="font-medium text-blue-600 dark:text-blue-400">
+                ₹{existingStoreCredits}
+              </span>
             </div>
           )}
           <div className="flex justify-between text-sm pt-2 border-t border-[var(--border)]">
-            <span className="font-bold text-[var(--text-primary)]">Maximum Eligible Adjustment</span>
+            <span className="font-bold text-[var(--text-primary)]">
+              Maximum Eligible Adjustment
+            </span>
             <span className="font-bold text-blue-600 dark:text-blue-400">₹{maxEligible}</span>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Adjustment Type</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+            Adjustment Type
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -144,7 +154,9 @@ export function FinancialAdjustmentModal({
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Amount (₹)</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+            Amount (₹)
+          </label>
           <input
             id="adjustment-amount-input"
             type="number"

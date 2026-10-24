@@ -294,7 +294,12 @@ export const CustomerProfilePage: React.FC = () => {
               title="Customer Not Found"
               message={`No customer record exists with ID "${customerId}". Please check the customer ID or perform a search.`}
               action={
-                <Button variant="primary" size="md" onClick={() => navigate('/')} className="rounded-full">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => navigate('/')}
+                  className="rounded-full"
+                >
                   Back to Customer Search
                 </Button>
               }

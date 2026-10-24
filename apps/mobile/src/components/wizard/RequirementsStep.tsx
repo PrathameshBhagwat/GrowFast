@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import {
   CreateOrderItemRequest,
   PickupType,
@@ -88,9 +83,7 @@ export function RequirementsStep({
             photoRequired ? styles.photoRequiredTitleText : styles.photoOptionalTitleText,
           ]}
         >
-          {photoRequired
-            ? '⚠️ Garment Intake Photo Required'
-            : '📷 Intake Photos Optional'}
+          {photoRequired ? '⚠️ Garment Intake Photo Required' : '📷 Intake Photos Optional'}
         </Text>
         <Text style={styles.photoRequirementDesc}>
           {photoRequired
@@ -112,9 +105,7 @@ export function RequirementsStep({
       <View style={styles.noticesCard}>
         <Text style={styles.noticesHeader}>Workshop Intake Notices</Text>
         <Text style={styles.noticeText}>📌 {GARMENT_COLLECTION_NOTICE}</Text>
-        <Text style={[styles.noticeText, { marginTop: 6 }]}>
-          🧼 {STAIN_REMOVAL_NOTICE}
-        </Text>
+        <Text style={[styles.noticeText, { marginTop: 6 }]}>🧼 {STAIN_REMOVAL_NOTICE}</Text>
       </View>
     </ScrollView>
   );

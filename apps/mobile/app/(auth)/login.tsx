@@ -160,9 +160,7 @@ export default function LoginScreen() {
                       <Text style={styles.empIdSub}>{emp.id}</Text>
                     </View>
                     <View style={[styles.roleBadge, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.roleBadgeText, { color: badge.text }]}>
-                        {emp.role}
-                      </Text>
+                      <Text style={[styles.roleBadgeText, { color: badge.text }]}>{emp.role}</Text>
                     </View>
                   </TouchableOpacity>
                 );

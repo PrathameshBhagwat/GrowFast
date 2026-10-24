@@ -146,9 +146,7 @@ export function CustomerStep({
               <Text style={styles.selectedCustomerName}>{selectedCustomer.name}</Text>
               <Text style={styles.selectedCustomerPhone}>📱 {selectedCustomer.phone}</Text>
               {selectedCustomer.customerCode ? (
-                <Text style={styles.selectedCustomerCode}>
-                  ID: {selectedCustomer.customerCode}
-                </Text>
+                <Text style={styles.selectedCustomerCode}>ID: {selectedCustomer.customerCode}</Text>
               ) : null}
             </View>
 
@@ -292,11 +290,14 @@ export function CustomerStep({
       )}
 
       {/* Empty State when search has query but no results */}
-      {isConnected && searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
-        <View style={styles.emptyResults}>
-          <Text style={styles.emptyResultsText}>No customers found matching "{searchQuery}"</Text>
-        </View>
-      )}
+      {isConnected &&
+        searchQuery.trim().length >= 2 &&
+        !isSearching &&
+        searchResults.length === 0 && (
+          <View style={styles.emptyResults}>
+            <Text style={styles.emptyResultsText}>No customers found matching "{searchQuery}"</Text>
+          </View>
+        )}
 
       {/* Create New Customer Toggle / Form */}
       <View style={styles.createCustomerContainer}>

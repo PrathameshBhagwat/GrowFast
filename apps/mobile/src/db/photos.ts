@@ -3,12 +3,7 @@ import { PhotoType } from '@growfast/shared-types';
 import { getDatabase } from './sqlite';
 import { generateUUID } from './drafts';
 
-export type PhotoSyncStatus =
-  | 'PENDING'
-  | 'UPLOADING'
-  | 'UPLOADED'
-  | 'FAILED'
-  | 'FILE_MISSING';
+export type PhotoSyncStatus = 'PENDING' | 'UPLOADING' | 'UPLOADED' | 'FAILED' | 'FILE_MISSING';
 
 export interface PendingPhoto {
   id: string;
@@ -174,10 +169,9 @@ export async function savePhotoLocally(params: {
     ],
   );
 
-  const row = await db.getFirstAsync<RawPhotoRow>(
-    'SELECT * FROM pending_photos WHERE id = ?',
-    [photoId],
-  );
+  const row = await db.getFirstAsync<RawPhotoRow>('SELECT * FROM pending_photos WHERE id = ?', [
+    photoId,
+  ]);
   return mapRowToPhoto(row!);
 }
 
@@ -263,10 +257,9 @@ export async function updatePhotoSyncStatus(
  */
 export async function deletePhoto(id: string): Promise<void> {
   const db = await getDatabase();
-  const photo = await db.getFirstAsync<RawPhotoRow>(
-    'SELECT * FROM pending_photos WHERE id = ?',
-    [id],
-  );
+  const photo = await db.getFirstAsync<RawPhotoRow>('SELECT * FROM pending_photos WHERE id = ?', [
+    id,
+  ]);
   if (photo) {
     const fs = await getFileSystem();
     if (fs && fs.documentDirectory && photo.local_file_uri) {

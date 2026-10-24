@@ -736,7 +736,12 @@ export const HomePage: React.FC = () => {
               onClick={() => setIsFindOrderModalOpen(true)}
               icon={<Search size={15} />}
               aria-label="Find / Edit Order"
-              style={{ minHeight: '38px', whiteSpace: 'nowrap', borderRadius: '9999px', fontSize: '0.825rem' }}
+              style={{
+                minHeight: '38px',
+                whiteSpace: 'nowrap',
+                borderRadius: '9999px',
+                fontSize: '0.825rem',
+              }}
             >
               <span className="hidden sm:inline">Find / Edit Order</span>
               <span className="sm:hidden">Find Order</span>

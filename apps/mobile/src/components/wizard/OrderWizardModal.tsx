@@ -1,13 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  SafeAreaView,
-} from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
 import {
   CustomerDTO,
   CreateOrderItemRequest,
@@ -76,14 +68,17 @@ export function OrderWizardModal({
   );
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<PendingPhoto[]>([]);
-  const [storeConfig, setStoreConfig] = useState<{ expressSurchargePercent?: number | null } | null>(
-    null,
-  );
+  const [storeConfig, setStoreConfig] = useState<{
+    expressSurchargePercent?: number | null;
+  } | null>(null);
 
   // Fetch store config when online
   useEffect(() => {
     if (visible && isConnected) {
-      apiClient.store.getConfig().then(setStoreConfig).catch(() => {});
+      apiClient.store
+        .getConfig()
+        .then(setStoreConfig)
+        .catch(() => {});
     }
   }, [visible, isConnected]);
 
@@ -317,9 +312,7 @@ export function OrderWizardModal({
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>
-            {draft ? 'Edit Order Draft' : 'New Mobile Order'}
-          </Text>
+          <Text style={styles.headerTitle}>{draft ? 'Edit Order Draft' : 'New Mobile Order'}</Text>
 
           <View style={styles.headerRightSpacer} />
         </View>
@@ -332,7 +325,9 @@ export function OrderWizardModal({
                 key={step.key}
                 style={[
                   styles.progressSegment,
-                  idx <= currentStepIndex ? styles.progressSegmentFilled : styles.progressSegmentEmpty,
+                  idx <= currentStepIndex
+                    ? styles.progressSegmentFilled
+                    : styles.progressSegmentEmpty,
                 ]}
               />
             ))}

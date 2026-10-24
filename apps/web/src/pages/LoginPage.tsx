@@ -83,15 +83,17 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen lg:h-screen w-full bg-[#edf3f8] dark:bg-[#0a1122] flex items-center justify-center relative font-sans selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden lg:overflow-hidden transition-colors">
       {/* ── Top-Left: Rounded-Square Theme Toggle ── */}
       <div className="absolute top-6 left-6 sm:top-8 sm:left-8 z-40">
-        <ThemeToggle
-          className="!w-11 !h-11 !rounded-2xl !p-0 shadow-[0_4px_16px_rgba(160,175,200,0.35)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.6)] !border !border-white/90 dark:!border-slate-800/80 !bg-white dark:!bg-[#111a2e] hover:scale-105 active:scale-95 transition-all"
-        />
+        <ThemeToggle className="!w-11 !h-11 !rounded-2xl !p-0 shadow-[0_4px_16px_rgba(160,175,200,0.35)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.6)] !border !border-white/90 dark:!border-slate-800/80 !bg-white dark:!bg-[#111a2e] hover:scale-105 active:scale-95 transition-all" />
       </div>
 
       {/* ── Top-Right: Security Badge ── */}
       <div className="absolute top-6 right-6 sm:top-8 sm:right-8 z-40">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-blue-50/90 dark:bg-blue-950/40 border border-blue-100/90 dark:border-blue-900/50 shadow-[0_2px_8px_rgba(160,175,200,0.2)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
-          <ShieldCheck size={16} strokeWidth={2.2} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <ShieldCheck
+            size={16}
+            strokeWidth={2.2}
+            className="text-blue-600 dark:text-blue-400 shrink-0"
+          />
           <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 tracking-tight">
             Secure staff access
           </span>
@@ -244,10 +246,22 @@ export const LoginPage: React.FC = () => {
             </linearGradient>
 
             <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="12" stdDeviation="16" floodColor="#94a3b8" floodOpacity="0.28" />
+              <feDropShadow
+                dx="0"
+                dy="12"
+                stdDeviation="16"
+                floodColor="#94a3b8"
+                floodOpacity="0.28"
+              />
             </filter>
             <filter id="drumShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#1e3a8a" floodOpacity="0.25" />
+              <feDropShadow
+                dx="0"
+                dy="4"
+                stdDeviation="8"
+                floodColor="#1e3a8a"
+                floodOpacity="0.25"
+              />
             </filter>
           </defs>
 
@@ -283,11 +297,7 @@ export const LoginPage: React.FC = () => {
               strokeWidth="0.5"
             />
             {/* Side Bevel */}
-            <path
-              d="M138 105 L162 88 L162 205 L138 225 Z"
-              fill="#cbd5e1"
-              opacity="0.6"
-            />
+            <path d="M138 105 L162 88 L162 205 L138 225 Z" fill="#cbd5e1" opacity="0.6" />
             {/* Front Main Body */}
             <rect
               x="32"
@@ -304,8 +314,25 @@ export const LoginPage: React.FC = () => {
             <line x1="36" y1="132" x2="134" y2="132" stroke="#cbd5e1" strokeWidth="1" />
 
             {/* Detergent Drawer */}
-            <rect x="44" y="113" width="28" height="12" rx="3" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.75" />
-            <line x1="58" y1="117" x2="58" y2="121" stroke="#94a3b8" strokeWidth="1" strokeLinecap="round" />
+            <rect
+              x="44"
+              y="113"
+              width="28"
+              height="12"
+              rx="3"
+              fill="#ffffff"
+              stroke="#cbd5e1"
+              strokeWidth="0.75"
+            />
+            <line
+              x1="58"
+              y1="117"
+              x2="58"
+              y2="121"
+              stroke="#94a3b8"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
 
             {/* Status LEDs */}
             <circle cx="88" cy="119" r="1.5" fill="#3b82f6" />
@@ -317,7 +344,15 @@ export const LoginPage: React.FC = () => {
             <circle cx="118" cy="119" r="2.5" fill="#3b82f6" />
 
             {/* Front Circular Glass Door & Drum */}
-            <circle cx="85" cy="174" r="36" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="2" filter="url(#drumShadow)" />
+            <circle
+              cx="85"
+              cy="174"
+              r="36"
+              fill="#f8fafc"
+              stroke="#cbd5e1"
+              strokeWidth="2"
+              filter="url(#drumShadow)"
+            />
             <circle cx="85" cy="174" r="30" fill="url(#drumGlass)" />
 
             {/* Drum Glass Water Ripples & Bubbles */}
@@ -340,14 +375,56 @@ export const LoginPage: React.FC = () => {
 
           {/* Stack of 3 Fluffy Folded Towels */}
           <g filter="url(#softShadow)">
-            <rect x="150" y="212" width="76" height="18" rx="9" fill="url(#towelBlue)" stroke="#bfdbfe" strokeWidth="0.75" />
-            <path d="M159 212 C 159 221 159 230 159 230" stroke="#93c5fd" strokeWidth="1" opacity="0.6" />
+            <rect
+              x="150"
+              y="212"
+              width="76"
+              height="18"
+              rx="9"
+              fill="url(#towelBlue)"
+              stroke="#bfdbfe"
+              strokeWidth="0.75"
+            />
+            <path
+              d="M159 212 C 159 221 159 230 159 230"
+              stroke="#93c5fd"
+              strokeWidth="1"
+              opacity="0.6"
+            />
 
-            <rect x="154" y="196" width="70" height="17" rx="8.5" fill="url(#towelWhite)" stroke="#e2e8f0" strokeWidth="0.75" />
-            <path d="M162 196 C 162 204 162 213 162 213" stroke="#cbd5e1" strokeWidth="1" opacity="0.6" />
+            <rect
+              x="154"
+              y="196"
+              width="70"
+              height="17"
+              rx="8.5"
+              fill="url(#towelWhite)"
+              stroke="#e2e8f0"
+              strokeWidth="0.75"
+            />
+            <path
+              d="M162 196 C 162 204 162 213 162 213"
+              stroke="#cbd5e1"
+              strokeWidth="1"
+              opacity="0.6"
+            />
 
-            <rect x="158" y="180" width="64" height="17" rx="8.5" fill="url(#towelBlue)" stroke="#bfdbfe" strokeWidth="0.75" />
-            <path d="M166 180 C 166 188 166 197 166 197" stroke="#93c5fd" strokeWidth="1" opacity="0.6" />
+            <rect
+              x="158"
+              y="180"
+              width="64"
+              height="17"
+              rx="8.5"
+              fill="url(#towelBlue)"
+              stroke="#bfdbfe"
+              strokeWidth="0.75"
+            />
+            <path
+              d="M166 180 C 166 188 166 197 166 197"
+              stroke="#93c5fd"
+              strokeWidth="1"
+              opacity="0.6"
+            />
           </g>
         </svg>
       </div>
@@ -576,7 +653,11 @@ export const LoginPage: React.FC = () => {
               <div className="flex items-center gap-3 mt-4 sm:mt-5 pt-1">
                 <div className="flex-1 h-px bg-slate-200/90 dark:bg-slate-800" />
                 <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase shrink-0">
-                  <Shield size={13} strokeWidth={2.5} className="text-blue-600 dark:text-blue-500" />
+                  <Shield
+                    size={13}
+                    strokeWidth={2.5}
+                    className="text-blue-600 dark:text-blue-500"
+                  />
                   <span>SECURE STAFF PORTAL</span>
                 </div>
                 <div className="flex-1 h-px bg-slate-200/90 dark:bg-slate-800" />

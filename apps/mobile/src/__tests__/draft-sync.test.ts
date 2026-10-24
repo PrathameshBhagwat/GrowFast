@@ -147,7 +147,16 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
     await migrationDb.runAsync(
       `INSERT INTO order_drafts (id, client_draft_id, store_id, customer_name, customer_phone, payload_json, sync_status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?)`,
-      ['id-1', 'draft-v1', 'store-1', 'Legacy User', '9999999999', '{}', '2026-10-01', '2026-10-01'],
+      [
+        'id-1',
+        'draft-v1',
+        'store-1',
+        'Legacy User',
+        '9999999999',
+        '{}',
+        '2026-10-01',
+        '2026-10-01',
+      ],
     );
 
     // Step 2: Run Version 2
@@ -162,13 +171,19 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
     await MIGRATIONS[2].up(migrationDb as any);
 
     // Verify existing data preserved
-    const draftRows = await migrationDb.getAllAsync<any>('SELECT * FROM order_drafts WHERE client_draft_id = ?', ['draft-v1']);
+    const draftRows = await migrationDb.getAllAsync<any>(
+      'SELECT * FROM order_drafts WHERE client_draft_id = ?',
+      ['draft-v1'],
+    );
     assert.equal(draftRows.length, 1);
     assert.equal(draftRows[0].customer_name, 'Legacy User');
     assert.equal(draftRows[0].server_order_id, null); // New column present and nullable
     assert.equal(draftRows[0].retry_count, null);
 
-    const photoRows = await migrationDb.getAllAsync<any>('SELECT * FROM pending_photos WHERE client_draft_id = ?', ['draft-v1']);
+    const photoRows = await migrationDb.getAllAsync<any>(
+      'SELECT * FROM pending_photos WHERE client_draft_id = ?',
+      ['draft-v1'],
+    );
     assert.equal(photoRows.length, 1);
     assert.equal(photoRows[0].server_photo_id, null);
   });
@@ -365,16 +380,17 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
       createCallCount++;
       // Artificial delay to simulate in-flight request
       await new Promise((res) => setTimeout(res, 30));
-      return { id: 'ord-concurrent-404', orderNumber: 'T-404', clientDraftId: payload.clientDraftId } as any;
+      return {
+        id: 'ord-concurrent-404',
+        orderNumber: 'T-404',
+        clientDraftId: payload.clientDraftId,
+      } as any;
     };
 
     const engine = new SyncEngine();
 
     // Trigger two sync calls concurrently
-    const [p1, p2] = await Promise.all([
-      engine.syncDraft(draftId),
-      engine.syncDraft(draftId),
-    ]);
+    const [p1, p2] = await Promise.all([engine.syncDraft(draftId), engine.syncDraft(draftId)]);
 
     // One succeeds, second is blocked by lock
     assert.equal(createCallCount, 1);
@@ -413,7 +429,10 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
       throw new ApiError('Not found', 404);
     };
     apiClient.orders.create = async () => {
-      throw new ApiError('Client draft ID was already submitted with different payload details.', 409);
+      throw new ApiError(
+        'Client draft ID was already submitted with different payload details.',
+        409,
+      );
     };
 
     const engine = new SyncEngine();
@@ -497,7 +516,12 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
       clientDraftId: draftId,
       storeId: 'store-1',
       customerName: 'Photo User',
-      payload: { customerId: 'c1', isExpress: false, pickupType: PickupType.STORE_PICKUP, items: [] },
+      payload: {
+        customerId: 'c1',
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [],
+      },
     });
 
     const photo = await savePhotoLocally({

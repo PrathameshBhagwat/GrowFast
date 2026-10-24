@@ -195,7 +195,9 @@ export function PaymentModal({
         <div className="bg-[var(--bg-surface-inset)] p-4 rounded-2xl space-y-2 mb-4 border border-[var(--border)] shadow-[var(--shadow-neu-inset)]">
           <div className="flex justify-between text-sm">
             <span className="text-[var(--text-secondary)]">Order Total</span>
-            <span className="font-medium font-mono text-[var(--text-primary)]">₹{order.totalAmount.toFixed(2)}</span>
+            <span className="font-medium font-mono text-[var(--text-primary)]">
+              ₹{order.totalAmount.toFixed(2)}
+            </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-[var(--text-secondary)]">Already Paid</span>
@@ -205,7 +207,9 @@ export function PaymentModal({
           </div>
           <div className="flex justify-between text-sm pt-2 border-t border-[var(--border)]">
             <span className="font-bold text-[var(--text-primary)]">Current Balance Due</span>
-            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">₹{order.amountDue.toFixed(2)}</span>
+            <span className="font-bold text-rose-600 dark:text-rose-400 font-mono">
+              ₹{order.amountDue.toFixed(2)}
+            </span>
           </div>
         </div>
 

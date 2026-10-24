@@ -154,9 +154,10 @@ export const TagPreviewModal: React.FC<TagPreviewModalProps> = ({
           <div className="no-print flex items-center justify-between text-xs text-[var(--text-secondary)] px-1">
             <span className="flex items-center gap-1.5">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-              Physical target:{' '}
-              <strong className="text-[var(--text-primary)]">40 mm × 40 mm</strong> (1:1
-              square washable cloth)
+              Physical target: <strong className="text-[var(--text-primary)]">
+                40 mm × 40 mm
+              </strong>{' '}
+              (1:1 square washable cloth)
             </span>
             <span>Target Scale: 100% (No auto-shrink)</span>
           </div>

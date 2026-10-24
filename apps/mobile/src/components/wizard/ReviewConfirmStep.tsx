@@ -230,8 +230,8 @@ export function ReviewConfirmStep({
         <View style={styles.offlineNotice}>
           <Text style={styles.offlineNoticeTitle}>Device is Offline</Text>
           <Text style={styles.offlineNoticeText}>
-            Submitting will queue this draft in your local SQLite queue. It will synchronize automatically
-            and receive an official server order number when you reconnect.
+            Submitting will queue this draft in your local SQLite queue. It will synchronize
+            automatically and receive an official server order number when you reconnect.
           </Text>
         </View>
       )}
@@ -304,7 +304,8 @@ export function ReviewConfirmStep({
         <Text style={styles.cardMainText}>{photos.length} photo(s) attached to draft</Text>
         {photoRequired && photos.length === 0 && (
           <Text style={styles.missingPhotoAlert}>
-            ⚠️ Mandatory walk-in photo is currently missing. Please attach a photo before submitting.
+            ⚠️ Mandatory walk-in photo is currently missing. Please attach a photo before
+            submitting.
           </Text>
         )}
       </View>

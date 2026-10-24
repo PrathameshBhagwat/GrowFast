@@ -3,6 +3,7 @@
 ## 1. Overview & Architecture
 
 The GrowFast system enforces a strict "Single Source of Truth" architectural principle:
+
 - **Shared Business Contracts**: All pricing formulas, order status state machines, category compatibility matrices, and SLA holiday rules are centralized in `packages/shared-types`.
 - **Zero Redefinition Rule**: Neither frontend (`apps/web`), mobile (`apps/mobile`), nor backend (`apps/backend`) is permitted to duplicate or manually override these algorithms (Rule 14 & Rule 16 in `AGENTS.md`).
 - **Server Authority**: While client applications compute optimistic pricing previews for UX responsiveness, the backend executes an identical server-side recalculation within an atomic database transaction prior to committing records.
@@ -14,23 +15,27 @@ The GrowFast system enforces a strict "Single Source of Truth" architectural pri
 Source: `packages/shared-types/src/order-status.ts`
 
 ### 2.1 Core Invariant
+
 **Order status is NEVER set directly by any API call or database mutation.** Instead, order status is a pure derived property computed deterministically from the discrete statuses of all non-cancelled items in the order.
 
 ### 2.2 Item Progression Hierarchy
+
 The system defines a linear progress index for garment items:
+
 ```typescript
 const ITEM_PROGRESSION = [
-  ItemStatus.RECEIVED,       // Index 0: Order accepted at counter
-  ItemStatus.PROCESSING,     // Index 1: Washing / dry cleaning in progress
-  ItemStatus.QUALITY_CHECK,  // Index 2: Post-wash inspection & ironing
-  ItemStatus.READY,          // Index 3: Tagged, bagged, and ready for pickup
-  ItemStatus.DELIVERED,      // Index 4: Handed over to customer or rider
+  ItemStatus.RECEIVED, // Index 0: Order accepted at counter
+  ItemStatus.PROCESSING, // Index 1: Washing / dry cleaning in progress
+  ItemStatus.QUALITY_CHECK, // Index 2: Post-wash inspection & ironing
+  ItemStatus.READY, // Index 3: Tagged, bagged, and ready for pickup
+  ItemStatus.DELIVERED, // Index 4: Handed over to customer or rider
 ];
 ```
 
 ### 2.3 Derivation Algorithm
+
 ```typescript
-export function deriveOrderStatus(ctx: OrderStatusDerivationContext): OrderStatus
+export function deriveOrderStatus(ctx: OrderStatusDerivationContext): OrderStatus;
 ```
 
 1. **Empty Order**: If `items.length === 0`, return `OrderStatus.RECEIVED`.
@@ -54,6 +59,7 @@ export function deriveOrderStatus(ctx: OrderStatusDerivationContext): OrderStatu
 Source: `packages/shared-types/src/pricing.ts`
 
 ### 3.1 Order Total Pipeline
+
 ```
 Subtotal (Σ line_items)
    │
@@ -76,13 +82,16 @@ Total Order Amount (rounded half-up)
 ### 3.2 Canonical Formulas & Code Implementation
 
 #### 1. Line Item Subtotal
+
 For weight-based laundry:
 $$\text{LineTotal} = \text{roundCurrency}(\text{unitPrice} \times \text{weight})$$
 For piece-based dry cleaning:
 $$\text{LineTotal} = \text{roundCurrency}(\text{unitPrice} \times \text{quantity})$$
 
 #### 2. Half-Up Currency Rounding
+
 Corrects IEEE 754 64-bit binary floating-point representation errors:
+
 ```typescript
 export function roundCurrency(val: number): number {
   return Math.round((val + 1e-9) * 100) / 100;
@@ -90,7 +99,9 @@ export function roundCurrency(val: number): number {
 ```
 
 #### 3. Express Surcharge Multipliers
+
 Source: `getExpressMultiplier(option)`
+
 - **Same-Day Delivery**: `2.0×` the store's configured express rate.
 - **Next-Day Evening Delivery**: `1.5×` the store's configured express rate.
 - **Regular Delivery**: `0×` (No surcharge applied).
@@ -99,6 +110,7 @@ $$\text{BaseSurcharge} = \text{roundCurrency}\left(\frac{\text{DiscountedSubtota
 $$\text{ExpressSurcharge} = \text{roundCurrency}(\text{BaseSurcharge} \times \text{Multiplier})$$
 
 #### 4. Tax (18% GST)
+
 Under Indian tax compliance rules for laundry services, GST is charged at **18%** and is assessed on the entire service fee including express delivery additions:
 $$\text{TaxableAmount} = \text{roundCurrency}(\text{DiscountedSubtotal} + \text{ExpressSurcharge})$$
 $$\text{TaxAmount} = \text{roundCurrency}(\text{TaxableAmount} \times 0.18)$$
@@ -127,15 +139,15 @@ Source: `packages/shared-types/src/catalog.ts`
 
 GrowFast operates two distinct business workflows with strict separation:
 
-| Rule | `LAUNDRY` Workflow | `DRY_CLEANING` Workflow |
-| :--- | :--- | :--- |
-| **Primary Unit** | Weight (kg) or Batch pieces | Strictly Per-Piece with individual tags |
-| **Minimum Weight** | Minimum **2.00 kg** threshold for weight-based washing | N/A (Weight mode strictly disallowed) |
-| **Allowed Services** | Wash & Steam Iron, Wash & Fold, Standard Wash, Premium Laundry, Starching | Dry Clean, Steam Iron, Starching, Shoe Cleaning |
-| **Excluded Services** | Dry Clean strictly disallowed | Wash & Fold, Wash & Steam Iron strictly disallowed |
-| **Global Exclusions** | "Free Shoe" and "Reprocess Cleaning" hidden from all operator menus | Same |
-| **Starching Limitation** | Allowed ONLY for: `MEN`, `WOMEN`, `KIDS` | Same |
-| **Shoe Category** | Hides: Steam Iron, Wash + Steam Iron, Starching | Same |
+| Rule                     | `LAUNDRY` Workflow                                                        | `DRY_CLEANING` Workflow                            |
+| :----------------------- | :------------------------------------------------------------------------ | :------------------------------------------------- |
+| **Primary Unit**         | Weight (kg) or Batch pieces                                               | Strictly Per-Piece with individual tags            |
+| **Minimum Weight**       | Minimum **2.00 kg** threshold for weight-based washing                    | N/A (Weight mode strictly disallowed)              |
+| **Allowed Services**     | Wash & Steam Iron, Wash & Fold, Standard Wash, Premium Laundry, Starching | Dry Clean, Steam Iron, Starching, Shoe Cleaning    |
+| **Excluded Services**    | Dry Clean strictly disallowed                                             | Wash & Fold, Wash & Steam Iron strictly disallowed |
+| **Global Exclusions**    | "Free Shoe" and "Reprocess Cleaning" hidden from all operator menus       | Same                                               |
+| **Starching Limitation** | Allowed ONLY for: `MEN`, `WOMEN`, `KIDS`                                  | Same                                               |
+| **Shoe Category**        | Hides: Steam Iron, Wash + Steam Iron, Starching                           | Same                                               |
 
 ---
 

@@ -3,6 +3,7 @@
 ## 1. Overview & Architecture
 
 The GrowFast data persistence architecture is divided into two distinct, coordinated tiers:
+
 1. **Authoritative Server Database**: PostgreSQL 16 managed via Prisma ORM 5.20.0 (`apps/backend/` and `prisma/schema.prisma`). It enforces relational integrity, foreign key cascades, tenant boundaries, composite unique constraints, financial ledger consistency, and sequential business numbering.
 2. **Transient Mobile Edge Database**: SQLite managed via `expo-sqlite` 15.1.4 with a custom transactional migration runner (`apps/mobile/src/db/sqlite.ts`). It handles offline order staging, draft queues, retry backoff tracking, local photo disk mapping, and optimistic order draft creation.
 
@@ -53,7 +54,9 @@ erDiagram
 The schema defines **16 relational models** and **17 enumerated types**.
 
 #### 1. `Store` (`stores`)
+
 Tenant boundary for multi-branch operations.
+
 - `id` (String, PK, cuid)
 - `name` (String)
 - `address`, `phone` (String, nullable)
@@ -63,7 +66,9 @@ Tenant boundary for multi-branch operations.
 - `createdAt`, `updatedAt` (DateTime)
 
 #### 2. `Employee` (`employees`)
+
 Staff members and operators authenticated via PIN.
+
 - `id` (String, PK, cuid)
 - `name` (String)
 - `phone` (String, nullable)
@@ -75,7 +80,9 @@ Staff members and operators authenticated via PIN.
 - **Indexes**: `@@index([storeId])`, `@@index([role])`, `@@index([isActive])`
 
 #### 3. `Customer` (`customers`)
+
 Master directory of laundry patrons.
+
 - `id` (String, PK, cuid)
 - `name` (String)
 - `phone` (String, unique): Primary lookup and WhatsApp messaging key.
@@ -88,7 +95,9 @@ Master directory of laundry patrons.
 - **Indexes**: `@@index([customerCode])`, `@@index([phone])`, `@@index([name])`
 
 #### 4. `GarmentCatalog` (`garment_catalog`)
+
 Master list of washable articles and items.
+
 - `id` (String, PK, cuid)
 - `name` (String, e.g., "Men Shirt", "Silk Saree", "Double Blanket")
 - `category` (GarmentCategory enum: `MEN`, `WOMEN`, `KIDS`, `HOUSEHOLD`, `SHOES`, `SPECIAL`, `WEIGHT_BASED`, `OTHERS`, `HOME_CLEANING`)
@@ -98,7 +107,9 @@ Master list of washable articles and items.
 - **Indexes**: `@@index([category])`, `@@index([storeId])`
 
 #### 5. `ServiceType` (`service_types`)
+
 Processing treatments available for garments.
+
 - `id` (String, PK, cuid)
 - `name` (String, e.g., "Steam Press", "Dry Cleaning", "Wash & Fold")
 - `category` (ServiceCategory enum: `DRY_CLEAN`, `STEAM_PRESS`, `WASH`, `WASH_IRON`, `SHOE_CLEAN`, `LEATHER_CLEAN`, `STAIN_REMOVAL`, `WEIGHT_BASED`)
@@ -108,7 +119,9 @@ Processing treatments available for garments.
 - **Indexes**: `@@index([category])`, `@@index([storeId])`
 
 #### 6. `ServiceGarmentPrice` (`service_garment_prices`)
+
 The pricing matrix resolving `GarmentCatalog × ServiceType × Store`.
+
 - `id` (String, PK, cuid)
 - `garmentCatalogId` (String, FK -> `garment_catalog.id`, onDelete: Cascade)
 - `serviceTypeId` (String, FK -> `service_types.id`, onDelete: Cascade)
@@ -118,7 +131,9 @@ The pricing matrix resolving `GarmentCatalog × ServiceType × Store`.
 - **Indexes**: `@@index([garmentCatalogId])`, `@@index([serviceTypeId])`, `@@index([storeId])`
 
 #### 7. `Order` (`orders`)
+
 The central business document of the system.
+
 - `id` (String, PK, cuid)
 - `orderNumber` (String, unique): Formatted identifier (e.g., `ORD-20261023-0001`).
 - `customerId` (String, FK -> `customers.id`)
@@ -152,7 +167,9 @@ The central business document of the system.
 - **Indexes**: `@@index([customerId])`, `@@index([status])`, `@@index([paymentStatus])`, `@@index([orderDate])`, `@@index([storeId])`, `@@index([createdById])`, `@@index([deliveredById])`
 
 #### 8. `OrderItem` (`order_items`)
+
 Line item grouping inside an order.
+
 - `id` (String, PK, cuid)
 - `orderId` (String, FK -> `orders.id`, onDelete: Cascade)
 - `garmentCatalogId` (String, FK -> `garment_catalog.id`)
@@ -169,7 +186,9 @@ Line item grouping inside an order.
 - **Indexes**: `@@index([orderId])`, `@@index([itemStatus])`
 
 #### 9. `PhysicalGarment` (`physical_garments`)
+
 Individual garment unit tracking (e.g. 5 shirts expand into 5 physical garment rows).
+
 - `id` (String, PK, cuid)
 - `orderItemId` (String, FK -> `order_items.id`, onDelete: Cascade)
 - `unitNumber` (Int): 1-indexed count within line item (`1, 2, ..., quantity`).
@@ -182,7 +201,9 @@ Individual garment unit tracking (e.g. 5 shirts expand into 5 physical garment r
 - **Indexes**: `@@index([orderItemId])`, `@@index([tagId])`
 
 #### 10. `OrderPhoto` (`order_photos`)
+
 Visual documentation of garment conditions, defects, tags, and delivery proof.
+
 - `id` (String, PK, cuid)
 - `orderId` (String, FK -> `orders.id`, onDelete: Cascade)
 - `orderItemId` (String, FK -> `order_items.id`, onDelete: SetNull, nullable)
@@ -193,7 +214,9 @@ Visual documentation of garment conditions, defects, tags, and delivery proof.
 - **Indexes**: `@@index([orderId])`, `@@index([orderItemId])`, `@@index([physicalGarmentId])`
 
 #### 11. `Payment` (`payments`)
+
 Financial transaction ledger for order settlements.
+
 - `id` (String, PK, cuid)
 - `orderId` (String, FK -> `orders.id`, onDelete: Cascade)
 - `amount` (Float): Tendered currency amount.
@@ -205,7 +228,9 @@ Financial transaction ledger for order settlements.
 - **Indexes**: `@@index([orderId])`
 
 #### 12. `FinancialAdjustment` (`financial_adjustments`)
+
 Compensations, credit notes, and post-order refunds.
+
 - `id` (String, PK, cuid)
 - `orderId` (String, FK -> `orders.id`, onDelete: Cascade)
 - `type` (AdjustmentType enum: `REFUND`, `STORE_CREDIT`)
@@ -217,7 +242,9 @@ Compensations, credit notes, and post-order refunds.
 - **Indexes**: `@@index([orderId])`, `@@index([createdById])`
 
 #### 13. `DeliveryRecord` (`delivery_records`)
+
 Logistics dispatch tracking for home deliveries.
+
 - `id` (String, PK, cuid)
 - `orderId` (String, FK -> `orders.id`, onDelete: Cascade)
 - `address` (String)
@@ -229,7 +256,9 @@ Logistics dispatch tracking for home deliveries.
 - **Indexes**: `@@index([orderId])`, `@@index([riderId])`, `@@index([status])`
 
 #### 14. `Notification` (`notifications`)
+
 Transactional customer message audit log.
+
 - `id` (String, PK, cuid)
 - `storeId` (String, FK -> `stores.id`)
 - `orderId`, `customerId` (String, nullable)
@@ -244,7 +273,9 @@ Transactional customer message audit log.
 - **Indexes**: `@@index([storeId])`, `@@index([orderId])`, `@@index([eventType])`, `@@index([status])`
 
 #### 15. `TagTemplate` (`tag_templates`)
+
 Thermal printer format layout specifications (40×40 mm garment labels).
+
 - `id` (String, PK, cuid)
 - `storeId` (String, FK -> `stores.id`, onDelete: Cascade)
 - `name` (String, default: "Default 40x40 mm Tag")
@@ -254,7 +285,9 @@ Thermal printer format layout specifications (40×40 mm garment labels).
 - **Indexes**: `@@index([storeId])`, `@@index([storeId, isActive])`
 
 #### 16. `BusinessSequence` (`business_sequences`)
+
 Atomic sequence counter for generating human-readable identifiers (`GF-XXXXXX`, `ORD-YYYYMMDD-XXXX`).
+
 - `name` (String, PK, e.g. "order_number_seq", "tag_id_seq")
 - `currentVal` (Int, default: 0)
 - `updatedAt` (DateTime)
@@ -268,7 +301,9 @@ Implemented in `apps/mobile/src/db/sqlite.ts` utilizing `expo-sqlite` 15.1.4:
 ### 3.1 SQLite Tables
 
 #### `schema_migrations`
+
 Tracks applied migration steps on the physical device.
+
 ```sql
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,
@@ -278,7 +313,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 ```
 
 #### `order_drafts`
+
 Staged order payloads created when mobile devices are offline.
+
 ```sql
 CREATE TABLE IF NOT EXISTS order_drafts (
   id TEXT PRIMARY KEY,
@@ -308,7 +345,9 @@ CREATE INDEX IF NOT EXISTS idx_order_drafts_server_order ON order_drafts(server_
 ```
 
 #### `pending_photos`
+
 Staged camera image files stored on native disk pending Cloudflare R2 upload.
+
 ```sql
 CREATE TABLE IF NOT EXISTS pending_photos (
   id TEXT PRIMARY KEY,
@@ -336,15 +375,15 @@ CREATE INDEX IF NOT EXISTS idx_pending_photos_server_order ON pending_photos(ser
 
 ## 4. State Authority & Data Lifecycle Comparison
 
-| Attribute | PostgreSQL (Server Authority) | SQLite (Mobile Edge) |
-| :--- | :--- | :--- |
-| **Persistence Duration** | Permanent, audit-trailed, backed up | Ephemeral / Staging until confirmed sync |
-| **Financial Ledger** | Strictly authoritative, unit-tested, GST audited | Preview calculations only; reconciles with server |
-| **Order Status** | Canonical derived via `deriveOrderStatus()` | Cached mirror from server response |
-| **Order Number** | Canonical `ORD-YYYYMMDD-XXXX` | Temporary client draft UUID (`clientDraftId`) |
-| **Photos** | Cloudflare R2 public CDN URLs | `file:///...` native cache storage |
-| **Garment Tags** | Canonical `GF-XXXXXX` generated in DB transaction | Null or pending tag placeholder |
-| **Payment Records** | Enforced unique `idempotencyKey` | Staged payment payload |
+| Attribute                | PostgreSQL (Server Authority)                     | SQLite (Mobile Edge)                              |
+| :----------------------- | :------------------------------------------------ | :------------------------------------------------ |
+| **Persistence Duration** | Permanent, audit-trailed, backed up               | Ephemeral / Staging until confirmed sync          |
+| **Financial Ledger**     | Strictly authoritative, unit-tested, GST audited  | Preview calculations only; reconciles with server |
+| **Order Status**         | Canonical derived via `deriveOrderStatus()`       | Cached mirror from server response                |
+| **Order Number**         | Canonical `ORD-YYYYMMDD-XXXX`                     | Temporary client draft UUID (`clientDraftId`)     |
+| **Photos**               | Cloudflare R2 public CDN URLs                     | `file:///...` native cache storage                |
+| **Garment Tags**         | Canonical `GF-XXXXXX` generated in DB transaction | Null or pending tag placeholder                   |
+| **Payment Records**      | Enforced unique `idempotencyKey`                  | Staged payment payload                            |
 
 ---
 

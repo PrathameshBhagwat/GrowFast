@@ -55,7 +55,9 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   const host = process.env.HOST || '0.0.0.0';
   await app.listen(port, host);
-  console.log(`🚀 Backend running on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api`);
+  console.log(
+    `🚀 Backend running on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api`,
+  );
 }
 
 bootstrap();

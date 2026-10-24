@@ -76,14 +76,8 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                       ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                       : 'var(--bg-surface-inset)',
                   border: i <= currentStep ? '1px solid #2563eb' : '1px solid var(--border)',
-                  boxShadow:
-                    i <= currentStep
-                      ? '0 2px 6px rgba(37, 99, 235, 0.35)'
-                      : 'none',
-                  color:
-                    i <= currentStep
-                      ? '#ffffff'
-                      : 'var(--text-muted)',
+                  boxShadow: i <= currentStep ? '0 2px 6px rgba(37, 99, 235, 0.35)' : 'none',
+                  color: i <= currentStep ? '#ffffff' : 'var(--text-muted)',
                   transition: 'all 300ms ease',
                 }}
               >
@@ -94,8 +88,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                   style={{
                     flex: 1,
                     height: '2px',
-                    background:
-                      i < currentStep ? '#2563eb' : 'var(--border)',
+                    background: i < currentStep ? '#2563eb' : 'var(--border)',
                     borderRadius: '1px',
                     transition: 'background 300ms ease',
                   }}

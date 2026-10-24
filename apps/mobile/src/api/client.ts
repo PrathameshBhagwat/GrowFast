@@ -171,20 +171,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (!response.ok) {
     const errorMessage =
-      responseData?.message ||
-      responseData?.error ||
-      `Request failed with HTTP ${response.status}`;
+      responseData?.message || responseData?.error || `Request failed with HTTP ${response.status}`;
     const formattedError = Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage;
 
     console.warn(
       `[apiClient] HTTP ${response.status} on [${options.method || 'GET'} ${cleanEndpoint}]: ${formattedError}`,
     );
 
-    throw new ApiError(
-      formattedError,
-      response.status,
-      responseData,
-    );
+    throw new ApiError(formattedError, response.status, responseData);
   }
 
   // Handle standard { success: true, data: T } wrapper or raw object
@@ -229,7 +223,9 @@ export const apiClient = {
 
     getDirectory: async (roles?: string[]) => {
       const qs = roles && roles.length > 0 ? `?roles=${encodeURIComponent(roles.join(','))}` : '';
-      return await request<{ id: string; name: string; role: string }[]>(`/api/auth/directory${qs}`);
+      return await request<{ id: string; name: string; role: string }[]>(
+        `/api/auth/directory${qs}`,
+      );
     },
   },
 
@@ -245,7 +241,9 @@ export const apiClient = {
       if (query) params.append('query', query);
       params.append('page', String(page));
       params.append('pageSize', String(pageSize));
-      return await request<PaginatedResponse<CustomerDTO>>(`/api/customers/search?${params.toString()}`);
+      return await request<PaginatedResponse<CustomerDTO>>(
+        `/api/customers/search?${params.toString()}`,
+      );
     },
 
     create: async (payload: CreateCustomerRequest): Promise<CustomerDTO> => {
@@ -271,8 +269,12 @@ export const apiClient = {
       return await request<ServiceTypeDTO[]>(url);
     },
 
-    getPricing: async (): Promise<{ id: string; garmentCatalogId: string; serviceTypeId: string; price: number }[]> => {
-      return await request<{ id: string; garmentCatalogId: string; serviceTypeId: string; price: number }[]>('/api/pricing');
+    getPricing: async (): Promise<
+      { id: string; garmentCatalogId: string; serviceTypeId: string; price: number }[]
+    > => {
+      return await request<
+        { id: string; garmentCatalogId: string; serviceTypeId: string; price: number }[]
+      >('/api/pricing');
     },
   },
 
@@ -361,8 +363,7 @@ export const apiClient = {
       formData.append('orderId', params.orderId);
       formData.append('type', params.photoType);
       if (params.orderItemId) formData.append('orderItemId', params.orderItemId);
-      if (params.physicalGarmentId)
-        formData.append('physicalGarmentId', params.physicalGarmentId);
+      if (params.physicalGarmentId) formData.append('physicalGarmentId', params.physicalGarmentId);
 
       if (params.file) {
         formData.append('file', params.file);

@@ -10,10 +10,7 @@ import {
   updateDraftSyncStatus,
   generateUUID,
 } from '../db/drafts';
-import {
-  savePhotoLocally,
-  getPhotosForDraft,
-} from '../db/photos';
+import { savePhotoLocally, getPhotosForDraft } from '../db/photos';
 import { SyncEngine } from '../services/sync-engine';
 import { apiClient, ApiError } from '../api/client';
 import { saveAuthToken, removeAuthToken } from '../storage/secure-store';
@@ -453,7 +450,14 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
         customerId: 'cust-offline',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-wash-iron', quantity: 3, unitPrice: 40 }],
+        items: [
+          {
+            garmentCatalogId: 'cat-shirt',
+            serviceTypeId: 'srv-wash-iron',
+            quantity: 3,
+            unitPrice: 40,
+          },
+        ],
       },
     });
 
@@ -483,7 +487,14 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
         customerId: 'cust-kavita',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'cat-saree', serviceTypeId: 'srv-dry-clean', quantity: 1, unitPrice: 180 }],
+        items: [
+          {
+            garmentCatalogId: 'cat-saree',
+            serviceTypeId: 'srv-dry-clean',
+            quantity: 1,
+            unitPrice: 180,
+          },
+        ],
       },
     });
 
@@ -533,7 +544,14 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
         customerId: 'cust-naveen',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-wash-iron', quantity: 1, unitPrice: 40 }],
+        items: [
+          {
+            garmentCatalogId: 'cat-shirt',
+            serviceTypeId: 'srv-wash-iron',
+            quantity: 1,
+            unitPrice: 40,
+          },
+        ],
       },
     });
 
@@ -622,7 +640,14 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
         customerId: 'cust-conflict',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-wash-iron', quantity: 1, unitPrice: 50 }],
+        items: [
+          {
+            garmentCatalogId: 'cat-shirt',
+            serviceTypeId: 'srv-wash-iron',
+            quantity: 1,
+            unitPrice: 50,
+          },
+        ],
       },
     });
 
@@ -643,7 +668,11 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
     const draft = await getDraft(draftId);
     assert.ok(draft);
     assert.equal(draft.syncStatus, 'CONFLICT');
-    assert.equal(draft.payload.items.length, 1, 'Draft contents must be completely preserved on conflict');
+    assert.equal(
+      draft.payload.items.length,
+      1,
+      'Draft contents must be completely preserved on conflict',
+    );
   });
 
   // 17. Authentication expiry and recoverable failures
@@ -660,7 +689,14 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
         customerId: 'cust-auth',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-wash-iron', quantity: 1, unitPrice: 50 }],
+        items: [
+          {
+            garmentCatalogId: 'cat-shirt',
+            serviceTypeId: 'srv-wash-iron',
+            quantity: 1,
+            unitPrice: 50,
+          },
+        ],
       },
     });
 
@@ -705,7 +741,14 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
         customerId: 'cust-offline-temp',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'cat-shirt', serviceTypeId: 'srv-wash-iron', quantity: 2, unitPrice: 40 }],
+        items: [
+          {
+            garmentCatalogId: 'cat-shirt',
+            serviceTypeId: 'srv-wash-iron',
+            quantity: 2,
+            unitPrice: 40,
+          },
+        ],
       },
     });
 

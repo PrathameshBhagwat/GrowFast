@@ -115,7 +115,10 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
         <div className="grid grid-cols-2 gap-4">
           {isWeightBased ? (
             <div>
-              <label htmlFor="item-weight" className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+              <label
+                htmlFor="item-weight"
+                className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5"
+              >
                 Weight (kg)
               </label>
               <div className="relative">
@@ -160,7 +163,9 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-2.5 min-h-[44px] text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-[var(--bg-surface-hover)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed"
               />
               {hasPhysicalGarments && (
-                <span className="text-xs text-[var(--text-muted)] mt-1 block">Fixed by physical garments</span>
+                <span className="text-xs text-[var(--text-muted)] mt-1 block">
+                  Fixed by physical garments
+                </span>
               )}
             </div>
           )}
@@ -181,14 +186,18 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-2.5 min-h-[44px] text-[var(--text-primary)] shadow-[var(--shadow-neu-inset)] focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
             {isWeightBased && (
-              <span className="text-xs text-[var(--text-muted)] mt-1 block">1 = full batch delivered</span>
+              <span className="text-xs text-[var(--text-muted)] mt-1 block">
+                1 = full batch delivered
+              </span>
             )}
           </div>
         </div>
 
         {hasPhysicalGarments ? (
           <div>
-            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Status</label>
+            <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+              Status
+            </label>
             <div
               id="derived-item-status"
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] p-3 text-sm font-medium text-[var(--text-primary)] min-h-[44px] flex items-center justify-between shadow-[var(--shadow-neu-inset)]"
@@ -218,7 +227,9 @@ export const OrderItemEditModal: React.FC<OrderItemEditModalProps> = ({
         />
 
         <div>
-          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">Defect Notes</label>
+          <label className="block text-sm font-semibold text-[var(--text-primary)] mb-1.5">
+            Defect Notes
+          </label>
           <textarea
             value={defectNotes}
             onChange={(e) => setDefectNotes(e.target.value)}

@@ -506,9 +506,7 @@ export const ItemSelector: React.FC<ItemSelectorProps> = ({
                 key={garment.id}
                 onClick={() => handleGarmentClick(garment)}
                 className={`flex flex-col justify-between group transition-all cursor-pointer ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 shadow-md scale-[1.01]'
-                    : 'hover:scale-[1.01]'
+                  isSelected ? 'ring-2 ring-blue-500 shadow-md scale-[1.01]' : 'hover:scale-[1.01]'
                 }`}
                 style={{
                   background: 'var(--bg-surface)',
