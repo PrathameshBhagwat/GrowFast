@@ -115,41 +115,72 @@ export class SyncEngine {
       }
 
       // 4.5 Resolve customer if created offline with temporary ID
-      const needsCustomerResolution =
-        !draft.payload.customerId ||
-        draft.payload.customerId === 'cust-offline-temp' ||
-        draft.payload.customerId.startsWith('temp-');
+      const isTemporaryCustomerId = (id?: string | null): boolean => {
+        if (!id) return true;
+        const lower = id.trim().toLowerCase();
+        return (
+          lower === 'cust-offline-temp' ||
+          lower.startsWith('temp-') ||
+          lower.startsWith('cust-temp') ||
+          lower.startsWith('offline-temp')
+        );
+      };
 
-      if (needsCustomerResolution && draft.customerPhone) {
-        try {
-          const cleanPhone = draft.customerPhone.trim();
-          const searchRes = await apiClient.customers.search(cleanPhone, 1, 5);
-          const matched = searchRes.data?.find(
-            (c) => c.phone.replace(/\D/g, '') === cleanPhone.replace(/\D/g, ''),
-          );
-          if (matched && matched.id) {
-            draft.payload.customerId = matched.id;
-            draft.customerId = matched.id;
-            await updateDraftSyncStatus(clientDraftId, 'SYNCING', {
-              customerId: matched.id,
-              payload: draft.payload,
-            });
-          } else if (draft.customerName) {
-            const created = await apiClient.customers.create({
-              name: draft.customerName.trim(),
-              phone: cleanPhone,
-            });
-            if (created && created.id) {
-              draft.payload.customerId = created.id;
-              draft.customerId = created.id;
+      const needsCustomerResolution =
+        isTemporaryCustomerId(draft.payload.customerId) || isTemporaryCustomerId(draft.customerId);
+
+      if (needsCustomerResolution) {
+        let resolutionError: string | null = null;
+        if (draft.customerPhone) {
+          try {
+            const cleanPhone = draft.customerPhone.trim();
+            const searchRes = await apiClient.customers.search(cleanPhone, 1, 5);
+            const matched = searchRes.data?.find(
+              (c) => c.phone.replace(/\D/g, '') === cleanPhone.replace(/\D/g, ''),
+            );
+            if (matched && matched.id) {
+              draft.payload.customerId = matched.id;
+              draft.customerId = matched.id;
               await updateDraftSyncStatus(clientDraftId, 'SYNCING', {
-                customerId: created.id,
+                customerId: matched.id,
                 payload: draft.payload,
               });
+            } else if (draft.customerName) {
+              const created = await apiClient.customers.create({
+                name: draft.customerName.trim(),
+                phone: cleanPhone,
+              });
+              if (created && created.id) {
+                draft.payload.customerId = created.id;
+                draft.customerId = created.id;
+                await updateDraftSyncStatus(clientDraftId, 'SYNCING', {
+                  customerId: created.id,
+                  payload: draft.payload,
+                });
+              } else {
+                resolutionError = 'Failed to create customer on server';
+              }
+            } else {
+              resolutionError = 'Customer name is missing for new customer registration';
             }
+          } catch (custErr: any) {
+            resolutionError = custErr.message || 'Failed to resolve customer with server';
           }
-        } catch (custErr: any) {
-          console.warn('Customer auto-resolution notice during sync:', custErr.message);
+        } else {
+          resolutionError = 'Customer phone number is missing for offline resolution';
+        }
+
+        // CRITICAL GUARD: Never submit order with unresolved temporary customer ID
+        if (isTemporaryCustomerId(draft.payload.customerId) && !serverOrder) {
+          const failMsg = `Customer resolution failed: ${resolutionError || 'Unresolved temporary customer'}`;
+          await updateDraftSyncStatus(clientDraftId, 'FAILED_RETRYABLE', {
+            error: failMsg,
+            incrementRetry: true,
+          });
+          return {
+            success: false,
+            error: failMsg,
+          };
         }
       }
 
