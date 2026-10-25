@@ -1,0 +1,1492 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  SafeAreaView,
+  RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import {
+  CustomerDTO,
+  CreateCustomerRequest,
+  OrderSummaryDTO,
+  MembershipTier,
+} from '@growfast/shared-types';
+import { apiClient, ApiError } from '../../src/api/client';
+import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
+import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
+import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
+import { OrderDetailModal } from '../../src/components/OrderDetailModal';
+
+const MEMBERSHIP_OPTIONS: MembershipTier[] = [
+  MembershipTier.NONE,
+  MembershipTier.SILVER,
+  MembershipTier.GOLD,
+  MembershipTier.PLATINUM,
+];
+
+export default function CustomersScreen() {
+  const router = useRouter();
+  const { isConnected } = useNetworkStatus();
+  const [session, setSession] = useState<MobileUserSession | null>(null);
+
+  // Tab: 'FIND' | 'NEW'
+  const [activeTab, setActiveTab] = useState<'FIND' | 'NEW'>('FIND');
+
+  // Search & Directory State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const PAGE_SIZE = 20;
+
+  // Stale request prevention ref
+  const searchRequestIdRef = useRef(0);
+
+  // Customer Detail & Order History Modal State
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerDTO | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<OrderSummaryDTO[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [orderHistoryError, setOrderHistoryError] = useState<string | null>(null);
+
+  // Order Detail Inspection Modal State
+  const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
+
+  // Wizard Launch state
+  const [wizardVisible, setWizardVisible] = useState(false);
+
+  // New Customer Form State
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newPincode, setNewPincode] = useState('');
+  const [newMembership, setNewMembership] = useState<MembershipTier>(MembershipTier.NONE);
+  const [newDiscount, setNewDiscount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getUserSession().then(setSession);
+  }, []);
+
+  /**
+   * Fetch customer directory with pagination and stale response protection.
+   */
+  const loadCustomers = useCallback(
+    async (query: string = '', page: number = 1, isRefresh: boolean = false) => {
+      const requestId = ++searchRequestIdRef.current;
+
+      if (page === 1) {
+        if (isRefresh) {
+          setIsRefreshing(true);
+        } else {
+          setIsLoading(true);
+        }
+        setSearchError(null);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      try {
+        const response = await apiClient.customers.search(
+          query.trim() || undefined,
+          page,
+          PAGE_SIZE,
+        );
+
+        // Ignore stale network response if user typed a newer query in the meantime
+        if (requestId !== searchRequestIdRef.current) {
+          return;
+        }
+
+        const newItems = response?.data || [];
+        const total = response?.total ?? newItems.length;
+
+        if (page === 1) {
+          setCustomers(newItems);
+        } else {
+          setCustomers((prev) => [...prev, ...newItems]);
+        }
+
+        setCurrentPage(page);
+        setTotalCustomers(total);
+        setHasMore(page * PAGE_SIZE < total);
+        setSearchError(null);
+      } catch (err: any) {
+        if (requestId !== searchRequestIdRef.current) {
+          return;
+        }
+        const errorMsg =
+          err?.message || 'Unable to connect to server. Please check your network and retry.';
+        setSearchError(errorMsg);
+        if (page === 1 && !isRefresh) {
+          setCustomers([]);
+        }
+      } finally {
+        if (requestId === searchRequestIdRef.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [],
+  );
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadCustomers(searchQuery, 1, false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, loadCustomers]);
+
+  const onRefresh = () => {
+    loadCustomers(searchQuery, 1, true);
+  };
+
+  const onLoadMore = () => {
+    if (!isLoading && !isLoadingMore && hasMore) {
+      loadCustomers(searchQuery, currentPage + 1, false);
+    }
+  };
+
+  /**
+   * Load customer order history with dedicated loading/error/retry states.
+   */
+  const loadCustomerOrderHistory = useCallback(async (customerId: string) => {
+    setLoadingOrders(true);
+    setOrderHistoryError(null);
+    try {
+      const res = await apiClient.orders.list({
+        customerId,
+        limit: 20,
+        pageSize: 20,
+      });
+      setCustomerOrders(res.data || []);
+    } catch (err: any) {
+      const msg = err?.message || 'Could not load past orders for this customer.';
+      setOrderHistoryError(msg);
+      setCustomerOrders([]);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
+
+  const handleSelectCustomer = (cust: CustomerDTO) => {
+    setSelectedCustomer(cust);
+    loadCustomerOrderHistory(cust.id);
+  };
+
+  /**
+   * Create Customer handler with phone validation and duplicate conflict handling.
+   */
+  const handleCreateCustomer = async () => {
+    setCreateError(null);
+
+    // 1. Name validation
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      Alert.alert('Validation Error', 'Customer Full Name is required.');
+      return;
+    }
+
+    // 2. Phone validation: 10-15 digits matching backend contract
+    const cleanPhone = newPhone.replace(/[\s\-()]/g, '');
+    if (!/^\+?[0-9]{10,15}$/.test(cleanPhone)) {
+      Alert.alert(
+        'Validation Error',
+        'Please enter a valid WhatsApp phone number with 10 to 15 digits.',
+      );
+      return;
+    }
+
+    // 3. Pincode validation (optional)
+    const trimmedPincode = newPincode.trim();
+    if (trimmedPincode && !/^[A-Za-z0-9\s\-]{3,10}$/.test(trimmedPincode)) {
+      Alert.alert('Validation Error', 'Pincode must be between 3 and 10 characters.');
+      return;
+    }
+
+    // 4. Discount validation (optional)
+    let discountPercent = 0;
+    if (newDiscount.trim()) {
+      const parsedDiscount = parseFloat(newDiscount.trim());
+      if (isNaN(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) {
+        Alert.alert('Validation Error', 'Discount must be a percentage between 0 and 100.');
+        return;
+      }
+      discountPercent = parsedDiscount;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload: CreateCustomerRequest = {
+        name: trimmedName,
+        phone: cleanPhone,
+        address: newAddress.trim() || undefined,
+        pincode: trimmedPincode || undefined,
+        membership: newMembership !== MembershipTier.NONE ? newMembership : undefined,
+        discountPercent: discountPercent > 0 ? discountPercent : undefined,
+      };
+
+      const created = await apiClient.customers.create(payload);
+
+      // Reset form fields
+      setNewName('');
+      setNewPhone('');
+      setNewAddress('');
+      setNewPincode('');
+      setNewMembership(MembershipTier.NONE);
+      setNewDiscount('');
+      setCreateError(null);
+
+      // Switch to directory, reload list, and select the newly created customer
+      setActiveTab('FIND');
+      loadCustomers('', 1, false);
+      handleSelectCustomer(created);
+
+      Alert.alert(
+        'Customer Registered',
+        `"${created.name}" has been successfully added to the system.`,
+      );
+    } catch (err: any) {
+      const isConflict =
+        err?.statusCode === 409 ||
+        err?.message?.toLowerCase().includes('already exists') ||
+        err?.data?.message?.toLowerCase().includes('already exists');
+
+      const message = isConflict
+        ? `A customer with phone number "${cleanPhone}" is already registered. Please search for the existing record or verify the number.`
+        : err?.message || 'Customer creation failed. Please check your network and retry.';
+
+      setCreateError(message);
+      Alert.alert(isConflict ? 'Duplicate Customer' : 'Registration Error', message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Avatar color helper matching Screen 3 pastel palette.
+   */
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      { bg: '#ede9fe', text: '#6d28d9' }, // Purple
+      { bg: '#dbeafe', text: '#1d4ed8' }, // Blue
+      { bg: '#fce7f3', text: '#be185d' }, // Pink
+      { bg: '#fef3c7', text: '#b45309' }, // Amber
+      { bg: '#dcfce7', text: '#15803d' }, // Green
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return (name.slice(0, 2) || 'CU').toUpperCase();
+  };
+
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Header matching Screen 3 */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Customers</Text>
+          <Text style={styles.headerSubtitle}>Directory & Quick Order Intake</Text>
+        </View>
+
+        {/* Segmented Control matching Screen 3 */}
+        <View style={styles.segmentContainer}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'FIND' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('FIND')}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'FIND' }}
+          >
+            <Text
+              style={[styles.segmentBtnText, activeTab === 'FIND' && styles.segmentBtnTextActive]}
+            >
+              Find Existing
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'NEW' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('NEW')}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'NEW' }}
+          >
+            <Text
+              style={[styles.segmentBtnText, activeTab === 'NEW' && styles.segmentBtnTextActive]}
+            >
+              + New Customer
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'FIND' ? (
+          <View style={{ flex: 1 }}>
+            {/* Search Bar matching Screen 3 */}
+            <View style={styles.searchBarWrapper}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name, phone, or customer code..."
+                placeholderTextColor="#94a3b8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                clearButtonMode="while-editing"
+                returnKeyType="search"
+              />
+              {searchQuery ? (
+                <TouchableOpacity
+                  style={styles.clearBtn}
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.clearSearchIcon}>✕</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.clearBtn}>
+                  <Text style={styles.scanIcon}>⊡</Text>
+                </View>
+              )}
+            </View>
+
+            {/* List Header */}
+            <View style={styles.listHeaderRow}>
+              <Text style={styles.listHeaderTitle}>
+                {searchQuery.trim()
+                  ? `Search Results (${totalCustomers})`
+                  : `All Customers (${totalCustomers})`}
+              </Text>
+              {searchQuery.trim() ? (
+                <TouchableOpacity style={styles.actionLinkTouch} onPress={() => setSearchQuery('')}>
+                  <Text style={styles.viewAllText}>Clear Search</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.actionLinkTouch}
+                  onPress={() => loadCustomers('', 1, false)}
+                >
+                  <Text style={styles.viewAllText}>Refresh</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Error Banner with Retry */}
+            {searchError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {searchError}</Text>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => loadCustomers(searchQuery, 1, false)}
+                >
+                  <Text style={styles.retryBtnText}>↻ Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {/* Loading Indicator */}
+            {isLoading && !isRefreshing ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="small" color="#2563eb" />
+                <Text style={styles.loadingText}>Searching customer directory...</Text>
+              </View>
+            ) : customers.length === 0 && !searchError ? (
+              /* Empty State */
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyEmoji}>👥</Text>
+                <Text style={styles.emptyTitle}>
+                  {searchQuery.trim() ? 'No Customers Found' : 'No Customers Registered'}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {searchQuery.trim()
+                    ? `No matches found for "${searchQuery}". Tap below to register a new customer.`
+                    : 'The directory is empty. Register your first customer to get started.'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyActionBtn}
+                  onPress={() => {
+                    const cleanPhoneInput = searchQuery.replace(/\D/g, '').trim();
+                    const cleanNameInput = searchQuery.replace(/[0-9+]/g, '').trim();
+                    if (cleanPhoneInput.length >= 5) {
+                      setNewPhone(cleanPhoneInput);
+                    } else if (cleanNameInput) {
+                      setNewName(cleanNameInput);
+                    }
+                    setActiveTab('NEW');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.emptyActionBtnText}>
+                    + Add {searchQuery.trim() ? `"${searchQuery.trim()}"` : 'New Customer'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Paginated Customer List */
+              <FlatList
+                data={customers}
+                keyExtractor={(item) => item.id}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={onRefresh}
+                    colors={['#2563eb']}
+                  />
+                }
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
+                onEndReached={onLoadMore}
+                onEndReachedThreshold={0.3}
+                ListFooterComponent={
+                  isLoadingMore ? (
+                    <View style={styles.loadingMoreBox}>
+                      <ActivityIndicator size="small" color="#2563eb" />
+                      <Text style={styles.loadingMoreText}>Loading more customers...</Text>
+                    </View>
+                  ) : null
+                }
+                renderItem={({ item }) => {
+                  const avatar = getAvatarColor(item.name);
+                  const initials = getInitials(item.name);
+                  const hasMembership = item.membership && item.membership !== MembershipTier.NONE;
+                  return (
+                    <TouchableOpacity
+                      style={styles.customerCard}
+                      onPress={() => handleSelectCustomer(item)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View customer ${item.name}`}
+                    >
+                      <View style={[styles.avatarCircle, { backgroundColor: avatar.bg }]}>
+                        <Text style={[styles.avatarText, { color: avatar.text }]}>{initials}</Text>
+                      </View>
+                      <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.custName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          {hasMembership ? (
+                            <View style={styles.memberTagSmall}>
+                              <Text style={styles.memberTagSmallText}>{item.membership}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={styles.custPhone}>{item.phone}</Text>
+                        {item.customerCode ? (
+                          <Text style={styles.custCodeText}>#{item.customerCode}</Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.chevronBox}>
+                        <Text style={styles.chevron}>›</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        ) : (
+          /* New Customer Form */
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.formContainer}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.formCard}>
+                <Text style={styles.formTitle}>Add New Customer</Text>
+                <Text style={styles.formSubtitle}>Quickly register walk-in or phone customer</Text>
+
+                {createError ? (
+                  <View style={styles.formErrorBox}>
+                    <Text style={styles.formErrorText}>⚠️ {createError}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Full Name *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. Rahul Sharma"
+                    placeholderTextColor="#94a3b8"
+                    value={newName}
+                    onChangeText={setNewName}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>WhatsApp Phone Number *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 9876543210 (10-15 digits)"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="phone-pad"
+                    maxLength={16}
+                    value={newPhone}
+                    onChangeText={setNewPhone}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Address (Optional)</Text>
+                  <TextInput
+                    style={[styles.formInput, { height: 72, textAlignVertical: 'top' }]}
+                    placeholder="House/Flat, Street, Area"
+                    placeholderTextColor="#94a3b8"
+                    multiline
+                    value={newAddress}
+                    onChangeText={setNewAddress}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Pincode (Optional)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 411001"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="default"
+                    maxLength={10}
+                    value={newPincode}
+                    onChangeText={setNewPincode}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Membership Tier (Optional)</Text>
+                  <View style={styles.tierSelectorRow}>
+                    {MEMBERSHIP_OPTIONS.map((tier) => (
+                      <TouchableOpacity
+                        key={tier}
+                        style={[styles.tierBtn, newMembership === tier && styles.tierBtnSelected]}
+                        onPress={() => setNewMembership(tier)}
+                      >
+                        <Text
+                          style={[
+                            styles.tierBtnText,
+                            newMembership === tier && styles.tierBtnTextSelected,
+                          ]}
+                        >
+                          {tier}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Special Discount % (Optional)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 10 (0 - 100%)"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="numeric"
+                    maxLength={3}
+                    value={newDiscount}
+                    onChangeText={setNewDiscount}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.submitCustomerBtn, isSubmitting && styles.btnDisabled]}
+                  onPress={handleCreateCustomer}
+                  disabled={isSubmitting}
+                  activeOpacity={0.8}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.submitCustomerBtnText}>Create Customer Record →</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        )}
+
+        {/* Customer Detail & Order History Profile Modal */}
+        {selectedCustomer ? (
+          <Modal
+            visible={!!selectedCustomer}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setSelectedCustomer(null)}
+          >
+            <View style={styles.modalBackdrop}>
+              <View style={styles.detailCard}>
+                {/* Header */}
+                <View style={styles.detailCardHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View
+                      style={[
+                        styles.avatarCircleLarge,
+                        { backgroundColor: getAvatarColor(selectedCustomer.name).bg },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.avatarTextLarge,
+                          { color: getAvatarColor(selectedCustomer.name).text },
+                        ]}
+                      >
+                        {getInitials(selectedCustomer.name)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.detailName} numberOfLines={1}>
+                        {selectedCustomer.name}
+                      </Text>
+                      <Text style={styles.detailPhone}>{selectedCustomer.phone}</Text>
+                      {selectedCustomer.customerCode ? (
+                        <Text style={styles.detailCode}>ID: #{selectedCustomer.customerCode}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.modalCloseBtn}
+                    onPress={() => setSelectedCustomer(null)}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  >
+                    <Text style={styles.modalCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false}>
+                  {/* Membership & Discount Badges */}
+                  <View style={styles.badgesRow}>
+                    {selectedCustomer.membership &&
+                    selectedCustomer.membership !== MembershipTier.NONE ? (
+                      <View style={styles.badgePillGold}>
+                        <Text style={styles.badgeTextGold}>
+                          ⭐ {selectedCustomer.membership} MEMBER
+                        </Text>
+                      </View>
+                    ) : null}
+                    {selectedCustomer.discountPercent && selectedCustomer.discountPercent > 0 ? (
+                      <View style={styles.badgePillDiscount}>
+                        <Text style={styles.badgeTextDiscount}>
+                          🏷️ {selectedCustomer.discountPercent}% OFF
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Address Snippet */}
+                  {selectedCustomer.address ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>📍 Address</Text>
+                      <Text style={styles.detailVal}>
+                        {selectedCustomer.address}
+                        {selectedCustomer.pincode ? ` - ${selectedCustomer.pincode}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Order History Section */}
+                  <View style={styles.orderHistoryHeaderRow}>
+                    <Text style={styles.orderHistoryTitle}>Order History</Text>
+                    <TouchableOpacity onPress={() => loadCustomerOrderHistory(selectedCustomer.id)}>
+                      <Text style={styles.orderHistoryRefreshText}>↻ Refresh</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {loadingOrders ? (
+                    <View style={styles.orderLoadingBox}>
+                      <ActivityIndicator size="small" color="#2563eb" />
+                      <Text style={styles.orderLoadingText}>Loading customer order history...</Text>
+                    </View>
+                  ) : orderHistoryError ? (
+                    <View style={styles.orderErrorBox}>
+                      <Text style={styles.orderErrorText}>⚠️ {orderHistoryError}</Text>
+                      <TouchableOpacity
+                        style={styles.retryOrderBtn}
+                        onPress={() => loadCustomerOrderHistory(selectedCustomer.id)}
+                      >
+                        <Text style={styles.retryOrderBtnText}>↻ Retry History</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : customerOrders.length > 0 ? (
+                    <View style={styles.orderListBox}>
+                      {customerOrders.map((ord) => {
+                        const isPending =
+                          ord.paymentStatus === 'PENDING' || (ord.amountDue && ord.amountDue > 0);
+                        return (
+                          <TouchableOpacity
+                            key={ord.id}
+                            style={styles.orderItemCard}
+                            onPress={() => setViewingOrderId(ord.id)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.orderItemGarmentBox}>
+                              <Text style={styles.orderItemEmoji}>👔</Text>
+                            </View>
+                            <View style={{ flex: 1, paddingHorizontal: 10 }}>
+                              <Text style={styles.orderItemNumber}>#{ord.orderNumber}</Text>
+                              <Text style={styles.orderItemDate}>{formatDate(ord.orderDate)}</Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <View
+                                style={[
+                                  styles.orderStatusChip,
+                                  ord.status === 'READY'
+                                    ? styles.chipReady
+                                    : ord.status === 'DELIVERED'
+                                      ? styles.chipDelivered
+                                      : styles.chipProcess,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.orderStatusChipText,
+                                    ord.status === 'READY'
+                                      ? styles.chipTextReady
+                                      : ord.status === 'DELIVERED'
+                                        ? styles.chipTextDelivered
+                                        : styles.chipTextProcess,
+                                  ]}
+                                >
+                                  {ord.status}
+                                </Text>
+                              </View>
+                              <Text style={styles.orderItemTotal}>
+                                ₹{ord.totalAmount.toFixed(0)}
+                              </Text>
+                              {isPending ? (
+                                <Text style={styles.orderItemDueText}>
+                                  Due: ₹{ord.amountDue?.toFixed(0)}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.noOrdersBox}>
+                      <Text style={styles.noOrdersText}>
+                        No past orders recorded for this customer.
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+
+                {/* Primary Action Button: Launch Order Wizard for Customer */}
+                <TouchableOpacity
+                  style={styles.startOrderBtn}
+                  onPress={() => {
+                    // Safe integration boundary: Keep selectedCustomer for order intake
+                    setSelectedCustomer(null);
+                    setWizardVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.startOrderBtnText}>
+                    + Start New Order for {selectedCustomer.name.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        ) : null}
+
+        {/* Order Wizard Modal integration (Developer B boundary preserved) */}
+        <OrderWizardModal
+          visible={wizardVisible}
+          draft={null}
+          storeId={session?.storeId || 'store-1'}
+          userRole={session?.role || 'COUNTER'}
+          onClose={() => setWizardVisible(false)}
+          onOrderSavedOrSubmitted={() => {
+            setWizardVisible(false);
+            router.push('/(tabs)/orders');
+          }}
+        />
+
+        {/* Direct Order Inspection Modal */}
+        <OrderDetailModal
+          visible={!!viewingOrderId}
+          orderId={viewingOrderId}
+          onClose={() => setViewingOrderId(null)}
+          onOrderUpdated={() => {
+            if (selectedCustomer) {
+              loadCustomerOrderHistory(selectedCustomer.id);
+            }
+          }}
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#ffffff',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 14,
+    padding: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  segmentBtnTextActive: {
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+  searchBarWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0f172a',
+    height: '100%',
+  },
+  clearBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchIcon: {
+    fontSize: 14,
+    color: '#94a3b8',
+    fontWeight: 'bold',
+  },
+  scanIcon: {
+    fontSize: 18,
+    color: '#64748b',
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  listHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  actionLinkTouch: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  viewAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  customerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+    minHeight: 64,
+  },
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  custName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+    flexShrink: 1,
+  },
+  custPhone: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  custCodeText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 1,
+    fontWeight: '500',
+  },
+  memberTagSmall: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  memberTagSmallText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#b45309',
+  },
+  chevronBox: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chevron: {
+    fontSize: 22,
+    color: '#cbd5e1',
+    fontWeight: '300',
+  },
+  errorBox: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorText: {
+    color: '#b91c1c',
+    fontSize: 13,
+    flex: 1,
+    marginRight: 8,
+  },
+  retryBtn: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  loadingBox: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 8,
+  },
+  loadingMoreBox: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  emptyBox: {
+    padding: 36,
+    alignItems: 'center',
+  },
+  emptyEmoji: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  emptyActionBtn: {
+    marginTop: 16,
+    minHeight: 44,
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyActionBtnText: {
+    color: '#1d4ed8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  formContainer: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  formCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  formSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  formErrorBox: {
+    backgroundColor: '#fef2f2',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    marginBottom: 14,
+  },
+  formErrorText: {
+    color: '#b91c1c',
+    fontSize: 13,
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+  formInput: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: '#0f172a',
+  },
+  tierSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tierBtn: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tierBtnSelected: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  tierBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  tierBtnTextSelected: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  submitCustomerBtn: {
+    minHeight: 50,
+    borderRadius: 25,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  submitCustomerBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  btnDisabled: {
+    backgroundColor: '#93c5fd',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  detailCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '85%',
+  },
+  detailCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 12,
+  },
+  avatarCircleLarge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarTextLarge: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  detailName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  detailPhone: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  detailCode: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 1,
+    fontWeight: '500',
+  },
+  modalCloseBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#94a3b8',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  badgePillGold: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeTextGold: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#b45309',
+  },
+  badgePillDiscount: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeTextDiscount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803d',
+  },
+  detailRow: {
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  detailVal: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  orderHistoryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderHistoryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  orderHistoryRefreshText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  orderLoadingBox: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    gap: 6,
+  },
+  orderLoadingText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  orderErrorBox: {
+    padding: 12,
+    backgroundColor: '#fef2f2',
+    borderRadius: 8,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  orderErrorText: {
+    color: '#b91c1c',
+    fontSize: 12,
+    flex: 1,
+    marginRight: 6,
+  },
+  retryOrderBtn: {
+    minHeight: 44,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryOrderBtnText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  orderListBox: {
+    maxHeight: 180,
+  },
+  orderItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    minHeight: 52,
+  },
+  orderItemGarmentBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orderItemEmoji: {
+    fontSize: 18,
+  },
+  orderItemNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  orderItemDate: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  orderStatusChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  chipReady: {
+    backgroundColor: '#e0f2fe',
+  },
+  chipTextReady: {
+    color: '#0284c7',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chipDelivered: {
+    backgroundColor: '#dcfce7',
+  },
+  chipTextDelivered: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chipProcess: {
+    backgroundColor: '#fef3c7',
+  },
+  chipTextProcess: {
+    color: '#b45309',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  orderStatusChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  orderItemTotal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  orderItemDueText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#b45309',
+  },
+  noOrdersBox: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  noOrdersText: {
+    fontSize: 13,
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
+  startOrderBtn: {
+    minHeight: 50,
+    borderRadius: 25,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  startOrderBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+});
