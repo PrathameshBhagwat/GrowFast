@@ -143,7 +143,11 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
         (o) => o.status !== OrderStatus.DELIVERED && o.status !== OrderStatus.CANCELLED,
       );
 
-      assert.equal(activeDueOrders.length, 3, 'Only non-delivered, non-cancelled orders count as due');
+      assert.equal(
+        activeDueOrders.length,
+        3,
+        'Only non-delivered, non-cancelled orders count as due',
+      );
       assert.ok(!activeDueOrders.some((o) => o.status === OrderStatus.DELIVERED));
       assert.ok(!activeDueOrders.some((o) => o.status === OrderStatus.CANCELLED));
     });
@@ -227,9 +231,7 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
 
     it('3.2 calculates Per-Weight order totals using weight as multiplier', () => {
       // 3.50 kg laundry at ₹80/kg
-      const items = [
-        { quantity: 1, unitPrice: 80, weight: 3.5 },
-      ];
+      const items = [{ quantity: 1, unitPrice: 80, weight: 3.5 }];
 
       const totals = calculateOrderTotals(items, {
         isExpress: false,
@@ -376,7 +378,8 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
       const failedMap = new Map<string, { count: number; lockedUntil: number }>();
       const recordFailure = (empId: string, now: number) => {
         const existing = failedMap.get(empId);
-        const count = (existing?.lockedUntil && existing.lockedUntil <= now ? 0 : existing?.count || 0) + 1;
+        const count =
+          (existing?.lockedUntil && existing.lockedUntil <= now ? 0 : existing?.count || 0) + 1;
         if (count >= 5) {
           failedMap.set(empId, { count, lockedUntil: now + 60000 });
         } else {
@@ -440,7 +443,15 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
       let receivedQuery: any = null;
       apiClient.orders.list = async (params?: any) => {
         receivedQuery = params;
-        return { data: [], meta: { page: 1, pageSize: params?.pageSize || params?.limit || 10, total: 0, totalPages: 0 } } as any;
+        return {
+          data: [],
+          meta: {
+            page: 1,
+            pageSize: params?.pageSize || params?.limit || 10,
+            total: 0,
+            totalPages: 0,
+          },
+        } as any;
       };
 
       // Request sending pageSize
@@ -676,7 +687,9 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
       assert.equal(express.length, 1);
       assert.equal(express[0].orderNumber, 'GF-102');
 
-      const standard = testOrders.filter((o) => !o.isExpress && o.priority !== OrderPriority.EXPRESS);
+      const standard = testOrders.filter(
+        (o) => !o.isExpress && o.priority !== OrderPriority.EXPRESS,
+      );
       assert.equal(standard.length, 3);
     });
 
@@ -749,7 +762,9 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
       ];
 
       const pItems = sampleItems.filter((i) => i.physicalGarments && i.physicalGarments.length > 0);
-      const lItems = sampleItems.filter((i) => !i.physicalGarments || i.physicalGarments.length === 0);
+      const lItems = sampleItems.filter(
+        (i) => !i.physicalGarments || i.physicalGarments.length === 0,
+      );
 
       assert.equal(pItems.length, 1);
       assert.equal(lItems.length, 1);
@@ -775,7 +790,11 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
     });
 
     it('8.3 enforces backend settlement gate: final handover requires amountDue to be 0 or settled', () => {
-      const checkSettlementGate = (isFinalHandover: boolean, amountDue: number, hasPayment: boolean) => {
+      const checkSettlementGate = (
+        isFinalHandover: boolean,
+        amountDue: number,
+        hasPayment: boolean,
+      ) => {
         if (isFinalHandover && amountDue > 0 && !hasPayment) {
           throw new Error(
             `Cannot complete final handover: Order has an outstanding balance of ₹${amountDue}. Full payment must be settled before final delivery.`,
@@ -859,4 +878,3 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
     });
   });
 });
-

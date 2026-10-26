@@ -139,7 +139,6 @@ export default function HomeScreen() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [orderDetailVisible, setOrderDetailVisible] = useState(false);
 
-
   /**
    * Load local SQLite pending draft count.
    */
@@ -199,57 +198,54 @@ export default function HomeScreen() {
   /**
    * Multi-field search implementation with debouncing and stale request guards.
    */
-  const executeSearch = useCallback(
-    async (query: string, field: SearchField) => {
-      const trimmed = query.trim();
-      if (trimmed.length < 2) {
-        setCustomerResults([]);
-        setOrderResults([]);
-        setIsSearching(false);
-        setSearchError(null);
-        return;
-      }
-
-      const requestId = ++searchRequestIdRef.current;
-      setIsSearching(true);
+  const executeSearch = useCallback(async (query: string, field: SearchField) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setCustomerResults([]);
+      setOrderResults([]);
+      setIsSearching(false);
       setSearchError(null);
+      return;
+    }
 
-      try {
-        if (field === 'INVOICE') {
-          // Search orders / invoices only
-          const orderRes = await apiClient.orders.list({ search: trimmed, pageSize: 6 });
-          if (requestId !== searchRequestIdRef.current) return;
-          setCustomerResults([]);
-          setOrderResults(orderRes?.data || []);
-        } else if (field === 'ALL') {
-          // Search both customers and orders in parallel
-          const [custRes, orderRes] = await Promise.all([
-            apiClient.customers.search(trimmed, 1, 5).catch(() => ({ data: [] })),
-            apiClient.orders.list({ search: trimmed, pageSize: 4 }).catch(() => ({ data: [] })),
-          ]);
-          if (requestId !== searchRequestIdRef.current) return;
-          setCustomerResults(custRes?.data || []);
-          setOrderResults(orderRes?.data || []);
-        } else {
-          // Customer fields: NAME, PHONE, ID, ADDRESS
-          const custRes = await apiClient.customers.search(trimmed, 1, 6);
-          if (requestId !== searchRequestIdRef.current) return;
-          setCustomerResults(custRes?.data || []);
-          setOrderResults([]);
-        }
-      } catch (err: any) {
+    const requestId = ++searchRequestIdRef.current;
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      if (field === 'INVOICE') {
+        // Search orders / invoices only
+        const orderRes = await apiClient.orders.list({ search: trimmed, pageSize: 6 });
         if (requestId !== searchRequestIdRef.current) return;
-        setSearchError(err?.message || 'Failed to search. Please try again.');
         setCustomerResults([]);
+        setOrderResults(orderRes?.data || []);
+      } else if (field === 'ALL') {
+        // Search both customers and orders in parallel
+        const [custRes, orderRes] = await Promise.all([
+          apiClient.customers.search(trimmed, 1, 5).catch(() => ({ data: [] })),
+          apiClient.orders.list({ search: trimmed, pageSize: 4 }).catch(() => ({ data: [] })),
+        ]);
+        if (requestId !== searchRequestIdRef.current) return;
+        setCustomerResults(custRes?.data || []);
+        setOrderResults(orderRes?.data || []);
+      } else {
+        // Customer fields: NAME, PHONE, ID, ADDRESS
+        const custRes = await apiClient.customers.search(trimmed, 1, 6);
+        if (requestId !== searchRequestIdRef.current) return;
+        setCustomerResults(custRes?.data || []);
         setOrderResults([]);
-      } finally {
-        if (requestId === searchRequestIdRef.current) {
-          setIsSearching(false);
-        }
       }
-    },
-    [],
-  );
+    } catch (err: any) {
+      if (requestId !== searchRequestIdRef.current) return;
+      setSearchError(err?.message || 'Failed to search. Please try again.');
+      setCustomerResults([]);
+      setOrderResults([]);
+    } finally {
+      if (requestId === searchRequestIdRef.current) {
+        setIsSearching(false);
+      }
+    }
+  }, []);
 
   // Debounced search trigger
   useEffect(() => {
@@ -265,7 +261,14 @@ export default function HomeScreen() {
     if (!session || !isAuthenticated || isAuthLoading) return;
     loadOfflineDraftCount();
     loadDueTodayOrders();
-  }, [session, isAuthenticated, isAuthLoading, isConnected, loadOfflineDraftCount, loadDueTodayOrders]);
+  }, [
+    session,
+    isAuthenticated,
+    isAuthLoading,
+    isConnected,
+    loadOfflineDraftCount,
+    loadDueTodayOrders,
+  ]);
 
   /**
    * Manual pull-to-refresh handler.
@@ -550,7 +553,12 @@ export default function HomeScreen() {
 
             {/* Search Input Row */}
             <View style={styles.searchInputRow}>
-              <Icon name="search-outline" size={19} color="#94A3B8" style={styles.searchIconStyle} />
+              <Icon
+                name="search-outline"
+                size={19}
+                color="#94A3B8"
+                style={styles.searchIconStyle}
+              />
               <TextInput
                 style={styles.searchTextInput}
                 placeholder={currentFieldOption.placeholder}
@@ -591,7 +599,9 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <View
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+                  >
                     <Text style={styles.selectedCustomerName} numberOfLines={1}>
                       {selectedCustomer.name}
                     </Text>
@@ -603,7 +613,9 @@ export default function HomeScreen() {
                   </View>
                   <Text style={styles.selectedCustomerPhone}>{selectedCustomer.phone}</Text>
                   {selectedCustomer.customerCode ? (
-                    <Text style={styles.selectedCustomerCode}>#{selectedCustomer.customerCode}</Text>
+                    <Text style={styles.selectedCustomerCode}>
+                      #{selectedCustomer.customerCode}
+                    </Text>
                   ) : null}
                   {selectedCustomer.address ? (
                     <Text style={styles.selectedCustomerAddress} numberOfLines={1}>
@@ -631,8 +643,15 @@ export default function HomeScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`View Profile for ${selectedCustomer.name}`}
                 >
-                  <Icon name="person-outline" size={14} color="#0284C7" style={{ marginRight: 4 }} />
-                  <Text style={styles.customerProfileBtnText} numberOfLines={1}>Profile</Text>
+                  <Icon
+                    name="person-outline"
+                    size={14}
+                    color="#0284C7"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.customerProfileBtnText} numberOfLines={1}>
+                    Profile
+                  </Text>
                 </TouchableOpacity>
 
                 {/* 2. Create Per-Piece Order */}
@@ -644,7 +663,9 @@ export default function HomeScreen() {
                   accessibilityLabel={`Create Per-Piece Order for ${selectedCustomer.name}`}
                 >
                   <Icon name="shirt-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.customerPerPieceBtnText} numberOfLines={1}>Piece</Text>
+                  <Text style={styles.customerPerPieceBtnText} numberOfLines={1}>
+                    Piece
+                  </Text>
                 </TouchableOpacity>
 
                 {/* 3. Create Per-Weight Order */}
@@ -656,19 +677,30 @@ export default function HomeScreen() {
                   accessibilityLabel={`Create Per-Weight Order for ${selectedCustomer.name}`}
                 >
                   <Icon name="scale-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.customerPerWeightBtnText} numberOfLines={1}>Weight</Text>
+                  <Text style={styles.customerPerWeightBtnText} numberOfLines={1}>
+                    Weight
+                  </Text>
                 </TouchableOpacity>
 
                 {/* 4. Create Dry Cleaning Order */}
                 <TouchableOpacity
                   style={styles.customerDryCleanBtn}
-                  onPress={() => handleStartOrderForCustomer(selectedCustomer, 'PIECES', 'DRY_CLEANING')}
+                  onPress={() =>
+                    handleStartOrderForCustomer(selectedCustomer, 'PIECES', 'DRY_CLEANING')
+                  }
                   activeOpacity={0.8}
                   accessibilityRole="button"
                   accessibilityLabel={`Create Dry Cleaning Order for ${selectedCustomer.name}`}
                 >
-                  <Icon name="sparkles-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.customerDryCleanBtnText} numberOfLines={1}>Dry Clean</Text>
+                  <Icon
+                    name="sparkles-outline"
+                    size={14}
+                    color="#FFFFFF"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.customerDryCleanBtnText} numberOfLines={1}>
+                    Dry Clean
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -677,7 +709,9 @@ export default function HomeScreen() {
           {/* Dropdown Customer Results */}
           {!selectedCustomer && customerResults.length > 0 ? (
             <View style={styles.resultsContainer}>
-              <Text style={styles.resultsSectionHeader}>Customer Matches ({customerResults.length})</Text>
+              <Text style={styles.resultsSectionHeader}>
+                Customer Matches ({customerResults.length})
+              </Text>
               {customerResults.map((cust) => (
                 <TouchableOpacity
                   key={cust.id}
@@ -719,14 +753,15 @@ export default function HomeScreen() {
           {/* Dropdown Order / Invoice Results */}
           {!selectedCustomer && orderResults.length > 0 ? (
             <View style={styles.resultsContainer}>
-              <Text style={styles.resultsSectionHeader}>Invoice / Order Matches ({orderResults.length})</Text>
+              <Text style={styles.resultsSectionHeader}>
+                Invoice / Order Matches ({orderResults.length})
+              </Text>
               {orderResults.map((order) => {
-                const statusColors =
-                  ORDER_STATUS_COLORS[order.status as OrderStatus] || {
-                    bg: '#f1f5f9',
-                    text: '#475569',
-                    border: '#cbd5e1',
-                  };
+                const statusColors = ORDER_STATUS_COLORS[order.status as OrderStatus] || {
+                  bg: '#f1f5f9',
+                  text: '#475569',
+                  border: '#cbd5e1',
+                };
                 const orderNumDisplay = order.orderNumber.startsWith('GF-')
                   ? `#${order.orderNumber}`
                   : order.orderNumber.startsWith('#')
@@ -791,7 +826,12 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Register New Customer"
               >
-                <Icon name="person-add-outline" size={16} color="#1765F5" style={{ marginRight: 6 }} />
+                <Icon
+                  name="person-add-outline"
+                  size={16}
+                  color="#1765F5"
+                  style={{ marginRight: 6 }}
+                />
                 <Text style={styles.registerCustomerCtaBtnText}>+ Register New Customer</Text>
               </TouchableOpacity>
             </View>
@@ -819,7 +859,11 @@ export default function HomeScreen() {
                 <Text style={styles.cardHeaderTitle}>Today's Due Orders</Text>
                 <View style={styles.dueCountBadgePill}>
                   {loadingDueOrders && dueTotalCount === null ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" style={{ transform: [{ scale: 0.7 }] }} />
+                    <ActivityIndicator
+                      size="small"
+                      color="#FFFFFF"
+                      style={{ transform: [{ scale: 0.7 }] }}
+                    />
                   ) : (
                     <Text style={styles.dueCountBadgePillText}>
                       {dueOrdersError ? '!' : (dueTotalCount ?? 0)}
@@ -859,7 +903,12 @@ export default function HomeScreen() {
                 </View>
               ) : dueOrdersError ? (
                 <View style={styles.errorDueBox}>
-                  <Icon name="alert-circle-outline" size={20} color="#b91c1c" style={{ marginRight: 6 }} />
+                  <Icon
+                    name="alert-circle-outline"
+                    size={20}
+                    color="#b91c1c"
+                    style={{ marginRight: 6 }}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.errorDueText}>{dueOrdersError}</Text>
                   </View>
@@ -878,12 +927,11 @@ export default function HomeScreen() {
               ) : (
                 <View style={styles.dueOrdersList}>
                   {dueOrders.map((order) => {
-                    const statusColors =
-                      ORDER_STATUS_COLORS[order.status as OrderStatus] || {
-                        bg: '#f1f5f9',
-                        text: '#475569',
-                        border: '#cbd5e1',
-                      };
+                    const statusColors = ORDER_STATUS_COLORS[order.status as OrderStatus] || {
+                      bg: '#f1f5f9',
+                      text: '#475569',
+                      border: '#cbd5e1',
+                    };
                     const orderNumDisplay = order.orderNumber.startsWith('GF-')
                       ? `#${order.orderNumber}`
                       : order.orderNumber.startsWith('#')
@@ -919,10 +967,15 @@ export default function HomeScreen() {
                           <View
                             style={[
                               styles.statusChipSmall,
-                              { backgroundColor: statusColors.bg, borderColor: statusColors.border },
+                              {
+                                backgroundColor: statusColors.bg,
+                                borderColor: statusColors.border,
+                              },
                             ]}
                           >
-                            <Text style={[styles.statusChipTextSmall, { color: statusColors.text }]}>
+                            <Text
+                              style={[styles.statusChipTextSmall, { color: statusColors.text }]}
+                            >
                               {order.status.replace(/_/g, ' ')}
                             </Text>
                           </View>
@@ -957,7 +1010,9 @@ export default function HomeScreen() {
           {/* Left Decorative Botanical Leaves */}
           <View style={styles.leafClusterLeft}>
             <View style={[styles.leafPetal, { transform: [{ rotate: '-35deg' }] }]} />
-            <View style={[styles.leafPetal, { transform: [{ rotate: '-10deg' }], marginTop: -10 }]} />
+            <View
+              style={[styles.leafPetal, { transform: [{ rotate: '-10deg' }], marginTop: -10 }]}
+            />
           </View>
 
           {/* Center Washing Machine */}
@@ -1041,7 +1096,10 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={opt.key}
-                  style={[styles.fieldPickerOptionRow, isSelected && styles.fieldPickerOptionRowSelected]}
+                  style={[
+                    styles.fieldPickerOptionRow,
+                    isSelected && styles.fieldPickerOptionRowSelected,
+                  ]}
                   onPress={() => {
                     setSelectedField(opt.key);
                     setFieldPickerVisible(false);

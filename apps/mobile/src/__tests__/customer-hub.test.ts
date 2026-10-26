@@ -363,7 +363,11 @@ describe('GrowFast Mobile POS — Customer Hub & Order History (Phase 1B)', () =
       return {
         success: true,
         data: [
-          mockOrderSummary({ id: 'ord-ready-1', orderNumber: 'GF-2001', status: OrderStatus.READY }),
+          mockOrderSummary({
+            id: 'ord-ready-1',
+            orderNumber: 'GF-2001',
+            status: OrderStatus.READY,
+          }),
         ],
         total: 1,
         page: 1,
@@ -481,19 +485,19 @@ describe('GrowFast Mobile POS — Customer Hub & Order History (Phase 1B)', () =
     const p1 = await apiClient.orders.list({ customerId: 'cust-1', page: 1, pageSize: 10 });
     assert.equal(p1.data.length, 10);
     assert.equal(p1.total, 25);
-    const hasMoreP1 = (p1.page * p1.pageSize) < p1.total;
+    const hasMoreP1 = p1.page * p1.pageSize < p1.total;
     assert.equal(hasMoreP1, true, 'Page 1 should indicate hasMoreOrders');
 
     // Page 2
     const p2 = await apiClient.orders.list({ customerId: 'cust-1', page: 2, pageSize: 10 });
     assert.equal(p2.data.length, 10);
-    const hasMoreP2 = (p2.page * p2.pageSize) < p2.total;
+    const hasMoreP2 = p2.page * p2.pageSize < p2.total;
     assert.equal(hasMoreP2, true, 'Page 2 should indicate hasMoreOrders');
 
     // Page 3
     const p3 = await apiClient.orders.list({ customerId: 'cust-1', page: 3, pageSize: 10 });
     assert.equal(p3.data.length, 5);
-    const hasMoreP3 = (p3.page * p3.pageSize) < p3.total;
+    const hasMoreP3 = p3.page * p3.pageSize < p3.total;
     assert.equal(hasMoreP3, false, 'Page 3 should indicate hasMoreOrders = false');
 
     // Total aggregated orders
@@ -513,7 +517,11 @@ describe('GrowFast Mobile POS — Customer Hub & Order History (Phase 1B)', () =
     };
 
     // Simulate async fetch with variable delay
-    const simulateFetch = async (customerId: string, delayMs: number, orders: OrderSummaryDTO[]) => {
+    const simulateFetch = async (
+      customerId: string,
+      delayMs: number,
+      orders: OrderSummaryDTO[],
+    ) => {
       const currentReqId = ++requestIdCounter;
       activeCustomerRef = customerId;
 
@@ -566,7 +574,7 @@ describe('GrowFast Mobile POS — Customer Hub & Order History (Phase 1B)', () =
     assert.equal(sample.amountDue, 200);
 
     // Outstanding balance computation check
-    const calculatedDue = sample.amountDue ?? (sample.totalAmount - (sample.amountPaid ?? 0));
+    const calculatedDue = sample.amountDue ?? sample.totalAmount - (sample.amountPaid ?? 0);
     assert.equal(calculatedDue, 200);
   });
 

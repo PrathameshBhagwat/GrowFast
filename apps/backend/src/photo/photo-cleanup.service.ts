@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnApplicationShutdown,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnApplicationShutdown } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PhotoStorageService } from './photo-storage.service';
 import { OrderStatus, ItemStatus } from '@growfast/shared-types';
@@ -72,14 +67,20 @@ export class PhotoCleanupService implements OnModuleInit, OnApplicationShutdown 
     // Initial delayed run after startup (30 seconds)
     setTimeout(() => {
       this.cleanupExpiredPhotos().catch((err) => {
-        this.logger.error('Error during initial photo cleanup run', err instanceof Error ? err.stack : undefined);
+        this.logger.error(
+          'Error during initial photo cleanup run',
+          err instanceof Error ? err.stack : undefined,
+        );
       });
     }, 30000);
 
     // Recurring interval
     this.timer = setInterval(() => {
       this.cleanupExpiredPhotos().catch((err) => {
-        this.logger.error('Error during scheduled photo cleanup run', err instanceof Error ? err.stack : undefined);
+        this.logger.error(
+          'Error during scheduled photo cleanup run',
+          err instanceof Error ? err.stack : undefined,
+        );
       });
     }, intervalMs);
   }
@@ -121,8 +122,7 @@ export class PhotoCleanupService implements OnModuleInit, OnApplicationShutdown 
     if (order.items && order.items.length > 0) {
       const hasUndelivered = order.items.some(
         (item) =>
-          item.itemStatus !== ItemStatus.DELIVERED &&
-          item.itemStatus !== ItemStatus.CANCELLED,
+          item.itemStatus !== ItemStatus.DELIVERED && item.itemStatus !== ItemStatus.CANCELLED,
       );
       if (hasUndelivered) {
         return false;

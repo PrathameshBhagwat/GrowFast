@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert, Platform, StatusBar } from 'react-native';
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Platform,
+  StatusBar,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CustomerDTO,
@@ -164,7 +173,7 @@ export function OrderWizardModal({
   const insets = useSafeAreaInsets();
   const topInset = Math.max(
     insets.top,
-    Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+    Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   );
 
   // Wizard Navigation
@@ -293,7 +302,9 @@ export function OrderWizardModal({
         setEntryMode(targetMode);
         if (targetWorkflow === 'DRY_CLEANING') {
           setSelectedCategory('ALL');
-          const dryCleanSvc = services.find((s) => s.category === ServiceCategory.DRY_CLEAN || s.id === 'srv-dry-clean');
+          const dryCleanSvc = services.find(
+            (s) => s.category === ServiceCategory.DRY_CLEAN || s.id === 'srv-dry-clean',
+          );
           setSelectedServiceId(dryCleanSvc ? dryCleanSvc.id : 'srv-dry-clean');
         } else if (targetMode === 'WEIGHT') {
           setSelectedCategory(GarmentCategory.WEIGHT_BASED);

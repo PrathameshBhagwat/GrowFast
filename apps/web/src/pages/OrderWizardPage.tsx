@@ -666,7 +666,9 @@ export function OrderWizardPage() {
         expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
       });
       return preview.expressSurcharge;
-    } catch { return 0; }
+    } catch {
+      return 0;
+    }
   }, [pricingInputs, storeConfig]);
 
   const sameDayPreviewSurcharge = useMemo(() => {
@@ -678,7 +680,9 @@ export function OrderWizardPage() {
         expressDeliveryOption: ExpressDeliveryOption.SAME_DAY,
       });
       return preview.expressSurcharge;
-    } catch { return 0; }
+    } catch {
+      return 0;
+    }
   }, [pricingInputs, storeConfig]);
 
   const totalRegularGarments = useMemo(() => {

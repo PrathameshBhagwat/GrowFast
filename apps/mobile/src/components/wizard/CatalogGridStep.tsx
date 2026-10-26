@@ -232,11 +232,9 @@ export function CatalogGridStep({
     }
     setWeightError(null);
 
-    const weightGarment =
-      garments.find(
-        (g) =>
-          g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category),
-      ) ||
+    const weightGarment = garments.find(
+      (g) => g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category),
+    ) ||
       garments[0] || {
         id: 'g-wb-1',
         name: 'Weight Based Laundry',
@@ -454,10 +452,7 @@ export function CatalogGridStep({
               {[2.0, 3.0, 4.0, 5.0, 8.0, 10.0].map((preset) => (
                 <TouchableOpacity
                   key={preset}
-                  style={[
-                    styles.presetChip,
-                    parsedWeightVal === preset && styles.presetChipActive,
-                  ]}
+                  style={[styles.presetChip, parsedWeightVal === preset && styles.presetChipActive]}
                   onPress={() => handleSetPresetWeight(preset)}
                   accessible={true}
                   accessibilityLabel={`Set weight to ${preset.toFixed(2)} kg`}
@@ -478,7 +473,9 @@ export function CatalogGridStep({
             <View style={styles.garmentCountSection}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.garmentCountTitle}>Pieces in Bag</Text>
-                <Text style={styles.garmentCountSubtitle}>Physical count for intake verification</Text>
+                <Text style={styles.garmentCountSubtitle}>
+                  Physical count for intake verification
+                </Text>
               </View>
               <View style={styles.countStepperRow}>
                 <TouchableOpacity
@@ -537,7 +534,8 @@ export function CatalogGridStep({
                       {serviceDisplayName} • {item.weight} kg
                     </Text>
                     <Text style={styles.cartWeightItemSub}>
-                      {item.quantity} pieces • ₹{((item.weight || 0) * (item.unitPrice || 0)).toFixed(2)}
+                      {item.quantity} pieces • ₹
+                      {((item.weight || 0) * (item.unitPrice || 0)).toFixed(2)}
                     </Text>
                   </View>
                   {onRemoveItem && (

@@ -1,6 +1,13 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { apiClient, setApiConfig, ApiError, onUnauthorized, triggerUnauthorized, _resetUnauthorizedLock } from '../api/client';
+import {
+  apiClient,
+  setApiConfig,
+  ApiError,
+  onUnauthorized,
+  triggerUnauthorized,
+  _resetUnauthorizedLock,
+} from '../api/client';
 import {
   saveAuthToken,
   getAuthToken,
@@ -397,10 +404,7 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
 
   it('14. Route guard decisions route unauthenticated users to login and authenticated users to tabs', () => {
     // Pure function logic mirroring ProtectedRoutes in _layout.tsx
-    function resolveGuardedRoute(
-      currentPath: string,
-      isAuthenticated: boolean,
-    ): string | null {
+    function resolveGuardedRoute(currentPath: string, isAuthenticated: boolean): string | null {
       const inAuthGroup = currentPath.startsWith('/(auth)') || currentPath === '/login';
       const inTabsGroup = currentPath.startsWith('/(tabs)') || currentPath === '/dashboard';
       const isAtRoot = currentPath === '/' || currentPath === '';

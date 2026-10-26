@@ -119,12 +119,7 @@ export function CustomerProfileModal({
   const hasDiscount = customer.discountPercent && customer.discountPercent > 0;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <SafeAreaView style={styles.sheetContainer}>
           {/* Header */}
@@ -165,7 +160,9 @@ export function CustomerProfileModal({
               accessibilityLabel={`Create Per-Piece Order for ${customer.name}`}
             >
               <Icon name="shirt-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.orderPerPieceBtnText} numberOfLines={1}>Per-Piece</Text>
+              <Text style={styles.orderPerPieceBtnText} numberOfLines={1}>
+                Per-Piece
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -179,7 +176,9 @@ export function CustomerProfileModal({
               accessibilityLabel={`Create Per-Weight Order for ${customer.name}`}
             >
               <Icon name="scale-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.orderPerWeightBtnText} numberOfLines={1}>Per-Weight</Text>
+              <Text style={styles.orderPerWeightBtnText} numberOfLines={1}>
+                Per-Weight
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -193,7 +192,9 @@ export function CustomerProfileModal({
               accessibilityLabel={`Create Dry Cleaning Order for ${customer.name}`}
             >
               <Icon name="sparkles-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.orderDryCleanBtnText} numberOfLines={1}>Dry Clean</Text>
+              <Text style={styles.orderDryCleanBtnText} numberOfLines={1}>
+                Dry Clean
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -209,7 +210,12 @@ export function CustomerProfileModal({
               accessibilityRole="button"
               accessibilityLabel="Return to Customer Search"
             >
-              <Icon name="arrow-back-outline" size={16} color="#1765F5" style={{ marginRight: 6 }} />
+              <Icon
+                name="arrow-back-outline"
+                size={16}
+                color="#1765F5"
+                style={{ marginRight: 6 }}
+              />
               <Text style={styles.returnToSearchText}>Return to Customer Search</Text>
             </TouchableOpacity>
           </View>
@@ -307,12 +313,11 @@ export function CustomerProfileModal({
             ) : (
               <View style={styles.orderListContainer}>
                 {orders.map((ord) => {
-                  const statusColors =
-                    ORDER_STATUS_COLORS[ord.status as OrderStatus] || {
-                      bg: '#f1f5f9',
-                      text: '#475569',
-                      border: '#cbd5e1',
-                    };
+                  const statusColors = ORDER_STATUS_COLORS[ord.status as OrderStatus] || {
+                    bg: '#f1f5f9',
+                    text: '#475569',
+                    border: '#cbd5e1',
+                  };
                   const orderNum = ord.orderNumber.startsWith('GF-')
                     ? `#${ord.orderNumber}`
                     : ord.orderNumber.startsWith('#')
@@ -358,7 +363,12 @@ export function CustomerProfileModal({
                           <Text style={styles.orderRowDue}>Due: ₹{ord.amountDue.toFixed(0)}</Text>
                         ) : null}
                       </View>
-                      <Icon name="chevron-forward" size={16} color="#94A3B8" style={{ marginLeft: 6 }} />
+                      <Icon
+                        name="chevron-forward"
+                        size={16}
+                        color="#94A3B8"
+                        style={{ marginLeft: 6 }}
+                      />
                     </TouchableOpacity>
                   );
                 })}

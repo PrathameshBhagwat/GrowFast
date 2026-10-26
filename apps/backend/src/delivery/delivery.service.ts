@@ -543,7 +543,11 @@ export class DeliveryService {
 
     // 10-day retention gatekeeping: do not expose proof photo if order was delivered >= 10 days ago
     const deliveryOrderDeliveredAt = delivery.order?.deliveredAt || delivery.completedAt;
-    if (deliveryOrderDeliveredAt && (delivery.order?.status === OrderStatus.DELIVERED || delivery.status === DeliveryStatus.COMPLETED)) {
+    if (
+      deliveryOrderDeliveredAt &&
+      (delivery.order?.status === OrderStatus.DELIVERED ||
+        delivery.status === DeliveryStatus.COMPLETED)
+    ) {
       const deliveredTime = new Date(deliveryOrderDeliveredAt).getTime();
       if (!isNaN(deliveredTime) && Date.now() - deliveredTime >= 10 * 24 * 60 * 60 * 1000) {
         resolvedProofPhotoUrl = null;

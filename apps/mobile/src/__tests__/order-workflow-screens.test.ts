@@ -225,7 +225,13 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
 
       // For Starching service, only Men, Women, Kids are allowed
       const starchingCategories = filterCategoriesForService(
-        ['ALL', GarmentCategory.MEN, GarmentCategory.WOMEN, GarmentCategory.KIDS, GarmentCategory.HOUSEHOLD],
+        [
+          'ALL',
+          GarmentCategory.MEN,
+          GarmentCategory.WOMEN,
+          GarmentCategory.KIDS,
+          GarmentCategory.HOUSEHOLD,
+        ],
         'srv-starching',
         [{ id: 'srv-starching', name: 'Starching' }],
         'DRY_CLEANING',
@@ -268,12 +274,22 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(toLaundry.serviceId, 'srv-wash-iron');
 
       // Incompatibility check: Weight item cannot exist in DRY_CLEANING
-      const weightItem = { isWeightBased: true, weight: 3.5, garmentCatalogId: 'g-laundry-kg', serviceTypeId: 'srv-wash-fold' };
+      const weightItem = {
+        isWeightBased: true,
+        weight: 3.5,
+        garmentCatalogId: 'g-laundry-kg',
+        serviceTypeId: 'srv-wash-fold',
+      };
       assert.equal(isItemCompatibleWithWorkflow(weightItem, 'DRY_CLEANING', mockServices), false);
       assert.equal(isItemCompatibleWithWorkflow(weightItem, 'LAUNDRY', mockServices), true);
 
       // Piece item in DRY_CLEANING is compatible
-      const pieceItem = { isWeightBased: false, weight: null, garmentCatalogId: 'g-shirt', serviceTypeId: 'srv-dry-clean' };
+      const pieceItem = {
+        isWeightBased: false,
+        weight: null,
+        garmentCatalogId: 'g-shirt',
+        serviceTypeId: 'srv-dry-clean',
+      };
       assert.equal(isItemCompatibleWithWorkflow(pieceItem, 'DRY_CLEANING', mockServices), true);
     });
 
@@ -671,7 +687,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       }
 
       assert.equal(wizardClosed, true, 'Wizard modal must be closed before opening detail');
-      assert.equal(activeDetailOrderId, 'ord-srv-confirm-9988', 'Authoritative server ID must be passed');
+      assert.equal(
+        activeDetailOrderId,
+        'ord-srv-confirm-9988',
+        'Authoritative server ID must be passed',
+      );
       assert.equal(detailModalVisible, true, 'OrderDetailModal must be set to visible');
     });
 
@@ -692,7 +712,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
         onViewOrderDetail(confirmedOfflineState.orderId);
       }
 
-      assert.equal(detailModalOpened, false, 'View Order Details must NOT trigger for offline queued drafts');
+      assert.equal(
+        detailModalOpened,
+        false,
+        'View Order Details must NOT trigger for offline queued drafts',
+      );
     });
   });
 
@@ -776,8 +800,18 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
     it('28. Multiple distinct catalog items can be added efficiently in one intake workflow', () => {
       const cartItems = [
         { garmentCatalogId: 'g-shirt', serviceTypeId: 'srv-wash-iron', quantity: 3, unitPrice: 60 },
-        { garmentCatalogId: 'g-trousers', serviceTypeId: 'srv-wash-iron', quantity: 2, unitPrice: 70 },
-        { garmentCatalogId: 'g-saree', serviceTypeId: 'srv-dry-clean', quantity: 1, unitPrice: 250 },
+        {
+          garmentCatalogId: 'g-trousers',
+          serviceTypeId: 'srv-wash-iron',
+          quantity: 2,
+          unitPrice: 70,
+        },
+        {
+          garmentCatalogId: 'g-saree',
+          serviceTypeId: 'srv-dry-clean',
+          quantity: 1,
+          unitPrice: 250,
+        },
       ];
 
       const totalPieces = cartItems.reduce((sum, it) => sum + it.quantity, 0);

@@ -339,7 +339,9 @@ describe('PhotoCleanupService & 10-Day Retention Rules', () => {
         status: OrderStatus.DELIVERED,
         deliveredAt: oldDeliveredAt,
         items: [{ itemStatus: ItemStatus.DELIVERED }],
-        photos: [{ id: 'photo-shared', url: 'uploads/photos/shared-logo.png', orderId: 'order-shared' }],
+        photos: [
+          { id: 'photo-shared', url: 'uploads/photos/shared-logo.png', orderId: 'order-shared' },
+        ],
         deliveryRecords: [],
       };
 
@@ -448,7 +450,9 @@ describe('PhotoCleanupService & 10-Day Retention Rules', () => {
         },
       ]);
 
-      mockStorage.getAccessUrl.mockResolvedValue('https://r2.cloudflarestorage.com/photo.jpg?signed');
+      mockStorage.getAccessUrl.mockResolvedValue(
+        'https://r2.cloudflarestorage.com/photo.jpg?signed',
+      );
 
       const dtos = await photoService.getOrderPhotos('order-near-expiry', 'store-001');
 

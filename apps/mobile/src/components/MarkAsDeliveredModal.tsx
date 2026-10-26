@@ -127,10 +127,7 @@ export function MarkAsDeliveredModal({
   });
 
   const selectedPhysicalCount = selectedGarmentIds.size;
-  const selectedLegacyCount = Object.values(legacyQuantities).reduce(
-    (sum, q) => sum + (q || 0),
-    0,
-  );
+  const selectedLegacyCount = Object.values(legacyQuantities).reduce((sum, q) => sum + (q || 0), 0);
   const totalSelectedCount = selectedPhysicalCount + selectedLegacyCount;
 
   // Check if this pickup would deliver all remaining active items (final handover)
@@ -363,7 +360,8 @@ export function MarkAsDeliveredModal({
                         <View key={pg.id} style={[styles.garmentRow, styles.garmentRowDisabled]}>
                           <Text style={styles.disabledCheckmark}>✓</Text>
                           <Text style={styles.garmentLabelDisabled}>
-                            Unit #{pg.unitNumber} {pg.tagId ? `(Tag: ${pg.tagId})` : ''} — Already Delivered
+                            Unit #{pg.unitNumber} {pg.tagId ? `(Tag: ${pg.tagId})` : ''} — Already
+                            Delivered
                           </Text>
                         </View>
                       );
@@ -458,10 +456,7 @@ export function MarkAsDeliveredModal({
                       {[PaymentMode.UPI, PaymentMode.CASH, PaymentMode.CARD].map((mode) => (
                         <TouchableOpacity
                           key={mode}
-                          style={[
-                            styles.modeTab,
-                            paymentMode === mode && styles.modeTabSelected,
-                          ]}
+                          style={[styles.modeTab, paymentMode === mode && styles.modeTabSelected]}
                           onPress={() => setPaymentMode(mode)}
                         >
                           <Text
@@ -478,7 +473,8 @@ export function MarkAsDeliveredModal({
                   </View>
                 ) : (
                   <Text style={styles.paymentWarningText}>
-                    ⚠️ Backend settlement gate: Full payment must be settled to complete final handover.
+                    ⚠️ Backend settlement gate: Full payment must be settled to complete final
+                    handover.
                   </Text>
                 )}
               </View>

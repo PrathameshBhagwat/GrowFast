@@ -73,11 +73,7 @@ export function ServiceCategoryStep({
 
   // Active service object
   const activeService = useMemo(() => {
-    return (
-      services.find((s) => s.id === selectedServiceId) ||
-      availableServices[0] ||
-      null
-    );
+    return services.find((s) => s.id === selectedServiceId) || availableServices[0] || null;
   }, [services, selectedServiceId, availableServices]);
 
   // Is weight-based pricing active?

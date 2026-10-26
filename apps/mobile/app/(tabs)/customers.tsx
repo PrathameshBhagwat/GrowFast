@@ -32,8 +32,6 @@ import { getUserSession, MobileUserSession } from '../../src/storage/secure-stor
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 
-
-
 export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -714,7 +712,8 @@ export default function CustomersScreen() {
                     value={newName}
                     onChangeText={(val) => {
                       setNewName(val);
-                      if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                      if (fieldErrors.name)
+                        setFieldErrors((prev) => ({ ...prev, name: undefined }));
                     }}
                     autoCapitalize="words"
                   />
@@ -734,7 +733,8 @@ export default function CustomersScreen() {
                     value={newPhone}
                     onChangeText={(val) => {
                       setNewPhone(val);
-                      if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+                      if (fieldErrors.phone)
+                        setFieldErrors((prev) => ({ ...prev, phone: undefined }));
                     }}
                   />
                   {fieldErrors.phone ? (
@@ -756,7 +756,8 @@ export default function CustomersScreen() {
                     value={newAddress}
                     onChangeText={(val) => {
                       setNewAddress(val);
-                      if (fieldErrors.address) setFieldErrors((prev) => ({ ...prev, address: undefined }));
+                      if (fieldErrors.address)
+                        setFieldErrors((prev) => ({ ...prev, address: undefined }));
                     }}
                   />
                   {fieldErrors.address ? (
@@ -775,7 +776,8 @@ export default function CustomersScreen() {
                     value={newPincode}
                     onChangeText={(val) => {
                       setNewPincode(val);
-                      if (fieldErrors.pincode) setFieldErrors((prev) => ({ ...prev, pincode: undefined }));
+                      if (fieldErrors.pincode)
+                        setFieldErrors((prev) => ({ ...prev, pincode: undefined }));
                     }}
                   />
                   {fieldErrors.pincode ? (
@@ -1219,7 +1221,9 @@ export default function CustomersScreen() {
 
                 {/* Order Action Buttons: 3 Specific Options matching Website Rules */}
                 <View style={styles.orderActionsContainer}>
-                  <Text style={styles.orderActionsTitle}>Create Order for {selectedCustomer.name}:</Text>
+                  <Text style={styles.orderActionsTitle}>
+                    Create Order for {selectedCustomer.name}:
+                  </Text>
                   <View style={styles.orderActionsRow}>
                     <TouchableOpacity
                       style={styles.perPieceActionBtn}

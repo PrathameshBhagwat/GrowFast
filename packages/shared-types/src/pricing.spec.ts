@@ -175,7 +175,7 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
 
     it('Calculates ₹1,000 base amount correctly for all 3 delivery options', () => {
       const thousandItems = [{ quantity: 10, unitPrice: 100 }];
-      
+
       // Regular: 1.0× => ₹1,000
       const regularTotals = calculateOrderTotals(thousandItems, {
         isExpress: false,
@@ -259,7 +259,7 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
     it('Applies express multipliers on discounted subtotal when discount is present', () => {
       // Subtotal ₹1000, 10% discount => discountedSubtotal = ₹900
       const orderItems = [{ quantity: 10, unitPrice: 100 }];
-      
+
       const tomorrowWithDiscount = calculateOrderTotals(orderItems, {
         discountPercent: 10,
         isExpress: true,

@@ -2,10 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { MockSQLiteDatabase } from './mock-sqlite';
 import { setDatabaseInstance, MIGRATIONS } from '../db/sqlite';
-import {
-  saveDraft,
-  generateUUID,
-} from '../db/drafts';
+import { saveDraft, generateUUID } from '../db/drafts';
 import {
   savePhotoLocally,
   getPhotosForDraft,
@@ -59,9 +56,7 @@ describe('GrowFast Mobile — 10-Day Photo Retention & Managed Storage Cleanup',
     await updatePhotoSyncStatus(photos[0].id, 'UPLOADED', { serverPhotoId: 'srv-p1' });
 
     // Order delivered 15 days ago (expired under 10-day retention)
-    const deliveredOrders = new Map<string, string>([
-      [serverOrderId, '2026-10-10T12:00:00.000Z'],
-    ]);
+    const deliveredOrders = new Map<string, string>([[serverOrderId, '2026-10-10T12:00:00.000Z']]);
 
     const result = await cleanupExpiredMobilePhotos({
       deliveredOrders,
@@ -95,9 +90,7 @@ describe('GrowFast Mobile — 10-Day Photo Retention & Managed Storage Cleanup',
     await linkPhotosToOrder(draftId, serverOrderId);
 
     // Delivered only 3 days ago (not expired)
-    const deliveredOrders = new Map<string, string>([
-      [serverOrderId, '2026-10-22T12:00:00.000Z'],
-    ]);
+    const deliveredOrders = new Map<string, string>([[serverOrderId, '2026-10-22T12:00:00.000Z']]);
 
     const result = await cleanupExpiredMobilePhotos({
       deliveredOrders,

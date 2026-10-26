@@ -15,7 +15,13 @@ import {
   clearUserSession,
   MobileUserSession,
 } from '../storage/secure-store';
-import { apiClient, onUnauthorized, setOnUnauthorized, AuthEmployeeProfile, ApiError } from '../api/client';
+import {
+  apiClient,
+  onUnauthorized,
+  setOnUnauthorized,
+  AuthEmployeeProfile,
+  ApiError,
+} from '../api/client';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
@@ -37,9 +43,7 @@ export function parseJwtPayload(token: string): { exp?: number; sub?: string } |
       base64 += '=';
     }
     const decoded =
-      typeof atob === 'function'
-        ? atob(base64)
-        : Buffer.from(base64, 'base64').toString('binary');
+      typeof atob === 'function' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
     return JSON.parse(decoded);
   } catch {
     return null;
@@ -135,7 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (apiErr: unknown) {
           const is401 = apiErr instanceof ApiError && apiErr.statusCode === 401;
           if (is401) {
-            console.warn('[AuthProvider] Stored session rejected by backend (401). Clearing session.');
+            console.warn(
+              '[AuthProvider] Stored session rejected by backend (401). Clearing session.',
+            );
             await clearUserSession();
             if (isMounted) {
               setToken(null);
@@ -144,7 +150,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           } else {
             // Network failure: preserve valid, non-expired offline session on mobile hardware
-            console.log('[AuthProvider] Server unreachable on startup; preserving valid offline session.');
+            console.log(
+              '[AuthProvider] Server unreachable on startup; preserving valid offline session.',
+            );
             if (isMounted) {
               setToken(storedToken);
               setUser(storedUser);
@@ -196,11 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [isAuthenticated, isLoading, token, user, login, logout],
   );
 
-  return (
-    <AuthContext.Provider value={authValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextType {

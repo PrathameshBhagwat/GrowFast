@@ -114,7 +114,10 @@ export class NativeSecureStoreAdapter implements StorageAdapter {
 
     // Never call native SecureStore on Web or Node.js test environments
     const isWeb = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-    const isNode = typeof process !== 'undefined' && Boolean(process.versions?.node) && typeof window === 'undefined';
+    const isNode =
+      typeof process !== 'undefined' &&
+      Boolean(process.versions?.node) &&
+      typeof window === 'undefined';
     if (isWeb || isNode) {
       this.available = false;
       return null;
@@ -185,7 +188,10 @@ export function getStorageAdapter(): StorageAdapter {
 
   const memory = new MemoryStorageAdapter();
   const isWeb = typeof window !== 'undefined' && typeof window.document !== 'undefined';
-  const isNode = typeof process !== 'undefined' && Boolean(process.versions?.node) && typeof window === 'undefined';
+  const isNode =
+    typeof process !== 'undefined' &&
+    Boolean(process.versions?.node) &&
+    typeof window === 'undefined';
 
   if (isWeb) {
     activeAdapter = new WebStorageAdapter(memory);

@@ -821,14 +821,22 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
     const result = await engine.syncDraft(draftId);
 
     assert.equal(result.success, false);
-    assert.equal(orderCreateAttempted, false, 'Must never submit order with unresolved temporary customer ID');
+    assert.equal(
+      orderCreateAttempted,
+      false,
+      'Must never submit order with unresolved temporary customer ID',
+    );
     assert.match(result.error || '', /Customer resolution failed/i);
 
     const draftAfterFail = await getDraft(draftId);
     assert.ok(draftAfterFail);
     assert.equal(draftAfterFail.syncStatus, 'FAILED_RETRYABLE');
     assert.equal(draftAfterFail.retryCount, 1);
-    assert.equal(draftAfterFail.clientDraftId, draftId, 'Original draft identity must be preserved');
+    assert.equal(
+      draftAfterFail.clientDraftId,
+      draftId,
+      'Original draft identity must be preserved',
+    );
 
     // Restore
     apiClient.customers.search = originalSearch;

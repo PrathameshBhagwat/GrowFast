@@ -222,7 +222,9 @@ export default function LoginScreen() {
         setLockoutUntil(Date.now() + 60000);
         setErrorMsg('Too many failed attempts. Temporary lockout active. Try again in 60s.');
       } else if (err.statusCode === 401 || err.message?.toLowerCase().includes('credential')) {
-        setErrorMsg(`Invalid PIN. Please check your staff PIN and try again. (Attempt ${attempts}/5)`);
+        setErrorMsg(
+          `Invalid PIN. Please check your staff PIN and try again. (Attempt ${attempts}/5)`,
+        );
       } else if (
         err.message?.includes('Network request failed') ||
         err.message?.includes('Failed to fetch') ||
@@ -375,12 +377,7 @@ export default function LoginScreen() {
                         : 'Select who you are'}
                   </Text>
                 </View>
-                <Icon
-                  name="chevron-down"
-                  size={20}
-                  color="#2563eb"
-                  style={{ marginLeft: 8 }}
-                />
+                <Icon name="chevron-down" size={20} color="#2563eb" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
             </View>
 
@@ -469,11 +466,17 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.signInButton,
-                (isLoading || !selectedEmpId || pin.length < 4 || pin.length > 6 || !!lockoutUntil) &&
+                (isLoading ||
+                  !selectedEmpId ||
+                  pin.length < 4 ||
+                  pin.length > 6 ||
+                  !!lockoutUntil) &&
                   styles.signInButtonDisabled,
               ]}
               onPress={handleLogin}
-              disabled={isLoading || !selectedEmpId || pin.length < 4 || pin.length > 6 || !!lockoutUntil}
+              disabled={
+                isLoading || !selectedEmpId || pin.length < 4 || pin.length > 6 || !!lockoutUntil
+              }
               activeOpacity={0.8}
               accessible={true}
               accessibilityLabel="Sign In Button"
@@ -483,12 +486,7 @@ export default function LoginScreen() {
               ) : (
                 <View style={styles.signInButtonInner}>
                   <Text style={styles.signInButtonText}>Sign In</Text>
-                  <Icon
-                    name="arrow-forward"
-                    size={20}
-                    color="#ffffff"
-                    style={{ marginLeft: 8 }}
-                  />
+                  <Icon name="arrow-forward" size={20} color="#ffffff" style={{ marginLeft: 8 }} />
                 </View>
               )}
             </TouchableOpacity>

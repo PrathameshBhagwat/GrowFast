@@ -74,7 +74,7 @@ export function ItemDetailsModal({
   const insets = useSafeAreaInsets();
   const topInset = Math.max(
     insets.top,
-    Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+    Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   );
 
   const isWeightBased =

@@ -246,7 +246,10 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     // 2 shirts * unitPrice, plus 18% GST
     assert.ok(serverOrder.subtotal > 0, 'Subtotal must be positive');
     assert.ok(serverOrder.taxAmount >= 0, 'Tax amount must be non-negative');
-    assert.ok(serverOrder.totalAmount >= serverOrder.subtotal, 'Total amount must be greater than or equal to subtotal');
+    assert.ok(
+      serverOrder.totalAmount >= serverOrder.subtotal,
+      'Total amount must be greater than or equal to subtotal',
+    );
   });
 
   // 7. Real Order Creation — Weight-Based Order & Minimum Weight Rule Enforcement
@@ -550,7 +553,10 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
 
     // Verify physical garments generated (4 garments inside the bag, each with physical tag)
     assert.equal(wtItem.physicalGarments?.length, garmentsInWeightBag);
-    assert.ok(wtItem.physicalGarments?.[0].tagId, 'Physical tag must be generated for weight piece');
+    assert.ok(
+      wtItem.physicalGarments?.[0].tagId,
+      'Physical tag must be generated for weight piece',
+    );
 
     // ─── B. Pure Per-Piece Order (mode: PIECES) ─────────────────────────
     const pieceDraftId = `draft-e2e-pure-pc-${Date.now()}`;
@@ -632,13 +638,20 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
       reference: 'PARTIAL-CASH-REC',
       idempotencyKey: partialIdempotencyKey,
     });
-    assert.equal(retryPayment1.id, payment1.id, 'Idempotent retry must return identical payment record');
+    assert.equal(
+      retryPayment1.id,
+      payment1.id,
+      'Idempotent retry must return identical payment record',
+    );
 
     // Verify partial status on order
     const afterPartialOrder = await apiClient.orders.getById(confirmedOrderId);
     assert.equal(afterPartialOrder.paymentStatus, PaymentStatus.PARTIAL);
     assert.equal(afterPartialOrder.amountPaid, partialAmount);
-    assert.equal(afterPartialOrder.amountDue, roundCurrency(afterPartialOrder.totalAmount - partialAmount));
+    assert.equal(
+      afterPartialOrder.amountDue,
+      roundCurrency(afterPartialOrder.totalAmount - partialAmount),
+    );
 
     // C. Record Full Remaining Balance Payment
     const remainingBalance = afterPartialOrder.amountDue;
