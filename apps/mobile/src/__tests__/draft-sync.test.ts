@@ -604,4 +604,275 @@ describe('GrowFast Mobile Phase C — Offline Drafts & Synchronization Engine', 
     const readyPhotos = await getPhotosReadyForUpload();
     assert.equal(readyPhotos.length, 0); // Already uploaded photos are skipped
   });
+
+  // 16. Offline temporary customer ID resolves existing customer by phone and submits order idempotently
+  it('16. Offline temporary customer ID resolves existing server customer by phone and submits order idempotently', async () => {
+    const draftId = generateUUID();
+    const tempCustomerId = 'cust-offline-temp';
+
+    await saveDraft({
+      clientDraftId: draftId,
+      storeId: 'store-1',
+      customerId: tempCustomerId,
+      customerName: 'Ananya Deshmukh',
+      customerPhone: '9820011223',
+      payload: {
+        customerId: tempCustomerId,
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [],
+      },
+    });
+    await queueDraftForSync(draftId);
+
+    const originalSearch = apiClient.customers.search;
+    const originalCreateCust = apiClient.customers.create;
+    const originalCreateOrder = apiClient.orders.create;
+    const originalGetByDraft = apiClient.orders.getByDraftId;
+
+    let customerSearchCalledWith: string | null = null;
+    let customerCreateCalled = false;
+    let orderSubmittedCustomerId: string | null = null;
+
+    apiClient.customers.search = async (query?: string) => {
+      customerSearchCalledWith = query || null;
+      return {
+        success: true,
+        data: [
+          {
+            id: 'cust-server-real-789',
+            name: 'Ananya Deshmukh',
+            phone: '9820011223',
+          } as any,
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 5,
+        totalPages: 1,
+      };
+    };
+
+    apiClient.customers.create = async () => {
+      customerCreateCalled = true;
+      throw new Error('Should not create duplicate customer when existing found');
+    };
+
+    apiClient.orders.getByDraftId = async () => {
+      throw new ApiError('Not found', 404);
+    };
+
+    apiClient.orders.create = async (payload) => {
+      orderSubmittedCustomerId = payload.customerId;
+      assert.notEqual(
+        payload.customerId,
+        tempCustomerId,
+        'Order submission must never receive temporary customer ID',
+      );
+      assert.equal(payload.clientDraftId, draftId, 'Original idempotency key must be preserved');
+      return {
+        id: 'ord-srv-real-555',
+        orderNumber: 'ORD-20261025-0001',
+        clientDraftId: payload.clientDraftId,
+      } as any;
+    };
+
+    const engine = new SyncEngine();
+    const result = await engine.syncDraft(draftId);
+
+    assert.equal(result.success, true);
+    assert.equal(customerSearchCalledWith, '9820011223');
+    assert.equal(customerCreateCalled, false, 'Duplicate customer must not be created');
+    assert.equal(orderSubmittedCustomerId, 'cust-server-real-789');
+
+    const syncedDraft = await getDraft(draftId);
+    assert.ok(syncedDraft);
+    assert.equal(syncedDraft.syncStatus, 'SYNCED');
+    assert.equal(syncedDraft.customerId, 'cust-server-real-789');
+    assert.equal(syncedDraft.payload.customerId, 'cust-server-real-789');
+    assert.equal(syncedDraft.serverOrderId, 'ord-srv-real-555');
+
+    // Restore
+    apiClient.customers.search = originalSearch;
+    apiClient.customers.create = originalCreateCust;
+    apiClient.orders.create = originalCreateOrder;
+    apiClient.orders.getByDraftId = originalGetByDraft;
+  });
+
+  // 17. Offline temporary customer creates new server customer when phone not found and submits order
+  it('17. Offline temporary customer creates new server customer when phone not found and submits order', async () => {
+    const draftId = generateUUID();
+    const tempCustomerId = 'cust-offline-temp';
+
+    await saveDraft({
+      clientDraftId: draftId,
+      storeId: 'store-1',
+      customerId: tempCustomerId,
+      customerName: 'Pooja Hegde',
+      customerPhone: '9833344455',
+      payload: {
+        customerId: tempCustomerId,
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [],
+      },
+    });
+    await queueDraftForSync(draftId);
+
+    const originalSearch = apiClient.customers.search;
+    const originalCreateCust = apiClient.customers.create;
+    const originalCreateOrder = apiClient.orders.create;
+    const originalGetByDraft = apiClient.orders.getByDraftId;
+
+    let customerCreatedPayload: any = null;
+    let orderSubmittedCustomerId: string | null = null;
+
+    apiClient.customers.search = async () => ({
+      success: true,
+      data: [],
+      total: 0,
+      page: 1,
+      pageSize: 5,
+      totalPages: 0,
+    });
+
+    apiClient.customers.create = async (payload) => {
+      customerCreatedPayload = payload;
+      return {
+        id: 'cust-brand-new-999',
+        name: payload.name,
+        phone: payload.phone,
+      } as any;
+    };
+
+    apiClient.orders.getByDraftId = async () => {
+      throw new ApiError('Not found', 404);
+    };
+
+    apiClient.orders.create = async (payload) => {
+      orderSubmittedCustomerId = payload.customerId;
+      assert.equal(payload.customerId, 'cust-brand-new-999');
+      return {
+        id: 'ord-brand-new-111',
+        orderNumber: 'ORD-20261025-0002',
+        clientDraftId: payload.clientDraftId,
+      } as any;
+    };
+
+    const engine = new SyncEngine();
+    const result = await engine.syncDraft(draftId);
+
+    assert.equal(result.success, true);
+    assert.equal(customerCreatedPayload.name, 'Pooja Hegde');
+    assert.equal(customerCreatedPayload.phone, '9833344455');
+    assert.equal(orderSubmittedCustomerId, 'cust-brand-new-999');
+
+    const synced = await getDraft(draftId);
+    assert.equal(synced?.customerId, 'cust-brand-new-999');
+    assert.equal(synced?.payload.customerId, 'cust-brand-new-999');
+    assert.equal(synced?.serverOrderId, 'ord-brand-new-111');
+
+    // Restore
+    apiClient.customers.search = originalSearch;
+    apiClient.customers.create = originalCreateCust;
+    apiClient.orders.create = originalCreateOrder;
+    apiClient.orders.getByDraftId = originalGetByDraft;
+  });
+
+  // 18. Customer resolution failure retains draft in FAILED_RETRYABLE and never submits temporary customer ID
+  it('18. Customer resolution failure retains draft in FAILED_RETRYABLE and never submits temporary customer ID', async () => {
+    const draftId = generateUUID();
+    const tempCustomerId = 'cust-offline-temp';
+
+    await saveDraft({
+      clientDraftId: draftId,
+      storeId: 'store-1',
+      customerId: tempCustomerId,
+      customerName: 'Fail Test User',
+      customerPhone: '9811122233',
+      payload: {
+        customerId: tempCustomerId,
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [],
+      },
+    });
+    await queueDraftForSync(draftId);
+
+    const originalSearch = apiClient.customers.search;
+    const originalCreateOrder = apiClient.orders.create;
+    const originalGetByDraft = apiClient.orders.getByDraftId;
+
+    let orderCreateAttempted = false;
+
+    apiClient.orders.getByDraftId = async () => {
+      throw new ApiError('Not found', 404);
+    };
+
+    apiClient.customers.search = async () => {
+      throw new Error('Customer service network timeout');
+    };
+
+    apiClient.orders.create = async () => {
+      orderCreateAttempted = true;
+      throw new Error('Order creation must not be called when customer resolution fails');
+    };
+
+    const engine = new SyncEngine();
+    const result = await engine.syncDraft(draftId);
+
+    assert.equal(result.success, false);
+    assert.equal(orderCreateAttempted, false, 'Must never submit order with unresolved temporary customer ID');
+    assert.match(result.error || '', /Customer resolution failed/i);
+
+    const draftAfterFail = await getDraft(draftId);
+    assert.ok(draftAfterFail);
+    assert.equal(draftAfterFail.syncStatus, 'FAILED_RETRYABLE');
+    assert.equal(draftAfterFail.retryCount, 1);
+    assert.equal(draftAfterFail.clientDraftId, draftId, 'Original draft identity must be preserved');
+
+    // Restore
+    apiClient.customers.search = originalSearch;
+    apiClient.orders.create = originalCreateOrder;
+    apiClient.orders.getByDraftId = originalGetByDraft;
+  });
+
+  // 19. Repeated sync on resolved/synced order returns existing confirmed server order idempotently
+  it('19. Repeated sync on resolved/synced order returns existing confirmed server order idempotently', async () => {
+    const draftId = generateUUID();
+    await saveDraft({
+      clientDraftId: draftId,
+      storeId: 'store-1',
+      customerId: 'cust-resolved-444',
+      customerName: 'Idempotency Check',
+      customerPhone: '9900011122',
+      payload: {
+        customerId: 'cust-resolved-444',
+        isExpress: false,
+        pickupType: PickupType.STORE_PICKUP,
+        items: [],
+      },
+    });
+    await updateDraftSyncStatus(draftId, 'SYNCED', {
+      serverOrderId: 'ord-already-synced-777',
+      serverOrderNumber: 'ORD-20261025-0044',
+    });
+
+    let networkCallMade = false;
+    const originalCreateOrder = apiClient.orders.create;
+    apiClient.orders.create = async () => {
+      networkCallMade = true;
+      throw new Error('Network call should not be made for already SYNCED draft');
+    };
+
+    const engine = new SyncEngine();
+    const result = await engine.syncDraft(draftId);
+
+    assert.equal(result.success, true);
+    assert.equal(result.orderId, 'ord-already-synced-777');
+    assert.equal(result.orderNumber, 'ORD-20261025-0044');
+    assert.equal(networkCallMade, false, 'No duplicate server submission should occur');
+
+    // Restore
+    apiClient.orders.create = originalCreateOrder;
+  });
 });

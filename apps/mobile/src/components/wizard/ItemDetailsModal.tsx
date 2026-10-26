@@ -10,8 +10,10 @@ import {
   Alert,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {
   GarmentCatalogDTO,
@@ -68,6 +70,12 @@ export function ItemDetailsModal({
   const [itemPhotos, setItemPhotos] = useState<PendingPhoto[]>([]);
   const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
   const [weightError, setWeightError] = useState<string | null>(null);
+
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+  );
 
   const isWeightBased =
     garment?.category === GarmentCategory.WEIGHT_BASED ||
@@ -255,7 +263,7 @@ export function ItemDetailsModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.safeContainer}>
+      <View style={[styles.safeContainer, { paddingTop: topInset, paddingBottom: insets.bottom }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerCancelBtn}>
@@ -290,30 +298,131 @@ export function ItemDetailsModal({
                 ₹{parsedRate.toFixed(2)} {isWeightBased ? '/ kg' : '/ piece'}
               </Text>
             </View>
+            <View style={[styles.pricingPreviewRow, { borderTopWidth: 0, paddingTop: 4 }]}>
+              <Text style={styles.previewRateLabel}>Estimated Line Total:</Text>
+              <Text style={[styles.previewRateValue, { color: '#16a34a' }]}>
+                ₹{estimatedLineTotal.toFixed(2)}
+              </Text>
+            </View>
           </View>
 
           {/* Quantity or Weight Input */}
           {isWeightBased ? (
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Measured Weight (kg) *</Text>
-              <Text style={styles.inputSubtitle}>
-                Minimum required weight is 2.00 kg per store policy
-              </Text>
-              <TextInput
-                style={[styles.textInput, weightError && styles.textInputError]}
-                keyboardType="decimal-pad"
-                value={weight}
-                onChangeText={(val) => {
-                  setWeight(val);
-                  setWeightError(null);
-                }}
-                placeholder="2.00"
-                placeholderTextColor="#94a3b8"
-                accessible={true}
-                accessibilityLabel="Measured laundry weight in kilograms"
-              />
-              {weightError && <Text style={styles.errorText}>{weightError}</Text>}
-            </View>
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Measured Weight (kg) *</Text>
+                <Text style={styles.inputSubtitle}>
+                  Minimum required weight is 2.00 kg per store policy
+                </Text>
+                <TextInput
+                  style={[styles.textInput, weightError && styles.textInputError]}
+                  keyboardType="decimal-pad"
+                  value={weight}
+                  onChangeText={(val) => {
+                    setWeight(val);
+                    setWeightError(null);
+                  }}
+                  placeholder="2.00"
+                  placeholderTextColor="#94a3b8"
+                  accessible={true}
+                  accessibilityLabel="Measured laundry weight in kilograms"
+                />
+                {weightError && <Text style={styles.errorText}>{weightError}</Text>}
+
+                {/* Quick Weight Presets (Workstream 2) */}
+                <View style={styles.quickChipsRow}>
+                  {['2.00', '3.00', '5.00', '10.00'].map((preset) => (
+                    <TouchableOpacity
+                      key={preset}
+                      style={[styles.quickChipBtn, weight === preset && styles.quickChipBtnActive]}
+                      onPress={() => {
+                        setWeight(preset);
+                        setWeightError(null);
+                      }}
+                      accessible={true}
+                      accessibilityLabel={`Set weight to ${preset} kg`}
+                    >
+                      <Text
+                        style={[
+                          styles.quickChipBtnText,
+                          weight === preset && styles.quickChipBtnTextActive,
+                        ]}
+                      >
+                        {preset} kg
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Garment Count in Weight Bag (matching website LaundryWeightOrderEntry) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Garments Count (Pieces in Bag) *</Text>
+                <Text style={styles.inputSubtitle}>
+                  Number of physical garments for tag tracking & inspection
+                </Text>
+                <View style={styles.quantityStepperRow}>
+                  <TouchableOpacity
+                    style={styles.quantityStepperBtn}
+                    onPress={() => {
+                      const q = Math.max(1, (parseInt(quantity, 10) || 1) - 1);
+                      setQuantity(String(q));
+                    }}
+                    accessible={true}
+                    accessibilityLabel="Decrease garment count"
+                  >
+                    <Text style={styles.quantityStepperBtnText}>−</Text>
+                  </TouchableOpacity>
+
+                  <TextInput
+                    style={styles.quantityInput}
+                    keyboardType="number-pad"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    accessible={true}
+                    accessibilityLabel="Garment count"
+                  />
+
+                  <TouchableOpacity
+                    style={styles.quantityStepperBtn}
+                    onPress={() => {
+                      const q = (parseInt(quantity, 10) || 1) + 1;
+                      setQuantity(String(q));
+                    }}
+                    accessible={true}
+                    accessibilityLabel="Increase garment count"
+                  >
+                    <Text style={styles.quantityStepperBtnText}>＋</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Quick Increment Chips */}
+                <View style={styles.quickChipsRow}>
+                  {[1, 2, 5, 10].map((inc) => (
+                    <TouchableOpacity
+                      key={inc}
+                      style={styles.quickChipBtn}
+                      onPress={() => {
+                        const current = parseInt(quantity, 10) || 1;
+                        setQuantity(String(current + inc));
+                      }}
+                      accessible={true}
+                      accessibilityLabel={`Add ${inc} more garments`}
+                    >
+                      <Text style={styles.quickChipBtnText}>+{inc}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    style={[styles.quickChipBtn, styles.quickChipResetBtn]}
+                    onPress={() => setQuantity('1')}
+                    accessible={true}
+                    accessibilityLabel="Reset count to 1"
+                  >
+                    <Text style={styles.quickChipResetBtnText}>Reset</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
           ) : (
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Piece Quantity *</Text>
@@ -349,6 +458,32 @@ export function ItemDetailsModal({
                   accessibilityLabel="Increase quantity"
                 >
                   <Text style={styles.quantityStepperBtnText}>＋</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Increment Chips for Fast Bulk Intake (Workstream 2) */}
+              <View style={styles.quickChipsRow}>
+                {[1, 2, 5, 10].map((inc) => (
+                  <TouchableOpacity
+                    key={inc}
+                    style={styles.quickChipBtn}
+                    onPress={() => {
+                      const current = parseInt(quantity, 10) || 1;
+                      setQuantity(String(current + inc));
+                    }}
+                    accessible={true}
+                    accessibilityLabel={`Add ${inc} more pieces`}
+                  >
+                    <Text style={styles.quickChipBtnText}>+{inc}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[styles.quickChipBtn, styles.quickChipResetBtn]}
+                  onPress={() => setQuantity('1')}
+                  accessible={true}
+                  accessibilityLabel="Reset quantity to 1"
+                >
+                  <Text style={styles.quickChipResetBtnText}>Reset</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -487,7 +622,7 @@ export function ItemDetailsModal({
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -672,6 +807,44 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     textAlign: 'center',
     minHeight: 44,
+  },
+  quickChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  quickChipBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickChipBtnActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  quickChipBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  quickChipBtnTextActive: {
+    color: '#ffffff',
+  },
+  quickChipResetBtn: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#fca5a5',
+  },
+  quickChipResetBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b91c1c',
   },
   defectTagsRow: {
     flexDirection: 'row',

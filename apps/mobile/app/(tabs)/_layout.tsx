@@ -1,7 +1,8 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
+import { Tabs, Redirect } from 'expo-router';
+import { Text, View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 const Icon = Ionicons as unknown as React.ComponentType<{
   name: string;
@@ -11,6 +12,19 @@ const Icon = Ionicons as unknown as React.ComponentType<{
 }>;
 
 export default function TabsLayout() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2563eb" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
   return (
     <Tabs
       screenOptions={{
@@ -103,5 +117,11 @@ const styles = StyleSheet.create({
   },
   tabEmoji: {
     fontSize: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
   },
 });

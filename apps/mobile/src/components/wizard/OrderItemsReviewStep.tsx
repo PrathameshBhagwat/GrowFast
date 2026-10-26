@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import {
   CreateOrderItemRequest,
   GarmentCatalogDTO,
@@ -18,6 +18,7 @@ export interface OrderItemsReviewStepProps {
   onRemoveItem: (index: number) => void;
   onAddMoreItems: () => void;
   onContinueToFinalReview: () => void;
+  onUpdateItemQuantity?: (index: number, newQty: number) => void;
 }
 
 export function OrderItemsReviewStep({
@@ -29,6 +30,7 @@ export function OrderItemsReviewStep({
   onRemoveItem,
   onAddMoreItems,
   onContinueToFinalReview,
+  onUpdateItemQuantity,
 }: OrderItemsReviewStepProps) {
   // Helpers
   const getGarmentName = (id: string): string => {
@@ -168,8 +170,40 @@ export function OrderItemsReviewStep({
                 </View>
               )}
 
-              {/* Action Buttons */}
+              {/* Action Buttons & Inline Stepper (Workstream 2) */}
               <View style={styles.itemActionsRow}>
+                {!isWeight && onUpdateItemQuantity ? (
+                  <View style={styles.inlineStepperBox}>
+                    <TouchableOpacity
+                      style={styles.inlineStepperBtn}
+                      onPress={() => {
+                        const current = it.quantity || 1;
+                        if (current <= 1) {
+                          handleConfirmRemove(idx);
+                        } else {
+                          onUpdateItemQuantity(idx, current - 1);
+                        }
+                      }}
+                      accessible={true}
+                      accessibilityLabel={`Decrease quantity of ${getGarmentName(it.garmentCatalogId)}`}
+                    >
+                      <Text style={styles.inlineStepperBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.inlineStepperQty}>{it.quantity || 1}</Text>
+                    <TouchableOpacity
+                      style={styles.inlineStepperBtn}
+                      onPress={() => {
+                        const current = it.quantity || 1;
+                        onUpdateItemQuantity(idx, current + 1);
+                      }}
+                      accessible={true}
+                      accessibilityLabel={`Increase quantity of ${getGarmentName(it.garmentCatalogId)}`}
+                    >
+                      <Text style={styles.inlineStepperBtnText}>＋</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
                 <TouchableOpacity
                   style={styles.editBtn}
                   onPress={() => onEditItem(idx)}
@@ -351,6 +385,37 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     marginTop: 4,
   },
+  inlineStepperBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    minHeight: 36,
+    paddingHorizontal: 2,
+    marginRight: 4,
+  },
+  inlineStepperBtn: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 4,
+    backgroundColor: '#f1f5f9',
+  },
+  inlineStepperBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    lineHeight: 18,
+  },
+  inlineStepperQty: {
+    paddingHorizontal: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1d4ed8',
+  },
   editBtn: {
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -386,11 +451,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.05)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 4,
+      },
+    }),
   },
   bottomBarTotals: {
     flex: 1,

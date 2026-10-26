@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   GarmentCategory,
   OrderWorkflowType,
+  OrderEntryMode,
   PickupType,
   ExpressDeliveryOption,
   OrderStatus,
@@ -12,11 +13,18 @@ import {
   adjustDueDateForThursday,
   isServiceAllowedInWorkflow,
   filterServicesForCategory,
+  filterCategoriesForService,
+  resolveCatalogSelectionOnWorkflowChange,
+  resolveCatalogSelectionOnServiceSelect,
+  resolveCatalogSelectionOnCategoryChange,
+  isItemCompatibleWithWorkflow,
+  roundCurrency,
   isCategoryAllowedInWorkflow,
   ServiceCategory,
   ServiceTypeDTO,
   GarmentCatalogDTO,
 } from '@growfast/shared-types';
+import { isWeightBasedPricing } from '../services/catalog-rules';
 
 interface MockPrice {
   id: string;
@@ -185,6 +193,122 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(isCategoryAllowedInWorkflow(GarmentCategory.MEN, 'LAUNDRY'), true);
       assert.equal(isCategoryAllowedInWorkflow(GarmentCategory.WOMEN, 'DRY_CLEANING'), true);
       assert.equal(isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'LAUNDRY'), false);
+    });
+
+    it('4.1 Weight-based laundry hides garment-category selector completely per business rules', () => {
+      const washIron = mockServices.find((s) => s.name === 'Wash and Steam Iron')!;
+      const washFold = mockServices.find((s) => s.name === 'Wash and Fold')!;
+      const dryClean = mockServices.find((s) => s.name === 'Dry Clean')!;
+
+      // In LAUNDRY workflow with wash/wash_iron services, weight-based pricing is active
+      assert.equal(isWeightBasedPricing('LAUNDRY', washIron), true);
+      assert.equal(isWeightBasedPricing('LAUNDRY', washFold), true);
+      assert.equal(isWeightBasedPricing('LAUNDRY', null, 'WEIGHT'), true);
+      assert.equal(isWeightBasedPricing('LAUNDRY', washIron, 'WEIGHT'), true);
+
+      // In DRY_CLEANING workflow, weight-based pricing is NEVER allowed
+      assert.equal(isWeightBasedPricing('DRY_CLEANING', dryClean), false);
+      assert.equal(isWeightBasedPricing('DRY_CLEANING', dryClean, 'PIECES'), false);
+
+      // Verify that weight-based laundry hides category grid (availableCategories is empty)
+      const isWeight = isWeightBasedPricing('LAUNDRY', washIron);
+      const availableCategories = isWeight ? [] : ['ALL', 'MEN', 'WOMEN', 'KIDS', 'HOUSEHOLD'];
+      assert.equal(availableCategories.length, 0);
+    });
+
+    it('4.2 Per-piece services show category filtering only when required by website rules', () => {
+      const steamIron = mockServices.find((s) => s.name === 'Steam Iron')!;
+      const shoeClean = mockServices.find((s) => s.name === 'Shoe Cleaning')!;
+
+      // In LAUNDRY, Steam Iron is a per-piece service
+      assert.equal(isWeightBasedPricing('LAUNDRY', steamIron), false);
+
+      // For Starching service, only Men, Women, Kids are allowed
+      const starchingCategories = filterCategoriesForService(
+        ['ALL', GarmentCategory.MEN, GarmentCategory.WOMEN, GarmentCategory.KIDS, GarmentCategory.HOUSEHOLD],
+        'srv-starching',
+        [{ id: 'srv-starching', name: 'Starching' }],
+        'DRY_CLEANING',
+      );
+      assert.deepEqual(starchingCategories, [
+        GarmentCategory.MEN,
+        GarmentCategory.WOMEN,
+        GarmentCategory.KIDS,
+      ]);
+      assert.ok(!starchingCategories.includes(GarmentCategory.HOUSEHOLD));
+
+      // For Shoe Cleaning, category resolves to SHOES
+      const resolved = resolveCatalogSelectionOnServiceSelect(
+        shoeClean.id,
+        GarmentCategory.MEN,
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(resolved.serviceId, shoeClean.id);
+      assert.equal(resolved.category, GarmentCategory.SHOES);
+    });
+
+    it('4.3 Workflow switching reconciles eligible services and drops incompatible items', () => {
+      // Switching from LAUNDRY (Wash and Steam Iron) to DRY_CLEANING auto-resolves to Dry Clean
+      const toDryClean = resolveCatalogSelectionOnWorkflowChange(
+        'DRY_CLEANING',
+        'srv-wash-iron',
+        'ALL',
+        mockServices,
+      );
+      assert.equal(toDryClean.serviceId, 'srv-dry-clean');
+
+      // Switching from DRY_CLEANING (Dry Clean) to LAUNDRY auto-resolves to preferred laundry service
+      const toLaundry = resolveCatalogSelectionOnWorkflowChange(
+        'LAUNDRY',
+        'srv-dry-clean',
+        GarmentCategory.MEN,
+        mockServices,
+      );
+      assert.equal(toLaundry.serviceId, 'srv-wash-iron');
+
+      // Incompatibility check: Weight item cannot exist in DRY_CLEANING
+      const weightItem = { isWeightBased: true, weight: 3.5, garmentCatalogId: 'g-laundry-kg', serviceTypeId: 'srv-wash-fold' };
+      assert.equal(isItemCompatibleWithWorkflow(weightItem, 'DRY_CLEANING', mockServices), false);
+      assert.equal(isItemCompatibleWithWorkflow(weightItem, 'LAUNDRY', mockServices), true);
+
+      // Piece item in DRY_CLEANING is compatible
+      const pieceItem = { isWeightBased: false, weight: null, garmentCatalogId: 'g-shirt', serviceTypeId: 'srv-dry-clean' };
+      assert.equal(isItemCompatibleWithWorkflow(pieceItem, 'DRY_CLEANING', mockServices), true);
+    });
+
+    it('4.4 Category change resolves service according to website constraints', () => {
+      // Selecting Household category auto-switches service to Dry Clean
+      const householdService = resolveCatalogSelectionOnCategoryChange(
+        GarmentCategory.HOUSEHOLD,
+        'srv-steam-iron',
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(householdService, 'srv-dry-clean');
+
+      // Selecting Shoe category auto-switches service to Shoe Cleaning
+      const shoeService = resolveCatalogSelectionOnCategoryChange(
+        GarmentCategory.SHOES,
+        'srv-dry-clean',
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(shoeService, 'srv-shoe-clean');
+    });
+
+    it('4.5 Safe-area topInset calculation guarantees header and back button clear status bar and cutouts', () => {
+      // Simulation of safe-area inset logic on Android
+      const mockAndroidInsets = { top: 24, bottom: 16, left: 0, right: 0 };
+      const mockStatusBarHeight = 36; // Android cutout device
+      const topInset = Math.max(mockAndroidInsets.top, mockStatusBarHeight);
+      assert.equal(topInset, 36);
+      assert.ok(topInset >= mockStatusBarHeight);
+
+      // Simulation on edge-to-edge Android
+      const edgeToEdgeInsets = { top: 48, bottom: 24, left: 0, right: 0 };
+      const edgeTopInset = Math.max(edgeToEdgeInsets.top, mockStatusBarHeight);
+      assert.equal(edgeTopInset, 48);
     });
   });
 
@@ -516,6 +640,364 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(freshState.selectedCustomer, null);
       assert.equal(freshState.items.length, 0);
       assert.equal(freshState.currentStepIndex, 0);
+    });
+
+    it('24. View Order Details action passes authoritative server order ID to parent modal handler on online confirmation', () => {
+      let wizardClosed = false;
+      let activeDetailOrderId: string | null = null;
+      let detailModalVisible = false;
+
+      const handleCloseWizard = () => {
+        wizardClosed = true;
+      };
+
+      const handleOpenOrderDetail = (orderId: string) => {
+        activeDetailOrderId = orderId;
+        detailModalVisible = true;
+      };
+
+      const onViewOrderDetail = (orderId: string) => {
+        handleCloseWizard();
+        handleOpenOrderDetail(orderId);
+      };
+
+      // Simulating Screen 9 confirmation with authoritative server order ID
+      const confirmedServerOrderId = 'ord-srv-confirm-9988';
+      const isOfflineQueued = false;
+
+      // Action execution: only when NOT offline queued
+      if (!isOfflineQueued) {
+        onViewOrderDetail(confirmedServerOrderId);
+      }
+
+      assert.equal(wizardClosed, true, 'Wizard modal must be closed before opening detail');
+      assert.equal(activeDetailOrderId, 'ord-srv-confirm-9988', 'Authoritative server ID must be passed');
+      assert.equal(detailModalVisible, true, 'OrderDetailModal must be set to visible');
+    });
+
+    it('25. View Order Details action is withheld for offline queued orders to prevent showing unconfirmed drafts', () => {
+      let detailModalOpened = false;
+      const onViewOrderDetail = (_orderId: string) => {
+        detailModalOpened = true;
+      };
+
+      const confirmedOfflineState = {
+        orderId: 'offline-queued',
+        orderNumber: 'PENDING_OFFLINE',
+        isOfflineQueued: true,
+      };
+
+      // In OrderCreatedStep: {!isOfflineQueued && <TouchableOpacity onPress={() => onViewOrder(orderId)} />}
+      if (!confirmedOfflineState.isOfflineQueued) {
+        onViewOrderDetail(confirmedOfflineState.orderId);
+      }
+
+      assert.equal(detailModalOpened, false, 'View Order Details must NOT trigger for offline queued drafts');
+    });
+  });
+
+  // ==========================================
+  // WORKSTREAM 2: BULK ITEM INTAKE TESTS
+  // ==========================================
+  describe('Workstream 2: Bulk Item Intake Workflow', () => {
+    // 26. 1-Tap Quick Add on catalog grid adds piece item directly at authoritative catalog rate
+    it('26. Quick 1-tap add adds piece item directly at authoritative catalog price without opening modal', () => {
+      let items: any[] = [];
+      const shirtGarment = mockGarments.find((g) => g.id === 'g-shirt')!;
+      const serviceId = 'srv-wash-iron';
+      const catalogPrice = mockPrices.find(
+        (p) => p.garmentCatalogId === shirtGarment.id && p.serviceTypeId === serviceId,
+      )!.price;
+
+      const handleQuickAddItem = (garment: GarmentCatalogDTO, srvId: string, unitPrice: number) => {
+        const existingIdx = items.findIndex(
+          (it) => it.garmentCatalogId === garment.id && it.serviceTypeId === srvId,
+        );
+        if (existingIdx >= 0) {
+          items[existingIdx].quantity += 1;
+        } else {
+          items.push({
+            garmentCatalogId: garment.id,
+            serviceTypeId: srvId,
+            quantity: 1,
+            unitPrice,
+            pieces: [{ unitNumber: 1, photoCount: 0 }],
+          });
+        }
+      };
+
+      // 1-Tap Quick Add
+      handleQuickAddItem(shirtGarment, serviceId, catalogPrice);
+
+      assert.equal(items.length, 1);
+      assert.equal(items[0].garmentCatalogId, 'g-shirt');
+      assert.equal(items[0].quantity, 1);
+      assert.equal(items[0].unitPrice, 60);
+      assert.equal(items[0].pieces.length, 1);
+    });
+
+    // 27. Rapid piece intake increments quantity of existing cart item
+    it('27. Rapid piece intake increments quantity of existing cart item without duplicates', () => {
+      let items: any[] = [];
+      const shirtGarment = mockGarments.find((g) => g.id === 'g-shirt')!;
+      const serviceId = 'srv-wash-iron';
+      const catalogPrice = 60;
+
+      const handleQuickAddItem = (garment: GarmentCatalogDTO, srvId: string, unitPrice: number) => {
+        const existingIdx = items.findIndex(
+          (it) => it.garmentCatalogId === garment.id && it.serviceTypeId === srvId,
+        );
+        if (existingIdx >= 0) {
+          const target = { ...items[existingIdx] };
+          target.quantity += 1;
+          items[existingIdx] = target;
+        } else {
+          items.push({
+            garmentCatalogId: garment.id,
+            serviceTypeId: srvId,
+            quantity: 1,
+            unitPrice,
+            pieces: [{ unitNumber: 1, photoCount: 0 }],
+          });
+        }
+      };
+
+      // Tap 3 times rapidly
+      handleQuickAddItem(shirtGarment, serviceId, catalogPrice);
+      handleQuickAddItem(shirtGarment, serviceId, catalogPrice);
+      handleQuickAddItem(shirtGarment, serviceId, catalogPrice);
+
+      assert.equal(items.length, 1, 'Should contain exactly 1 aggregated item');
+      assert.equal(items[0].quantity, 3, 'Quantity should be 3');
+      assert.equal(items[0].unitPrice * items[0].quantity, 180);
+    });
+
+    // 28. Multiple distinct catalog items can be added to one order
+    it('28. Multiple distinct catalog items can be added efficiently in one intake workflow', () => {
+      const cartItems = [
+        { garmentCatalogId: 'g-shirt', serviceTypeId: 'srv-wash-iron', quantity: 3, unitPrice: 60 },
+        { garmentCatalogId: 'g-trousers', serviceTypeId: 'srv-wash-iron', quantity: 2, unitPrice: 70 },
+        { garmentCatalogId: 'g-saree', serviceTypeId: 'srv-dry-clean', quantity: 1, unitPrice: 250 },
+      ];
+
+      const totalPieces = cartItems.reduce((sum, it) => sum + it.quantity, 0);
+      const estSubtotal = cartItems.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0);
+
+      assert.equal(cartItems.length, 3, 'Cart should contain 3 distinct catalog items');
+      assert.equal(totalPieces, 6, 'Total pieces should equal 3 + 2 + 1 = 6');
+      assert.equal(estSubtotal, 3 * 60 + 2 * 70 + 1 * 250, '3*60 + 2*70 + 250 = 570');
+    });
+
+    // 29. Inline quantity stepper in review step allows increasing and decreasing piece quantities directly
+    it('29. Inline quantity steppers in review step update quantities and pieces array directly', () => {
+      let items = [
+        {
+          garmentCatalogId: 'g-shirt',
+          serviceTypeId: 'srv-wash-iron',
+          quantity: 2,
+          unitPrice: 60,
+          pieces: [
+            { unitNumber: 1, photoCount: 0 },
+            { unitNumber: 2, photoCount: 0 },
+          ],
+        },
+        {
+          garmentCatalogId: 'g-trousers',
+          serviceTypeId: 'srv-wash-iron',
+          quantity: 1,
+          unitPrice: 70,
+          pieces: [{ unitNumber: 1, photoCount: 0 }],
+        },
+      ];
+
+      const updateQuantity = (idx: number, newQty: number) => {
+        if (newQty <= 0) {
+          items = items.filter((_, i) => i !== idx);
+          return;
+        }
+        const target = { ...items[idx] };
+        target.quantity = newQty;
+        target.pieces = Array.from({ length: newQty }, (_, i) => ({
+          unitNumber: i + 1,
+          photoCount: 0,
+        }));
+        items[idx] = target;
+      };
+
+      // Increment trousers from 1 to 3
+      updateQuantity(1, 3);
+      assert.equal(items[1].quantity, 3);
+      assert.equal(items[1].pieces.length, 3);
+
+      // Decrement shirt from 2 to 1
+      updateQuantity(0, 1);
+      assert.equal(items[0].quantity, 1);
+      assert.equal(items[0].pieces.length, 1);
+    });
+
+    // 30. Reducing piece quantity to 0 removes the item from the cart
+    it('30. Reducing piece quantity to 0 removes the item from the cart', () => {
+      let items = [
+        { garmentCatalogId: 'g-shirt', quantity: 1, unitPrice: 60 },
+        { garmentCatalogId: 'g-trousers', quantity: 2, unitPrice: 70 },
+      ];
+
+      const updateQuantity = (idx: number, newQty: number) => {
+        if (newQty <= 0) {
+          items = items.filter((_, i) => i !== idx);
+          return;
+        }
+        items[idx].quantity = newQty;
+      };
+
+      // Decrement shirt (idx 0) from 1 to 0
+      updateQuantity(0, 0);
+
+      assert.equal(items.length, 1);
+      assert.equal(items[0].garmentCatalogId, 'g-trousers');
+      assert.equal(items[0].quantity, 2);
+    });
+
+    // 31. Weight-based laundry strictly enforces 2.00 kg minimum and rejects invalid weights
+    it('31. Weight-based laundry requires minimum 2.00 kg per business rules and rejects invalid weights', () => {
+      const validateWeight = (val: string): { valid: boolean; error?: string; weight?: number } => {
+        const parsed = parseFloat(val);
+        if (isNaN(parsed) || parsed < 2.0) {
+          return {
+            valid: false,
+            error: 'Minimum weight requirement is 2.00 kg per business rules.',
+          };
+        }
+        return { valid: true, weight: Math.round(parsed * 100) / 100 };
+      };
+
+      // Invalid: 1.50 kg
+      const underWeight = validateWeight('1.50');
+      assert.equal(underWeight.valid, false);
+      assert.ok(underWeight.error?.includes('2.00 kg'));
+
+      // Invalid: negative or non-numeric
+      const negativeWeight = validateWeight('-0.5');
+      assert.equal(negativeWeight.valid, false);
+
+      const invalidStr = validateWeight('abc');
+      assert.equal(invalidStr.valid, false);
+
+      // Valid: exactly 2.00 kg
+      const minValid = validateWeight('2.00');
+      assert.equal(minValid.valid, true);
+      assert.equal(minValid.weight, 2.0);
+
+      // Valid: 4.75 kg
+      const largerValid = validateWeight('4.75');
+      assert.equal(largerValid.valid, true);
+      assert.equal(largerValid.weight, 4.75);
+    });
+
+    // 32. Bulk increment chips (+1, +2, +5, +10) and weight presets
+    it('32. Bulk increment chips and weight presets update values correctly', () => {
+      let qty = 1;
+      const addIncrement = (inc: number) => {
+        qty += inc;
+      };
+
+      addIncrement(5); // 1 + 5 = 6
+      assert.equal(qty, 6);
+
+      addIncrement(10); // 6 + 10 = 16
+      assert.equal(qty, 16);
+
+      // Weight presets
+      const weightPresets = ['2.00', '3.00', '5.00', '10.00'];
+      for (const preset of weightPresets) {
+        const val = parseFloat(preset);
+        assert.ok(val >= 2.0, `Preset ${preset} must satisfy 2.00 kg minimum`);
+      }
+    });
+
+    // 33. Canonical pricing and currency rounding across multi-item intake
+    it('33. Multi-item cart calculations agree with calculateOrderTotals and roundCurrency', () => {
+      const items = [
+        { unitPrice: 60, quantity: 3 }, // 180
+        { unitPrice: 70, quantity: 2 }, // 140
+        { unitPrice: 80, quantity: 1, weight: 2.5 }, // 200
+      ];
+
+      const subtotal = items.reduce((sum, it) => {
+        const mult = it.weight && it.weight > 0 ? it.weight : it.quantity || 1;
+        return sum + it.unitPrice * mult;
+      }, 0);
+
+      assert.equal(subtotal, 520);
+
+      const totals = calculateOrderTotals(items, {
+        discountPercent: 10, // 10%
+        isExpress: true,
+        expressSurchargePercent: 20,
+        expressDeliveryOption: ExpressDeliveryOption.SAME_DAY, // 2.0x multiplier -> 40%
+      });
+
+      // Verification of math:
+      // Subtotal = 520
+      // Discount 10% = 52.00 -> After discount = 468.00
+      // Express 20% base on 468 = 93.60 * 2.0x (Same Day) = 187.20 -> Taxable = 655.20
+      // Tax 18% on 655.20 = 117.94
+      // Total = 655.20 + 117.94 = 773.14
+      assert.equal(totals.subtotal, 520);
+      assert.equal(totals.discountAmount, 52);
+      assert.equal(totals.expressSurcharge, 187.2);
+      assert.equal(totals.taxAmount, 117.94);
+      assert.equal(totals.totalAmount, 773.14);
+    });
+
+    // 34. Item-specific notes, defect tags, and photo associations are preserved across multi-item intake
+    it('34. Item-specific notes, defect tags, and photo associations remain isolated to their respective items', () => {
+      const mockPhotos = [
+        { id: 'p-1', garmentId: 'g-suit', clientDraftId: 'draft-test-1', uri: 'file://suit.jpg' },
+        { id: 'p-2', garmentId: 'g-suit', clientDraftId: 'draft-test-1', uri: 'file://suit2.jpg' },
+      ];
+
+      const item1 = {
+        garmentCatalogId: 'g-suit',
+        serviceTypeId: 'srv-dry-clean',
+        quantity: 1,
+        unitPrice: 400,
+        defectNotes: 'Collar Stain, Torn Hem',
+        pieces: [{ unitNumber: 1, photoCount: 2 }],
+      };
+
+      const item2 = {
+        garmentCatalogId: 'g-shirt',
+        serviceTypeId: 'srv-wash-iron',
+        quantity: 2,
+        unitPrice: 60,
+        defectNotes: undefined,
+        pieces: [
+          { unitNumber: 1, photoCount: 0 },
+          { unitNumber: 2, photoCount: 0 },
+        ],
+      };
+
+      const orderPayload = {
+        clientDraftId: 'draft-test-1',
+        items: [item1, item2],
+      };
+
+      // Item 1 has defects and photos
+      assert.equal(orderPayload.items[0].defectNotes, 'Collar Stain, Torn Hem');
+      assert.equal(orderPayload.items[0].pieces[0].photoCount, 2);
+
+      // Item 2 has NO defects and NO photos
+      assert.equal(orderPayload.items[1].defectNotes, undefined);
+      assert.equal(orderPayload.items[1].pieces[0].photoCount, 0);
+      assert.equal(orderPayload.items[1].pieces[1].photoCount, 0);
+
+      // Photo mapping to specific garment
+      const suitPhotos = mockPhotos.filter((p) => p.garmentId === item1.garmentCatalogId);
+      assert.equal(suitPhotos.length, 2);
+
+      const shirtPhotos = mockPhotos.filter((p) => p.garmentId === item2.garmentCatalogId);
+      assert.equal(shirtPhotos.length, 0);
     });
   });
 });

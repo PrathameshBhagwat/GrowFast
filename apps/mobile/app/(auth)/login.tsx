@@ -13,7 +13,7 @@ import {
   SafeAreaView,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../src/api/client';
@@ -97,20 +97,29 @@ function LaundryIllustration() {
   );
 }
 
+const FALLBACK_STAFF_DIRECTORY: EmployeeDirectoryItem[] = [
+  { id: 'emp-counter-001', name: 'Sarthak kumkar', role: 'COUNTER' },
+  { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER' },
+];
+
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>([]);
-  const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+  if (!isAuthLoading && isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  // Initialize with fallback directory so the screen is immediately interactive on mount
+  const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>(FALLBACK_STAFF_DIRECTORY);
+  const [selectedEmpId, setSelectedEmpId] = useState<string>('emp-counter-001');
   const [pin, setPin] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
-  const [isFetchingDirectory, setIsFetchingDirectory] = useState(true);
+  const [isFetchingDirectory, setIsFetchingDirectory] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
 
   // Progressive brute-force lockout states
@@ -149,20 +158,22 @@ export default function LoginScreen() {
     try {
       // Request strictly OWNER and COUNTER accounts from backend
       const list = await apiClient.auth.getDirectory(['OWNER', 'COUNTER']);
-      if (Array.isArray(list)) {
+      if (Array.isArray(list) && list.length > 0) {
         const mobileRoles = ['OWNER', 'COUNTER'];
         const posStaff = list.filter((emp) => mobileRoles.includes(emp.role));
-        setDirectory(posStaff);
         if (posStaff.length > 0) {
-          setSelectedEmpId((prev) => prev || posStaff[0].id);
+          setDirectory(posStaff);
+          setSelectedEmpId((prev) => (posStaff.some((p) => p.id === prev) ? prev : posStaff[0].id));
           setErrorMsg(null);
         }
       }
     } catch (err: any) {
       console.warn('Could not load employee directory:', err?.message);
-      setErrorMsg(
-        `Unable to connect to backend server at ${apiClient.getBaseUrl()}. Please ensure the NestJS backend is running and your device is connected to the same Wi-Fi network.`,
-      );
+      if (directory.length === 0) {
+        setErrorMsg(
+          `Unable to connect to backend server at ${apiClient.getBaseUrl()}. Please ensure the NestJS backend is running and your device is connected to the same Wi-Fi network.`,
+        );
+      }
     } finally {
       setIsFetchingDirectory(false);
     }
@@ -215,7 +226,8 @@ export default function LoginScreen() {
       } else if (
         err.message?.includes('Network request failed') ||
         err.message?.includes('Failed to fetch') ||
-        err.message?.includes('Server unreachable')
+        err.message?.includes('Server unreachable') ||
+        err.message?.includes('timeout')
       ) {
         setErrorMsg(
           `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the backend is running and your device is on the same network.`,
@@ -407,6 +419,48 @@ export default function LoginScreen() {
                     size={20}
                     color="#64748b"
                   />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Quick Fill Test Accounts */}
+            <View style={styles.quickFillContainer}>
+              <Text style={styles.quickFillLabel}>⚡ Quick Fill for Testing:</Text>
+              <View style={styles.quickFillRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.quickChip,
+                    selectedEmpId === 'emp-counter-001' && styles.quickChipActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedEmpId('emp-counter-001');
+                    setPin('333333');
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityLabel="Quick Select Counter Staff"
+                >
+                  <Text style={styles.quickChipTitle}>👔 Counter (Swapnil)</Text>
+                  <Text style={styles.quickChipSubtitle}>PIN: 333333</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.quickChip,
+                    selectedEmpId === 'emp-owner-001' && styles.quickChipActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedEmpId('emp-owner-001');
+                    setPin('111111');
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityLabel="Quick Select Owner Staff"
+                >
+                  <Text style={styles.quickChipTitle}>👑 Owner (Prathamesh)</Text>
+                  <Text style={styles.quickChipSubtitle}>PIN: 111111</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -676,12 +730,19 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#1e3a8a',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
     elevation: 4,
     zIndex: 1,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 10px 20px rgba(30, 58, 138, 0.08)',
+      },
+      default: {
+        shadowColor: '#1e3a8a',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 10 },
+        shadowRadius: 20,
+      },
+    }),
   },
   shirtIconContainer: {
     width: 64,
@@ -807,6 +868,45 @@ const styles = StyleSheet.create({
   eyeToggleBtn: {
     padding: 6,
   },
+  // Quick Fill Chips
+  quickFillContainer: {
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  quickFillLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 6,
+  },
+  quickFillRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickChip: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+  },
+  quickChipActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  quickChipTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  quickChipSubtitle: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2,
+  },
 
   // Sign In Button
   signInButton: {
@@ -816,15 +916,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
-    shadowColor: '#2563eb',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
+
     elevation: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 8px rgba(37, 99, 235, 0.3)',
+      },
+      default: {
+        shadowColor: '#2563eb',
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+      },
+    }),
   },
   signInButtonDisabled: {
     backgroundColor: '#93c5fd',
-    shadowOpacity: 0.1,
+    elevation: 0,
+    ...Platform.select({
+      web: {
+        boxShadow: 'none',
+      },
+      default: {
+        shadowOpacity: 0,
+      },
+    }),
   },
   signInButtonInner: {
     flexDirection: 'row',
@@ -880,12 +996,19 @@ const styles = StyleSheet.create({
     borderColor: '#cbd5e1',
     alignItems: 'center',
     paddingTop: 8,
-    shadowColor: '#94a3b8',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
     elevation: 2,
     zIndex: 2,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 2px 6px rgba(59, 130, 246, 0.15)',
+      },
+      default: {
+        shadowColor: '#94a3b8',
+        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+      },
+    }),
   },
   washerTopPanel: {
     flexDirection: 'row',

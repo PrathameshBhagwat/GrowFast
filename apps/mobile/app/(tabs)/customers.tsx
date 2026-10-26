@@ -27,6 +27,7 @@ import {
 } from '@growfast/shared-types';
 import { apiClient, ApiError } from '../../src/api/client';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
@@ -37,7 +38,8 @@ export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
-  const [session, setSession] = useState<MobileUserSession | null>(null);
+  const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const session = authUser;
 
   // Tab: 'FIND' | 'NEW'
   const [activeTab, setActiveTab] = useState<'FIND' | 'NEW'>('FIND');
@@ -65,6 +67,19 @@ export default function CustomersScreen() {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [orderHistoryError, setOrderHistoryError] = useState<string | null>(null);
 
+  // Order History Filter & Pagination State (Workstream 1)
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('ALL');
+  const [orderPaymentFilter, setOrderPaymentFilter] = useState<string>('ALL');
+  const [orderHistoryPage, setOrderHistoryPage] = useState(1);
+  const [totalOrderCount, setTotalOrderCount] = useState(0);
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+  const [isLoadingMoreOrders, setIsLoadingMoreOrders] = useState(false);
+
+  // Stale request prevention refs
+  const orderHistoryRequestIdRef = useRef(0);
+  const selectedCustomerIdRef = useRef<string | null>(null);
+
   // Order Detail Inspection Modal State
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
 
@@ -88,15 +103,19 @@ export default function CustomersScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  useEffect(() => {
-    getUserSession().then(setSession);
-  }, []);
-
   /**
    * Fetch customer directory with pagination and stale response protection.
    */
   const loadCustomers = useCallback(
     async (query: string = '', page: number = 1, isRefresh: boolean = false) => {
+      if (!isAuthenticated || isAuthLoading) {
+        setCustomers([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        setIsLoadingMore(false);
+        return;
+      }
+
       const requestId = ++searchRequestIdRef.current;
 
       if (page === 1) {
@@ -153,51 +172,161 @@ export default function CustomersScreen() {
         }
       }
     },
-    [],
+    [isAuthenticated, isAuthLoading],
   );
 
   // Debounced search effect
   useEffect(() => {
+    if (!isAuthenticated || isAuthLoading) {
+      setCustomers([]);
+      return;
+    }
     const timer = setTimeout(() => {
       loadCustomers(searchQuery, 1, false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, loadCustomers]);
+  }, [searchQuery, loadCustomers, isAuthenticated, isAuthLoading]);
 
   const onRefresh = () => {
+    if (!isAuthenticated || isAuthLoading) return;
     loadCustomers(searchQuery, 1, true);
   };
 
   const onLoadMore = () => {
+    if (!isAuthenticated || isAuthLoading) return;
     if (!isLoading && !isLoadingMore && hasMore) {
       loadCustomers(searchQuery, currentPage + 1, false);
     }
   };
 
   /**
-   * Load customer order history with dedicated loading/error/retry states.
+   * Load customer order history with search, status/payment filters, pagination, and race protection.
    */
-  const loadCustomerOrderHistory = useCallback(async (customerId: string) => {
-    setLoadingOrders(true);
-    setOrderHistoryError(null);
-    try {
-      const res = await apiClient.orders.list({
-        customerId,
-        pageSize: 20,
-      });
-      setCustomerOrders(res.data || []);
-    } catch (err: any) {
-      const msg = err?.message || 'Could not load past orders for this customer.';
-      setOrderHistoryError(msg);
-      setCustomerOrders([]);
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, []);
+  const loadCustomerOrderHistory = useCallback(
+    async (
+      customerId: string,
+      page: number = 1,
+      append: boolean = false,
+      search: string = '',
+      status: string = 'ALL',
+      paymentStatus: string = 'ALL',
+    ) => {
+      if (!isAuthenticated || isAuthLoading) {
+        setCustomerOrders([]);
+        setLoadingOrders(false);
+        setIsLoadingMoreOrders(false);
+        return;
+      }
+
+      const requestId = ++orderHistoryRequestIdRef.current;
+      selectedCustomerIdRef.current = customerId;
+
+      if (page === 1) {
+        setLoadingOrders(true);
+        setOrderHistoryError(null);
+      } else {
+        setIsLoadingMoreOrders(true);
+      }
+
+      try {
+        const res = await apiClient.orders.list({
+          customerId,
+          page,
+          pageSize: 10,
+          search: search.trim() || undefined,
+          status: status === 'ALL' ? undefined : status,
+          paymentStatus: paymentStatus === 'ALL' ? undefined : paymentStatus,
+        });
+
+        // Guard against stale response if user switched customer or query in the meantime
+        if (
+          requestId !== orderHistoryRequestIdRef.current ||
+          selectedCustomerIdRef.current !== customerId
+        ) {
+          return;
+        }
+
+        const items = res.data || [];
+        const total = res.total ?? items.length;
+
+        if (append) {
+          setCustomerOrders((prev) => [...prev, ...items]);
+        } else {
+          setCustomerOrders(items);
+        }
+
+        setOrderHistoryPage(page);
+        setTotalOrderCount(total);
+        setHasMoreOrders(page * 10 < total);
+        setOrderHistoryError(null);
+      } catch (err: any) {
+        if (
+          requestId !== orderHistoryRequestIdRef.current ||
+          selectedCustomerIdRef.current !== customerId
+        ) {
+          return;
+        }
+        const msg = err?.message || 'Could not load past orders for this customer.';
+        setOrderHistoryError(msg);
+        if (!append) {
+          setCustomerOrders([]);
+        }
+      } finally {
+        if (
+          requestId === orderHistoryRequestIdRef.current &&
+          selectedCustomerIdRef.current === customerId
+        ) {
+          setLoadingOrders(false);
+          setIsLoadingMoreOrders(false);
+        }
+      }
+    },
+    [],
+  );
 
   const handleSelectCustomer = (cust: CustomerDTO) => {
+    selectedCustomerIdRef.current = cust.id;
     setSelectedCustomer(cust);
-    loadCustomerOrderHistory(cust.id);
+    setOrderSearchQuery('');
+    setOrderStatusFilter('ALL');
+    setOrderPaymentFilter('ALL');
+    setOrderHistoryPage(1);
+    setHasMoreOrders(false);
+    loadCustomerOrderHistory(cust.id, 1, false, '', 'ALL', 'ALL');
+  };
+
+  // Debounced search and filter effect for customer order history
+  useEffect(() => {
+    if (!selectedCustomer) return;
+    const timer = setTimeout(() => {
+      loadCustomerOrderHistory(
+        selectedCustomer.id,
+        1,
+        false,
+        orderSearchQuery,
+        orderStatusFilter,
+        orderPaymentFilter,
+      );
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [
+    selectedCustomer?.id,
+    orderSearchQuery,
+    orderStatusFilter,
+    orderPaymentFilter,
+    loadCustomerOrderHistory,
+  ]);
+
+  const handleLoadMoreOrders = () => {
+    if (!selectedCustomer || loadingOrders || isLoadingMoreOrders || !hasMoreOrders) return;
+    loadCustomerOrderHistory(
+      selectedCustomer.id,
+      orderHistoryPage + 1,
+      true,
+      orderSearchQuery,
+      orderStatusFilter,
+      orderPaymentFilter,
+    );
   };
 
   const startPerPieceOrder = (cust: CustomerDTO) => {
@@ -677,7 +806,10 @@ export default function CustomersScreen() {
             visible={!!selectedCustomer}
             transparent={true}
             animationType="slide"
-            onRequestClose={() => setSelectedCustomer(null)}
+            onRequestClose={() => {
+              selectedCustomerIdRef.current = null;
+              setSelectedCustomer(null);
+            }}
           >
             <View style={styles.modalBackdrop}>
               <View style={styles.detailCard}>
@@ -711,7 +843,10 @@ export default function CustomersScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.modalCloseBtn}
-                    onPress={() => setSelectedCustomer(null)}
+                    onPress={() => {
+                      selectedCustomerIdRef.current = null;
+                      setSelectedCustomer(null);
+                    }}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
                     <Text style={styles.modalCloseText}>✕</Text>
@@ -749,12 +884,191 @@ export default function CustomersScreen() {
                     </View>
                   ) : null}
 
-                  {/* Order History Section */}
+                  {/* Order History Section (Workstream 1) */}
                   <View style={styles.orderHistoryHeaderRow}>
-                    <Text style={styles.orderHistoryTitle}>Order History</Text>
-                    <TouchableOpacity onPress={() => loadCustomerOrderHistory(selectedCustomer.id)}>
+                    <Text style={styles.orderHistoryTitle}>
+                      Order History {totalOrderCount > 0 ? `(${totalOrderCount})` : ''}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        loadCustomerOrderHistory(
+                          selectedCustomer.id,
+                          1,
+                          false,
+                          orderSearchQuery,
+                          orderStatusFilter,
+                          orderPaymentFilter,
+                        )
+                      }
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
                       <Text style={styles.orderHistoryRefreshText}>↻ Refresh</Text>
                     </TouchableOpacity>
+                  </View>
+
+                  {/* Order History Search Bar */}
+                  <View style={styles.orderSearchWrapper}>
+                    <Text style={styles.orderSearchIcon}>🔍</Text>
+                    <TextInput
+                      style={styles.orderSearchInput}
+                      placeholder="Search order # (e.g. 1024)..."
+                      placeholderTextColor="#94a3b8"
+                      value={orderSearchQuery}
+                      onChangeText={setOrderSearchQuery}
+                      autoCapitalize="characters"
+                      clearButtonMode="while-editing"
+                      returnKeyType="search"
+                    />
+                    {orderSearchQuery ? (
+                      <TouchableOpacity
+                        style={styles.orderClearBtn}
+                        onPress={() => setOrderSearchQuery('')}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.orderClearIcon}>✕</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {/* Order Status & Payment Filter Chips */}
+                  <View style={styles.orderFilterContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.filterChipScroll}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderStatusFilter === 'ALL' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderStatusFilter('ALL')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderStatusFilter === 'ALL' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          All Status
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderStatusFilter === 'READY' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderStatusFilter('READY')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderStatusFilter === 'READY' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          Ready
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderStatusFilter === 'PROCESSING' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderStatusFilter('PROCESSING')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderStatusFilter === 'PROCESSING' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          Processing
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderStatusFilter === 'DELIVERED' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderStatusFilter('DELIVERED')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderStatusFilter === 'DELIVERED' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          Delivered
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderStatusFilter === 'CANCELLED' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderStatusFilter('CANCELLED')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderStatusFilter === 'CANCELLED' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          Cancelled
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={styles.filterChipDivider} />
+
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderPaymentFilter === 'ALL' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderPaymentFilter('ALL')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderPaymentFilter === 'ALL' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          All Pay
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderPaymentFilter === 'PENDING' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderPaymentFilter('PENDING')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderPaymentFilter === 'PENDING' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          Pending Due
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.filterChip,
+                          orderPaymentFilter === 'PAID' && styles.filterChipActive,
+                        ]}
+                        onPress={() => setOrderPaymentFilter('PAID')}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            orderPaymentFilter === 'PAID' && styles.filterChipTextActive,
+                          ]}
+                        >
+                          Paid
+                        </Text>
+                      </TouchableOpacity>
+                    </ScrollView>
                   </View>
 
                   {loadingOrders ? (
@@ -767,7 +1081,16 @@ export default function CustomersScreen() {
                       <Text style={styles.orderErrorText}>⚠️ {orderHistoryError}</Text>
                       <TouchableOpacity
                         style={styles.retryOrderBtn}
-                        onPress={() => loadCustomerOrderHistory(selectedCustomer.id)}
+                        onPress={() =>
+                          loadCustomerOrderHistory(
+                            selectedCustomer.id,
+                            1,
+                            false,
+                            orderSearchQuery,
+                            orderStatusFilter,
+                            orderPaymentFilter,
+                          )
+                        }
                       >
                         <Text style={styles.retryOrderBtnText}>↻ Retry History</Text>
                       </TouchableOpacity>
@@ -775,64 +1098,121 @@ export default function CustomersScreen() {
                   ) : customerOrders.length > 0 ? (
                     <View style={styles.orderListBox}>
                       {customerOrders.map((ord) => {
-                        const isPending =
-                          ord.paymentStatus === 'PENDING' || (ord.amountDue && ord.amountDue > 0);
+                        const paidAmount =
+                          ord.amountPaid ?? Math.max(0, ord.totalAmount - (ord.amountDue ?? 0));
+                        const hasDue = ord.amountDue != null && ord.amountDue > 0;
+
                         return (
                           <TouchableOpacity
                             key={ord.id}
                             style={styles.orderItemCard}
                             onPress={() => setViewingOrderId(ord.id)}
                             activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={`View order ${ord.orderNumber}`}
                           >
                             <View style={styles.orderItemGarmentBox}>
                               <Text style={styles.orderItemEmoji}>👔</Text>
                             </View>
                             <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                              <Text style={styles.orderItemNumber}>#{ord.orderNumber}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.orderItemNumber}>#{ord.orderNumber}</Text>
+                                <View
+                                  style={[
+                                    styles.orderStatusChip,
+                                    ord.status === 'READY'
+                                      ? styles.chipReady
+                                      : ord.status === 'DELIVERED'
+                                        ? styles.chipDelivered
+                                        : ord.status === 'CANCELLED'
+                                          ? styles.chipCancelled
+                                          : styles.chipProcess,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.orderStatusChipText,
+                                      ord.status === 'READY'
+                                        ? styles.chipTextReady
+                                        : ord.status === 'DELIVERED'
+                                          ? styles.chipTextDelivered
+                                          : ord.status === 'CANCELLED'
+                                            ? styles.chipTextCancelled
+                                            : styles.chipTextProcess,
+                                    ]}
+                                  >
+                                    {ord.status}
+                                  </Text>
+                                </View>
+                              </View>
                               <Text style={styles.orderItemDate}>{formatDate(ord.orderDate)}</Text>
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
-                              <View
-                                style={[
-                                  styles.orderStatusChip,
-                                  ord.status === 'READY'
-                                    ? styles.chipReady
-                                    : ord.status === 'DELIVERED'
-                                      ? styles.chipDelivered
-                                      : styles.chipProcess,
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.orderStatusChipText,
-                                    ord.status === 'READY'
-                                      ? styles.chipTextReady
-                                      : ord.status === 'DELIVERED'
-                                        ? styles.chipTextDelivered
-                                        : styles.chipTextProcess,
-                                  ]}
-                                >
-                                  {ord.status}
-                                </Text>
-                              </View>
                               <Text style={styles.orderItemTotal}>
                                 ₹{ord.totalAmount.toFixed(0)}
                               </Text>
-                              {isPending ? (
-                                <Text style={styles.orderItemDueText}>
-                                  Due: ₹{ord.amountDue?.toFixed(0)}
+                              <View style={styles.orderFinancialSummary}>
+                                <Text style={styles.orderItemPaidText}>
+                                  Paid: ₹{paidAmount.toFixed(0)}
                                 </Text>
-                              ) : null}
+                                {hasDue ? (
+                                  <Text style={styles.orderItemDueText}>
+                                    Due: ₹{ord.amountDue?.toFixed(0)}
+                                  </Text>
+                                ) : (
+                                  <Text style={styles.orderItemSettledText}>✓ Settled</Text>
+                                )}
+                              </View>
                             </View>
                           </TouchableOpacity>
                         );
                       })}
+
+                      {/* Pagination: Load More Orders */}
+                      {hasMoreOrders ? (
+                        <TouchableOpacity
+                          style={styles.loadMoreOrdersBtn}
+                          onPress={handleLoadMoreOrders}
+                          disabled={isLoadingMoreOrders}
+                          activeOpacity={0.8}
+                        >
+                          {isLoadingMoreOrders ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <ActivityIndicator size="small" color="#2563eb" />
+                              <Text style={styles.loadMoreOrdersText}>Loading more orders...</Text>
+                            </View>
+                          ) : (
+                            <Text style={styles.loadMoreOrdersText}>
+                              Load More Orders ({customerOrders.length} of {totalOrderCount}) ↓
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   ) : (
                     <View style={styles.noOrdersBox}>
+                      <Text style={styles.noOrdersEmoji}>📦</Text>
                       <Text style={styles.noOrdersText}>
-                        No past orders recorded for this customer.
+                        {orderSearchQuery.trim() ||
+                        orderStatusFilter !== 'ALL' ||
+                        orderPaymentFilter !== 'ALL'
+                          ? 'No orders match your filter criteria.'
+                          : 'No past orders recorded for this customer.'}
                       </Text>
+                      {orderSearchQuery.trim() ||
+                      orderStatusFilter !== 'ALL' ||
+                      orderPaymentFilter !== 'ALL' ? (
+                        <TouchableOpacity
+                          style={styles.clearOrderFiltersBtn}
+                          onPress={() => {
+                            setOrderSearchQuery('');
+                            setOrderStatusFilter('ALL');
+                            setOrderPaymentFilter('ALL');
+                          }}
+                        >
+                          <Text style={styles.clearOrderFiltersText}>Clear Filters</Text>
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   )}
                 </ScrollView>
@@ -892,6 +1272,10 @@ export default function CustomersScreen() {
             setOrderTargetCustomer(null);
             router.push('/(tabs)/orders');
           }}
+          onViewOrderDetail={(orderId) => {
+            setWizardVisible(false);
+            setViewingOrderId(orderId);
+          }}
         />
 
         {/* Direct Order Inspection Modal */}
@@ -901,7 +1285,14 @@ export default function CustomersScreen() {
           onClose={() => setViewingOrderId(null)}
           onOrderUpdated={() => {
             if (selectedCustomer) {
-              loadCustomerOrderHistory(selectedCustomer.id);
+              loadCustomerOrderHistory(
+                selectedCustomer.id,
+                orderHistoryPage,
+                false,
+                orderSearchQuery,
+                orderStatusFilter,
+                orderPaymentFilter,
+              );
             }
           }}
         />
@@ -1449,7 +1840,72 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   orderListBox: {
-    maxHeight: 180,
+    paddingVertical: 2,
+  },
+  orderSearchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 8,
+  },
+  orderSearchIcon: {
+    fontSize: 13,
+    marginRight: 6,
+  },
+  orderSearchInput: {
+    flex: 1,
+    fontSize: 12,
+    color: '#0f172a',
+    height: '100%',
+  },
+  orderClearBtn: {
+    padding: 4,
+  },
+  orderClearIcon: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: 'bold',
+  },
+  orderFilterContainer: {
+    marginBottom: 8,
+  },
+  filterChipScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  filterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  filterChipActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  filterChipDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#cbd5e1',
+    marginHorizontal: 4,
   },
   orderItemCard: {
     flexDirection: 'row',
@@ -1478,20 +1934,19 @@ const styles = StyleSheet.create({
   orderItemDate: {
     fontSize: 11,
     color: '#64748b',
-    marginTop: 1,
+    marginTop: 2,
   },
   orderStatusChip: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
-    marginBottom: 2,
+    borderRadius: 5,
   },
   chipReady: {
     backgroundColor: '#e0f2fe',
   },
   chipTextReady: {
     color: '#0284c7',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   chipDelivered: {
@@ -1499,7 +1954,7 @@ const styles = StyleSheet.create({
   },
   chipTextDelivered: {
     color: '#15803d',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   chipProcess: {
@@ -1507,11 +1962,19 @@ const styles = StyleSheet.create({
   },
   chipTextProcess: {
     color: '#b45309',
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chipCancelled: {
+    backgroundColor: '#fee2e2',
+  },
+  chipTextCancelled: {
+    color: '#b91c1c',
+    fontSize: 10,
     fontWeight: '700',
   },
   orderStatusChipText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   orderItemTotal: {
@@ -1519,19 +1982,67 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
-  orderItemDueText: {
+  orderFinancialSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  orderItemPaidText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#b45309',
+    color: '#16a34a',
+  },
+  orderItemDueText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  orderItemSettledText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  loadMoreOrdersBtn: {
+    minHeight: 44,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  loadMoreOrdersText: {
+    color: '#2563eb',
+    fontSize: 12,
+    fontWeight: '700',
   },
   noOrdersBox: {
-    paddingVertical: 16,
+    paddingVertical: 20,
     alignItems: 'center',
+  },
+  noOrdersEmoji: {
+    fontSize: 28,
+    marginBottom: 6,
   },
   noOrdersText: {
     fontSize: 13,
     color: '#94a3b8',
     textAlign: 'center',
+  },
+  clearOrderFiltersBtn: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
+  },
+  clearOrderFiltersText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
   },
   startOrderBtn: {
     minHeight: 50,

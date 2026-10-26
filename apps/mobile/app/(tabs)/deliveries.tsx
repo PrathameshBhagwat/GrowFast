@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DeliveryRecordDTO, DeliveryStatus, Role } from '@growfast/shared-types';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { apiClient } from '../../src/api/client';
@@ -37,7 +38,8 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 export default function DeliveriesScreen() {
   const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
-  const [session, setSession] = useState<MobileUserSession | null>(null);
+  const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const session = authUser;
 
   // Deliveries State
   const [deliveries, setDeliveries] = useState<DeliveryRecordDTO[]>([]);
@@ -64,16 +66,16 @@ export default function DeliveriesScreen() {
   const [selectedRiderId, setSelectedRiderId] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState(false);
 
-  // Load session
-  useEffect(() => {
-    getUserSession().then((user) => {
-      setSession(user);
-    });
-  }, []);
-
   // Fetch Deliveries from authenticated endpoint
   const fetchDeliveries = useCallback(async () => {
     setError(null);
+    if (!isAuthenticated || isAuthLoading) {
+      setDeliveries([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (!isConnected) {
       setLoading(false);
       setRefreshing(false);
@@ -96,14 +98,20 @@ export default function DeliveriesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isConnected, activeTab]);
+  }, [isConnected, activeTab, isAuthenticated, isAuthLoading]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchDeliveries();
-  }, [fetchDeliveries]);
+    if (isAuthenticated && !isAuthLoading) {
+      setLoading(true);
+      fetchDeliveries();
+    } else {
+      setDeliveries([]);
+      setLoading(false);
+    }
+  }, [fetchDeliveries, isAuthenticated, isAuthLoading]);
 
   const handleRefresh = () => {
+    if (!isAuthenticated || isAuthLoading) return;
     setRefreshing(true);
     fetchDeliveries();
   };

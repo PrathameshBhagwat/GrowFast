@@ -26,6 +26,7 @@ import {
   OrderEntryMode,
   OrderWorkflowType,
 } from '@growfast/shared-types';
+
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { apiClient } from '../../src/api/client';
@@ -97,7 +98,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
-  const { user: session, logout } = useAuth();
+  const { user: session, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
 
   // 1. Operational Screen Notice State
   const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
@@ -138,6 +139,7 @@ export default function HomeScreen() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [orderDetailVisible, setOrderDetailVisible] = useState(false);
 
+
   /**
    * Load local SQLite pending draft count.
    */
@@ -163,13 +165,14 @@ export default function HomeScreen() {
    * Load today's due orders directly from the canonical backend endpoint.
    */
   const loadDueTodayOrders = useCallback(async () => {
-    setLoadingDueOrders(true);
-    setDueOrdersError(null);
-
-    if (!session) {
+    if (!isAuthenticated || isAuthLoading || !session) {
       setLoadingDueOrders(false);
+      setDueOrders([]);
       return;
     }
+
+    setLoadingDueOrders(true);
+    setDueOrdersError(null);
 
     if (!isConnected) {
       setLoadingDueOrders(false);
@@ -191,7 +194,7 @@ export default function HomeScreen() {
     } finally {
       setLoadingDueOrders(false);
     }
-  }, [isConnected, session]);
+  }, [isConnected, session, isAuthenticated, isAuthLoading]);
 
   /**
    * Multi-field search implementation with debouncing and stale request guards.
@@ -259,10 +262,10 @@ export default function HomeScreen() {
 
   // Initial load on mount
   useEffect(() => {
-    if (!session) return;
+    if (!session || !isAuthenticated || isAuthLoading) return;
     loadOfflineDraftCount();
     loadDueTodayOrders();
-  }, [session, isConnected, loadOfflineDraftCount, loadDueTodayOrders]);
+  }, [session, isAuthenticated, isAuthLoading, isConnected, loadOfflineDraftCount, loadDueTodayOrders]);
 
   /**
    * Manual pull-to-refresh handler.
@@ -1109,6 +1112,11 @@ export default function HomeScreen() {
           handleClearSelectedCustomer();
         }}
         onViewOrder={(orderId) => {
+          setActiveOrderId(orderId);
+          setOrderDetailVisible(true);
+        }}
+        onViewOrderDetail={(orderId) => {
+          setWizardVisible(false);
           setActiveOrderId(orderId);
           setOrderDetailVisible(true);
         }}

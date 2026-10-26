@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { useSyncManager } from '../../src/hooks/useSyncManager';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import {
   listDrafts,
@@ -154,8 +155,9 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
   const { syncDraft, syncAll, isSyncingAll } = useSyncManager();
+  const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const session = authUser;
 
-  const [session, setSession] = useState<MobileUserSession | null>(null);
   const [drafts, setDrafts] = useState<OrderDraft[]>([]);
   const [serverOrders, setServerOrders] = useState<OrderSummaryDTO[]>(REFERENCE_ORDERS);
   const [loading, setLoading] = useState(false);
@@ -251,6 +253,12 @@ export default function OrdersScreen() {
   }, [searchQuery]);
 
   const loadData = useCallback(async () => {
+    if (!isAuthenticated || isAuthLoading) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     const reqId = ++searchRequestIdRef.current;
     try {
       const allDrafts = await listDrafts({ storeId: session?.storeId });
@@ -299,19 +307,25 @@ export default function OrdersScreen() {
         setRefreshing(false);
       }
     }
-  }, [session?.storeId, isConnected, debouncedSearch, activeFilter, filterStatus, filterPaymentStatus]);
+  }, [
+    session?.storeId,
+    isConnected,
+    debouncedSearch,
+    activeFilter,
+    filterStatus,
+    filterPaymentStatus,
+    isAuthenticated,
+    isAuthLoading,
+  ]);
 
   useEffect(() => {
-    getUserSession().then((sess) => {
-      setSession(sess);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (session) {
+    if (isAuthenticated && !isAuthLoading && session) {
       loadData();
+    } else if (!isAuthenticated) {
+      setServerOrders([]);
+      setDrafts([]);
     }
-  }, [session, loadData]);
+  }, [isAuthenticated, isAuthLoading, session, loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -755,6 +769,10 @@ export default function OrdersScreen() {
           onOrderSavedOrSubmitted={() => {
             setEditorVisible(false);
             loadData();
+          }}
+          onViewOrderDetail={(orderId) => {
+            setEditorVisible(false);
+            handleOpenOrderDetail(orderId);
           }}
         />
 

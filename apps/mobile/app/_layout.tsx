@@ -1,18 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { getDatabase } from '../src/db/sqlite';
+import { onUnauthorized } from '../src/api/client';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
-        // Never retry 401 Unauthorized errors
-        if (error?.statusCode === 401 || error?.status === 401) return false;
+        // Never retry HTTP 401 Unauthorized errors
+        if (error?.statusCode === 401 || error?.status === 401) {
+          return false;
+        }
         return failureCount < 2;
       },
       staleTime: 1000 * 60 * 5, // 5 minutes
@@ -32,47 +36,53 @@ export function ProtectedRoutes({
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
 
-  const isNavigationReady = Boolean(rootNavigationState?.key);
-  const isAppReady = isDbReady && !isLoading && isNavigationReady;
+  // Cancel in-flight queries and remove cached queries on unauthorized without re-triggering fetches
+  useEffect(() => {
+    const unsubscribe = onUnauthorized(() => {
+      queryClient.cancelQueries();
+      queryClient.removeQueries();
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
-    if (!isAppReady) return;
+    // 1. Never attempt navigation before the root navigator state key exists
+    if (!rootNavigationState?.key) return;
+
+    // 2. Never attempt navigation while authentication state is loading
+    if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inProtectedGroup = segments[0] === '(tabs)';
+    const isAtRoot = !segments[0] || (segments[0] as string) === 'index';
 
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login screen if unauthenticated
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to main tabs if already authenticated
-      router.replace('/(tabs)');
+    if (!isAuthenticated) {
+      // Unauthenticated: if at root or inside protected tabs, redirect to login
+      if (isAtRoot || inProtectedGroup) {
+        router.replace('/(auth)/login');
+      }
+    } else {
+      // Authenticated: if at root or on login screen, redirect to main tabs
+      if (isAtRoot || inAuthGroup) {
+        router.replace('/(tabs)');
+      }
     }
-  }, [isAppReady, isAuthenticated, segments, router]);
+  }, [isLoading, isAuthenticated, segments, rootNavigationState?.key, router]);
 
-  return (
-    <View style={styles.wrapper}>
-      {children}
-      {(!isDbReady || isLoading) && (
-        <View style={styles.loadingOverlay} pointerEvents="auto">
-          <ActivityIndicator size="large" color="#4f46e5" />
-        </View>
-      )}
-    </View>
-  );
+  // Unconditionally render children so the root navigator (<Stack>) mounts on the first render
+  return <>{children}</>;
 }
 
 export default function RootLayout() {
-  const [isDbReady, setIsDbReady] = useState(false);
-
   useEffect(() => {
     async function initApp() {
       try {
-        // Initialize SQLite local database and migrations
-        await getDatabase();
+        if (Platform.OS !== 'web') {
+          // Initialize SQLite local database and migrations asynchronously
+          await getDatabase();
+        }
       } catch (err) {
         console.error('Failed to initialize mobile app foundation:', err);
-      } finally {
-        setIsDbReady(true);
       }
     }
 
@@ -80,20 +90,23 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ProtectedRoutes isDbReady={isDbReady}>
-          <View style={styles.container}>
-            <StatusBar style="auto" />
-            <ConnectionBanner />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(auth)/login" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          </View>
-        </ProtectedRoutes>
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <ProtectedRoutes>
+            <View style={styles.container}>
+              <StatusBar style="auto" />
+              <ConnectionBanner />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(auth)/login" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </View>
+          </ProtectedRoutes>
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
 
