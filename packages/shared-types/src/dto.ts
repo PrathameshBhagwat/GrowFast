@@ -148,6 +148,7 @@ export interface OrderSummaryDTO {
   collectedAmount: number;
   cancelledAmount: number;
   payableAmount: number;
+  createdByName?: string | null;
 }
 
 export interface OrderDetailDTO extends OrderSummaryDTO {
@@ -160,7 +161,7 @@ export interface OrderDetailDTO extends OrderSummaryDTO {
   storeAddress?: string | null;
   storePhone?: string | null;
   createdById: string;
-  createdByName: string;
+  createdByName?: string | null;
   deliveredById?: string | null;
   deliveredByName?: string | null;
   clientDraftId?: string | null;

@@ -360,8 +360,8 @@ describe('OrderService', () => {
       expect(callArgs.data.items.create[0].unitPrice).toBe(180);
       expect(callArgs.data.items.create[0].lineTotal).toBe(360);
       expect(callArgs.data.subtotal).toBe(360);
-      // Subtotal 360 + 18% GST (64.80) => total = 424.8
-      expect(callArgs.data.totalAmount).toBe(424.8);
+      // Canonical tax-inclusive pricing: tax = 0, totalAmount = 360
+      expect(callArgs.data.totalAmount).toBe(360);
     });
 
     it('should support multiple add-ons on a per-piece item without double counting', async () => {
@@ -1684,8 +1684,8 @@ describe('OrderService', () => {
           data: expect.objectContaining({
             status: OrderStatus.PROCESSING,
             subtotal: 750,
-            totalAmount: 885,
-            amountDue: 685,
+            totalAmount: 750,
+            amountDue: 550,
           }),
         }),
       );
@@ -1816,8 +1816,8 @@ describe('OrderService', () => {
           data: expect.objectContaining({
             status: OrderStatus.READY,
             subtotal: 500,
-            totalAmount: 590,
-            amountDue: 390,
+            totalAmount: 500,
+            amountDue: 300,
           }),
         }),
       );
@@ -1906,23 +1906,23 @@ describe('OrderService', () => {
         id: 'adj1',
         orderId: 'o1',
         type: AdjustmentType.REFUND,
-        amount: 295,
+        amount: 385,
         reason: 'Cancelled damaged piece',
         status: AdjustmentStatus.COMPLETED,
       });
       service.findOrderById = jest.fn().mockResolvedValue({
         ...mockOrder,
-        totalAmount: 590,
+        totalAmount: 500,
         amountPaid: 885,
-        refundAmount: 295,
-        effectivePaid: 590,
+        refundAmount: 385,
+        effectivePaid: 500,
         amountDue: 0,
         paymentStatus: PaymentStatus.PAID,
       });
 
       await service.cancelPhysicalGarment('o1', 'item1', 'g3', 'store1', 'emp-owner', Role.OWNER, {
         type: AdjustmentType.REFUND,
-        amount: 295,
+        amount: 385,
         reason: 'Cancelled damaged piece',
       });
 
@@ -1931,7 +1931,7 @@ describe('OrderService', () => {
         data: {
           orderId: 'o1',
           type: AdjustmentType.REFUND,
-          amount: 295,
+          amount: 385,
           reason: 'Cancelled damaged piece',
           status: AdjustmentStatus.COMPLETED,
           reference: undefined,
@@ -1951,7 +1951,7 @@ describe('OrderService', () => {
           where: { id: 'o1' },
           data: expect.objectContaining({
             subtotal: 500,
-            totalAmount: 590,
+            totalAmount: 500,
             amountDue: 0,
             paymentStatus: PaymentStatus.PAID,
           }),
@@ -1978,30 +1978,30 @@ describe('OrderService', () => {
         id: 'adj2',
         orderId: 'o1',
         type: AdjustmentType.STORE_CREDIT,
-        amount: 295,
+        amount: 385,
         reason: 'Customer opted for store credit',
         status: AdjustmentStatus.COMPLETED,
       });
       service.findOrderById = jest.fn().mockResolvedValue({
         ...mockOrder,
-        totalAmount: 590,
+        totalAmount: 500,
         amountPaid: 885,
-        storeCreditAmount: 295,
-        effectivePaid: 590,
+        storeCreditAmount: 385,
+        effectivePaid: 500,
         amountDue: 0,
         paymentStatus: PaymentStatus.PAID,
       });
 
       await service.cancelPhysicalGarment('o1', 'item1', 'g3', 'store1', 'emp-owner', Role.OWNER, {
         type: AdjustmentType.STORE_CREDIT,
-        amount: 295,
+        amount: 385,
         reason: 'Customer opted for store credit',
       });
 
       expect(mockPrismaService.financialAdjustment.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           type: AdjustmentType.STORE_CREDIT,
-          amount: 295,
+          amount: 385,
           status: AdjustmentStatus.COMPLETED,
         }),
       });
@@ -2109,21 +2109,21 @@ describe('OrderService', () => {
       // Verify authoritative PaymentService call
       expect(mockPaymentService.calculateOrderFinancialState).toHaveBeenCalledWith(
         expect.objectContaining({
-          totalAmount: 885,
+          totalAmount: 750,
           amountPaid: 590,
           paymentStatus: PaymentStatus.PAID,
           adjustments: [],
         }),
       );
 
-      // Verify order update contains authoritative amountDue (295) and paymentStatus (PARTIAL)
+      // Verify order update contains authoritative amountDue (160) and paymentStatus (PARTIAL)
       expect(mockPrismaService.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'o-paid-add' },
           data: expect.objectContaining({
             subtotal: 750,
-            totalAmount: 885,
-            amountDue: 295,
+            totalAmount: 750,
+            amountDue: 160,
             paymentStatus: PaymentStatus.PARTIAL,
           }),
         }),
@@ -2188,19 +2188,19 @@ describe('OrderService', () => {
       // Verify PaymentService was called with adjustments
       expect(mockPaymentService.calculateOrderFinancialState).toHaveBeenCalledWith(
         expect.objectContaining({
-          totalAmount: 885,
+          totalAmount: 750,
           amountPaid: 590,
           adjustments: paidOrderWithAdjustments.adjustments,
         }),
       );
 
-      // Effective paid = 590 - 150 = 440; new total = 885; amountDue = 885 - 440 = 445
+      // Effective paid = 590 - 150 = 440; new total = 750; amountDue = 750 - 440 = 310
       expect(mockPrismaService.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'o-adj-add' },
           data: expect.objectContaining({
-            totalAmount: 885,
-            amountDue: 445,
+            totalAmount: 750,
+            amountDue: 310,
             paymentStatus: PaymentStatus.PARTIAL,
           }),
         }),
@@ -2251,12 +2251,12 @@ describe('OrderService', () => {
       mockPrismaService.physicalGarment.update = jest.fn().mockResolvedValue({});
       mockPrismaService.orderItem.update = jest.fn();
       mockPrismaService.order.update = jest.fn();
-      // Current effective paid = 885 - 50 = 835. New total = 590. Reduction required = 835 - 590 = 245.
+      // Current effective paid = 885 - 50 = 835. New total = 500. Reduction required = 835 - 500 = 335.
       mockPrismaService.financialAdjustment.create = jest.fn().mockResolvedValue({
         id: 'adj-new',
         orderId: 'o-adj-cancel',
         type: AdjustmentType.REFUND,
-        amount: 245,
+        amount: 335,
         reason: 'Refund for cancelled piece',
         status: AdjustmentStatus.COMPLETED,
       });
@@ -2271,7 +2271,7 @@ describe('OrderService', () => {
         Role.OWNER,
         {
           type: AdjustmentType.REFUND,
-          amount: 245,
+          amount: 335,
           reason: 'Refund for cancelled piece',
         },
       );
@@ -2281,18 +2281,18 @@ describe('OrderService', () => {
         data: expect.objectContaining({
           orderId: 'o-adj-cancel',
           type: AdjustmentType.REFUND,
-          amount: 245,
+          amount: 335,
           status: AdjustmentStatus.COMPLETED,
           createdById: 'emp-owner',
         }),
       });
 
-      // Total adjustments = 50 + 245 = 295. Effective paid = 885 - 295 = 590. Total = 590 => amountDue = 0, status = PAID.
+      // Total adjustments = 50 + 335 = 385. Effective paid = 885 - 385 = 500. Total = 500 => amountDue = 0, status = PAID.
       expect(mockPrismaService.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'o-adj-cancel' },
           data: expect.objectContaining({
-            totalAmount: 590,
+            totalAmount: 500,
             amountDue: 0,
             paymentStatus: PaymentStatus.PAID,
           }),
@@ -4681,9 +4681,9 @@ describe('OrderService', () => {
       await service.createOrder(pieceWeightDto, 'emp-1', 'store-1');
       const createCall = mockPrismaService.order.create.mock.calls[0][0];
 
-      // 3 pieces * ₹40 = ₹120 subtotal (₹141.60 with 18% GST)
+      // 3 pieces * ₹40 = ₹120 subtotal (tax-inclusive canonical total)
       expect(createCall.data.subtotal).toBe(120);
-      expect(createCall.data.totalAmount).toBe(141.6);
+      expect(createCall.data.totalAmount).toBe(120);
 
       // Creates individual physical garments with permanent tags for each piece
       const createdItem = createCall.data.items.create[0];
@@ -4745,7 +4745,7 @@ describe('OrderService', () => {
       await service.createOrder(pieceWeightDto, 'emp-1', 'store-1');
       const createCall = mockPrismaService.order.create.mock.calls[0][0];
       expect(createCall.data.subtotal).toBe(200); // 5 * 40 = 200
-      expect(createCall.data.totalAmount).toBe(236); // 200 + 18% GST = 236
+      expect(createCall.data.totalAmount).toBe(200); // tax-inclusive total = 200
     });
 
     it('updating permitted price updates the total (3 pieces at ₹50 = ₹150)', async () => {
@@ -4798,7 +4798,7 @@ describe('OrderService', () => {
       await service.createOrder(pieceWeightDto, 'emp-1', 'store-1');
       const createCall = mockPrismaService.order.create.mock.calls[0][0];
       expect(createCall.data.subtotal).toBe(150); // 3 * 50 = 150
-      expect(createCall.data.totalAmount).toBe(177); // 150 + 18% GST = 177
+      expect(createCall.data.totalAmount).toBe(150); // tax-inclusive total = 150
     });
 
     it('rejects invalid piece quantity (0 or negative)', async () => {
@@ -4973,9 +4973,8 @@ describe('OrderService', () => {
 
     it('Same-day delivery calculates express charge as base express charge × 2.0', async () => {
       // 2 shirts at ₹100 = ₹200 subtotal
-      // Base express = 20% of ₹200 = ₹40
-      // Same-day express = ₹40 × 2.0 = ₹80
-      // Taxable = ₹280, GST (18%) = ₹50.40, Total = ₹330.40
+      // Canonical direct multiplier for same-day delivery: 2.0× base (express surcharge = ₹200)
+      // Tax-inclusive pricing (TAX_RATE = 0): total = ₹400
       const dto = setupOrderMock(ExpressDeliveryOption.SAME_DAY);
 
       await service.createOrder(dto, 'emp-1', 'store-1');
@@ -4986,10 +4985,10 @@ describe('OrderService', () => {
             isExpress: true,
             expressDeliveryOption: ExpressDeliveryOption.SAME_DAY,
             subtotal: 200,
-            expressSurcharge: 80,
-            taxAmount: 50.4,
-            totalAmount: 330.4,
-            amountDue: 330.4,
+            expressSurcharge: 200,
+            taxAmount: 0,
+            totalAmount: 400,
+            amountDue: 400,
           }),
         }),
       );
@@ -4997,9 +4996,8 @@ describe('OrderService', () => {
 
     it('Tomorrow / next-day evening delivery calculates express charge as base express charge × 1.5', async () => {
       // 2 shirts at ₹100 = ₹200 subtotal
-      // Base express = 20% of ₹200 = ₹40
-      // Next-day evening express = ₹40 × 1.5 = ₹60
-      // Taxable = ₹260, GST (18%) = ₹46.80, Total = ₹306.80
+      // Canonical direct multiplier for next-day evening: 1.5× base (express surcharge = ₹100)
+      // Tax-inclusive pricing (TAX_RATE = 0): total = ₹300
       const friday = new Date('2026-10-23T10:00:00.000Z');
       jest.useFakeTimers().setSystemTime(friday);
 
@@ -5013,10 +5011,10 @@ describe('OrderService', () => {
             isExpress: true,
             expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
             subtotal: 200,
-            expressSurcharge: 60,
-            taxAmount: 46.8,
-            totalAmount: 306.8,
-            amountDue: 306.8,
+            expressSurcharge: 100,
+            taxAmount: 0,
+            totalAmount: 300,
+            amountDue: 300,
           }),
         }),
       );
@@ -5027,7 +5025,7 @@ describe('OrderService', () => {
     it('Regular delivery produces 0 express charge and is marked standard', async () => {
       // 2 shirts at ₹100 = ₹200 subtotal
       // Regular delivery = No express charge (₹0)
-      // Taxable = ₹200, GST (18%) = ₹36.00, Total = ₹236.00
+      // Tax-inclusive pricing (TAX_RATE = 0): total = ₹200
       const dto = setupOrderMock(ExpressDeliveryOption.REGULAR);
 
       await service.createOrder(dto, 'emp-1', 'store-1');
@@ -5039,8 +5037,8 @@ describe('OrderService', () => {
             expressDeliveryOption: ExpressDeliveryOption.REGULAR,
             subtotal: 200,
             expressSurcharge: 0,
-            taxAmount: 36,
-            totalAmount: 236,
+            taxAmount: 0,
+            totalAmount: 200,
           }),
         }),
       );
@@ -5129,12 +5127,141 @@ describe('OrderService', () => {
           where: { id: 'ord-edit-1' },
           data: expect.objectContaining({
             subtotal: 300,
-            expressSurcharge: 90, // Exactly 20% of 300 * 1.5 = 90
-            taxAmount: 70.2, // 18% of (300 + 90) = 70.2
-            totalAmount: 460.2,
+            expressSurcharge: 150, // 300 * 0.5 (1.5x multiplier)
+            taxAmount: 0,
+            totalAmount: 450,
           }),
         }),
       );
+    });
+  });
+
+  describe('Order Creator Attribution', () => {
+    it('records authenticated employee ID on order creation and maps createdByName from relation', async () => {
+      const dto: any = {
+        customerId: 'cust-1',
+        isExpress: false,
+        pickupType: PickupType.HOME_DELIVERY,
+        items: [
+          {
+            garmentCatalogId: 'g1',
+            serviceTypeId: 's1',
+            quantity: 1,
+            unitPrice: 100,
+          },
+        ],
+      };
+
+      mockPrismaService.customer.findUnique.mockResolvedValue({ id: 'cust-1' });
+      mockPrismaService.garmentCatalog.findMany.mockResolvedValue([
+        { id: 'g1', name: 'Shirt', category: GarmentCategory.MEN, isActive: true },
+      ]);
+      mockPrismaService.serviceType.findMany.mockResolvedValue([
+        { id: 's1', name: 'Dry Clean', category: ServiceCategory.DRY_CLEAN, isActive: true },
+      ]);
+      mockPrismaService.store.findUnique.mockResolvedValue({ id: 'store-1' });
+      mockPrismaService.order.create.mockResolvedValue({
+        id: 'o-creator-test',
+        orderNumber: 'ORD-CREATOR-01',
+        createdById: 'emp-creator-123',
+        createdBy: { id: 'emp-creator-123', name: 'Swapnil Gandhale' },
+        customerId: 'cust-1',
+        storeId: 'store-1',
+        status: OrderStatus.RECEIVED,
+        subtotal: 100,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 0,
+        totalAmount: 100,
+        amountPaid: 0,
+        paymentStatus: PaymentStatus.PENDING,
+        pickupType: PickupType.STORE_PICKUP,
+        priority: OrderPriority.STANDARD,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        items: [],
+      });
+
+      const result = await service.createOrder(dto, 'emp-creator-123', 'store-1', Role.COUNTER);
+
+      expect(mockPrismaService.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            createdById: 'emp-creator-123',
+          }),
+        }),
+      );
+      expect(result.createdById).toBe('emp-creator-123');
+      expect(result.createdByName).toBe('Swapnil Gandhale');
+    });
+
+    it('returns createdByName from createdBy relation in findOrderById', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue({
+        id: 'o-find-creator',
+        orderNumber: 'ORD-FIND-01',
+        storeId: 'store-1',
+        createdById: 'emp-creator-123',
+        createdBy: { id: 'emp-creator-123', name: 'Swapnil Gandhale' },
+        deliveredById: 'emp-deliv-456',
+        deliveredBy: { id: 'emp-deliv-456', name: 'Prathamesh Bhagwat' },
+        deliveredAt: new Date('2026-10-26T14:26:33.000Z'),
+        status: OrderStatus.DELIVERED,
+        subtotal: 200,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 0,
+        totalAmount: 200,
+        amountPaid: 200,
+        paymentStatus: PaymentStatus.PAID,
+        pickupType: PickupType.STORE_PICKUP,
+        priority: OrderPriority.STANDARD,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        items: [],
+        payments: [],
+        adjustments: [],
+      });
+
+      const result = await service.findOrderById('o-find-creator', 'store-1');
+
+      expect(result.createdById).toBe('emp-creator-123');
+      expect(result.createdByName).toBe('Swapnil Gandhale');
+      expect(result.deliveredByName).toBe('Prathamesh Bhagwat');
+    });
+
+    it('honestly returns null for createdByName on historical orders with missing creator relation without inventing a name', async () => {
+      mockPrismaService.order.findUnique.mockResolvedValue({
+        id: 'o-historical',
+        orderNumber: 'ORD-HIST-01',
+        storeId: 'store-1',
+        createdById: 'old-emp-deleted',
+        createdBy: null,
+        deliveredById: null,
+        deliveredBy: null,
+        status: OrderStatus.RECEIVED,
+        subtotal: 150,
+        discountAmount: 0,
+        expressSurcharge: 0,
+        taxAmount: 0,
+        totalAmount: 150,
+        amountPaid: 0,
+        paymentStatus: PaymentStatus.PENDING,
+        pickupType: PickupType.STORE_PICKUP,
+        priority: OrderPriority.STANDARD,
+        orderDate: new Date(),
+        systemDueDate: new Date(),
+        effectiveDueDate: new Date(),
+        items: [],
+        payments: [],
+        adjustments: [],
+      });
+
+      const result = await service.findOrderById('o-historical', 'store-1');
+
+      expect(result.createdById).toBe('old-emp-deleted');
+      expect(result.createdByName).toBeNull();
     });
   });
 });

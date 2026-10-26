@@ -2388,6 +2388,7 @@ export class OrderService {
       paymentStatus: financial.paymentStatus,
       pickupType: order.pickupType,
       deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
+      createdByName: order.createdBy?.name || null,
       itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
       ...calculateFulfillmentBreakdown(order.totalAmount, order.amountPaid, order.items),
     };
@@ -2407,7 +2408,7 @@ export class OrderService {
       storeAddress: order.store?.address || null,
       storePhone: order.store?.phone || null,
       createdById: order.createdById,
-      createdByName: order.createdBy?.name || 'Staff',
+      createdByName: order.createdBy?.name || null,
       deliveredById: order.deliveredById || null,
       deliveredByName: order.deliveredBy?.name || null,
       clientDraftId: order.clientDraftId || null,

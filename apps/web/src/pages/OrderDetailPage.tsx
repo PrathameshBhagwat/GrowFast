@@ -468,6 +468,12 @@ export function OrderDetailPage() {
               <div className="font-bold text-base text-[var(--text-primary)]">
                 Order Completely Delivered
               </div>
+              <div
+                className="text-xs text-[var(--text-secondary)] mt-0.5"
+                id="order-delivered-created-by"
+              >
+                Created by: {order.createdByName || 'Not recorded'}
+              </div>
               <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
                 {order.deliveredAt
                   ? `Delivered on ${new Date(order.deliveredAt).toLocaleString()}`
@@ -499,6 +505,12 @@ export function OrderDetailPage() {
             <div className="flex justify-between">
               <span className="text-gray-500">Phone</span>
               <span className="font-medium text-gray-900">{order.customerPhone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Created By</span>
+              <span className="font-medium text-gray-900" id="order-details-created-by">
+                {order.createdByName || 'Not recorded'}
+              </span>
             </div>
             <div className="flex justify-between pt-2 border-t mt-2">
               <span className="text-gray-500 flex items-center gap-1">

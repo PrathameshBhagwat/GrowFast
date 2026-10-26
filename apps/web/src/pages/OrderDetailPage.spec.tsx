@@ -203,6 +203,7 @@ const mockOrderDeliveredFinal = {
   amountDue: 0,
   deliveredAt: '2026-09-06T18:30:00Z',
   deliveredByName: 'Ramesh Patel',
+  createdByName: 'Swapnil Gandhale',
   items: [
     {
       ...mockOrderWithPhysicalGarments.items[0],
@@ -602,18 +603,31 @@ describe('OrderDetailPage — Phase 3D Physical Garment Add/Cancel', () => {
       expect(screen.queryByRole('button', { name: /Counter Handover/i })).not.toBeInTheDocument();
     });
 
-    it('Delivered order renders order-level delivered banner with timestamp and deliveredByName', async () => {
+    it('Delivered order renders order-level delivered banner with timestamp, deliveredByName, and createdByName', async () => {
       mockRole = 'COUNTER';
       renderWithRouter('order-delivered-final');
 
       await waitFor(() => {
         expect(screen.getByText(/Order Completely Delivered/i)).toBeInTheDocument();
+        expect(screen.getByText(/Created by: Swapnil Gandhale/i)).toBeInTheDocument();
         expect(screen.getByText(/Delivered on/i)).toBeInTheDocument();
         expect(screen.getByText(/Ramesh Patel/i)).toBeInTheDocument();
       });
 
       // When all are delivered, Counter Handover button does not show
       expect(screen.queryByRole('button', { name: /Counter Handover/i })).not.toBeInTheDocument();
+    });
+
+    it('Renders Created By in Customer Details card for non-delivered order, with honest missing data handling', async () => {
+      mockRole = 'COUNTER';
+      renderWithRouter('order-101');
+
+      await waitFor(() => {
+        expect(screen.getByText('ORD-101')).toBeInTheDocument();
+      });
+
+      // mockOrderWithPhysicalGarments does not have createdByName -> displays "Not recorded" honestly
+      expect(screen.getByText('Not recorded')).toBeInTheDocument();
     });
 
     it('Delivered physical garments show DELIVERED badge and disabled state', async () => {

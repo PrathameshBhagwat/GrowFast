@@ -292,10 +292,18 @@ export function OrderDetailModal({
                     <View style={styles.dateCol}>
                       <Text style={styles.dateLabel}>Created</Text>
                       <Text style={styles.dateVal}>{formatDateTime(order.orderDate)}</Text>
+                      <Text style={styles.creatorVal} testID="mobile-order-created-by">
+                        {order.createdByName
+                          ? `by ${order.createdByName}`
+                          : 'Creator: Not recorded'}
+                      </Text>
                     </View>
                     <View style={styles.dateCol}>
                       <Text style={styles.dateLabel}>Due Date</Text>
                       <Text style={styles.dateVal}>{formatDateOnly(order.effectiveDueDate)}</Text>
+                      {order.deliveredByName ? (
+                        <Text style={styles.creatorVal}>delivered by {order.deliveredByName}</Text>
+                      ) : null}
                     </View>
                   </View>
                 </View>
@@ -663,6 +671,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#0f172a',
+    marginTop: 2,
+  },
+  creatorVal: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
     marginTop: 2,
   },
   tabBar: {

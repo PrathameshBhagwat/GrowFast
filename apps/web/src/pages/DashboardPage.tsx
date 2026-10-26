@@ -174,6 +174,9 @@ export const DashboardPage: React.FC = () => {
   /* ─── Handlers ──────────────────────────────────────────────── */
 
   const handleSelectPreset = (newPreset: DashboardDatePreset) => {
+    if (newPreset === preset && newPreset !== 'CUSTOM') {
+      return;
+    }
     setPreset(newPreset);
     setCustomError(null);
     if (newPreset === 'CUSTOM') {
@@ -186,6 +189,8 @@ export const DashboardPage: React.FC = () => {
       setDateRange(newRange);
       setCustomStartDate(newRange.startDate);
       setCustomEndDate(newRange.endDate);
+    } else {
+      loadDashboard(newRange);
     }
   };
 
