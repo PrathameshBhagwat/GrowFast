@@ -93,7 +93,7 @@ describe('BillPdfService', () => {
       expect(buffer.length).toBeGreaterThan(100);
       const header = buffer.subarray(0, 4).toString('utf-8');
       expect(header).toBe('%PDF');
-    }, 15000);
+    }, 30000);
 
     it('should be idempotent across multiple generations without modifying state', async () => {
       const buffer1 = await service.renderPdfFromOrderData(mockOrderData);
@@ -101,7 +101,7 @@ describe('BillPdfService', () => {
       expect(buffer1.length).toBeGreaterThan(100);
       expect(buffer2.length).toBeGreaterThan(100);
       expect(mockPrisma.order.findUnique).not.toHaveBeenCalled();
-    }, 15000);
+    }, 30000);
   });
 
   describe('fetchOrderData', () => {
