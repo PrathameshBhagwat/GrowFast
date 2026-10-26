@@ -20,6 +20,16 @@ import {
 } from '@growfast/shared-types';
 import { getAuthToken, clearUserSession } from '../storage/secure-store';
 
+export interface AuthEmployeeProfile {
+  id: string;
+  employeeId?: string;
+  name: string;
+  role: string;
+  storeId: string;
+  storeName?: string;
+  phone?: string;
+}
+
 export interface ApiClientConfig {
   baseUrl: string;
 }
@@ -78,18 +88,20 @@ export function _resetUnauthorizedLock(): void {
 // falling back to EXPO_PUBLIC_API_URL or the LAN host (http://192.168.1.38:3000).
 // Never defaults to Android-emulator-only 10.0.2.2 on physical hardware.
 function resolveDefaultBaseUrl(): string {
-  // 1. Explicit environment variable if valid and not a local emulator loopback
+  // 1. Explicit environment variable if provided
   const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-  if (
-    envUrl &&
-    !envUrl.includes('10.0.2.2') &&
-    !envUrl.includes('localhost') &&
-    !envUrl.includes('127.0.0.1')
-  ) {
+  if (envUrl) {
     return envUrl;
   }
 
-  // 2. Dynamic discovery from Expo Metro host URI if available at runtime
+  // 2. Web browser context: strictly match the browser's current host (e.g. localhost or LAN host)
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const protocol = window.location.protocol || 'http:';
+    const hostname = window.location.hostname || 'localhost';
+    return `${protocol}//${hostname}:3000`;
+  }
+
+  // 3. Dynamic discovery from Expo Metro host URI on physical Android or iOS device
   try {
     const Constants = require('expo-constants').default;
     const hostUri =
@@ -107,17 +119,12 @@ function resolveDefaultBaseUrl(): string {
     // Non-Expo or test runner context (e.g. tsx unit tests)
   }
 
-  // 3. If explicit env URL was provided, use it even if loopback in test environments
-  if (envUrl) {
-    return envUrl;
-  }
-
-  // 4. In test or node environments without Expo, default to localhost
-  if (typeof window === 'undefined' && !process.env.EXPO_PUBLIC_API_URL) {
+  // 4. Default localhost for desktop / node / test environments
+  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
     return 'http://localhost:3000';
   }
 
-  // 5. Fallback for physical device on local development Wi-Fi
+  // 5. Fallback for mobile devices on local Wi-Fi
   return 'http://192.168.1.17:3000';
 }
 
@@ -314,12 +321,12 @@ export const apiClient = {
       );
     },
 
-    getProfile: async () => {
-      return await request<any>('/api/auth/me');
+    getProfile: async (): Promise<AuthEmployeeProfile> => {
+      return await request<AuthEmployeeProfile>('/api/auth/me');
     },
 
-    getMe: async () => {
-      return await request<any>('/api/auth/me');
+    getMe: async (): Promise<AuthEmployeeProfile> => {
+      return await request<AuthEmployeeProfile>('/api/auth/me');
     },
   },
 

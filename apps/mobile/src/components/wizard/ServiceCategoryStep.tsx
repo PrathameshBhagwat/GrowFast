@@ -10,10 +10,13 @@ import {
 import {
   ServiceTypeDTO,
   GarmentCategory,
+  ServiceCategory,
   OrderWorkflowType,
+  OrderEntryMode,
   formatCatalogServiceName,
-  filterServicesForCategory,
-  isShoeCategory,
+  filterCategoriesForService,
+  resolveCatalogSelectionOnServiceSelect,
+  resolveCatalogSelectionOnCategoryChange,
   isWeightBasedCategory,
   isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
@@ -30,6 +33,8 @@ export interface ServiceCategoryStepProps {
   isLoadingServices?: boolean;
   cartItemCount: number;
   onContinue: () => void;
+  entryMode?: OrderEntryMode;
+  onEntryModeChange?: (mode: OrderEntryMode) => void;
 }
 
 const CATEGORIES: { key: string; label: string; icon: string }[] = [
@@ -38,9 +43,12 @@ const CATEGORIES: { key: string; label: string; icon: string }[] = [
   { key: GarmentCategory.WOMEN, label: 'Women', icon: '👗' },
   { key: GarmentCategory.KIDS, label: 'Kids', icon: '🧒' },
   { key: GarmentCategory.HOUSEHOLD, label: 'Household', icon: '🛏️' },
-  { key: GarmentCategory.WEIGHT_BASED, label: 'Per Kg Laundry', icon: '⚖️' },
+  { key: GarmentCategory.SHOES, label: 'Shoes', icon: '👟' },
   { key: GarmentCategory.OTHERS, label: 'Others', icon: '📦' },
 ];
+
+import { isWeightBasedPricing } from '../../services/catalog-rules';
+export { isWeightBasedPricing };
 
 export function ServiceCategoryStep({
   workflow,
@@ -53,29 +61,53 @@ export function ServiceCategoryStep({
   isLoadingServices = false,
   cartItemCount,
   onContinue,
+  entryMode,
 }: ServiceCategoryStepProps) {
-  // Filter available services based on workflow and active category
+  // Filter available services based on workflow
   const availableServices = useMemo(() => {
     return services.filter((svc) => {
       if (!svc.isActive) return false;
-      if (!isServiceAllowedInWorkflow(svc, workflow)) return false;
-      if (selectedCategory && selectedCategory !== 'ALL') {
-        const catServices = filterServicesForCategory(services, selectedCategory, workflow);
-        return catServices.some((s) => s.id === svc.id);
-      }
-      return true;
+      return isServiceAllowedInWorkflow(svc, workflow);
     });
-  }, [services, workflow, selectedCategory]);
+  }, [services, workflow]);
 
-  // Filter available categories based on workflow
+  // Active service object
+  const activeService = useMemo(() => {
+    return (
+      services.find((s) => s.id === selectedServiceId) ||
+      availableServices[0] ||
+      null
+    );
+  }, [services, selectedServiceId, availableServices]);
+
+  // Is weight-based pricing active?
+  const isWeightBased = useMemo(() => {
+    return isWeightBasedPricing(workflow, activeService, entryMode, selectedCategory);
+  }, [workflow, activeService, entryMode, selectedCategory]);
+
+  // Filter available categories based on active service and workflow (for per-piece services only)
   const availableCategories = useMemo(() => {
-    return CATEGORIES.filter((cat) => {
-      if (cat.key === 'ALL') return true;
-      return isCategoryAllowedInWorkflow(cat.key as GarmentCategory, workflow);
-    });
-  }, [workflow]);
+    if (isWeightBased) {
+      // Critical business rule: Per-weight laundry must not display garment-category selector
+      return [];
+    }
+    const baseCategories = CATEGORIES.filter(
+      (cat) =>
+        cat.key !== GarmentCategory.WEIGHT_BASED &&
+        cat.key !== GarmentCategory.HOME_CLEANING &&
+        cat.key !== 'HOME_CLEANING' &&
+        (cat.key === 'ALL' || isCategoryAllowedInWorkflow(cat.key as GarmentCategory, workflow)),
+    );
+    const filteredKeys = filterCategoriesForService(
+      baseCategories.map((c) => c.key),
+      selectedServiceId,
+      services,
+      workflow,
+    );
+    return baseCategories.filter((c) => filteredKeys.includes(c.key));
+  }, [isWeightBased, workflow, selectedServiceId, services]);
 
-  // Auto-select first compatible service if current is invalid
+  // Auto-select first compatible service if current selection is invalid
   React.useEffect(() => {
     if (availableServices.length > 0) {
       const exists = availableServices.some((s) => s.id === selectedServiceId);
@@ -84,6 +116,32 @@ export function ServiceCategoryStep({
       }
     }
   }, [availableServices, selectedServiceId, onSelectService]);
+
+  const handleSelectService = (svcId: string) => {
+    const resolved = resolveCatalogSelectionOnServiceSelect(
+      svcId,
+      selectedCategory,
+      services,
+      workflow,
+    );
+    onSelectService(resolved.serviceId);
+    if (resolved.category && String(resolved.category) !== selectedCategory) {
+      onSelectCategory(String(resolved.category));
+    }
+  };
+
+  const handleSelectCategory = (catKey: string) => {
+    onSelectCategory(catKey);
+    const resolvedSvcId = resolveCatalogSelectionOnCategoryChange(
+      catKey,
+      selectedServiceId,
+      services,
+      workflow,
+    );
+    if (resolvedSvcId !== selectedServiceId) {
+      onSelectService(resolvedSvcId);
+    }
+  };
 
   const getServiceIcon = (name: string): string => {
     const lower = name.toLowerCase();
@@ -163,7 +221,7 @@ export function ServiceCategoryStep({
               <TouchableOpacity
                 key={svc.id}
                 style={[styles.serviceCard, isSelected && styles.serviceCardActive]}
-                onPress={() => onSelectService(svc.id)}
+                onPress={() => handleSelectService(svc.id)}
                 accessible={true}
                 accessibilityLabel={`Select service ${displayName}`}
               >
@@ -199,34 +257,67 @@ export function ServiceCategoryStep({
         </View>
       )}
 
-      {/* Category Selection Grid */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Filter Garment Category</Text>
-        <Text style={styles.sectionSubtitle}>Narrow down catalog garments or select All Items</Text>
-      </View>
-
-      <View style={styles.categoryGrid}>
-        {availableCategories.map((cat) => {
-          const isSelected = selectedCategory === cat.key;
-          return (
-            <TouchableOpacity
-              key={cat.key}
-              style={[styles.categoryCard, isSelected && styles.categoryCardActive]}
-              onPress={() => onSelectCategory(cat.key)}
-              accessible={true}
-              accessibilityLabel={`Select category ${cat.label}`}
-            >
-              <Text style={styles.categoryIcon}>{cat.icon}</Text>
-              <Text
-                style={[styles.categoryLabel, isSelected && styles.categoryLabelActive]}
-                numberOfLines={1}
-              >
-                {cat.label}
+      {/* Critical Business Rule: Per-Weight Laundry hides garment category selector */}
+      {isWeightBased ? (
+        <View style={styles.weightIntakeNotice}>
+          <View style={styles.weightNoticeHeader}>
+            <View style={styles.weightNoticeIconCircle}>
+              <Text style={styles.weightNoticeIcon}>⚖️</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.weightNoticeTitle}>Per-Kg Weight Laundry</Text>
+              <Text style={styles.weightNoticeDesc}>
+                Garment-category filtering is hidden for per-kg laundry (min 2.00 kg). Batch laundry
+                is weighed directly with piece counts and photos in the next step.
               </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+            </View>
+          </View>
+          <View style={styles.weightBadgeRow}>
+            <View style={styles.weightBadge}>
+              <Text style={styles.weightBadgeText}>Min 2.00 kg</Text>
+            </View>
+            <View style={styles.weightBadge}>
+              <Text style={styles.weightBadgeText}>Bulk Weighing</Text>
+            </View>
+            <View style={styles.weightBadge}>
+              <Text style={styles.weightBadgeText}>Piece Tag Tracking</Text>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <>
+          {/* Category Selection Grid (Only rendered for per-piece services) */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Filter Garment Category</Text>
+            <Text style={styles.sectionSubtitle}>
+              Narrow down catalog garments or select All Items
+            </Text>
+          </View>
+
+          <View style={styles.categoryGrid}>
+            {availableCategories.map((cat) => {
+              const isSelected = selectedCategory === cat.key;
+              return (
+                <TouchableOpacity
+                  key={cat.key}
+                  style={[styles.categoryCard, isSelected && styles.categoryCardActive]}
+                  onPress={() => handleSelectCategory(cat.key)}
+                  accessible={true}
+                  accessibilityLabel={`Select category ${cat.label}`}
+                >
+                  <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                  <Text
+                    style={[styles.categoryLabel, isSelected && styles.categoryLabelActive]}
+                    numberOfLines={1}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       {/* Bottom Action */}
       <View style={styles.bottomBar}>
@@ -234,10 +325,16 @@ export function ServiceCategoryStep({
           style={styles.continueButton}
           onPress={onContinue}
           accessible={true}
-          accessibilityLabel="Continue to Garment Catalog"
+          accessibilityLabel={
+            isWeightBased
+              ? `Continue to Weight Intake (${cartItemCount} in cart)`
+              : `Continue to Garment Catalog (${cartItemCount} in cart)`
+          }
         >
           <Text style={styles.continueButtonText}>
-            Continue to Garments ({cartItemCount} in cart) →
+            {isWeightBased
+              ? `Continue to Weight Intake (${cartItemCount} in cart) →`
+              : `Continue to Garments (${cartItemCount} in cart) →`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -394,6 +491,63 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
+  },
+  weightIntakeNotice: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#bfdbfe',
+    padding: 16,
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  weightNoticeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  weightNoticeIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#dbeafe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weightNoticeIcon: {
+    fontSize: 20,
+  },
+  weightNoticeTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e40af',
+  },
+  weightNoticeDesc: {
+    fontSize: 12,
+    color: '#3b82f6',
+    marginTop: 3,
+    lineHeight: 18,
+  },
+  weightBadgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#dbeafe',
+  },
+  weightBadge: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  weightBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1d4ed8',
   },
   categoryGrid: {
     flexDirection: 'row',

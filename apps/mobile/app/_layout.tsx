@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
@@ -11,7 +12,13 @@ import { onUnauthorized } from '../src/api/client';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      retry: (failureCount, error: any) => {
+        // Never retry HTTP 401 Unauthorized errors
+        if (error?.statusCode === 401 || error?.status === 401) {
+          return false;
+        }
+        return failureCount < 2;
+      },
       staleTime: 1000 * 60 * 5, // 5 minutes
     },
   },
@@ -23,10 +30,11 @@ function ProtectedRoutes({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
 
-  // Clear query cache on unauthorized response to protect user data
+  // Cancel in-flight queries and remove cached queries on unauthorized without re-triggering fetches
   useEffect(() => {
     const unsubscribe = onUnauthorized(() => {
-      queryClient.clear();
+      queryClient.cancelQueries();
+      queryClient.removeQueries();
     });
     return unsubscribe;
   }, []);
@@ -76,21 +84,23 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ProtectedRoutes>
-          <View style={styles.container}>
-            <StatusBar style="auto" />
-            <ConnectionBanner />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(auth)/login" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          </View>
-        </ProtectedRoutes>
-      </AuthProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <ProtectedRoutes>
+            <View style={styles.container}>
+              <StatusBar style="auto" />
+              <ConnectionBanner />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(auth)/login" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </View>
+          </ProtectedRoutes>
+        </AuthProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
 

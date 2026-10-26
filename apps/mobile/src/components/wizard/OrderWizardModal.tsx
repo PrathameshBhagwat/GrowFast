@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert, Platform, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CustomerDTO,
   CreateOrderItemRequest,
@@ -13,6 +14,10 @@ import {
   GarmentCategory,
   ServiceCategory,
   Role,
+  resolveCatalogSelectionOnWorkflowChange,
+  resolveCatalogSelectionOnServiceSelect,
+  resolveCatalogSelectionOnCategoryChange,
+  isItemCompatibleWithWorkflow,
 } from '@growfast/shared-types';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../../db/drafts';
@@ -23,6 +28,7 @@ import { apiClient } from '../../api/client';
 // Modular Screen Components
 import { CustomerStep } from './CustomerStep';
 import { ServiceCategoryStep } from './ServiceCategoryStep';
+import { isWeightBasedPricing } from '../../services/catalog-rules';
 import { CatalogGridStep } from './CatalogGridStep';
 import { ItemDetailsModal } from './ItemDetailsModal';
 import { OrderItemsReviewStep } from './OrderItemsReviewStep';
@@ -147,6 +153,13 @@ export function OrderWizardModal({
 }: OrderWizardModalProps) {
   const { isConnected } = useNetworkStatus();
   const canModifyPrice = userRole === Role.OWNER || userRole === Role.MANAGER;
+
+  // Safe Area insets (respects Android status bar, cutouts, notches, and navigation bar)
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+  );
 
   // Wizard Navigation
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -449,6 +462,81 @@ export function OrderWizardModal({
     setItems(items.filter((_, idx) => idx !== index));
   };
 
+  // Workflow switch handler: reconciles service, category, entryMode, and handles incompatible items
+  const handleWorkflowChange = (newWorkflow: OrderWorkflowType) => {
+    if (newWorkflow === workflow) return;
+
+    const incompatible = items.filter(
+      (item) => !isItemCompatibleWithWorkflow(item, newWorkflow, services),
+    );
+
+    const executeWorkflowSwitch = () => {
+      const resolved = resolveCatalogSelectionOnWorkflowChange(
+        newWorkflow,
+        selectedServiceId,
+        selectedCategory,
+        services,
+      );
+      setWorkflow(newWorkflow);
+      setSelectedServiceId(resolved.serviceId);
+      setSelectedCategory(String(resolved.category));
+
+      const newSvc = services.find((s) => s.id === resolved.serviceId);
+      const isWeight = isWeightBasedPricing(newWorkflow, newSvc);
+      setEntryMode(isWeight ? 'WEIGHT' : 'PIECES');
+
+      if (incompatible.length > 0) {
+        setItems((prev) =>
+          prev.filter((item) => isItemCompatibleWithWorkflow(item, newWorkflow, services)),
+        );
+      }
+    };
+
+    if (incompatible.length > 0) {
+      Alert.alert(
+        'Switch Processing Track',
+        `Switching to ${newWorkflow === 'DRY_CLEANING' ? 'Dry Cleaning' : 'Laundry'} will remove ${incompatible.length} incompatible item(s) from your order. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch & Remove', style: 'destructive', onPress: executeWorkflowSwitch },
+        ],
+      );
+    } else {
+      executeWorkflowSwitch();
+    }
+  };
+
+  // Service selection handler: enforces service selection rules and reconciles category/entryMode
+  const handleSelectService = (newServiceId: string) => {
+    const resolved = resolveCatalogSelectionOnServiceSelect(
+      newServiceId,
+      selectedCategory,
+      services,
+      workflow,
+    );
+    setSelectedServiceId(resolved.serviceId);
+    if (resolved.category) {
+      setSelectedCategory(String(resolved.category));
+    }
+    const svc = services.find((s) => s.id === resolved.serviceId);
+    const isWeight = isWeightBasedPricing(workflow, svc);
+    setEntryMode(isWeight ? 'WEIGHT' : 'PIECES');
+  };
+
+  // Category selection handler: updates category and reconciles service constraints
+  const handleSelectCategory = (newCat: string) => {
+    const resolvedServiceId = resolveCatalogSelectionOnCategoryChange(
+      newCat,
+      selectedServiceId,
+      services,
+      workflow,
+    );
+    setSelectedCategory(newCat);
+    if (resolvedServiceId !== selectedServiceId) {
+      setSelectedServiceId(resolvedServiceId);
+    }
+  };
+
   // Direct quantity update from review screen (Workstream 2)
   const handleUpdateItemQuantity = (index: number, newQty: number) => {
     if (index < 0 || index >= items.length) return;
@@ -537,7 +625,7 @@ export function OrderWizardModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <SafeAreaView style={styles.safeContainer}>
+      <View style={[styles.safeContainer, { paddingTop: topInset, paddingBottom: insets.bottom }]}>
         {/* Header Bar */}
         <View style={styles.header}>
           {currentStepIndex !== 5 ? (
@@ -636,31 +724,37 @@ export function OrderWizardModal({
           {currentStepIndex === 1 && (
             <ServiceCategoryStep
               workflow={workflow}
-              onWorkflowChange={setWorkflow}
+              onWorkflowChange={handleWorkflowChange}
               selectedServiceId={selectedServiceId}
-              onSelectService={setSelectedServiceId}
+              onSelectService={handleSelectService}
               selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
+              onSelectCategory={handleSelectCategory}
               services={services}
               isLoadingServices={isLoadingCatalog}
               cartItemCount={items.length}
               onContinue={handleNext}
+              entryMode={entryMode}
+              onEntryModeChange={setEntryMode}
             />
           )}
 
           {/* STEP 2: Garment Catalog Grid (Screen 5 - Dev B) */}
           {currentStepIndex === 2 && (
             <CatalogGridStep
+              workflow={workflow}
+              entryMode={entryMode}
               garments={garments}
               services={services}
               prices={prices}
               selectedServiceId={selectedServiceId}
               selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
+              onCategoryChange={handleSelectCategory}
               items={items}
               onOpenItemConfig={handleOpenItemConfig}
               onQuickAddItem={handleQuickAddItem}
               onQuickDecrementItem={handleQuickDecrementItem}
+              onAddWeightItem={(weightItem) => setItems((prev) => [...prev, weightItem])}
+              onRemoveItem={handleRemoveCartItem}
               onProceedToReview={() => setCurrentStepIndex(3)}
               onBackToService={() => setCurrentStepIndex(1)}
               isLoadingCatalog={isLoadingCatalog}
@@ -769,7 +863,7 @@ export function OrderWizardModal({
             onPhotosUpdated={refreshPhotos}
           />
         )}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

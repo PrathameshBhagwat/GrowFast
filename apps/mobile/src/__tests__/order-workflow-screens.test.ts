@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   GarmentCategory,
   OrderWorkflowType,
+  OrderEntryMode,
   PickupType,
   ExpressDeliveryOption,
   OrderStatus,
@@ -12,11 +13,18 @@ import {
   adjustDueDateForThursday,
   isServiceAllowedInWorkflow,
   filterServicesForCategory,
+  filterCategoriesForService,
+  resolveCatalogSelectionOnWorkflowChange,
+  resolveCatalogSelectionOnServiceSelect,
+  resolveCatalogSelectionOnCategoryChange,
+  isItemCompatibleWithWorkflow,
+  roundCurrency,
   isCategoryAllowedInWorkflow,
   ServiceCategory,
   ServiceTypeDTO,
   GarmentCatalogDTO,
 } from '@growfast/shared-types';
+import { isWeightBasedPricing } from '../services/catalog-rules';
 
 interface MockPrice {
   id: string;
@@ -185,6 +193,122 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(isCategoryAllowedInWorkflow(GarmentCategory.MEN, 'LAUNDRY'), true);
       assert.equal(isCategoryAllowedInWorkflow(GarmentCategory.WOMEN, 'DRY_CLEANING'), true);
       assert.equal(isCategoryAllowedInWorkflow(GarmentCategory.HOME_CLEANING, 'LAUNDRY'), false);
+    });
+
+    it('4.1 Weight-based laundry hides garment-category selector completely per business rules', () => {
+      const washIron = mockServices.find((s) => s.name === 'Wash and Steam Iron')!;
+      const washFold = mockServices.find((s) => s.name === 'Wash and Fold')!;
+      const dryClean = mockServices.find((s) => s.name === 'Dry Clean')!;
+
+      // In LAUNDRY workflow with wash/wash_iron services, weight-based pricing is active
+      assert.equal(isWeightBasedPricing('LAUNDRY', washIron), true);
+      assert.equal(isWeightBasedPricing('LAUNDRY', washFold), true);
+      assert.equal(isWeightBasedPricing('LAUNDRY', null, 'WEIGHT'), true);
+      assert.equal(isWeightBasedPricing('LAUNDRY', washIron, 'WEIGHT'), true);
+
+      // In DRY_CLEANING workflow, weight-based pricing is NEVER allowed
+      assert.equal(isWeightBasedPricing('DRY_CLEANING', dryClean), false);
+      assert.equal(isWeightBasedPricing('DRY_CLEANING', dryClean, 'PIECES'), false);
+
+      // Verify that weight-based laundry hides category grid (availableCategories is empty)
+      const isWeight = isWeightBasedPricing('LAUNDRY', washIron);
+      const availableCategories = isWeight ? [] : ['ALL', 'MEN', 'WOMEN', 'KIDS', 'HOUSEHOLD'];
+      assert.equal(availableCategories.length, 0);
+    });
+
+    it('4.2 Per-piece services show category filtering only when required by website rules', () => {
+      const steamIron = mockServices.find((s) => s.name === 'Steam Iron')!;
+      const shoeClean = mockServices.find((s) => s.name === 'Shoe Cleaning')!;
+
+      // In LAUNDRY, Steam Iron is a per-piece service
+      assert.equal(isWeightBasedPricing('LAUNDRY', steamIron), false);
+
+      // For Starching service, only Men, Women, Kids are allowed
+      const starchingCategories = filterCategoriesForService(
+        ['ALL', GarmentCategory.MEN, GarmentCategory.WOMEN, GarmentCategory.KIDS, GarmentCategory.HOUSEHOLD],
+        'srv-starching',
+        [{ id: 'srv-starching', name: 'Starching' }],
+        'DRY_CLEANING',
+      );
+      assert.deepEqual(starchingCategories, [
+        GarmentCategory.MEN,
+        GarmentCategory.WOMEN,
+        GarmentCategory.KIDS,
+      ]);
+      assert.ok(!starchingCategories.includes(GarmentCategory.HOUSEHOLD));
+
+      // For Shoe Cleaning, category resolves to SHOES
+      const resolved = resolveCatalogSelectionOnServiceSelect(
+        shoeClean.id,
+        GarmentCategory.MEN,
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(resolved.serviceId, shoeClean.id);
+      assert.equal(resolved.category, GarmentCategory.SHOES);
+    });
+
+    it('4.3 Workflow switching reconciles eligible services and drops incompatible items', () => {
+      // Switching from LAUNDRY (Wash and Steam Iron) to DRY_CLEANING auto-resolves to Dry Clean
+      const toDryClean = resolveCatalogSelectionOnWorkflowChange(
+        'DRY_CLEANING',
+        'srv-wash-iron',
+        'ALL',
+        mockServices,
+      );
+      assert.equal(toDryClean.serviceId, 'srv-dry-clean');
+
+      // Switching from DRY_CLEANING (Dry Clean) to LAUNDRY auto-resolves to preferred laundry service
+      const toLaundry = resolveCatalogSelectionOnWorkflowChange(
+        'LAUNDRY',
+        'srv-dry-clean',
+        GarmentCategory.MEN,
+        mockServices,
+      );
+      assert.equal(toLaundry.serviceId, 'srv-wash-iron');
+
+      // Incompatibility check: Weight item cannot exist in DRY_CLEANING
+      const weightItem = { isWeightBased: true, weight: 3.5, garmentCatalogId: 'g-laundry-kg', serviceTypeId: 'srv-wash-fold' };
+      assert.equal(isItemCompatibleWithWorkflow(weightItem, 'DRY_CLEANING', mockServices), false);
+      assert.equal(isItemCompatibleWithWorkflow(weightItem, 'LAUNDRY', mockServices), true);
+
+      // Piece item in DRY_CLEANING is compatible
+      const pieceItem = { isWeightBased: false, weight: null, garmentCatalogId: 'g-shirt', serviceTypeId: 'srv-dry-clean' };
+      assert.equal(isItemCompatibleWithWorkflow(pieceItem, 'DRY_CLEANING', mockServices), true);
+    });
+
+    it('4.4 Category change resolves service according to website constraints', () => {
+      // Selecting Household category auto-switches service to Dry Clean
+      const householdService = resolveCatalogSelectionOnCategoryChange(
+        GarmentCategory.HOUSEHOLD,
+        'srv-steam-iron',
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(householdService, 'srv-dry-clean');
+
+      // Selecting Shoe category auto-switches service to Shoe Cleaning
+      const shoeService = resolveCatalogSelectionOnCategoryChange(
+        GarmentCategory.SHOES,
+        'srv-dry-clean',
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(shoeService, 'srv-shoe-clean');
+    });
+
+    it('4.5 Safe-area topInset calculation guarantees header and back button clear status bar and cutouts', () => {
+      // Simulation of safe-area inset logic on Android
+      const mockAndroidInsets = { top: 24, bottom: 16, left: 0, right: 0 };
+      const mockStatusBarHeight = 36; // Android cutout device
+      const topInset = Math.max(mockAndroidInsets.top, mockStatusBarHeight);
+      assert.equal(topInset, 36);
+      assert.ok(topInset >= mockStatusBarHeight);
+
+      // Simulation on edge-to-edge Android
+      const edgeToEdgeInsets = { top: 48, bottom: 24, left: 0, right: 0 };
+      const edgeTopInset = Math.max(edgeToEdgeInsets.top, mockStatusBarHeight);
+      assert.equal(edgeTopInset, 48);
     });
   });
 

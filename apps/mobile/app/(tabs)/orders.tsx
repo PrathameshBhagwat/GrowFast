@@ -206,7 +206,7 @@ export default function OrdersScreen() {
     if (isAuthenticated && !isAuthLoading && session) {
       loadData();
     } else if (!isAuthenticated) {
-      setServerOrders(REFERENCE_ORDERS);
+      setServerOrders([]);
       setDrafts([]);
     }
   }, [isAuthenticated, isAuthLoading, session, loadData]);

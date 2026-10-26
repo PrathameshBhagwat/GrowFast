@@ -12,7 +12,7 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Redirect } from 'expo-router';
 import { apiClient } from '../../src/api/client';
 import { useAuth } from '../../src/contexts/AuthContext';
 
@@ -23,15 +23,19 @@ interface EmployeeDirectoryItem {
 }
 
 const FALLBACK_STAFF_DIRECTORY: EmployeeDirectoryItem[] = [
-  { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER' },
+  { id: 'emp-counter-001', name: 'Sarthak kumkar', role: 'COUNTER' },
   { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER' },
 ];
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  if (!isAuthLoading && isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   // Initialize with fallback directory so the screen is immediately interactive on mount
   const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>(FALLBACK_STAFF_DIRECTORY);

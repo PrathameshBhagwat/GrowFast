@@ -10,8 +10,10 @@ import {
   Alert,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {
   GarmentCatalogDTO,
@@ -68,6 +70,12 @@ export function ItemDetailsModal({
   const [itemPhotos, setItemPhotos] = useState<PendingPhoto[]>([]);
   const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
   const [weightError, setWeightError] = useState<string | null>(null);
+
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
+  );
 
   const isWeightBased =
     garment?.category === GarmentCategory.WEIGHT_BASED ||
@@ -255,7 +263,7 @@ export function ItemDetailsModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={styles.safeContainer}>
+      <View style={[styles.safeContainer, { paddingTop: topInset, paddingBottom: insets.bottom }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerCancelBtn}>
@@ -614,7 +622,7 @@ export function ItemDetailsModal({
             </Text>
           </TouchableOpacity>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

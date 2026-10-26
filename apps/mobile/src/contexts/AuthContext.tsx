@@ -14,7 +14,7 @@ import {
   clearUserSession,
   MobileUserSession,
 } from '../storage/secure-store';
-import { apiClient, onUnauthorized } from '../api/client';
+import { apiClient, onUnauthorized, AuthEmployeeProfile, ApiError } from '../api/client';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
@@ -94,11 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // 3. Validate session against the backend if connected
         try {
-          const profile: any = await apiClient.auth.getMe();
-          if (profile && (profile.id || profile.data)) {
+          const profile: AuthEmployeeProfile = await apiClient.auth.getMe();
+          if (profile && profile.id) {
+            const updatedUser: MobileUserSession = {
+              id: profile.id,
+              name: profile.name,
+              phone: profile.phone || storedUser.phone || '',
+              role: profile.role,
+              storeId: profile.storeId,
+              storeName: profile.storeName || storedUser.storeName,
+            };
+            await saveUserSession(updatedUser);
             if (isMounted) {
               setToken(storedToken);
-              setUser(storedUser);
+              setUser(updatedUser);
               setIsAuthenticated(true);
             }
           } else {
@@ -109,8 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setIsAuthenticated(false);
             }
           }
-        } catch (apiErr: any) {
-          if (apiErr.statusCode === 401) {
+        } catch (apiErr: unknown) {
+          const is401 = apiErr instanceof ApiError && apiErr.statusCode === 401;
+          if (is401) {
             console.warn('[AuthProvider] Stored session rejected by backend (401). Clearing session.');
             await clearUserSession();
             if (isMounted) {
@@ -119,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setIsAuthenticated(false);
             }
           } else {
-            // Network failure / offline store environment: allow valid non-expired offline session
+            // Network failure: preserve valid, non-expired offline session on mobile hardware
             console.log('[AuthProvider] Server unreachable on startup; preserving valid offline session.');
             if (isMounted) {
               setToken(storedToken);

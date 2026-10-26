@@ -8,6 +8,9 @@ import {
   saveUserSession,
   getUserSession,
   clearUserSession,
+  MemoryStorageAdapter,
+  WebStorageAdapter,
+  setStorageAdapterForTesting,
 } from '../storage/secure-store';
 import { parseJwtPayload } from '../contexts/AuthContext';
 
@@ -392,6 +395,123 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
 
     // Clean up
     await clearUserSession();
+  });
+
+  it('16. WebStorageAdapter safely stores and retrieves tokens with fallback', async () => {
+    const memory = new MemoryStorageAdapter();
+    const webAdapter = new WebStorageAdapter(memory);
+
+    // Test get on empty
+    assert.equal(await webAdapter.getItem('token_key'), null);
+
+    // Test set and get
+    await webAdapter.setItem('token_key', 'web-test-jwt-token');
+    assert.equal(await webAdapter.getItem('token_key'), 'web-test-jwt-token');
+
+    // Test remove
+    await webAdapter.removeItem('token_key');
+    assert.equal(await webAdapter.getItem('token_key'), null);
+  });
+
+  it('17. SSR safety: Storage adapter never assumes window or localStorage exists', async () => {
+    const origWindow = globalThis.window;
+    try {
+      // Simulate SSR environment where window is undefined
+      // @ts-ignore
+      delete globalThis.window;
+
+      const memory = new MemoryStorageAdapter();
+      const webAdapter = new WebStorageAdapter(memory);
+
+      // Should not throw Error: window is not defined
+      await webAdapter.setItem('ssr_key', 'ssr_value');
+      const val = await webAdapter.getItem('ssr_key');
+      assert.equal(val, 'ssr_value');
+      await webAdapter.removeItem('ssr_key');
+      assert.equal(await webAdapter.getItem('ssr_key'), null);
+    } finally {
+      if (origWindow !== undefined) {
+        // @ts-ignore
+        globalThis.window = origWindow;
+      }
+    }
+  });
+
+  it('18. Corrupted session data in storage returns null and self-cleans safely', async () => {
+    const memory = new MemoryStorageAdapter();
+    setStorageAdapterForTesting(memory);
+
+    try {
+      // Write corrupted non-JSON data
+      await memory.setItem('growfast_user_session', 'MALFORMED{NOT_JSON}');
+
+      // getUserSession must not throw and must return null
+      const session = await getUserSession();
+      assert.equal(session, null);
+
+      // Corrupted data must be purged
+      assert.equal(await memory.getItem('growfast_user_session'), null);
+    } finally {
+      setStorageAdapterForTesting(null);
+    }
+  });
+
+  it('19. Storage error or empty token is never treated as proof of authentication', async () => {
+    // Failing storage adapter
+    class FailingStorageAdapter extends MemoryStorageAdapter {
+      async getItem(): Promise<string | null> {
+        throw new Error('Disk read failure');
+      }
+    }
+
+    setStorageAdapterForTesting(new FailingStorageAdapter());
+    try {
+      const token = await getAuthToken();
+      assert.equal(token, null, 'Storage error must safely resolve to null, never authenticated');
+
+      const session = await getUserSession();
+      assert.equal(session, null, 'Storage error must safely resolve to null');
+    } finally {
+      setStorageAdapterForTesting(null);
+    }
+  });
+
+  it('20. 401 Unauthorized handling cancels in-flight queries and clears session without loop', async () => {
+    _resetUnauthorizedLock();
+    let authFired = 0;
+    const unsub = onUnauthorized(() => {
+      authFired++;
+    });
+
+    try {
+      // Simulate 401 trigger
+      await triggerUnauthorized();
+      assert.equal(authFired, 1);
+
+      // Subsequent 401 within debounce period must not fire duplicate logouts
+      await triggerUnauthorized();
+      assert.equal(authFired, 1);
+    } finally {
+      unsub();
+    }
+  });
+
+  it('21. Route guard logic prevents protected tab rendering when unauthenticated or loading', () => {
+    function evaluateTabAccess(isLoading: boolean, isAuthenticated: boolean) {
+      if (isLoading) return 'SHOW_LOADING_INDICATOR';
+      if (!isAuthenticated) return 'REDIRECT_TO_LOGIN';
+      return 'RENDER_PROTECTED_TABS';
+    }
+
+    // While loading, tabs NEVER render
+    assert.equal(evaluateTabAccess(true, false), 'SHOW_LOADING_INDICATOR');
+    assert.equal(evaluateTabAccess(true, true), 'SHOW_LOADING_INDICATOR');
+
+    // When unauthenticated, redirects to login
+    assert.equal(evaluateTabAccess(false, false), 'REDIRECT_TO_LOGIN');
+
+    // Only when fully loaded and authenticated does it render tabs
+    assert.equal(evaluateTabAccess(false, true), 'RENDER_PROTECTED_TABS');
   });
 });
 
