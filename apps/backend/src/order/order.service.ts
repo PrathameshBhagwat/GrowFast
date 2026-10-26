@@ -894,8 +894,9 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
-    const { customerId, status, paymentStatus, page = 1, pageSize = 10, search } = query;
-    const skip = (page - 1) * pageSize;
+    const { customerId, status, paymentStatus, page = 1, search } = query;
+    const effectivePageSize = query.pageSize || query.limit || 10;
+    const skip = (page - 1) * effectivePageSize;
 
     const where: any = { storeId };
     if (customerId) where.customerId = customerId;
@@ -931,7 +932,7 @@ export class OrderService {
         },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: pageSize,
+        take: effectivePageSize,
       }),
       this.prisma.order.count({ where }),
     ]);
@@ -940,7 +941,7 @@ export class OrderService {
       data: orders.map((o) => this.mapToSummaryDto(o)),
       total,
       page,
-      pageSize,
+      pageSize: effectivePageSize,
     };
   }
 

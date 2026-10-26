@@ -229,10 +229,7 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
                 : '₹0.00'}
             </span>
           </div>
-          <div className="flex justify-between text-gray-700">
-            <span>GST</span>
-            <span>{order.taxAmount > 0 ? `+${formatCurrency(order.taxAmount)}` : '₹0.00'}</span>
-          </div>
+          {/* GST removed — pricing is now tax-inclusive */}
 
           <div className="border-t border-dashed border-gray-400 my-1.5" />
 
@@ -532,12 +529,7 @@ export const OrderReceipt: React.FC<OrderReceiptProps> = ({
             </div>
           )}
 
-          {order.taxAmount > 0 && (
-            <div className="flex justify-between text-gray-600">
-              <span>Tax (GST)</span>
-              <span className="font-mono">+{formatCurrency(order.taxAmount)}</span>
-            </div>
-          )}
+          {/* GST removed — pricing is now tax-inclusive */}
 
           <div className="flex justify-between text-sm font-bold text-gray-900 pt-2 border-t border-gray-200">
             <span>Total Amount</span>

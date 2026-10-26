@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, Matches } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
@@ -8,11 +8,12 @@ import { Roles } from './roles.decorator';
 
 export class LoginDto {
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Employee ID is required' })
   employeeId!: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'PIN is required' })
+  @Matches(/^\d{4,6}$/, { message: 'PIN must be 4 to 6 numeric digits' })
   pin!: string;
 }
 

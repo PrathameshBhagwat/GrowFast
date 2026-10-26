@@ -5,6 +5,7 @@ import React, {
   useEffect,
   ReactNode,
   useCallback,
+  useMemo,
 } from 'react';
 import {
   saveAuthToken,
@@ -14,7 +15,7 @@ import {
   clearUserSession,
   MobileUserSession,
 } from '../storage/secure-store';
-import { apiClient } from '../api/client';
+import { apiClient, setOnUnauthorized } from '../api/client';
 
 export interface AuthContextType {
   isAuthenticated: boolean;
@@ -32,6 +33,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<MobileUserSession | null>(null);
+
+  const logout = useCallback(async () => {
+    try {
+      await clearUserSession();
+    } finally {
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setOnUnauthorized(logout);
+    return () => {
+      setOnUnauthorized(null);
+    };
+  }, [logout]);
 
   useEffect(() => {
     let isMounted = true;
@@ -76,27 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(true);
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      await clearUserSession();
-    } finally {
-      setToken(null);
-      setUser(null);
-      setIsAuthenticated(false);
-    }
-  }, []);
+  const authValue = useMemo(
+    () => ({
+      isAuthenticated,
+      isLoading,
+      token,
+      user,
+      login,
+      logout,
+    }),
+    [isAuthenticated, isLoading, token, user, login, logout],
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        isAuthenticated,
-        isLoading,
-        token,
-        user,
-        login,
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );

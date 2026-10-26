@@ -129,6 +129,9 @@ const FALLBACK_PRICES = [
 interface OrderWizardModalProps {
   visible: boolean;
   draft: OrderDraft | null;
+  initialCustomer?: CustomerDTO | null;
+  initialEntryMode?: OrderEntryMode;
+  initialWorkflow?: OrderWorkflowType;
   storeId: string;
   userRole?: string;
   onClose: () => void;
@@ -139,6 +142,9 @@ interface OrderWizardModalProps {
 export function OrderWizardModal({
   visible,
   draft,
+  initialCustomer,
+  initialEntryMode = 'PIECES',
+  initialWorkflow = 'LAUNDRY',
   storeId,
   userRole,
   onClose,
@@ -193,25 +199,26 @@ export function OrderWizardModal({
     isOfflineQueued?: boolean;
   } | null>(null);
 
-  // Fetch catalog & store config
+  // Fetch catalog & store config (Stale-while-revalidate)
   useEffect(() => {
-    if (visible) {
-      if (isConnected) {
+    if (visible && isConnected) {
+      const hasCatalog = garments !== FALLBACK_GARMENTS && garments.length > 0;
+      if (!hasCatalog) {
         setIsLoadingCatalog(true);
-        Promise.all([
-          apiClient.catalog.getGarments().catch(() => FALLBACK_GARMENTS),
-          apiClient.catalog.getServices().catch(() => FALLBACK_SERVICES),
-          apiClient.catalog.getPricing().catch(() => FALLBACK_PRICES),
-          apiClient.store.getConfig().catch(() => null),
-        ])
-          .then(([gRes, sRes, pRes, cfgRes]) => {
-            if (gRes && gRes.length > 0) setGarments(gRes);
-            if (sRes && sRes.length > 0) setServices(sRes);
-            if (pRes && pRes.length > 0) setPrices(pRes);
-            if (cfgRes) setStoreConfig(cfgRes);
-          })
-          .finally(() => setIsLoadingCatalog(false));
       }
+      Promise.all([
+        apiClient.catalog.getGarments().catch(() => FALLBACK_GARMENTS),
+        apiClient.catalog.getServices().catch(() => FALLBACK_SERVICES),
+        apiClient.catalog.getPricing().catch(() => FALLBACK_PRICES),
+        apiClient.store.getConfig().catch(() => null),
+      ])
+        .then(([gRes, sRes, pRes, cfgRes]) => {
+          if (gRes && gRes.length > 0) setGarments(gRes);
+          if (sRes && sRes.length > 0) setServices(sRes);
+          if (pRes && pRes.length > 0) setPrices(pRes);
+          if (cfgRes) setStoreConfig(cfgRes);
+        })
+        .finally(() => setIsLoadingCatalog(false));
     }
   }, [visible, isConnected]);
 
@@ -256,23 +263,41 @@ export function OrderWizardModal({
         // Fresh draft
         const newDraftId = generateUUID();
         setClientDraftId(newDraftId);
-        setSelectedCustomer(null);
-        setManualCustomerName('');
-        setManualCustomerPhone('');
-        setWorkflow('LAUNDRY');
-        setEntryMode('PIECES');
-        setSelectedServiceId('srv-wash-iron');
-        setSelectedCategory('ALL');
+        if (initialCustomer) {
+          setSelectedCustomer(initialCustomer);
+          setManualCustomerName(initialCustomer.name);
+          setManualCustomerPhone(initialCustomer.phone);
+          setCurrentStepIndex(1);
+        } else {
+          setSelectedCustomer(null);
+          setManualCustomerName('');
+          setManualCustomerPhone('');
+          setCurrentStepIndex(0);
+        }
+        const targetMode = initialEntryMode || 'PIECES';
+        const targetWorkflow = initialWorkflow || 'LAUNDRY';
+        setWorkflow(targetWorkflow);
+        setEntryMode(targetMode);
+        if (targetWorkflow === 'DRY_CLEANING') {
+          setSelectedCategory('ALL');
+          const dryCleanSvc = services.find((s) => s.category === ServiceCategory.DRY_CLEAN || s.id === 'srv-dry-clean');
+          setSelectedServiceId(dryCleanSvc ? dryCleanSvc.id : 'srv-dry-clean');
+        } else if (targetMode === 'WEIGHT') {
+          setSelectedCategory(GarmentCategory.WEIGHT_BASED);
+          setSelectedServiceId('srv-premium-wash');
+        } else {
+          setSelectedCategory('ALL');
+          setSelectedServiceId('srv-wash-iron');
+        }
         setItems([]);
         setPickupType(PickupType.STORE_PICKUP);
         setExpressOption(ExpressDeliveryOption.REGULAR);
         setNotes('');
         setPhotos([]);
         setConfirmedOrder(null);
-        setCurrentStepIndex(0);
       }
     }
-  }, [visible, draft]);
+  }, [visible, draft, initialCustomer, initialEntryMode]);
 
   const refreshPhotos = useCallback(async () => {
     if (clientDraftId) {

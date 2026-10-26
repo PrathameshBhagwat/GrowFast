@@ -19,6 +19,7 @@ import {
   OrderStatus,
   PaymentStatus,
   ItemStatus,
+  NotificationDTO,
 } from '@growfast/shared-types';
 import { apiClient } from '../api/client';
 import { PaymentHistoryView } from './PaymentHistoryView';
@@ -56,6 +57,8 @@ export function OrderDetailModal({
   // Sub-modals
   const [paymentModalVisible, setPaymentModalVisible] = useState<boolean>(false);
   const [markDeliveredVisible, setMarkDeliveredVisible] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState<boolean>(false);
 
   // Loading state for operations
   const [operatingGarmentId, setOperatingGarmentId] = useState<string | null>(null);
@@ -65,20 +68,18 @@ export function OrderDetailModal({
     setError(null);
 
     try {
-      const [orderData, paymentsData, summaryData, photosData] = await Promise.all([
+      const [orderData, paymentsData, summaryData, notifsRes] = await Promise.all([
         apiClient.orders.getById(orderId),
         apiClient.payments.getOrderPayments(orderId).catch(() => []),
         apiClient.payments.getSummary(orderId).catch(() => null),
-        apiClient.orders
-          .getById(orderId)
-          .then((o) => (o as any).photos || [])
-          .catch(() => []),
+        apiClient.notifications.list({ orderId }).catch(() => ({ success: true, data: [] })),
       ]);
 
       setOrder(orderData);
       setPayments(paymentsData);
       setSummary(summaryData);
-      setOrderPhotos(photosData);
+      setOrderPhotos((orderData as any)?.photos || []);
+      setNotifications(notifsRes?.data || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load order details from server.');
     } finally {
@@ -450,6 +451,45 @@ export function OrderDetailModal({
                       amountPaid={effectivePaid}
                       amountDue={effectiveDue}
                     />
+
+                    {/* Notification Dispatch History (Task 4) */}
+                    <View style={styles.notificationHistorySection}>
+                      <Text style={styles.notificationHistoryTitle}>Customer Notifications</Text>
+                      {notifications.length > 0 ? (
+                        notifications.map((notif) => (
+                          <View key={notif.id} style={styles.notificationCard}>
+                            <View style={styles.notificationHeader}>
+                              <Text style={styles.notifEventText}>
+                                {notif.eventType.replace(/_/g, ' ')}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.notifStatusBadge,
+                                  notif.status === 'SENT' ? styles.notifSent : styles.notifPending,
+                                ]}
+                              >
+                                <Text style={styles.notifStatusText}>{notif.status}</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.notifRecipientText}>
+                              📱 {notif.recipient} via {notif.channel}
+                            </Text>
+                            <Text style={styles.notifDateText}>
+                              {new Date(notif.createdAt).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </Text>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={styles.noNotificationsText}>
+                          No notifications recorded for this order yet.
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 )}
               </ScrollView>
@@ -813,7 +853,72 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   historyTabContainer: {
-    gap: 10,
+    gap: 16,
+  },
+  notificationHistorySection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 8,
+  },
+  notificationHistoryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 10,
+  },
+  notificationCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 8,
+  },
+  notificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  notifEventText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  notifStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  notifSent: {
+    backgroundColor: '#dcfce7',
+  },
+  notifPending: {
+    backgroundColor: '#fef3c7',
+  },
+  notifStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#15803d',
+  },
+  notifRecipientText: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+  },
+  notifDateText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  noNotificationsText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    paddingVertical: 6,
   },
   bottomBar: {
     flexDirection: 'row',

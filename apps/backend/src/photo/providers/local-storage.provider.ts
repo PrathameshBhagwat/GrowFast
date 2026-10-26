@@ -70,7 +70,7 @@ export class LocalStorageProvider extends PhotoStorageService implements OnModul
    * This simulates the architecture of S3 presigned URLs without exposing
    * the local storage directory statically.
    */
-  async getAccessUrl(storedUrl: string): Promise<string> {
+  async getAccessUrl(storedUrl: string, _maxExpirySeconds?: number): Promise<string> {
     const secret = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production';
     const signature = crypto.createHmac('sha256', secret).update(storedUrl).digest('hex');
     // We use the Vite proxy path pattern: /api/photos/local/...

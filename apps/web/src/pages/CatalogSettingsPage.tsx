@@ -1361,46 +1361,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
     }
   };
 
-  const handleAutoFillAllMissingPrices = async () => {
-    setSavingPrices(true);
-    setPriceSaveError(null);
-    setPriceSaveSuccess(null);
-    try {
-      let count = 0;
-      for (const service of services) {
-        for (const garment of garments) {
-          const hasPrice = pricingData.some(
-            (p) => p.garmentCatalogId === garment.id && p.serviceTypeId === service.id,
-          );
-          if (!hasPrice) {
-            const randomPrice = Math.floor(Math.random() * 10 + 1) * 100; // 100 to 1000
-            const res = await fetch(`${API_URL}/pricing/${garment.id}/${service.id}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ price: randomPrice }),
-            });
-            if (!res.ok) {
-              const body = await res.json().catch(() => ({}));
-              throw new Error(
-                body.message || `Failed on garment ${garment.id} and service ${service.id}`,
-              );
-            }
-            count++;
-          }
-        }
-      }
-      setPriceSaveSuccess(`Auto-filled ${count} missing prices across all combinations!`);
-      await fetchAllData();
-      setTimeout(() => setPriceSaveSuccess(null), 3000);
-    } catch (err) {
-      setPriceSaveError(err instanceof Error ? err.message : 'Auto-fill failed');
-    } finally {
-      setSavingPrices(false);
-    }
-  };
+  // Auto-fill removed — random pricing is not appropriate for production catalog data
 
   // ─── Top Up Services Handlers ─────────────────────────
   const handleUpdateTopUpField = (
@@ -2091,16 +2052,7 @@ export const CatalogSettingsPage: React.FC<CatalogSettingsPageProps> = ({ onBack
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {/* Auto-fill All Missing Button */}
-                            <button
-                              type="button"
-                              onClick={handleAutoFillAllMissingPrices}
-                              disabled={savingPrices}
-                              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-[3px] text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                            >
-                              <Zap size={14} className="fill-white" />
-                              <span>Auto-fill All Missing</span>
-                            </button>
+                            {/* Auto-fill removed — random pricing not appropriate for production */}
 
                             {/* Save All Changes Button (if pending edits exist) */}
                             {Object.keys(editedPrices).length > 0 && (

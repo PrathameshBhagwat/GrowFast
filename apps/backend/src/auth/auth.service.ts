@@ -18,31 +18,50 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  // Progressive brute-force protection tracking failed login attempts per employee ID
+  private failedAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
   /**
    * Authenticate an employee by ID and PIN.
    * Returns a JWT access token and employee summary.
    */
   async login(employeeId: string, pin: string) {
-    // Find employee by ID
+    const now = Date.now();
+    const failureRecord = this.failedAttempts.get(employeeId);
+
+    // 1. Check active lockout
+    if (failureRecord && failureRecord.lockedUntil > now) {
+      const remainingSeconds = Math.ceil((failureRecord.lockedUntil - now) / 1000);
+      throw new UnauthorizedException(
+        `Too many failed attempts. Temporary lockout active. Try again in ${remainingSeconds}s.`,
+      );
+    }
+
+    // 2. Find employee by ID
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
       include: { store: true },
     });
 
     if (!employee) {
+      this.recordFailedAttempt(employeeId, now, failureRecord);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check if employee is active
+    // 3. Check if employee is active
     if (!employee.isActive) {
       throw new UnauthorizedException('Account is inactive. Contact your manager.');
     }
 
-    // Verify PIN
+    // 4. Verify PIN
     const isPinValid = await bcrypt.compare(pin, employee.pinHash);
     if (!isPinValid) {
+      this.recordFailedAttempt(employeeId, now, failureRecord);
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // 5. Reset failure tracking on successful authentication
+    this.failedAttempts.delete(employeeId);
 
     // Generate JWT
     const payload: JwtPayload = {
@@ -111,5 +130,25 @@ export class AuthService {
     });
 
     return employees;
+  }
+
+  private recordFailedAttempt(
+    employeeId: string,
+    now: number,
+    existing?: { count: number; lockedUntil: number },
+  ) {
+    const isPreviousLockExpired = existing && existing.lockedUntil <= now;
+    const currentFailures = (isPreviousLockExpired ? 0 : existing?.count || 0) + 1;
+    if (currentFailures >= 5) {
+      this.failedAttempts.set(employeeId, {
+        count: currentFailures,
+        lockedUntil: now + 60000, // 60s temporary lockout
+      });
+    } else {
+      this.failedAttempts.set(employeeId, {
+        count: currentFailures,
+        lockedUntil: 0,
+      });
+    }
   }
 }

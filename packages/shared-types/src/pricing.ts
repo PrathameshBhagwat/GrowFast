@@ -94,19 +94,24 @@ export function calculateOrderTotals(
 
   let expressSurcharge = 0;
   if (isExpress) {
-    if (options?.expressSurchargePercent == null) {
+    if (multiplier > 0) {
+      // The delivery multiplier applies to the eligible base amount (discountedSubtotal) exactly once:
+      // - Regular: 1.0× (no surcharge, final = 1.0× base)
+      // - Tomorrow / Next-day evening: 1.5× (surcharge = 0.5× base, final = 1.5× base)
+      // - Same Day: 2.0× (surcharge = 1.0× base, final = 2.0× base)
+      expressSurcharge = roundCurrency(discountedSubtotal * (multiplier - 1.0));
+    } else if (options?.expressSurchargePercent != null) {
+      // Fallback for generic express flag when no tiered delivery option is selected
+      expressSurcharge = roundCurrency(
+        (discountedSubtotal * options.expressSurchargePercent) / 100,
+      );
+    } else {
       throw new Error('Express surcharge percent must be provided for express orders');
     }
-    const baseExpressCharge = roundCurrency(
-      (discountedSubtotal * options.expressSurchargePercent) / 100,
-    );
-    const effectiveMultiplier = multiplier > 0 ? multiplier : 1.0;
-    expressSurcharge = roundCurrency(baseExpressCharge * effectiveMultiplier);
   }
 
-  // 3. Tax (V1: 18% GST as per user choice)
-  // GST applies on the discounted subtotal + express surcharge (surcharge is a taxable service fee)
-  const TAX_RATE = 0.18;
+  // 3. Tax (V1: GST removed per business decision — all pricing is tax-inclusive)
+  const TAX_RATE = 0;
   const taxableAmount = roundCurrency(discountedSubtotal + expressSurcharge);
   const taxAmount = roundCurrency(taxableAmount * TAX_RATE);
 

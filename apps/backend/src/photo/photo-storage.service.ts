@@ -25,9 +25,10 @@ export abstract class PhotoStorageService {
    * For S3/GCS: returns a presigned URL with time-limited access.
    *
    * @param storedUrl - The storage reference from the database
+   * @param maxExpirySeconds - Optional upper bound on presigned URL lifetime (seconds)
    * @returns A URL the client can use to display the photo
    */
-  abstract getAccessUrl(storedUrl: string): Promise<string>;
+  abstract getAccessUrl(storedUrl: string, maxExpirySeconds?: number): Promise<string>;
 
   /**
    * Delete a stored photo. Used for cleanup when database persistence

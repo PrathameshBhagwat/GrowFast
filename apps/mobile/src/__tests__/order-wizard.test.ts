@@ -206,12 +206,12 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
     assert.equal(canModifyManager, true);
 
     // When totals are computed, server logic calculates strictly based on canonical rules:
-    // subtotal = 120, GST (18%) = 21.60, totalAmount = 141.60
+    // subtotal = 120, tax-inclusive (GST 0), totalAmount = 120
     const items = [{ quantity: 2, unitPrice: 60, weight: null }];
     const totals = calculateOrderTotals(items, { isExpress: false });
     assert.equal(totals.subtotal, 120);
-    assert.equal(totals.taxAmount, 21.6);
-    assert.equal(totals.totalAmount, 141.6);
+    assert.equal(totals.taxAmount, 0);
+    assert.equal(totals.totalAmount, 120);
   });
 
   // 7. Express option and price display using actual backend rules
@@ -222,28 +222,28 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
 
     const items = [{ quantity: 1, unitPrice: 200, weight: null }];
 
-    // Regular (subtotal: 200, surcharge: 0, GST: 36, total: 236)
+    // Regular (subtotal: 200, surcharge: 0, total: 200)
     const regTotals = calculateOrderTotals(items, {
       isExpress: false,
       expressDeliveryOption: ExpressDeliveryOption.REGULAR,
     });
     assert.equal(regTotals.subtotal, 200);
     assert.equal(regTotals.expressSurcharge, 0);
-    assert.equal(regTotals.taxAmount, 36);
-    assert.equal(regTotals.totalAmount, 236);
+    assert.equal(regTotals.taxAmount, 0);
+    assert.equal(regTotals.totalAmount, 200);
 
-    // Next-Day Evening (50% base surcharge * 1.5 multiplier = 150; taxable = 350; GST = 63; total = 413)
+    // Next-Day Evening: 1.5x delivery multiplier (surcharge = 100; total = 300)
     const nextDayTotals = calculateOrderTotals(items, {
       isExpress: true,
       expressSurchargePercent: 50,
       expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
     });
     assert.equal(nextDayTotals.subtotal, 200);
-    assert.equal(nextDayTotals.expressSurcharge, 150);
-    assert.equal(nextDayTotals.taxAmount, 63);
-    assert.equal(nextDayTotals.totalAmount, 413);
+    assert.equal(nextDayTotals.expressSurcharge, 100);
+    assert.equal(nextDayTotals.taxAmount, 0);
+    assert.equal(nextDayTotals.totalAmount, 300);
 
-    // Same-Day Express (50% base surcharge * 2.0 multiplier = 200; taxable = 400; GST = 72; total = 472)
+    // Same-Day Express: 2.0x delivery multiplier (surcharge = 200; total = 400)
     const sameDayTotals = calculateOrderTotals(items, {
       isExpress: true,
       expressSurchargePercent: 50,
@@ -251,8 +251,8 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
     });
     assert.equal(sameDayTotals.subtotal, 200);
     assert.equal(sameDayTotals.expressSurcharge, 200);
-    assert.equal(sameDayTotals.taxAmount, 72);
-    assert.equal(sameDayTotals.totalAmount, 472);
+    assert.equal(sameDayTotals.taxAmount, 0);
+    assert.equal(sameDayTotals.totalAmount, 400);
   });
 
   // 8. Photo and garment/tag requirements
@@ -996,29 +996,27 @@ describe('GrowFast Mobile Phase D — Complete Mobile Order-Creation Workflow', 
     assert.equal(regTotals.subtotal, 200);
     assert.equal(regTotals.expressSurcharge, 0);
 
-    // Next-Day Evening: 1.5x of (200 * 25% = 50) = 75
+    // Next-Day Evening: 1.5x delivery multiplier (surcharge = 100, total = 300)
     const nextDayTotals = calculateOrderTotals(items, {
       isExpress: true,
       expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
       expressSurchargePercent: storeSurchargePercent,
     });
     assert.equal(nextDayTotals.subtotal, 200);
-    assert.equal(nextDayTotals.expressSurcharge, 75); // 50 * 1.5 = 75
-    // Tax: 18% of (200 + 75 = 275) = 49.50. Total = 324.50
-    assert.equal(nextDayTotals.taxAmount, 49.5);
-    assert.equal(nextDayTotals.totalAmount, 324.5);
+    assert.equal(nextDayTotals.expressSurcharge, 100);
+    assert.equal(nextDayTotals.taxAmount, 0);
+    assert.equal(nextDayTotals.totalAmount, 300);
 
-    // Same-Day: 2.0x of (200 * 25% = 50) = 100
+    // Same-Day: 2.0x delivery multiplier (surcharge = 200, total = 400)
     const sameDayTotals = calculateOrderTotals(items, {
       isExpress: true,
       expressDeliveryOption: ExpressDeliveryOption.SAME_DAY,
       expressSurchargePercent: storeSurchargePercent,
     });
     assert.equal(sameDayTotals.subtotal, 200);
-    assert.equal(sameDayTotals.expressSurcharge, 100); // 50 * 2.0 = 100
-    // Tax: 18% of (200 + 100 = 300) = 54. Total = 354
-    assert.equal(sameDayTotals.taxAmount, 54);
-    assert.equal(sameDayTotals.totalAmount, 354);
+    assert.equal(sameDayTotals.expressSurcharge, 200);
+    assert.equal(sameDayTotals.taxAmount, 0);
+    assert.equal(sameDayTotals.totalAmount, 400);
   });
 
   // 21. Express delivery restrictions adhere to store schedule off-days (Wednesday / Thursday)

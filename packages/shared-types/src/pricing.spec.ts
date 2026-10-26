@@ -9,12 +9,12 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
       { quantity: 2, unitPrice: 100 }, // subtotal: 200
     ];
     const totals = calculateOrderTotals(items);
-    // Subtotal: 200, Tax (18%): 36, Total: 236
+    // Subtotal: 200, Tax: 0 (GST removed), Total: 200
     assert.strictEqual(totals.subtotal, 200);
     assert.strictEqual(totals.discountAmount, 0);
     assert.strictEqual(totals.expressSurcharge, 0);
-    assert.strictEqual(totals.taxAmount, 36);
-    assert.strictEqual(totals.totalAmount, 236);
+    assert.strictEqual(totals.taxAmount, 0);
+    assert.strictEqual(totals.totalAmount, 200);
   });
 
   describe('Weight-Based Items Pricing', () => {
@@ -22,55 +22,55 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
       const items = [{ quantity: 1, weight: 0.5, unitPrice: 80 }];
       const totals = calculateOrderTotals(items);
       // subtotal: 0.5 * 80 = 40
-      // 18% GST: 7.20
-      // total: 47.20
+      // Tax: 0 (GST removed)
+      // total: 40
       assert.strictEqual(totals.subtotal, 40);
-      assert.strictEqual(totals.taxAmount, 7.2);
-      assert.strictEqual(totals.totalAmount, 47.2);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 40);
     });
 
     it('calculates 1.25 kg at ₹80/kg correctly', () => {
       const items = [{ quantity: 1, weight: 1.25, unitPrice: 80 }];
       const totals = calculateOrderTotals(items);
       // subtotal: 1.25 * 80 = 100
-      // 18% GST: 18.00
-      // total: 118.00
+      // Tax: 0 (GST removed)
+      // total: 100
       assert.strictEqual(totals.subtotal, 100);
-      assert.strictEqual(totals.taxAmount, 18);
-      assert.strictEqual(totals.totalAmount, 118);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 100);
     });
 
     it('calculates 2.5 kg at ₹80/kg correctly', () => {
       const items = [{ quantity: 1, weight: 2.5, unitPrice: 80 }];
       const totals = calculateOrderTotals(items);
       // subtotal: 2.5 * 80 = 200
-      // 18% GST: 36.00
-      // total: 236.00
+      // Tax: 0 (GST removed)
+      // total: 200
       assert.strictEqual(totals.subtotal, 200);
-      assert.strictEqual(totals.taxAmount, 36);
-      assert.strictEqual(totals.totalAmount, 236);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 200);
     });
 
     it('calculates 5.75 kg at ₹80/kg correctly', () => {
       const items = [{ quantity: 1, weight: 5.75, unitPrice: 80 }];
       const totals = calculateOrderTotals(items);
       // subtotal: 5.75 * 80 = 460
-      // 18% GST: 82.80
-      // total: 542.80
+      // Tax: 0 (GST removed)
+      // total: 460
       assert.strictEqual(totals.subtotal, 460);
-      assert.strictEqual(totals.taxAmount, 82.8);
-      assert.strictEqual(totals.totalAmount, 542.8);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 460);
     });
 
     it('calculates 10 kg at ₹80/kg correctly', () => {
       const items = [{ quantity: 1, weight: 10, unitPrice: 80 }];
       const totals = calculateOrderTotals(items);
       // subtotal: 10 * 80 = 800
-      // 18% GST: 144.00
-      // total: 944.00
+      // Tax: 0 (GST removed)
+      // total: 800
       assert.strictEqual(totals.subtotal, 800);
-      assert.strictEqual(totals.taxAmount, 144);
-      assert.strictEqual(totals.totalAmount, 944);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 800);
     });
 
     it('handles mixed normal piece items + weight-based items', () => {
@@ -80,11 +80,11 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
       ];
       const totals = calculateOrderTotals(items);
       // subtotal: 200 + 400 = 600
-      // GST: 108
-      // total: 708
+      // Tax: 0 (GST removed)
+      // total: 600
       assert.strictEqual(totals.subtotal, 600);
-      assert.strictEqual(totals.taxAmount, 108);
-      assert.strictEqual(totals.totalAmount, 708);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 600);
     });
 
     it('handles multiple weight-based items in one order', () => {
@@ -94,11 +94,11 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
       ];
       const totals = calculateOrderTotals(items);
       // subtotal: 400 + 240 = 640
-      // GST: 115.20
-      // total: 755.20
+      // Tax: 0 (GST removed)
+      // total: 640
       assert.strictEqual(totals.subtotal, 640);
-      assert.strictEqual(totals.taxAmount, 115.2);
-      assert.strictEqual(totals.totalAmount, 755.2);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 640);
     });
 
     it('applies express surcharge to weight-based items correctly', () => {
@@ -110,12 +110,12 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
       // subtotal: 440
       // express: 220 (50% of 440)
       // taxable: 660
-      // GST (18% of 660): 118.80
-      // total: 778.80
+      // Tax: 0 (GST removed)
+      // total: 660
       assert.strictEqual(totals.subtotal, 440);
       assert.strictEqual(totals.expressSurcharge, 220);
-      assert.strictEqual(totals.taxAmount, 118.8);
-      assert.strictEqual(totals.totalAmount, 778.8);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 660);
     });
 
     it('applies discount to weight-based items correctly', () => {
@@ -126,87 +126,181 @@ describe('Pricing Calculation - calculateOrderTotals', () => {
       // subtotal: 1000
       // discount: 100
       // discounted subtotal: 900
-      // GST (18% of 900): 162
-      // total: 1062
+      // Tax: 0 (GST removed)
+      // total: 900
       assert.strictEqual(totals.subtotal, 1000);
       assert.strictEqual(totals.discountAmount, 100);
-      assert.strictEqual(totals.taxAmount, 162);
-      assert.strictEqual(totals.totalAmount, 1062);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 900);
     });
   });
 
   describe('Express Delivery Pricing Multipliers (Canonical Rules)', () => {
     const items = [{ quantity: 2, unitPrice: 100 }]; // subtotal = 200
-    const expressSurchargePercent = 25; // base express = 25% of 200 = 50
-
     it('Regular delivery results in 0 express charge even if isExpress flag is set', () => {
       const totals = calculateOrderTotals(items, {
         isExpress: true,
-        expressSurchargePercent,
         expressDeliveryOption: 'REGULAR',
       });
-      // Regular delivery has NO express charge
+      // Regular delivery has NO express charge (1.0× multiplier)
       assert.strictEqual(totals.subtotal, 200);
       assert.strictEqual(totals.expressSurcharge, 0);
-      // Taxable: 200, GST (18%): 36, Total: 236
-      assert.strictEqual(totals.taxAmount, 36);
-      assert.strictEqual(totals.totalAmount, 236);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 200);
     });
 
-    it('Tomorrow/next-day evening express charge = base charge × 1.5', () => {
+    it('Tomorrow/next-day evening express charge: ₹200 base × 1.5 multiplier = ₹300 total', () => {
       const totals = calculateOrderTotals(items, {
         isExpress: true,
-        expressSurchargePercent,
         expressDeliveryOption: 'NEXT_DAY_EVENING',
       });
-      // Base express: 50 * 1.5 = 75
-      assert.strictEqual(totals.subtotal, 200);
-      assert.strictEqual(totals.expressSurcharge, 75);
-      // Taxable: 275, GST (18%): 49.50, Total: 324.50
-      assert.strictEqual(totals.taxAmount, 49.5);
-      assert.strictEqual(totals.totalAmount, 324.5);
-    });
-
-    it('Same-day express charge = base charge × 2.0', () => {
-      const totals = calculateOrderTotals(items, {
-        isExpress: true,
-        expressSurchargePercent,
-        expressDeliveryOption: 'SAME_DAY',
-      });
-      // Base express: 50 * 2.0 = 100
+      // 1.5× base: surcharge = ₹100, total = ₹300
       assert.strictEqual(totals.subtotal, 200);
       assert.strictEqual(totals.expressSurcharge, 100);
-      // Taxable: 300, GST (18%): 54, Total: 354
-      assert.strictEqual(totals.taxAmount, 54);
-      assert.strictEqual(totals.totalAmount, 354);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 300);
     });
 
-    it('Regular delivery without express produces 0 express charge', () => {
+    it('Same-day express charge: ₹200 base × 2.0 multiplier = ₹400 total', () => {
       const totals = calculateOrderTotals(items, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      // 2.0× base: surcharge = ₹200, total = ₹400
+      assert.strictEqual(totals.subtotal, 200);
+      assert.strictEqual(totals.expressSurcharge, 200);
+      assert.strictEqual(totals.taxAmount, 0);
+      assert.strictEqual(totals.totalAmount, 400);
+    });
+
+    it('Calculates ₹1,000 base amount correctly for all 3 delivery options', () => {
+      const thousandItems = [{ quantity: 10, unitPrice: 100 }];
+      
+      // Regular: 1.0× => ₹1,000
+      const regularTotals = calculateOrderTotals(thousandItems, {
         isExpress: false,
-        expressSurchargePercent,
         expressDeliveryOption: 'REGULAR',
       });
-      assert.strictEqual(totals.subtotal, 200);
-      assert.strictEqual(totals.expressSurcharge, 0);
-      assert.strictEqual(totals.taxAmount, 36);
-      assert.strictEqual(totals.totalAmount, 236);
-    });
+      assert.strictEqual(regularTotals.subtotal, 1000);
+      assert.strictEqual(regularTotals.expressSurcharge, 0);
+      assert.strictEqual(regularTotals.totalAmount, 1000);
 
-    it('Enforces consistent 2-decimal currency rounding on fractional multipliers', () => {
-      // Subtotal 133, express 15% => base express = 19.95
-      // 1.5x => 29.925 => rounded to 29.93
-      const oddItems = [{ quantity: 1, unitPrice: 133 }];
-      const totals = calculateOrderTotals(oddItems, {
+      // Tomorrow: 1.5× => ₹1,500 (+₹500 surcharge)
+      const tomorrowTotals = calculateOrderTotals(thousandItems, {
         isExpress: true,
-        expressSurchargePercent: 15,
         expressDeliveryOption: 'NEXT_DAY_EVENING',
       });
-      assert.strictEqual(totals.subtotal, 133);
-      assert.strictEqual(totals.expressSurcharge, 29.93);
-      // Taxable: 162.93, 18% GST: 29.3274 => 29.33, Total: 192.26
-      assert.strictEqual(totals.taxAmount, 29.33);
-      assert.strictEqual(totals.totalAmount, 192.26);
+      assert.strictEqual(tomorrowTotals.subtotal, 1000);
+      assert.strictEqual(tomorrowTotals.expressSurcharge, 500);
+      assert.strictEqual(tomorrowTotals.totalAmount, 1500);
+
+      // Same Day: 2.0× => ₹2,000 (+₹1,000 surcharge)
+      const sameDayTotals = calculateOrderTotals(thousandItems, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(sameDayTotals.subtotal, 1000);
+      assert.strictEqual(sameDayTotals.expressSurcharge, 1000);
+      assert.strictEqual(sameDayTotals.totalAmount, 2000);
+    });
+
+    it('Switching delivery options recalculates from base without compounding', () => {
+      // 1. Same Day (2.0×) => 400
+      const step1 = calculateOrderTotals(items, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(step1.totalAmount, 400);
+
+      // 2. Switch to Tomorrow (1.5×) => 300
+      const step2 = calculateOrderTotals(items, {
+        isExpress: true,
+        expressDeliveryOption: 'NEXT_DAY_EVENING',
+      });
+      assert.strictEqual(step2.totalAmount, 300);
+
+      // 3. Switch to Regular (1.0×) => 200
+      const step3 = calculateOrderTotals(items, {
+        isExpress: false,
+        expressDeliveryOption: 'REGULAR',
+      });
+      assert.strictEqual(step3.totalAmount, 200);
+
+      // 4. Switch back to Same Day (2.0×) => 400
+      const step4 = calculateOrderTotals(items, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(step4.totalAmount, 400);
+    });
+
+    it('Quantity change immediately updates express surcharge and total', () => {
+      // 2 items @ ₹100 = ₹200 => Same Day = ₹400
+      const twoItems = [{ quantity: 2, unitPrice: 100 }];
+      const res2 = calculateOrderTotals(twoItems, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(res2.subtotal, 200);
+      assert.strictEqual(res2.expressSurcharge, 200);
+      assert.strictEqual(res2.totalAmount, 400);
+
+      // Increase to 3 items @ ₹100 = ₹300 => Same Day = ₹600
+      const threeItems = [{ quantity: 3, unitPrice: 100 }];
+      const res3 = calculateOrderTotals(threeItems, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(res3.subtotal, 300);
+      assert.strictEqual(res3.expressSurcharge, 300);
+      assert.strictEqual(res3.totalAmount, 600);
+    });
+
+    it('Applies express multipliers on discounted subtotal when discount is present', () => {
+      // Subtotal ₹1000, 10% discount => discountedSubtotal = ₹900
+      const orderItems = [{ quantity: 10, unitPrice: 100 }];
+      
+      const tomorrowWithDiscount = calculateOrderTotals(orderItems, {
+        discountPercent: 10,
+        isExpress: true,
+        expressDeliveryOption: 'NEXT_DAY_EVENING',
+      });
+      assert.strictEqual(tomorrowWithDiscount.subtotal, 1000);
+      assert.strictEqual(tomorrowWithDiscount.discountAmount, 100);
+      assert.strictEqual(tomorrowWithDiscount.expressSurcharge, 450); // 0.5 × 900
+      assert.strictEqual(tomorrowWithDiscount.totalAmount, 1350); // 1.5 × 900
+
+      const sameDayWithDiscount = calculateOrderTotals(orderItems, {
+        discountPercent: 10,
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(sameDayWithDiscount.subtotal, 1000);
+      assert.strictEqual(sameDayWithDiscount.discountAmount, 100);
+      assert.strictEqual(sameDayWithDiscount.expressSurcharge, 900); // 1.0 × 900
+      assert.strictEqual(sameDayWithDiscount.totalAmount, 1800); // 2.0 × 900
+    });
+
+    it('Enforces consistent 2-decimal currency rounding on fractional amounts', () => {
+      // Subtotal 133
+      // Tomorrow 1.5× => Surcharge = 66.50, Total = 199.50
+      const oddItems = [{ quantity: 1, unitPrice: 133 }];
+      const tomorrowTotals = calculateOrderTotals(oddItems, {
+        isExpress: true,
+        expressDeliveryOption: 'NEXT_DAY_EVENING',
+      });
+      assert.strictEqual(tomorrowTotals.subtotal, 133);
+      assert.strictEqual(tomorrowTotals.expressSurcharge, 66.5);
+      assert.strictEqual(tomorrowTotals.totalAmount, 199.5);
+
+      // Same Day 2.0× => Surcharge = 133.00, Total = 266.00
+      const sameDayTotals = calculateOrderTotals(oddItems, {
+        isExpress: true,
+        expressDeliveryOption: 'SAME_DAY',
+      });
+      assert.strictEqual(sameDayTotals.subtotal, 133);
+      assert.strictEqual(sameDayTotals.expressSurcharge, 133);
+      assert.strictEqual(sameDayTotals.totalAmount, 266);
     });
   });
 

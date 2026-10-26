@@ -16,11 +16,14 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CustomerDTO,
   CreateCustomerRequest,
   OrderSummaryDTO,
   MembershipTier,
+  OrderEntryMode,
+  OrderWorkflowType,
 } from '@growfast/shared-types';
 import { apiClient, ApiError } from '../../src/api/client';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
@@ -28,15 +31,11 @@ import { getUserSession, MobileUserSession } from '../../src/storage/secure-stor
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 
-const MEMBERSHIP_OPTIONS: MembershipTier[] = [
-  MembershipTier.NONE,
-  MembershipTier.SILVER,
-  MembershipTier.GOLD,
-  MembershipTier.PLATINUM,
-];
+
 
 export default function CustomersScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
   const [session, setSession] = useState<MobileUserSession | null>(null);
 
@@ -69,16 +68,23 @@ export default function CustomersScreen() {
   // Order Detail Inspection Modal State
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
 
-  // Wizard Launch state
+  // Wizard Launch state with Target Customer and Modes (Task 6)
   const [wizardVisible, setWizardVisible] = useState(false);
+  const [orderTargetCustomer, setOrderTargetCustomer] = useState<CustomerDTO | null>(null);
+  const [orderTargetMode, setOrderTargetMode] = useState<OrderEntryMode>('PIECES');
+  const [orderTargetWorkflow, setOrderTargetWorkflow] = useState<OrderWorkflowType>('LAUNDRY');
 
-  // New Customer Form State
+  // New Customer Form State (Strictly Name, WhatsApp Phone, Address, Pincode)
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newPincode, setNewPincode] = useState('');
-  const [newMembership, setNewMembership] = useState<MembershipTier>(MembershipTier.NONE);
-  const [newDiscount, setNewDiscount] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    phone?: string;
+    address?: string;
+    pincode?: string;
+  }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -177,7 +183,6 @@ export default function CustomersScreen() {
     try {
       const res = await apiClient.orders.list({
         customerId,
-        limit: 20,
         pageSize: 20,
       });
       setCustomerOrders(res.data || []);
@@ -195,56 +200,78 @@ export default function CustomersScreen() {
     loadCustomerOrderHistory(cust.id);
   };
 
+  const startPerPieceOrder = (cust: CustomerDTO) => {
+    setOrderTargetCustomer(cust);
+    setOrderTargetMode('PIECES');
+    setOrderTargetWorkflow('LAUNDRY');
+    setSelectedCustomer(null);
+    setWizardVisible(true);
+  };
+
+  const startPerWeightOrder = (cust: CustomerDTO) => {
+    setOrderTargetCustomer(cust);
+    setOrderTargetMode('WEIGHT');
+    setOrderTargetWorkflow('LAUNDRY');
+    setSelectedCustomer(null);
+    setWizardVisible(true);
+  };
+
+  const startDryCleanOrder = (cust: CustomerDTO) => {
+    setOrderTargetCustomer(cust);
+    setOrderTargetMode('PIECES');
+    setOrderTargetWorkflow('DRY_CLEANING');
+    setSelectedCustomer(null);
+    setWizardVisible(true);
+  };
+
   /**
-   * Create Customer handler with phone validation and duplicate conflict handling.
+   * Create Customer handler with mandatory address & pincode, phone validation, and duplicate conflict handling.
    */
   const handleCreateCustomer = async () => {
     setCreateError(null);
+    const errors: { name?: string; phone?: string; address?: string; pincode?: string } = {};
 
     // 1. Name validation
     const trimmedName = newName.trim();
     if (!trimmedName) {
-      Alert.alert('Validation Error', 'Customer Full Name is required.');
-      return;
+      errors.name = 'Customer Full Name is required.';
     }
 
-    // 2. Phone validation: 10-15 digits matching backend contract
+    // 2. WhatsApp Phone validation: 10-15 digits matching backend contract
     const cleanPhone = newPhone.replace(/[\s\-()]/g, '');
-    if (!/^\+?[0-9]{10,15}$/.test(cleanPhone)) {
-      Alert.alert(
-        'Validation Error',
-        'Please enter a valid WhatsApp phone number with 10 to 15 digits.',
-      );
-      return;
+    if (!cleanPhone) {
+      errors.phone = 'WhatsApp Phone Number is required.';
+    } else if (!/^\+?[0-9]{10,15}$/.test(cleanPhone)) {
+      errors.phone = 'Please enter a valid WhatsApp phone number (10 to 15 digits).';
     }
 
-    // 3. Pincode validation (optional)
+    // 3. Address validation: mandatory
+    const trimmedAddress = newAddress.trim();
+    if (!trimmedAddress) {
+      errors.address = 'Delivery / Street Address is required.';
+    }
+
+    // 4. Pincode validation: mandatory, 3-10 characters
     const trimmedPincode = newPincode.trim();
-    if (trimmedPincode && !/^[A-Za-z0-9\s\-]{3,10}$/.test(trimmedPincode)) {
-      Alert.alert('Validation Error', 'Pincode must be between 3 and 10 characters.');
+    if (!trimmedPincode) {
+      errors.pincode = 'Pincode is required.';
+    } else if (!/^[A-Za-z0-9\s\-]{3,10}$/.test(trimmedPincode)) {
+      errors.pincode = 'Pincode must be between 3 and 10 characters.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
-    // 4. Discount validation (optional)
-    let discountPercent = 0;
-    if (newDiscount.trim()) {
-      const parsedDiscount = parseFloat(newDiscount.trim());
-      if (isNaN(parsedDiscount) || parsedDiscount < 0 || parsedDiscount > 100) {
-        Alert.alert('Validation Error', 'Discount must be a percentage between 0 and 100.');
-        return;
-      }
-      discountPercent = parsedDiscount;
-    }
-
+    setFieldErrors({});
     setIsSubmitting(true);
     try {
       const payload: CreateCustomerRequest = {
         name: trimmedName,
         phone: cleanPhone,
-        address: newAddress.trim() || undefined,
-        pincode: trimmedPincode || undefined,
-        membership: newMembership !== MembershipTier.NONE ? newMembership : undefined,
-        discountPercent: discountPercent > 0 ? discountPercent : undefined,
+        address: trimmedAddress,
+        pincode: trimmedPincode,
       };
 
       const created = await apiClient.customers.create(payload);
@@ -254,18 +281,17 @@ export default function CustomersScreen() {
       setNewPhone('');
       setNewAddress('');
       setNewPincode('');
-      setNewMembership(MembershipTier.NONE);
-      setNewDiscount('');
+      setFieldErrors({});
       setCreateError(null);
 
-      // Switch to directory, reload list, and select the newly created customer
+      // Switch to directory, reload list, and select the newly created customer for immediate order creation
       setActiveTab('FIND');
       loadCustomers('', 1, false);
       handleSelectCustomer(created);
 
       Alert.alert(
         'Customer Registered',
-        `"${created.name}" has been successfully added to the system.`,
+        `"${created.name}" has been successfully added and is ready for order creation.`,
       );
     } catch (err: any) {
       const isConflict =
@@ -278,6 +304,9 @@ export default function CustomersScreen() {
         : err?.message || 'Customer creation failed. Please check your network and retry.';
 
       setCreateError(message);
+      if (isConflict) {
+        setFieldErrors((prev) => ({ ...prev, phone: message }));
+      }
       Alert.alert(isConflict ? 'Duplicate Customer' : 'Registration Error', message);
     } finally {
       setIsSubmitting(false);
@@ -324,7 +353,7 @@ export default function CustomersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
         {/* Header matching Screen 3 */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Customers</Text>
@@ -550,86 +579,79 @@ export default function CustomersScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Full Name *</Text>
                   <TextInput
-                    style={styles.formInput}
+                    style={[styles.formInput, fieldErrors.name && styles.inputError]}
                     placeholder="e.g. Rahul Sharma"
                     placeholderTextColor="#94a3b8"
                     value={newName}
-                    onChangeText={setNewName}
+                    onChangeText={(val) => {
+                      setNewName(val);
+                      if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
                     autoCapitalize="words"
                   />
+                  {fieldErrors.name ? (
+                    <Text style={styles.fieldErrorText}>{fieldErrors.name}</Text>
+                  ) : null}
                 </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>WhatsApp Phone Number *</Text>
                   <TextInput
-                    style={styles.formInput}
+                    style={[styles.formInput, fieldErrors.phone && styles.inputError]}
                     placeholder="e.g. 9876543210 (10-15 digits)"
                     placeholderTextColor="#94a3b8"
                     keyboardType="phone-pad"
                     maxLength={16}
                     value={newPhone}
-                    onChangeText={setNewPhone}
+                    onChangeText={(val) => {
+                      setNewPhone(val);
+                      if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
                   />
+                  {fieldErrors.phone ? (
+                    <Text style={styles.fieldErrorText}>{fieldErrors.phone}</Text>
+                  ) : null}
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Address (Optional)</Text>
+                  <Text style={styles.inputLabel}>Address *</Text>
                   <TextInput
-                    style={[styles.formInput, { height: 72, textAlignVertical: 'top' }]}
+                    style={[
+                      styles.formInput,
+                      { height: 72, textAlignVertical: 'top', paddingTop: 10 },
+                      fieldErrors.address && styles.inputError,
+                    ]}
                     placeholder="House/Flat, Street, Area"
                     placeholderTextColor="#94a3b8"
                     multiline
                     value={newAddress}
-                    onChangeText={setNewAddress}
+                    onChangeText={(val) => {
+                      setNewAddress(val);
+                      if (fieldErrors.address) setFieldErrors((prev) => ({ ...prev, address: undefined }));
+                    }}
                   />
+                  {fieldErrors.address ? (
+                    <Text style={styles.fieldErrorText}>{fieldErrors.address}</Text>
+                  ) : null}
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Pincode (Optional)</Text>
+                  <Text style={styles.inputLabel}>Pincode *</Text>
                   <TextInput
-                    style={styles.formInput}
+                    style={[styles.formInput, fieldErrors.pincode && styles.inputError]}
                     placeholder="e.g. 411001"
                     placeholderTextColor="#94a3b8"
                     keyboardType="default"
                     maxLength={10}
                     value={newPincode}
-                    onChangeText={setNewPincode}
+                    onChangeText={(val) => {
+                      setNewPincode(val);
+                      if (fieldErrors.pincode) setFieldErrors((prev) => ({ ...prev, pincode: undefined }));
+                    }}
                   />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Membership Tier (Optional)</Text>
-                  <View style={styles.tierSelectorRow}>
-                    {MEMBERSHIP_OPTIONS.map((tier) => (
-                      <TouchableOpacity
-                        key={tier}
-                        style={[styles.tierBtn, newMembership === tier && styles.tierBtnSelected]}
-                        onPress={() => setNewMembership(tier)}
-                      >
-                        <Text
-                          style={[
-                            styles.tierBtnText,
-                            newMembership === tier && styles.tierBtnTextSelected,
-                          ]}
-                        >
-                          {tier}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Special Discount % (Optional)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. 10 (0 - 100%)"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="numeric"
-                    maxLength={3}
-                    value={newDiscount}
-                    onChangeText={setNewDiscount}
-                  />
+                  {fieldErrors.pincode ? (
+                    <Text style={styles.fieldErrorText}>{fieldErrors.pincode}</Text>
+                  ) : null}
                 </View>
 
                 <TouchableOpacity
@@ -815,20 +837,38 @@ export default function CustomersScreen() {
                   )}
                 </ScrollView>
 
-                {/* Primary Action Button: Launch Order Wizard for Customer */}
-                <TouchableOpacity
-                  style={styles.startOrderBtn}
-                  onPress={() => {
-                    // Safe integration boundary: Keep selectedCustomer for order intake
-                    setSelectedCustomer(null);
-                    setWizardVisible(true);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.startOrderBtnText}>
-                    + Start New Order for {selectedCustomer.name.split(' ')[0]}
-                  </Text>
-                </TouchableOpacity>
+                {/* Order Action Buttons: 3 Specific Options matching Website Rules */}
+                <View style={styles.orderActionsContainer}>
+                  <Text style={styles.orderActionsTitle}>Create Order for {selectedCustomer.name}:</Text>
+                  <View style={styles.orderActionsRow}>
+                    <TouchableOpacity
+                      style={styles.perPieceActionBtn}
+                      onPress={() => startPerPieceOrder(selectedCustomer)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.actionBtnIcon}>👕</Text>
+                      <Text style={styles.perPieceActionText}>Per-Piece</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.perWeightActionBtn}
+                      onPress={() => startPerWeightOrder(selectedCustomer)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.actionBtnIcon}>⚖️</Text>
+                      <Text style={styles.perWeightActionText}>Per-Weight</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.dryCleanActionBtn}
+                      onPress={() => startDryCleanOrder(selectedCustomer)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.actionBtnIcon}>✨</Text>
+                      <Text style={styles.dryCleanActionText}>Dry Clean</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
             </View>
           </Modal>
@@ -838,11 +878,18 @@ export default function CustomersScreen() {
         <OrderWizardModal
           visible={wizardVisible}
           draft={null}
-          storeId={session?.storeId || 'store-1'}
+          initialCustomer={orderTargetCustomer}
+          initialEntryMode={orderTargetMode}
+          initialWorkflow={orderTargetWorkflow}
+          storeId={session?.storeId || 'store-kp-001'}
           userRole={session?.role || 'COUNTER'}
-          onClose={() => setWizardVisible(false)}
+          onClose={() => {
+            setWizardVisible(false);
+            setOrderTargetCustomer(null);
+          }}
           onOrderSavedOrSubmitted={() => {
             setWizardVisible(false);
+            setOrderTargetCustomer(null);
             router.push('/(tabs)/orders');
           }}
         />
@@ -1191,6 +1238,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0f172a',
   },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  fieldErrorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
+  },
   tierSelectorRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1488,5 +1545,72 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  orderActionsContainer: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  orderActionsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 8,
+  },
+  orderActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  perPieceActionBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  perPieceActionText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  perWeightActionBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  perWeightActionText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dryCleanActionBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#7c3aed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  dryCleanActionText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionBtnIcon: {
+    fontSize: 14,
   },
 });

@@ -30,4 +30,10 @@ export class GetOrdersQueryDto {
   @IsInt()
   @Min(1)
   pageSize?: number = 10;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
 }

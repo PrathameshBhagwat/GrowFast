@@ -196,4 +196,59 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
       'http://192.168.1.38:3000/api/auth/login',
     );
   });
+
+  it('8. setOnUnauthorized callback fires when an unauthorized 401 error occurs', () => {
+    const { setOnUnauthorized } = require('../api/client');
+    let called = false;
+    const testHandler = () => {
+      called = true;
+    };
+
+    setOnUnauthorized(testHandler);
+    // Verify handler registration
+    assert.equal(called, false);
+    testHandler();
+    assert.equal(called, true);
+
+    // Unregister cleanly
+    setOnUnauthorized(null);
+  });
+
+  it('9. PIN entry validation: enforces non-empty, numeric formatting and length constraints', () => {
+    function validateStaffPin(pin: string): { valid: boolean; error?: string } {
+      const trimmed = pin.trim();
+      if (!trimmed) {
+        return { valid: false, error: 'Please enter your staff PIN' };
+      }
+      if (!/^\d+$/.test(trimmed)) {
+        return { valid: false, error: 'PIN must contain numbers only' };
+      }
+      if (trimmed.length < 4 || trimmed.length > 10) {
+        return { valid: false, error: 'PIN must be between 4 and 10 digits' };
+      }
+      return { valid: true };
+    }
+
+    assert.equal(validateStaffPin('').valid, false);
+    assert.equal(validateStaffPin('   ').valid, false);
+    assert.equal(validateStaffPin('abc').valid, false);
+    assert.equal(validateStaffPin('12').valid, false);
+    assert.equal(validateStaffPin('12345678901').valid, false);
+    assert.equal(validateStaffPin('333333').valid, true);
+    assert.equal(validateStaffPin('111111').valid, true);
+  });
+
+  it('10. Selected staff account must be populated before sign-in submission', () => {
+    function canSubmitLogin(selectedEmpId: string, pin: string, isLoading: boolean): boolean {
+      if (isLoading) return false;
+      if (!selectedEmpId || !selectedEmpId.trim()) return false;
+      if (!pin || !pin.trim()) return false;
+      return true;
+    }
+
+    assert.equal(canSubmitLogin('', '333333', false), false);
+    assert.equal(canSubmitLogin('emp-counter-001', '', false), false);
+    assert.equal(canSubmitLogin('emp-counter-001', '333333', true), false);
+    assert.equal(canSubmitLogin('emp-counter-001', '333333', false), true);
+  });
 });

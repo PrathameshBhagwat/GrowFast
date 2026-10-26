@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
@@ -10,19 +10,33 @@ import { getDatabase } from '../src/db/sqlite';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      retry: (failureCount, error: any) => {
+        // Never retry 401 Unauthorized errors
+        if (error?.statusCode === 401 || error?.status === 401) return false;
+        return failureCount < 2;
+      },
       staleTime: 1000 * 60 * 5, // 5 minutes
     },
   },
 });
 
-function ProtectedRoutes({ children }: { children: React.ReactNode }) {
+export function ProtectedRoutes({
+  children,
+  isDbReady = true,
+}: {
+  children: React.ReactNode;
+  isDbReady?: boolean;
+}) {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
+
+  const isNavigationReady = Boolean(rootNavigationState?.key);
+  const isAppReady = isDbReady && !isLoading && isNavigationReady;
 
   useEffect(() => {
-    if (isLoading) return;
+    if (!isAppReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
@@ -33,17 +47,18 @@ function ProtectedRoutes({ children }: { children: React.ReactNode }) {
       // Redirect to main tabs if already authenticated
       router.replace('/(tabs)');
     }
-  }, [isLoading, isAuthenticated, segments, router]);
+  }, [isAppReady, isAuthenticated, segments, router]);
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f46e5" />
-      </View>
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <View style={styles.wrapper}>
+      {children}
+      {(!isDbReady || isLoading) && (
+        <View style={styles.loadingOverlay} pointerEvents="auto">
+          <ActivityIndicator size="large" color="#4f46e5" />
+        </View>
+      )}
+    </View>
+  );
 }
 
 export default function RootLayout() {
@@ -64,18 +79,10 @@ export default function RootLayout() {
     initApp();
   }, []);
 
-  if (!isDbReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f46e5" />
-      </View>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ProtectedRoutes>
+        <ProtectedRoutes isDbReady={isDbReady}>
           <View style={styles.container}>
             <StatusBar style="auto" />
             <ConnectionBanner />
@@ -91,6 +98,9 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -100,5 +110,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    zIndex: 999,
   },
 });

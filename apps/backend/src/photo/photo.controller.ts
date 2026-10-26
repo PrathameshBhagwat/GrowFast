@@ -26,19 +26,49 @@ import { PhotoService } from './photo.service';
 import { UploadPhotoDto } from './dto/upload-photo.dto';
 import { PHOTO_MAX_FILE_SIZE, PHOTO_UPLOAD_DIR } from './photo.constants';
 
+import { PhotoCleanupService } from './photo-cleanup.service';
+
 /**
- * PhotoController — HTTP endpoints for photo upload and retrieval.
+ * PhotoController — HTTP endpoints for photo upload, retrieval, and retention cleanup.
  *
  * Endpoints:
  * - POST /api/photos/upload — Upload a photo (multipart/form-data)
- * - GET  /api/orders/:orderId/photos — List photos for an order
+ * - GET  /api/orders/:orderId/photos — List photos for an order (gatekept by 10-day retention)
+ * - POST /api/photos/cleanup — Run 10-day retention cleanup (OWNER, MANAGER)
  *
  * All endpoints require JWT authentication and role-based authorization.
  * Frontend visibility is NOT authorization — the backend enforces access.
  */
 @Controller()
 export class PhotoController {
-  constructor(private readonly photoService: PhotoService) {}
+  constructor(
+    private readonly photoService: PhotoService,
+    private readonly cleanupService: PhotoCleanupService,
+  ) {}
+
+  /**
+   * POST /api/photos/cleanup
+   *
+   * Trigger retention cleanup to delete photos from orders delivered 10+ days ago.
+   * Roles: OWNER, MANAGER
+   */
+  @Post('photos/cleanup')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'MANAGER')
+  async triggerCleanup(
+    @Body() body: { retentionDays?: number; batchSize?: number },
+    @Request() req: any,
+  ) {
+    const result = await this.cleanupService.cleanupExpiredPhotos({
+      retentionDays: body?.retentionDays,
+      batchSize: body?.batchSize,
+      storeId: req.user.storeId,
+    });
+    return {
+      success: true,
+      data: result,
+    };
+  }
 
   /**
    * POST /api/photos/upload
@@ -100,7 +130,7 @@ export class PhotoController {
    * the architecture of presigned object URLs.
    */
   @Get('photos/local/*')
-  serveLocalFile(
+  async serveLocalFile(
     @Param('0') urlPath: string,
     @Query('sig') sig: string,
     @Response() res: ExpressResponse,
@@ -126,6 +156,11 @@ export class PhotoController {
 
     if (!fullPath.startsWith(expectedRoot)) {
       throw new BadRequestException('Invalid path');
+    }
+
+    // Retention check: verify photo has not reached 10-day post-delivery expiration
+    if (await this.photoService.isPhotoUrlExpired(urlPath)) {
+      throw new NotFoundException('Photo retention period has expired');
     }
 
     if (!fs.existsSync(fullPath)) {

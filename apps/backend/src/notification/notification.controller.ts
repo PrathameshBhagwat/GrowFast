@@ -21,10 +21,10 @@ export class NotificationController {
    * GET /api/notifications?eventType=...&status=...&orderId=...
    *
    * List notification events for the authenticated user's store.
-   * Restricted to OWNER and MANAGER roles.
+   * Restricted to OWNER, MANAGER, and COUNTER roles.
    */
   @Get()
-  @Roles(Role.OWNER, Role.MANAGER)
+  @Roles(Role.OWNER, Role.MANAGER, Role.COUNTER)
   async findAll(
     @Request() req: any,
     @Query('eventType') eventType?: string,
@@ -66,7 +66,7 @@ export class NotificationController {
    * Store isolation enforced — cannot access notifications from other stores.
    */
   @Get(':id')
-  @Roles(Role.OWNER, Role.MANAGER)
+  @Roles(Role.OWNER, Role.MANAGER, Role.COUNTER)
   async findOne(@Param('id') id: string, @Request() req: any) {
     const storeId: string = req.user.storeId;
     const notification = await this.notificationService.findById(id, storeId);

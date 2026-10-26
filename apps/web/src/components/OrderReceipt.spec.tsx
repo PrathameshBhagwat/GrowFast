@@ -347,16 +347,16 @@ describe('OrderReceipt Component & Modal (Phase 4E)', () => {
     expect(screen.getByText('₹0.00')).toBeInTheDocument();
   });
 
-  it('24. Receipt correctly renders GST, Discount, and Express Surcharge when present', () => {
+  it('24. Receipt correctly renders Discount and Express Surcharge without GST', () => {
     const taxAndExpressOrder: OrderDetailDTO = {
       ...baseOrder,
       isExpress: true,
       subtotal: 1000,
       discountAmount: 100,
       expressSurcharge: 250,
-      taxAmount: 207,
-      totalAmount: 1357,
-      amountPaid: 1357,
+      taxAmount: 0,
+      totalAmount: 1150,
+      amountPaid: 1150,
       amountDue: 0,
       paymentStatus: PaymentStatus.PAID,
     };
@@ -365,8 +365,8 @@ describe('OrderReceipt Component & Modal (Phase 4E)', () => {
     expect(screen.getByText('EXPRESS DELIVERY')).toBeInTheDocument();
     expect(screen.getByText('-₹100.00')).toBeInTheDocument();
     expect(screen.getByText('+₹250.00')).toBeInTheDocument();
-    expect(screen.getByText('+₹207.00')).toBeInTheDocument();
-    expect(screen.getAllByText('₹1357.00').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/GST/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('₹1150.00').length).toBeGreaterThanOrEqual(1);
   });
 
   it('25. Thermal 80mm receipt renders 3-column table and clean POS layout', () => {

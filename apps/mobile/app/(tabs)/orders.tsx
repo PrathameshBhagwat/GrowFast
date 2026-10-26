@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,12 @@ import {
   TextInput,
   SafeAreaView,
   ScrollView,
+  Platform,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { useSyncManager } from '../../src/hooks/useSyncManager';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
@@ -27,6 +31,13 @@ import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { apiClient } from '../../src/api/client';
 import { OrderSummaryDTO } from '@growfast/shared-types';
+
+const Icon = Ionicons as unknown as React.ComponentType<{
+  name: string;
+  size?: number;
+  color?: string;
+  style?: any;
+}>;
 
 // Fallback orders matching Screen 10 reference for instant display
 const REFERENCE_ORDERS: OrderSummaryDTO[] = [
@@ -140,6 +151,7 @@ type FilterCategory = 'ALL' | 'IN_PROCESS' | 'READY' | 'DELIVERED' | 'DRAFTS';
 
 export default function OrdersScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
   const { syncDraft, syncAll, isSyncingAll } = useSyncManager();
 
@@ -149,9 +161,11 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Search & Filter state matching Screen 10
+  // Search & Filter state with 300ms debounce
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('ALL');
+  const searchRequestIdRef = useRef(0);
 
   // Modals
   const [editorVisible, setEditorVisible] = useState(false);
@@ -159,26 +173,115 @@ export default function OrdersScreen() {
   const [orderDetailVisible, setOrderDetailVisible] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
+  // Functional Filters State (Task 2)
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>('ALL');
+  const [filterFulfillment, setFilterFulfillment] = useState<string>('ALL');
+  const [filterPriority, setFilterPriority] = useState<string>('ALL');
+  const [filterDatePreset, setFilterDatePreset] = useState<string>('ALL');
+
+  // Temporary staging state inside the filter modal before applying
+  const [tempStatus, setTempStatus] = useState<string>('ALL');
+  const [tempPaymentStatus, setTempPaymentStatus] = useState<string>('ALL');
+  const [tempFulfillment, setTempFulfillment] = useState<string>('ALL');
+  const [tempPriority, setTempPriority] = useState<string>('ALL');
+  const [tempDatePreset, setTempDatePreset] = useState<string>('ALL');
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filterStatus !== 'ALL') count++;
+    if (filterPaymentStatus !== 'ALL') count++;
+    if (filterFulfillment !== 'ALL') count++;
+    if (filterPriority !== 'ALL') count++;
+    if (filterDatePreset !== 'ALL') count++;
+    return count;
+  }, [filterStatus, filterPaymentStatus, filterFulfillment, filterPriority, filterDatePreset]);
+
+  const openFilterModal = () => {
+    setTempStatus(filterStatus);
+    setTempPaymentStatus(filterPaymentStatus);
+    setTempFulfillment(filterFulfillment);
+    setTempPriority(filterPriority);
+    setTempDatePreset(filterDatePreset);
+    setFilterModalVisible(true);
+  };
+
+  const handleApplyFilters = () => {
+    setFilterStatus(tempStatus);
+    setFilterPaymentStatus(tempPaymentStatus);
+    setFilterFulfillment(tempFulfillment);
+    setFilterPriority(tempPriority);
+    setFilterDatePreset(tempDatePreset);
+
+    // Keep horizontal quick pills synced
+    if (tempStatus === 'ALL') {
+      setActiveFilter('ALL');
+    } else if (tempStatus === 'PROCESSING' || tempStatus === 'RECEIVED') {
+      setActiveFilter('IN_PROCESS');
+    } else if (tempStatus === 'READY') {
+      setActiveFilter('READY');
+    } else if (tempStatus === 'DELIVERED') {
+      setActiveFilter('DELIVERED');
+    }
+
+    setFilterModalVisible(false);
+  };
+
+  const handleResetFilters = () => {
+    setTempStatus('ALL');
+    setTempPaymentStatus('ALL');
+    setTempFulfillment('ALL');
+    setTempPriority('ALL');
+    setTempDatePreset('ALL');
+    setFilterStatus('ALL');
+    setFilterPaymentStatus('ALL');
+    setFilterFulfillment('ALL');
+    setFilterPriority('ALL');
+    setFilterDatePreset('ALL');
+    setActiveFilter('ALL');
+    setFilterModalVisible(false);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const loadData = useCallback(async () => {
+    const reqId = ++searchRequestIdRef.current;
     try {
       const allDrafts = await listDrafts({ storeId: session?.storeId });
+      if (reqId !== searchRequestIdRef.current) return;
       setDrafts(allDrafts);
 
       if (isConnected) {
         let statusParam: string | undefined = undefined;
-        if (activeFilter === 'READY') statusParam = 'READY';
+        if (filterStatus !== 'ALL') {
+          statusParam = filterStatus;
+        } else if (activeFilter === 'READY') statusParam = 'READY';
         else if (activeFilter === 'DELIVERED') statusParam = 'DELIVERED';
         else if (activeFilter === 'IN_PROCESS') statusParam = 'PROCESSING';
 
+        let paymentParam: string | undefined = undefined;
+        if (filterPaymentStatus !== 'ALL') {
+          paymentParam = filterPaymentStatus;
+        }
+
         const resp = await apiClient.orders.list({
-          search: searchQuery.trim() || undefined,
+          search: debouncedSearch || undefined,
           status: statusParam,
-          limit: 30,
+          paymentStatus: paymentParam,
+          pageSize: 50,
         });
+
+        if (reqId !== searchRequestIdRef.current) return;
 
         if (resp && resp.data && resp.data.length > 0) {
           setServerOrders(resp.data);
-        } else if (!searchQuery.trim()) {
+        } else if (!debouncedSearch && !statusParam && !paymentParam) {
           setServerOrders(REFERENCE_ORDERS);
         } else {
           setServerOrders([]);
@@ -187,12 +290,16 @@ export default function OrdersScreen() {
         setServerOrders(REFERENCE_ORDERS);
       }
     } catch {
-      setServerOrders(REFERENCE_ORDERS);
+      if (reqId === searchRequestIdRef.current) {
+        setServerOrders(REFERENCE_ORDERS);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (reqId === searchRequestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [session?.storeId, isConnected, searchQuery, activeFilter]);
+  }, [session?.storeId, isConnected, debouncedSearch, activeFilter, filterStatus, filterPaymentStatus]);
 
   useEffect(() => {
     getUserSession().then((sess) => {
@@ -273,48 +380,121 @@ export default function OrdersScreen() {
     }
   };
 
-  // Filter server orders locally if offline or searching
-  const filteredOrders = serverOrders.filter((ord) => {
-    if (activeFilter === 'IN_PROCESS') {
-      return ord.status === 'PROCESSING' || ord.status === 'RECEIVED';
-    }
-    if (activeFilter === 'READY') {
-      return ord.status === 'READY';
-    }
-    if (activeFilter === 'DELIVERED') {
-      return ord.status === 'DELIVERED';
-    }
-    return true;
-  });
+  // Memoized filtered orders to prevent expensive list recalculation on re-renders
+  const filteredOrders = useMemo(() => {
+    return serverOrders.filter((ord) => {
+      // 1. Text Search across Order #, Customer Name, and Customer Phone
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesNum = ord.orderNumber.toLowerCase().includes(q);
+        const matchesCust = (ord.customerName || (ord as any).customer?.name || '')
+          .toLowerCase()
+          .includes(q);
+        const matchesPhone = ((ord as any).customerPhone || '').includes(q);
+        if (!matchesNum && !matchesCust && !matchesPhone) return false;
+      }
 
-  const pendingDraftCount = drafts.filter((d) => d.syncStatus !== 'SYNCED').length;
+      // 2. Status filter
+      if (filterStatus !== 'ALL') {
+        if (filterStatus === 'PROCESSING') {
+          if (ord.status !== 'PROCESSING' && ord.status !== 'RECEIVED') return false;
+        } else if (ord.status !== filterStatus) {
+          return false;
+        }
+      } else {
+        if (activeFilter === 'IN_PROCESS') {
+          if (ord.status !== 'PROCESSING' && ord.status !== 'RECEIVED') return false;
+        } else if (activeFilter === 'READY') {
+          if (ord.status !== 'READY') return false;
+        } else if (activeFilter === 'DELIVERED') {
+          if (ord.status !== 'DELIVERED') return false;
+        }
+      }
+
+      // 3. Payment Status filter
+      if (filterPaymentStatus !== 'ALL') {
+        if (ord.paymentStatus !== filterPaymentStatus) return false;
+      }
+
+      // 4. Fulfillment filter (Counter vs Home Delivery)
+      if (filterFulfillment !== 'ALL') {
+        if ((ord as any).pickupType !== filterFulfillment) return false;
+      }
+
+      // 5. Priority filter
+      if (filterPriority === 'EXPRESS') {
+        if (!ord.isExpress && ord.priority !== 'EXPRESS') return false;
+      } else if (filterPriority === 'STANDARD') {
+        if (ord.isExpress || ord.priority === 'EXPRESS') return false;
+      }
+
+      // 6. Date Range preset
+      if (filterDatePreset === 'TODAY') {
+        const d = new Date(ord.orderDate);
+        const today = new Date();
+        if (d.toDateString() !== today.toDateString()) return false;
+      } else if (filterDatePreset === 'THIS_WEEK') {
+        const orderTime = new Date(ord.orderDate).getTime();
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        if (orderTime < sevenDaysAgo) return false;
+      }
+
+      return true;
+    });
+  }, [
+    serverOrders,
+    searchQuery,
+    activeFilter,
+    filterStatus,
+    filterPaymentStatus,
+    filterFulfillment,
+    filterPriority,
+    filterDatePreset,
+  ]);
+
+  const pendingDraftCount = useMemo(
+    () => drafts.filter((d) => d.syncStatus !== 'SYNCED').length,
+    [drafts],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
         {/* Header matching Screen 10 */}
         <View style={styles.headerRow}>
           <TouchableOpacity
+            style={{ width: 44, height: 44, justifyContent: 'center' }}
             onPress={() => router.push('/(tabs)')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Back to Home"
           >
-            <Text style={styles.backArrow}>‹</Text>
+            <Icon name="chevron-back" size={24} color="#0f172a" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Search Orders</Text>
           <TouchableOpacity
             style={styles.filterIconBtn}
-            onPress={() => {
-              Alert.alert('Filter Options', 'Show: All, In Process, Ready, Delivered');
-            }}
+            onPress={openFilterModal}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Filter Options"
           >
-            <Text style={styles.filterIcon}>⚙</Text>
+            <View style={{ position: 'relative' }}>
+              <Icon
+                name="options-outline"
+                size={22}
+                color={activeFilterCount > 0 ? '#2563eb' : '#64748b'}
+              />
+              {activeFilterCount > 0 ? (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              ) : null}
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* Search Bar matching Screen 10 */}
         <View style={styles.searchBarContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Icon name="search-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by order no, name, phone..."
@@ -327,11 +507,12 @@ export default function OrdersScreen() {
             <TouchableOpacity
               onPress={() => setSearchQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Clear Search"
             >
-              <Text style={styles.clearSearchIcon}>✕</Text>
+              <Icon name="close-circle" size={18} color="#94a3b8" />
             </TouchableOpacity>
           ) : (
-            <Text style={styles.scanIcon}>⊡</Text>
+            <Icon name="barcode-outline" size={20} color="#64748b" />
           )}
         </View>
 
@@ -503,6 +684,10 @@ export default function OrdersScreen() {
           <FlatList
             data={filteredOrders}
             keyExtractor={(item) => item.id}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS !== 'web'}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />
             }
@@ -523,7 +708,7 @@ export default function OrdersScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.garmentIconBox}>
-                    <Text style={styles.garmentEmoji}>👔</Text>
+                    <Icon name="shirt-outline" size={20} color="#2563eb" />
                   </View>
                   <View style={styles.orderCenterDetails}>
                     <Text style={styles.orderNumberText}>{orderNumDisplay}</Text>
@@ -584,6 +769,210 @@ export default function OrdersScreen() {
           }}
           onOrderUpdated={loadData}
         />
+
+        {/* Functional Filter Modal (Task 2) */}
+        <Modal
+          visible={filterModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.filterModalCard}>
+              <View style={styles.filterModalHeader}>
+                <View>
+                  <Text style={styles.filterModalTitle}>Filter Orders</Text>
+                  <Text style={styles.filterModalSubtitle}>
+                    {activeFilterCount > 0
+                      ? `${activeFilterCount} active filter(s)`
+                      : 'Refine orders by status, payment, or date'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.filterModalCloseBtn}
+                  onPress={() => setFilterModalVisible(false)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Icon name="close" size={22} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.filterModalScroll} showsVerticalScrollIndicator={false}>
+                {/* 1. Order Status */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Order Status</Text>
+                  <View style={styles.chipsContainer}>
+                    {[
+                      { key: 'ALL', label: 'All Statuses' },
+                      { key: 'RECEIVED', label: 'Received' },
+                      { key: 'PROCESSING', label: 'In Process' },
+                      { key: 'READY', label: 'Ready' },
+                      { key: 'DELIVERED', label: 'Delivered' },
+                      { key: 'CANCELLED', label: 'Cancelled' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.filterChip,
+                          tempStatus === opt.key && styles.filterChipSelected,
+                        ]}
+                        onPress={() => setTempStatus(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            tempStatus === opt.key && styles.filterChipTextSelected,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* 2. Payment Status */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Payment Status</Text>
+                  <View style={styles.chipsContainer}>
+                    {[
+                      { key: 'ALL', label: 'All Payments' },
+                      { key: 'PENDING', label: 'Unpaid / Pending' },
+                      { key: 'PARTIAL', label: 'Partially Paid' },
+                      { key: 'PAID', label: 'Fully Paid' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.filterChip,
+                          tempPaymentStatus === opt.key && styles.filterChipSelected,
+                        ]}
+                        onPress={() => setTempPaymentStatus(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            tempPaymentStatus === opt.key && styles.filterChipTextSelected,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* 3. Fulfillment Method */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Fulfillment Method</Text>
+                  <View style={styles.chipsContainer}>
+                    {[
+                      { key: 'ALL', label: 'All Types' },
+                      { key: 'STORE_PICKUP', label: 'Counter Pickup' },
+                      { key: 'HOME_DELIVERY', label: 'Home Delivery' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.filterChip,
+                          tempFulfillment === opt.key && styles.filterChipSelected,
+                        ]}
+                        onPress={() => setTempFulfillment(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            tempFulfillment === opt.key && styles.filterChipTextSelected,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* 4. Priority */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Order Priority</Text>
+                  <View style={styles.chipsContainer}>
+                    {[
+                      { key: 'ALL', label: 'All Priorities' },
+                      { key: 'STANDARD', label: 'Regular' },
+                      { key: 'EXPRESS', label: 'Express ⚡' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.filterChip,
+                          tempPriority === opt.key && styles.filterChipSelected,
+                        ]}
+                        onPress={() => setTempPriority(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            tempPriority === opt.key && styles.filterChipTextSelected,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* 5. Date Range */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Date Range</Text>
+                  <View style={styles.chipsContainer}>
+                    {[
+                      { key: 'ALL', label: 'All Time' },
+                      { key: 'TODAY', label: 'Placed Today' },
+                      { key: 'THIS_WEEK', label: 'Past 7 Days' },
+                    ].map((opt) => (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.filterChip,
+                          tempDatePreset === opt.key && styles.filterChipSelected,
+                        ]}
+                        onPress={() => setTempDatePreset(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            tempDatePreset === opt.key && styles.filterChipTextSelected,
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Bottom Actions: Reset and Apply */}
+              <View style={styles.filterModalActions}>
+                <TouchableOpacity
+                  style={styles.filterResetBtn}
+                  onPress={handleResetFilters}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.filterResetBtnText}>Reset All</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.filterApplyBtn}
+                  onPress={handleApplyFilters}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.filterApplyBtnText}>Apply Filters</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -841,5 +1230,137 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    backgroundColor: '#2563eb',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  filterModalCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 28,
+    maxHeight: '85%',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  filterModalSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  filterModalCloseBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterModalScroll: {
+    marginVertical: 14,
+  },
+  filterSection: {
+    marginBottom: 16,
+  },
+  filterSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 8,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+  },
+  filterChipSelected: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  filterChipTextSelected: {
+    color: '#2563eb',
+    fontWeight: '700',
+  },
+  filterModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  filterResetBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterResetBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  filterApplyBtn: {
+    flex: 2,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2563eb',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  filterApplyBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });

@@ -161,16 +161,29 @@ export class PhotoService {
 
   /**
    * Retrieve all photos for a given order.
+   * If the order has been delivered for 10 full days or more,
+   * photos are expired under the 10-day retention rule and are not returned.
    */
   async getOrderPhotos(orderId: string, storeId: string): Promise<OrderPhotoDTO[]> {
     // Verify order exists and belongs to the user's store
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true, storeId: true },
+      select: {
+        id: true,
+        storeId: true,
+        status: true,
+        deliveredAt: true,
+        items: { select: { itemStatus: true } },
+      },
     });
 
     if (!order || order.storeId !== storeId) {
       throw new NotFoundException('Order not found');
+    }
+
+    // 10-day retention gatekeeping: if order was delivered >= 10 days ago, photos cannot be fetched
+    if (this.isOrderPhotoRetentionExpired(order)) {
+      return [];
     }
 
     const photos = await this.prisma.orderPhoto.findMany({
@@ -178,15 +191,89 @@ export class PhotoService {
       orderBy: { uploadedAt: 'desc' },
     });
 
+    let maxExpirySeconds: number | undefined;
+    if (order.deliveredAt && order.status === 'DELIVERED') {
+      const deliveredTime = new Date(order.deliveredAt).getTime();
+      if (!isNaN(deliveredTime)) {
+        const retentionEndMs = deliveredTime + 10 * 24 * 60 * 60 * 1000;
+        const remainingSeconds = Math.floor((retentionEndMs - Date.now()) / 1000);
+        maxExpirySeconds = Math.min(3600, Math.max(60, remainingSeconds));
+      }
+    }
+
     // Map to DTOs with access URLs
     const dtos: OrderPhotoDTO[] = [];
     for (const photo of photos) {
       const dto = this.mapToDto(photo);
-      dto.url = await this.storage.getAccessUrl(photo.url);
+      dto.url =
+        maxExpirySeconds !== undefined
+          ? await this.storage.getAccessUrl(photo.url, maxExpirySeconds)
+          : await this.storage.getAccessUrl(photo.url);
       dtos.push(dto);
     }
 
     return dtos;
+  }
+
+  /**
+   * Check if a stored photo URL belongs to an order whose retention has expired.
+   * Used for direct local file download gatekeeping.
+   */
+  async isPhotoUrlExpired(urlPath: string, now: Date = new Date()): Promise<boolean> {
+    const photo = await this.prisma.orderPhoto.findFirst({
+      where: {
+        url: {
+          contains: urlPath,
+        },
+      },
+      include: {
+        order: {
+          select: {
+            status: true,
+            deliveredAt: true,
+            items: { select: { itemStatus: true } },
+          },
+        },
+      },
+    });
+
+    if (photo && photo.order) {
+      return this.isOrderPhotoRetentionExpired(photo.order, now);
+    }
+    return false;
+  }
+
+  /**
+   * Check if an order's photos have expired under the 10-day retention rule.
+   */
+  isOrderPhotoRetentionExpired(
+    order: {
+      status?: string | null;
+      deliveredAt?: Date | string | null;
+      items?: Array<{ itemStatus: string }>;
+    },
+    now: Date = new Date(),
+  ): boolean {
+    if (!order || !order.deliveredAt || order.status !== 'DELIVERED') {
+      return false;
+    }
+    const deliveredDate = new Date(order.deliveredAt);
+    if (isNaN(deliveredDate.getTime())) {
+      return false;
+    }
+
+    // Do not expire if partially delivered
+    if (order.items && order.items.length > 0) {
+      const hasUndelivered = order.items.some(
+        (i) => i.itemStatus !== 'DELIVERED' && i.itemStatus !== 'CANCELLED',
+      );
+      if (hasUndelivered) {
+        return false;
+      }
+    }
+
+    const retentionMs = 10 * 24 * 60 * 60 * 1000;
+    return now.getTime() - deliveredDate.getTime() >= retentionMs;
   }
 
   // ── Private helpers ───────────────────────────────────────────────

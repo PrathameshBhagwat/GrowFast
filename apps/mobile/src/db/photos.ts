@@ -269,6 +269,108 @@ export async function deletePhoto(id: string): Promise<void> {
         // Best-effort cleanup
       }
     }
+    testFileStore.set(photo.local_file_uri, false);
     await db.runAsync('DELETE FROM pending_photos WHERE id = ?', [id]);
   }
+}
+
+export interface MobilePhotoCleanupOptions {
+  retentionDays?: number; // default: 10
+  now?: Date;
+  /**
+   * Optional map of serverOrderId -> deliveredAt ISO string, Date, or null
+   */
+  deliveredOrders?: Map<string, string | Date | null>;
+  /**
+   * Optional list or set of order IDs that have reached retention expiration
+   */
+  expiredOrderIds?: Set<string> | string[];
+}
+
+export interface MobilePhotoCleanupResult {
+  examined: number;
+  cleanedCount: number;
+  filesDeleted: number;
+  skippedActiveCount: number;
+}
+
+/**
+ * Clean up local cached/managed mobile photos for orders delivered 10+ days ago.
+ *
+ * Rules:
+ * - Active orders without confirmed delivery >= 10 days are preserved.
+ * - Offline drafts without server confirmation are preserved.
+ * - Photos for orders confirmed delivered >= 10 days ago have their local file deleted
+ *   and SQLite pending_photos row removed.
+ * - Safe to run repeatedly and on app restart.
+ */
+export async function cleanupExpiredMobilePhotos(
+  options?: MobilePhotoCleanupOptions,
+): Promise<MobilePhotoCleanupResult> {
+  const retentionDays = options?.retentionDays ?? 10;
+  const now = options?.now ?? new Date();
+  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+
+  const expiredSet = new Set<string>();
+  if (options?.expiredOrderIds) {
+    for (const id of options.expiredOrderIds) {
+      expiredSet.add(id);
+    }
+  }
+
+  const result: MobilePhotoCleanupResult = {
+    examined: 0,
+    cleanedCount: 0,
+    filesDeleted: 0,
+    skippedActiveCount: 0,
+  };
+
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<RawPhotoRow>('SELECT * FROM pending_photos');
+  const fs = await getFileSystem();
+
+  for (const row of rows) {
+    result.examined++;
+
+    // Unsynchronized offline drafts without serverOrderId must be preserved
+    if (!row.server_order_id) {
+      result.skippedActiveCount++;
+      continue;
+    }
+
+    let isExpired = expiredSet.has(row.server_order_id);
+
+    if (!isExpired && options?.deliveredOrders?.has(row.server_order_id)) {
+      const deliveredAtVal = options.deliveredOrders.get(row.server_order_id);
+      if (deliveredAtVal) {
+        const deliveredDate = new Date(deliveredAtVal);
+        if (!isNaN(deliveredDate.getTime())) {
+          isExpired = now.getTime() - deliveredDate.getTime() >= retentionMs;
+        }
+      }
+    }
+
+    if (isExpired) {
+      // Delete physical local file
+      if (row.local_file_uri) {
+        if (fs && fs.documentDirectory) {
+          try {
+            await fs.deleteAsync(row.local_file_uri, { idempotent: true });
+          } catch {
+            // Best effort
+          }
+        }
+        testFileStore.set(row.local_file_uri, false);
+        result.filesDeleted++;
+      }
+
+      // Delete SQLite record
+      await db.runAsync('DELETE FROM pending_photos WHERE id = ?', [row.id]);
+      result.cleanedCount++;
+    } else {
+      result.skippedActiveCount++;
+    }
+  }
+
+  return result;
 }

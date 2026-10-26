@@ -656,6 +656,31 @@ export function OrderWizardPage() {
   const expressSurcharge = pricingTotals.expressSurcharge;
   const total = pricingTotals.totalAmount;
 
+  // Preview surcharges for express delivery speed buttons (canonical calculation)
+  const tomorrowPreviewSurcharge = useMemo(() => {
+    if (storeConfig?.expressSurchargePercent == null || pricingInputs.length === 0) return 0;
+    try {
+      const preview = calculateOrderTotals(pricingInputs, {
+        isExpress: true,
+        expressSurchargePercent: storeConfig.expressSurchargePercent,
+        expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
+      });
+      return preview.expressSurcharge;
+    } catch { return 0; }
+  }, [pricingInputs, storeConfig]);
+
+  const sameDayPreviewSurcharge = useMemo(() => {
+    if (storeConfig?.expressSurchargePercent == null || pricingInputs.length === 0) return 0;
+    try {
+      const preview = calculateOrderTotals(pricingInputs, {
+        isExpress: true,
+        expressSurchargePercent: storeConfig.expressSurchargePercent,
+        expressDeliveryOption: ExpressDeliveryOption.SAME_DAY,
+      });
+      return preview.expressSurcharge;
+    } catch { return 0; }
+  }, [pricingInputs, storeConfig]);
+
   const totalRegularGarments = useMemo(() => {
     return items
       .filter((i) => !i.isWeightBased && !(i.weight != null && i.weight > 0))
@@ -1900,7 +1925,7 @@ export function OrderWizardPage() {
                           ? 'Express not configured for this store'
                           : isWednesdayOff
                             ? 'Tomorrow is Thursday (store weekly off)'
-                            : 'Tomorrow / Next-Day Evening Delivery (+1.5× base express)'
+                            : 'Tomorrow / Next-Day Evening Delivery (1.5× multiplier)'
                       }
                       className={`py-2 px-2 rounded-lg text-center transition-all text-xs font-medium cursor-pointer min-h-[44px] border ${
                         storeConfig?.expressSurchargePercent == null || isWednesdayOff
@@ -1914,9 +1939,9 @@ export function OrderWizardPage() {
                         <span className="text-amber-500">⚡</span> Tomorrow
                       </div>
                       <div className="text-[10px] text-slate-400 font-mono font-medium mt-0.5">
-                        {storeConfig?.expressSurchargePercent != null && subtotal > 0
-                          ? `+₹${(((subtotal * storeConfig.expressSurchargePercent) / 100) * 1.5).toFixed(0)}`
-                          : '1.5× base'}
+                        {tomorrowPreviewSurcharge > 0
+                          ? `+₹${tomorrowPreviewSurcharge.toFixed(0)}`
+                          : '1.5×'}
                       </div>
                     </button>
 
@@ -1931,7 +1956,7 @@ export function OrderWizardPage() {
                           ? 'Express not configured for this store'
                           : isThursdayOff
                             ? 'Today is Thursday (store weekly off)'
-                            : 'Same-Day Express Delivery (+2.0× base express)'
+                            : 'Same-Day Express Delivery (2.0× multiplier)'
                       }
                       className={`py-2 px-2 rounded-lg text-center transition-all text-xs font-medium cursor-pointer min-h-[44px] border ${
                         storeConfig?.expressSurchargePercent == null || isThursdayOff
@@ -1945,9 +1970,9 @@ export function OrderWizardPage() {
                         <span className="text-amber-500">⚡</span> Same Day
                       </div>
                       <div className="text-[10px] text-slate-400 font-mono font-medium mt-0.5">
-                        {storeConfig?.expressSurchargePercent != null && subtotal > 0
-                          ? `+₹${(((subtotal * storeConfig.expressSurchargePercent) / 100) * 2.0).toFixed(0)}`
-                          : '2.0× base'}
+                        {sameDayPreviewSurcharge > 0
+                          ? `+₹${sameDayPreviewSurcharge.toFixed(0)}`
+                          : '2.0×'}
                       </div>
                     </button>
                   </div>
@@ -1983,7 +2008,7 @@ export function OrderWizardPage() {
                     Total
                   </div>
                   <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-                    Inclusive of taxes
+                    All items included
                   </div>
                 </div>
                 <div className="text-2xl font-bold font-mono tracking-tight text-blue-600 dark:text-blue-400">

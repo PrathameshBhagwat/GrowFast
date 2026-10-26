@@ -11,10 +11,21 @@ import {
   ScrollView,
   Modal,
   SafeAreaView,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../src/api/client';
 import { useAuth } from '../../src/contexts/AuthContext';
+
+// Safe component wrapper for vector icons across React 18/19 type definitions
+const Icon = Ionicons as unknown as React.ComponentType<{
+  name: string;
+  size?: number;
+  color?: string;
+  style?: any;
+}>;
 
 interface EmployeeDirectoryItem {
   id: string;
@@ -22,9 +33,76 @@ interface EmployeeDirectoryItem {
   role: string;
 }
 
+// Reusable 4x4 dot matrix decoration matching the reference image corners
+function DotMatrix({ rows = 4, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <View style={styles.dotGridContainer} pointerEvents="none" accessible={false}>
+      {Array.from({ length: rows }).map((_, r) => (
+        <View key={`row-${r}`} style={styles.dotGridRow}>
+          {Array.from({ length: cols }).map((_, c) => (
+            <View key={`dot-${r}-${c}`} style={styles.dotItem} />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// Bottom Laundry Machine & Towel Illustration matching reference image
+function LaundryIllustration() {
+  return (
+    <View style={styles.illustrationWrap} pointerEvents="none" accessible={false}>
+      {/* Left Leaf Accent */}
+      <View style={[styles.leafBase, styles.leafLeft1]} />
+      <View style={[styles.leafBase, styles.leafLeft2]} />
+
+      {/* Washing Machine Body */}
+      <View style={styles.washerBody}>
+        {/* Machine Top Panel */}
+        <View style={styles.washerTopPanel}>
+          <View style={styles.washerDispenserSlot} />
+          <View style={styles.washerControlDots}>
+            <View style={styles.washerTinyDot} />
+            <View style={styles.washerTinyDot} />
+            <View style={styles.washerTinyDot} />
+          </View>
+          <View style={styles.washerKnobRing}>
+            <View style={styles.washerKnobCenter} />
+          </View>
+        </View>
+
+        {/* Circular Front-Load Door */}
+        <View style={styles.washerDoorOuter}>
+          <View style={styles.washerDoorMid}>
+            <View style={styles.washerDoorGlass}>
+              <View style={styles.waterBubbleBig} />
+              <View style={styles.waterBubbleSmall} />
+              <View style={styles.waterWaveLine} />
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Stack of Clean Folded Towels */}
+      <View style={styles.towelStack}>
+        <View style={[styles.towelFold, styles.towelTop]} />
+        <View style={[styles.towelFold, styles.towelMid]} />
+        <View style={[styles.towelFold, styles.towelBottom]} />
+      </View>
+
+      {/* Right Leaf Accent */}
+      <View style={[styles.leafBase, styles.leafRight1]} />
+      <View style={[styles.leafBase, styles.leafRight2]} />
+    </View>
+  );
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,6 +112,37 @@ export default function LoginScreen() {
   const [showPin, setShowPin] = useState(false);
   const [isFetchingDirectory, setIsFetchingDirectory] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
+
+  // Progressive brute-force lockout states
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (!lockoutUntil) return;
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockoutUntil(null);
+        setFailedAttempts(0);
+        setTimeLeft(0);
+        clearInterval(interval);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutUntil]);
+
+  const handlePinChange = (val: string) => {
+    // Strictly numeric, maximum 6 digits
+    const digitsOnly = val.replace(/\D/g, '').slice(0, 6);
+    setPin(digitsOnly);
+    if (errorMsg && !lockoutUntil) {
+      setErrorMsg(null);
+    }
+  };
 
   const loadDirectory = useCallback(async () => {
     setIsFetchingDirectory(true);
@@ -50,7 +159,7 @@ export default function LoginScreen() {
         }
       }
     } catch (err: any) {
-      console.warn('Could not load employee directory:', err.message);
+      console.warn('Could not load employee directory:', err?.message);
       setErrorMsg(
         `Unable to connect to backend server at ${apiClient.getBaseUrl()}. Please ensure the NestJS backend is running and your device is connected to the same Wi-Fi network.`,
       );
@@ -64,12 +173,18 @@ export default function LoginScreen() {
   }, [loadDirectory]);
 
   const handleLogin = async () => {
+    if (lockoutUntil) return;
+
     if (!selectedEmpId.trim()) {
-      setErrorMsg('Please select or enter an employee ID');
+      setErrorMsg('Please select your staff account');
       return;
     }
-    if (!pin.trim()) {
-      setErrorMsg('Please enter your staff PIN');
+    if (pin.length < 4) {
+      setErrorMsg('PIN must be at least 4 digits');
+      return;
+    }
+    if (pin.length > 6) {
+      setErrorMsg('PIN cannot exceed 6 digits');
       return;
     }
 
@@ -81,16 +196,29 @@ export default function LoginScreen() {
         employeeId: selectedEmpId.trim(),
         pin: pin.trim(),
       });
+      setFailedAttempts(0);
+      setLockoutUntil(null);
       router.replace('/(tabs)');
     } catch (err: any) {
-      if (err.statusCode === 401 || err.message?.toLowerCase().includes('credential')) {
-        setErrorMsg('Invalid PIN. Please check your 6-digit staff PIN and try again.');
+      setPin('');
+      const attempts = failedAttempts + 1;
+      setFailedAttempts(attempts);
+
+      if (err.message && err.message.toLowerCase().includes('lockout')) {
+        setLockoutUntil(Date.now() + 60000);
+        setErrorMsg(err.message);
+      } else if (attempts >= 5) {
+        setLockoutUntil(Date.now() + 60000);
+        setErrorMsg('Too many failed attempts. Temporary lockout active. Try again in 60s.');
+      } else if (err.statusCode === 401 || err.message?.toLowerCase().includes('credential')) {
+        setErrorMsg(`Invalid PIN. Please check your staff PIN and try again. (Attempt ${attempts}/5)`);
       } else if (
         err.message?.includes('Network request failed') ||
-        err.message?.includes('Failed to fetch')
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('Server unreachable')
       ) {
         setErrorMsg(
-          `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the host IP and ensure your phone is on the same local network.`,
+          `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the backend is running and your device is on the same network.`,
         );
       } else {
         setErrorMsg(err.message || 'Login failed. Please verify your PIN.');
@@ -101,46 +229,109 @@ export default function LoginScreen() {
   };
 
   const selectedEmployee = directory.find((d) => d.id === selectedEmpId);
+  const isCompactScreen = windowHeight < 720;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View
+      style={[
+        styles.safeArea,
+        {
+          paddingTop: Math.max(insets.top, 16),
+          paddingBottom: Math.max(insets.bottom, 12),
+        },
+      ]}
+    >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
       >
+        {/* Decorative Top-Right & Bottom-Right Dot Matrix */}
+        <View style={styles.topRightDots}>
+          <DotMatrix rows={4} cols={4} />
+        </View>
+        <View style={styles.bottomRightDots}>
+          <DotMatrix rows={4} cols={4} />
+        </View>
+
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            isCompactScreen && styles.scrollContentCompact,
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Top Brand Header matching Screen 1 */}
-          <View style={styles.brandHeader}>
-            <View style={styles.bubbleIconCircle}>
-              <Text style={styles.bubbleEmoji}>🫧</Text>
+          {/* Top Bar: Secure Staff Access Badge (Right-aligned, moon toggle removed) */}
+          <View style={styles.topBarRow}>
+            <View style={styles.secureBadgePill}>
+              <Icon
+                name="shield-checkmark-outline"
+                size={14}
+                color="#2563eb"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.secureBadgeText}>Secure staff access</Text>
             </View>
-            <Text style={styles.brandTitle}>GrowFast</Text>
-            <Text style={styles.brandTagline}>Simpler Operations, Cleaner Tomorrow.</Text>
           </View>
 
-          {/* Login Card matching Screen 1 */}
-          <View style={styles.card}>
-            <Text style={styles.portalTitle}>Staff Portal</Text>
-            <Text style={styles.portalSubtitle}>Sign in to continue</Text>
+          {/* Wordmark Header: GrowFast & Tagline */}
+          <View style={styles.brandHeader}>
+            <View style={styles.wordmarkRow}>
+              <Text style={styles.brandGrow}>Grow</Text>
+              <Text style={styles.brandFast}>Fast</Text>
+            </View>
+            <Text style={styles.brandTagline}>Simpler Operations. Cleaner Tomorrow.</Text>
+            <View style={styles.taglineAccentPill} />
+          </View>
 
-            {errorMsg ? (
+          {/* Main White Login Card */}
+          <View style={styles.card}>
+            {/* Center Top Laundry / T-Shirt Icon Badge */}
+            <View style={styles.shirtIconContainer}>
+              <Icon name="shirt" size={32} color="#ffffff" />
+            </View>
+
+            {/* Welcome Back & Subtitle */}
+            <Text style={styles.cardHeading}>Welcome back</Text>
+            <Text style={styles.cardSubtitle}>Sign in to continue to GrowFast</Text>
+
+            {/* Error Message / Lockout Box */}
+            {lockoutUntil ? (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
-                {directory.length === 0 ? (
-                  <TouchableOpacity
-                    style={styles.retryBtn}
-                    onPress={loadDirectory}
-                    disabled={isFetchingDirectory}
-                  >
-                    <Text style={styles.retryBtnText}>
-                      {isFetchingDirectory ? 'Connecting...' : '🔄 Retry Staff Loading'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
+                <Icon
+                  name="alert-circle"
+                  size={18}
+                  color="#b91c1c"
+                  style={{ marginRight: 6, marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.errorText}>
+                    Too many failed attempts. Temporary lockout active. Try again in {timeLeft}s.
+                  </Text>
+                </View>
+              </View>
+            ) : errorMsg ? (
+              <View style={styles.errorBox}>
+                <Icon
+                  name="alert-circle"
+                  size={18}
+                  color="#b91c1c"
+                  style={{ marginRight: 6, marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.errorText}>{errorMsg}</Text>
+                  {directory.length === 0 ? (
+                    <TouchableOpacity
+                      style={styles.retryBtn}
+                      onPress={loadDirectory}
+                      disabled={isFetchingDirectory}
+                    >
+                      <Text style={styles.retryBtnText}>
+                        {isFetchingDirectory ? 'Connecting...' : '🔄 Retry Staff Loading'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
             ) : null}
 
@@ -148,16 +339,17 @@ export default function LoginScreen() {
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Role of You</Text>
               <TouchableOpacity
-                style={styles.dropdownTrigger}
+                style={[styles.dropdownTrigger, !!lockoutUntil && { opacity: 0.6 }]}
                 onPress={() => setPickerVisible(true)}
+                disabled={!!lockoutUntil}
                 activeOpacity={0.7}
                 accessible={true}
                 accessibilityLabel="Select Staff Account"
               >
-                <View style={styles.fieldLeftIconContainer}>
-                  <Text style={styles.fieldIcon}>👤</Text>
+                <View style={styles.fieldIconLeft}>
+                  <Icon name="person-outline" size={20} color="#2563eb" />
                 </View>
-                <View style={{ flex: 1, paddingHorizontal: 8 }}>
+                <View style={styles.fieldTextWrapper}>
                   <Text
                     style={
                       selectedEmployee ? styles.dropdownSelectedText : styles.dropdownPlaceholder
@@ -168,19 +360,24 @@ export default function LoginScreen() {
                       ? `${selectedEmployee.name} (${selectedEmployee.role})`
                       : isFetchingDirectory
                         ? 'Loading staff accounts...'
-                        : 'Select who you are...'}
+                        : 'Select who you are'}
                   </Text>
                 </View>
-                <Text style={styles.chevronIcon}>⌄</Text>
+                <Icon
+                  name="chevron-down"
+                  size={20}
+                  color="#2563eb"
+                  style={{ marginLeft: 8 }}
+                />
               </TouchableOpacity>
             </View>
 
             {/* Field 2: PIN */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>PIN</Text>
-              <View style={styles.pinInputContainer}>
-                <View style={styles.fieldLeftIconContainer}>
-                  <Text style={styles.fieldIcon}>🔒</Text>
+              <View style={[styles.pinInputContainer, !!lockoutUntil && { opacity: 0.6 }]}>
+                <View style={styles.fieldIconLeft}>
+                  <Icon name="lock-closed-outline" size={20} color="#2563eb" />
                 </View>
                 <TextInput
                   style={styles.pinTextInput}
@@ -189,17 +386,27 @@ export default function LoginScreen() {
                   keyboardType="number-pad"
                   secureTextEntry={!showPin}
                   value={pin}
-                  onChangeText={setPin}
-                  maxLength={10}
+                  onChangeText={handlePinChange}
+                  maxLength={6}
+                  editable={!lockoutUntil && !isLoading}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  accessible={true}
+                  accessibilityLabel="Staff PIN Input"
                 />
                 <TouchableOpacity
                   style={styles.eyeToggleBtn}
                   onPress={() => setShowPin(!showPin)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  disabled={!!lockoutUntil}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   accessible={true}
                   accessibilityLabel={showPin ? 'Hide PIN' : 'Show PIN'}
                 >
-                  <Text style={styles.eyeIcon}>{showPin ? '👁️' : '👁️‍🗨️'}</Text>
+                  <Icon
+                    name={showPin ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#64748b"
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -208,50 +415,51 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.signInButton,
-                (isLoading || !selectedEmpId) && styles.signInButtonDisabled,
+                (isLoading || !selectedEmpId || pin.length < 4 || pin.length > 6 || !!lockoutUntil) &&
+                  styles.signInButtonDisabled,
               ]}
               onPress={handleLogin}
-              disabled={isLoading || !selectedEmpId}
+              disabled={isLoading || !selectedEmpId || pin.length < 4 || pin.length > 6 || !!lockoutUntil}
               activeOpacity={0.8}
               accessible={true}
-              accessibilityLabel="Sign In"
+              accessibilityLabel="Sign In Button"
             >
               {isLoading ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <Text style={styles.signInButtonText}>Sign In →</Text>
+                <View style={styles.signInButtonInner}>
+                  <Text style={styles.signInButtonText}>Sign In</Text>
+                  <Icon
+                    name="arrow-forward"
+                    size={20}
+                    color="#ffffff"
+                    style={{ marginLeft: 8 }}
+                  />
+                </View>
               )}
             </TouchableOpacity>
 
-            {/* Secure Badge */}
-            <View style={styles.secureBadgeContainer}>
-              <Text style={styles.secureBadgeText}>🛡️ SECURE STAFF PORTAL</Text>
+            {/* Card Footer: Divider + SECURE STAFF PORTAL */}
+            <View style={styles.cardFooterDividerRow}>
+              <View style={styles.footerLine} />
+              <View style={styles.footerBadge}>
+                <Icon
+                  name="shield-checkmark-outline"
+                  size={12}
+                  color="#64748b"
+                  style={{ marginRight: 5 }}
+                />
+                <Text style={styles.footerPortalText}>SECURE STAFF PORTAL</Text>
+              </View>
+              <View style={styles.footerLine} />
             </View>
           </View>
 
-          {/* Bottom Illustration matching Screen 1 (Stylized Washing Machine & Basket) */}
-          <View style={styles.illustrationContainer}>
-            <View style={styles.machineBody}>
-              <View style={styles.machineDisplayBar}>
-                <View style={styles.machineStatusDot} />
-                <View style={styles.machineKnob} />
-              </View>
-              <View style={styles.machineDoorOuter}>
-                <View style={styles.machineDoorInner}>
-                  <Text style={styles.waterWaveEmoji}>🌊</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.basketContainer}>
-              <View style={styles.foldedTowel} />
-              <View style={styles.basketBase}>
-                <Text style={styles.basketEmoji}>🧺</Text>
-              </View>
-            </View>
-          </View>
+          {/* Bottom Illustration (Front-Load Washing Machine, Folded Towels & Foliage) */}
+          <LaundryIllustration />
         </ScrollView>
 
-        {/* Staff Directory Selection Modal */}
+        {/* Staff Directory Modal */}
         <Modal
           visible={pickerVisible}
           transparent={true}
@@ -270,11 +478,11 @@ export default function LoginScreen() {
                   onPress={() => setPickerVisible(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={styles.pickerCloseBtn}>✕</Text>
+                  <Icon name="close" size={22} color="#64748b" />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ maxHeight: 320 }}>
+              <ScrollView style={{ maxHeight: 340 }}>
                 {directory.length > 0 ? (
                   directory.map((emp) => {
                     const isSelected = selectedEmpId === emp.id;
@@ -293,7 +501,7 @@ export default function LoginScreen() {
                             {emp.name.slice(0, 1).toUpperCase()}
                           </Text>
                         </View>
-                        <View style={{ flex: 1 }}>
+                        <View style={{ flex: 1, paddingRight: 8 }}>
                           <Text style={styles.staffRowName}>{emp.name}</Text>
                           <Text style={styles.staffRowId}>{emp.id}</Text>
                         </View>
@@ -316,7 +524,7 @@ export default function LoginScreen() {
                     );
                   })
                 ) : (
-                  <View style={{ padding: 20, alignItems: 'center' }}>
+                  <View style={{ padding: 24, alignItems: 'center' }}>
                     <Text style={{ color: '#64748b' }}>No staff accounts loaded.</Text>
                   </View>
                 )}
@@ -325,98 +533,209 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </Modal>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f0f6ff',
+    backgroundColor: '#f0f7ff',
   },
-  container: {
+  keyboardContainer: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingTop: 12,
+    paddingBottom: 20,
     justifyContent: 'space-between',
   },
-  brandHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
+  scrollContentCompact: {
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  bubbleIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#dbeafe',
+
+  // Dot matrix decorations
+  topRightDots: {
+    position: 'absolute',
+    top: 40,
+    right: 18,
+    zIndex: 0,
+  },
+  bottomRightDots: {
+    position: 'absolute',
+    bottom: 120,
+    right: 20,
+    zIndex: 0,
+  },
+  dotGridContainer: {
+    flexDirection: 'column',
+    gap: 7,
+  },
+  dotGridRow: {
+    flexDirection: 'row',
+    gap: 7,
+  },
+  dotItem: {
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: '#93c5fd',
+    opacity: 0.6,
+  },
+
+  // Top Bar Row
+  topBarRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    marginBottom: 16,
+    zIndex: 1,
+  },
+  themeCircleBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    shadowColor: '#64748b',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
   },
-  bubbleEmoji: {
-    fontSize: 22,
+  secureBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    shadowColor: '#93c5fd',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
   },
-  brandTitle: {
-    fontSize: 26,
-    fontWeight: '800',
+  secureBadgeText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+
+  // Brand Header
+  brandHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+    zIndex: 1,
+  },
+  wordmarkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandGrow: {
+    fontSize: 38,
+    fontWeight: '900',
     color: '#0f172a',
     letterSpacing: -0.5,
   },
+  brandFast: {
+    fontSize: 38,
+    fontWeight: '900',
+    color: '#2563eb',
+    letterSpacing: -0.5,
+  },
   brandTagline: {
-    fontSize: 13,
+    fontSize: 13.5,
+    fontWeight: '500',
     color: '#64748b',
     marginTop: 4,
     textAlign: 'center',
   },
+  taglineAccentPill: {
+    width: 34,
+    height: 3,
+    backgroundColor: '#2563eb',
+    borderRadius: 2,
+    marginTop: 8,
+  },
+
+  // Main Card
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 28,
+    paddingHorizontal: 22,
+    paddingTop: 26,
+    paddingBottom: 22,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#2563eb',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
-    elevation: 3,
+    shadowColor: '#1e3a8a',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    elevation: 4,
+    zIndex: 1,
   },
-  portalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+  shirtIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#2563eb',
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2563eb',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 4,
+    marginBottom: 14,
+  },
+  cardHeading: {
+    fontSize: 27,
+    fontWeight: '800',
     color: '#0f172a',
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  portalSubtitle: {
-    fontSize: 14,
+  cardSubtitle: {
+    fontSize: 13.5,
     color: '#64748b',
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 20,
   },
+
+  // Error Box
   errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     backgroundColor: '#fef2f2',
     borderWidth: 1,
     borderColor: '#fca5a5',
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 16,
   },
   errorText: {
     color: '#b91c1c',
     fontSize: 13,
-    textAlign: 'center',
     lineHeight: 18,
+    fontWeight: '500',
   },
   retryBtn: {
-    marginTop: 8,
-    alignSelf: 'center',
+    marginTop: 6,
+    alignSelf: 'flex-start',
     backgroundColor: '#fee2e2',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#fca5a5',
@@ -426,212 +745,320 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+
+  // Form Fields
   fieldGroup: {
     marginBottom: 16,
   },
   fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1e293b',
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0f172a',
     marginBottom: 8,
   },
   dropdownTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
-  fieldLeftIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#eff6ff',
+  fieldIconLeft: {
+    width: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fieldIcon: {
-    fontSize: 16,
+  fieldTextWrapper: {
+    flex: 1,
+    paddingHorizontal: 10,
   },
   dropdownSelectedText: {
     fontSize: 15,
-    fontWeight: '600',
     color: '#0f172a',
+    fontWeight: '600',
   },
   dropdownPlaceholder: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#94a3b8',
   },
-  chevronIcon: {
-    fontSize: 18,
-    color: '#94a3b8',
-    paddingRight: 4,
-  },
+
+  // PIN Input
   pinInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
   pinTextInput: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
     color: '#0f172a',
     paddingHorizontal: 10,
-    height: '100%',
+    letterSpacing: 2,
+    fontWeight: '600',
   },
   eyeToggleBtn: {
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
-  eyeIcon: {
-    fontSize: 18,
-  },
+
+  // Sign In Button
   signInButton: {
     height: 52,
-    borderRadius: 26,
     backgroundColor: '#2563eb',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
+    marginTop: 4,
     shadowColor: '#2563eb',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
     elevation: 4,
   },
   signInButtonDisabled: {
     backgroundColor: '#93c5fd',
-    shadowOpacity: 0,
-    elevation: 0,
+    shadowOpacity: 0.1,
+  },
+  signInButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   signInButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
-  secureBadgeContainer: {
-    marginTop: 18,
-    alignSelf: 'center',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
+
+  // Card Footer Divider
+  cardFooterDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 22,
   },
-  secureBadgeText: {
+  footerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  footerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  footerPortalText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#2563eb',
-    letterSpacing: 0.5,
+    color: '#64748b',
+    letterSpacing: 0.8,
   },
-  illustrationContainer: {
+
+  // Bottom Illustration
+  illustrationWrap: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'flex-end',
-    marginTop: 24,
-    marginBottom: 8,
-    gap: 16,
+    justifyContent: 'center',
+    marginTop: 18,
+    marginBottom: 6,
+    height: 96,
   },
-  machineBody: {
-    width: 96,
-    height: 108,
-    borderRadius: 18,
+  washerBody: {
+    width: 82,
+    height: 88,
     backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#bfdbfe',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
     alignItems: 'center',
-    padding: 6,
-    shadowColor: '#3b82f6',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    paddingTop: 8,
+    shadowColor: '#94a3b8',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
     elevation: 2,
+    zIndex: 2,
   },
-  machineDisplayBar: {
-    width: '100%',
+  washerTopPanel: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    justifyContent: 'space-between',
+    width: '84%',
     marginBottom: 8,
   },
-  machineStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10b981',
+  washerDispenserSlot: {
+    width: 16,
+    height: 7,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#94a3b8',
+    backgroundColor: '#f1f5f9',
   },
-  machineKnob: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#93c5fd',
+  washerControlDots: {
+    flexDirection: 'row',
+    gap: 2,
   },
-  machineDoorOuter: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+  washerTinyDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#3b82f6',
+  },
+  washerKnobRing: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  washerKnobCenter: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#2563eb',
+  },
+  washerDoorOuter: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#94a3b8',
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  washerDoorMid: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
+  },
+  washerDoorGlass: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#38bdf8',
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waterBubbleBig: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ffffff',
+    opacity: 0.8,
+    top: 6,
+    left: 8,
+  },
+  waterBubbleSmall: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ffffff',
+    opacity: 0.7,
+    bottom: 8,
+    right: 8,
+  },
+  waterWaveLine: {
+    position: 'absolute',
+    bottom: 0,
+    width: 40,
+    height: 14,
+    backgroundColor: '#0284c7',
+    opacity: 0.6,
+    borderRadius: 8,
+  },
+
+  // Stack of Towels
+  towelStack: {
+    marginLeft: 8,
+    marginBottom: 4,
+    zIndex: 2,
+  },
+  towelFold: {
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginBottom: 2,
+  },
+  towelTop: {
+    width: 42,
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+  },
+  towelMid: {
+    width: 46,
+    backgroundColor: '#e0f2fe',
     borderColor: '#93c5fd',
   },
-  machineDoorInner: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#bfdbfe',
-    alignItems: 'center',
-    justifyContent: 'center',
+  towelBottom: {
+    width: 50,
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
   },
-  waterWaveEmoji: {
-    fontSize: 18,
+
+  // Soft Cyan Leaves
+  leafBase: {
+    position: 'absolute',
+    width: 32,
+    height: 16,
+    backgroundColor: '#bae6fd',
+    opacity: 0.75,
+    borderRadius: 16,
   },
-  basketContainer: {
-    alignItems: 'center',
+  leafLeft1: {
+    left: '12%',
+    bottom: 12,
+    transform: [{ rotate: '-35deg' }],
   },
-  foldedTowel: {
-    width: 38,
-    height: 12,
-    backgroundColor: '#93c5fd',
-    borderRadius: 6,
-    marginBottom: -2,
-    zIndex: 1,
+  leafLeft2: {
+    left: '18%',
+    bottom: 24,
+    transform: [{ rotate: '-55deg' }],
   },
-  basketBase: {
-    width: 52,
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: '#eff6ff',
-    borderWidth: 1.5,
-    borderColor: '#bfdbfe',
-    alignItems: 'center',
-    justifyContent: 'center',
+  leafRight1: {
+    right: '12%',
+    bottom: 12,
+    transform: [{ rotate: '35deg' }],
   },
-  basketEmoji: {
-    fontSize: 24,
+  leafRight2: {
+    right: '18%',
+    bottom: 24,
+    transform: [{ rotate: '55deg' }],
   },
+
+  // Staff Picker Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    padding: 20,
   },
   pickerModalCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
-    maxHeight: 450,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 8,
   },
   pickerModalHeader: {
     flexDirection: 'row',
@@ -647,26 +1074,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
-  pickerCloseBtn: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#64748b',
-    padding: 4,
-  },
   staffRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginBottom: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'transparent',
-    gap: 12,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
   },
   staffRowSelected: {
+    borderColor: '#2563eb',
     backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
   },
   staffAvatarCircle: {
     width: 38,
@@ -675,6 +1096,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   staffAvatarInitials: {
     fontSize: 16,
@@ -682,34 +1104,34 @@ const styles = StyleSheet.create({
     color: '#1d4ed8',
   },
   staffRowName: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14.5,
+    fontWeight: '700',
     color: '#0f172a',
   },
   staffRowId: {
     fontSize: 12,
     color: '#64748b',
-    marginTop: 2,
+    marginTop: 1,
   },
   rolePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   roleOwner: {
-    backgroundColor: '#fef08a',
+    backgroundColor: '#fef3c7',
   },
   roleCounter: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#e0e7ff',
   },
   rolePillText: {
     fontSize: 11,
     fontWeight: '700',
   },
   roleTextOwner: {
-    color: '#854d0e',
+    color: '#b45309',
   },
   roleTextCounter: {
-    color: '#1e40af',
+    color: '#4338ca',
   },
 });

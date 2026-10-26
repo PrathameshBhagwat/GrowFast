@@ -6,6 +6,7 @@ import {
   linkPhotosToOrder,
   updatePhotoSyncStatus,
   checkFileExists,
+  deletePhoto,
   PendingPhoto,
 } from '../db/photos';
 import { getAuthToken } from '../storage/secure-store';
@@ -313,6 +314,29 @@ export class SyncEngine {
     const pendingPhotos = photos.filter(
       (p) => p.syncStatus === 'PENDING' || p.syncStatus === 'FAILED',
     );
+
+    if (pendingPhotos.length === 0) {
+      return { uploaded: 0, failed: 0 };
+    }
+
+    // Reconnection safety check: verify order is not already expired under the 10-day retention rule
+    try {
+      const serverOrder = await apiClient.orders.getById(serverOrderId);
+      if (serverOrder && serverOrder.status === 'DELIVERED' && serverOrder.deliveredAt) {
+        const deliveredDate = new Date(serverOrder.deliveredAt);
+        const isExpired = Date.now() - deliveredDate.getTime() >= 10 * 24 * 60 * 60 * 1000;
+        if (isExpired) {
+          // Retention expired while device was offline.
+          // Clean up local files and prevent upload to server.
+          for (const photo of pendingPhotos) {
+            await deletePhoto(photo.id);
+          }
+          return { uploaded: 0, failed: 0 };
+        }
+      }
+    } catch {
+      // If order lookup fails, proceed with normal upload
+    }
 
     let uploaded = 0;
     let failed = 0;

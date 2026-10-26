@@ -110,7 +110,7 @@ export class R2StorageProvider extends PhotoStorageService {
    * @param storedUrl - The object key stored in the database
    * @returns Short-lived signed URL (valid for 1 hour)
    */
-  async getAccessUrl(storedUrl: string): Promise<string> {
+  async getAccessUrl(storedUrl: string, maxExpirySeconds?: number): Promise<string> {
     if (!storedUrl) return '';
 
     // If storedUrl is already a complete URL (legacy or test URL), return as-is
@@ -129,8 +129,9 @@ export class R2StorageProvider extends PhotoStorageService {
         Key: storedUrl,
       });
 
-      // Generate a short-lived presigned GET URL (3600 seconds = 1 hour)
-      return await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
+      // Default 3600 seconds (1 hour), but clamp to maxExpirySeconds so signed URLs cannot exceed retention
+      const expiry = maxExpirySeconds ? Math.min(3600, Math.max(60, maxExpirySeconds)) : 3600;
+      return await getSignedUrl(this.s3Client, command, { expiresIn: expiry });
     } catch (error) {
       this.logger.error(
         `Failed to generate signed URL for R2 key (${storedUrl})`,

@@ -551,10 +551,7 @@ export function OrderDetailPage() {
                 <span className="font-medium text-orange-600">₹{order.expressSurcharge}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-gray-500">GST (18%)</span>
-              <span className="font-medium text-gray-900">₹{order.taxAmount}</span>
-            </div>
+            {/* GST removed — pricing is now tax-inclusive */}
             <div className="flex justify-between pt-2 border-t">
               <span className="font-semibold text-gray-900">Total Amount</span>
               <span className="font-bold text-gray-900">₹{order.totalAmount}</span>

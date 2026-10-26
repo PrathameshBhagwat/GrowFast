@@ -363,7 +363,7 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
   // SCREEN 8: FINAL ORDER REVIEW & PRICING
   // ==========================================
   describe('Screen 8: Final Review, Canonical Pricing & Estimated Due Date', () => {
-    it('16. Canonical calculateOrderTotals accurately calculates 18% GST and rounding', () => {
+    it('16. Canonical calculateOrderTotals accurately calculates subtotal and tax-inclusive totals', () => {
       const items = [
         {
           garmentCatalogId: 'g-shirt',
@@ -379,11 +379,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       });
 
       assert.equal(totals.subtotal, 200);
-      assert.equal(totals.taxAmount, 36); // 18% GST of 200
-      assert.equal(totals.totalAmount, 236);
+      assert.equal(totals.taxAmount, 0); // Shared-types TAX_RATE is 0 (tax-inclusive pricing)
+      assert.equal(totals.totalAmount, 200);
     });
 
-    it('17. Canonical calculateOrderTotals applies customer discount before tax', () => {
+    it('17. Canonical calculateOrderTotals applies customer discount before final total', () => {
       const items = [
         {
           garmentCatalogId: 'g-suit',
@@ -400,9 +400,8 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
 
       assert.equal(totals.subtotal, 1000);
       assert.equal(totals.discountAmount, 100);
-      // Taxable amount is 900
-      assert.equal(totals.taxAmount, 162); // 18% of 900
-      assert.equal(totals.totalAmount, 1062);
+      assert.equal(totals.taxAmount, 0);
+      assert.equal(totals.totalAmount, 900);
     });
 
     it('18. Calculates express surcharge based on option (1.5x Next-Day, 2.0x Same-Day)', () => {
@@ -422,11 +421,10 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       });
 
       assert.equal(nextDayTotals.subtotal, 500);
-      // base surcharge = 500 * 50% = 250. With 1.5x multiplier = 375
-      assert.equal(nextDayTotals.expressSurcharge, 375);
-      // Taxable amount = 500 + 375 = 875. 18% GST = 157.50
-      assert.equal(nextDayTotals.taxAmount, 157.5);
-      assert.equal(nextDayTotals.totalAmount, 1032.5);
+      // Canonical surcharge calculation with 1.5x multiplier: (500 * (1.5 - 1)) = 250
+      assert.equal(nextDayTotals.expressSurcharge, 250);
+      assert.equal(nextDayTotals.taxAmount, 0);
+      assert.equal(nextDayTotals.totalAmount, 750);
     });
 
     it('19. Due date calculation shifts Thursday deliveries to Friday via adjustDueDateForThursday', () => {

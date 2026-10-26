@@ -17,6 +17,7 @@ import {
   CompleteDeliveryRequest,
   UpdateCustomerRequest,
   DashboardSummaryDTO,
+  NotificationDTO,
 } from '@growfast/shared-types';
 import { getAuthToken } from '../storage/secure-store';
 
@@ -86,6 +87,12 @@ export function getBaseUrl(): string {
   const resolved = resolveDefaultBaseUrl();
   config.baseUrl = resolved;
   return resolved;
+}
+
+let onUnauthorizedHandler: (() => void) | null = null;
+
+export function setOnUnauthorized(handler: (() => void) | null) {
+  onUnauthorizedHandler = handler;
 }
 
 export class ApiError extends Error {
@@ -163,6 +170,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     responseData = await response.json();
   } catch (jsonErr: any) {
     if (!response.ok) {
+      if (response.status === 401 && !cleanEndpoint.includes('/auth/login')) {
+        onUnauthorizedHandler?.();
+      }
       const statusDetail = `HTTP ${response.status} (${response.statusText || 'Error'}) from ${cleanEndpoint}`;
       console.warn(`[apiClient] HTTP error without JSON body: ${statusDetail}`);
       throw new ApiError(statusDetail, response.status, null);
@@ -174,6 +184,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
+    if (response.status === 401 && !cleanEndpoint.includes('/auth/login')) {
+      onUnauthorizedHandler?.();
+    }
     const errorMessage =
       responseData?.message || responseData?.error || `Request failed with HTTP ${response.status}`;
     const formattedError = Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage;
@@ -187,7 +200,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   // Handle standard { success: true, data: T } wrapper or raw object
   if (responseData && typeof responseData === 'object' && 'data' in responseData) {
-    if ('total' in responseData && 'page' in responseData) {
+    if ('total' in responseData) {
       return responseData as T;
     }
     return responseData.data as T;
@@ -322,7 +335,6 @@ export const apiClient = {
       if (params?.page) searchParams.append('page', String(params.page));
       const size = params?.pageSize || params?.limit;
       if (size) {
-        searchParams.append('limit', String(size));
         searchParams.append('pageSize', String(size));
       }
       const qs = searchParams.toString();
@@ -332,14 +344,49 @@ export const apiClient = {
     dueToday: async (options?: {
       countOnly?: boolean;
       date?: string;
-    }): Promise<{ count: number; orders?: OrderSummaryDTO[] }> => {
+      timezone?: string;
+    }): Promise<{
+      count: number;
+      data?: OrderSummaryDTO[];
+      total?: number;
+      date?: string;
+      orders?: OrderSummaryDTO[];
+    }> => {
       const searchParams = new URLSearchParams();
       if (options?.countOnly) searchParams.append('countOnly', 'true');
       if (options?.date) searchParams.append('date', options.date);
+      if (options?.timezone) searchParams.append('timezone', options.timezone);
       const qs = searchParams.toString();
-      return await request<{ count: number; orders?: OrderSummaryDTO[] }>(
-        `/api/orders/due-today${qs ? `?${qs}` : ''}`,
-      );
+      const res = await request<any>(`/api/orders/due-today${qs ? `?${qs}` : ''}`);
+
+      if (Array.isArray(res)) {
+        return {
+          count: res.length,
+          total: res.length,
+          data: res,
+          orders: res,
+        };
+      }
+
+      const ordersList: OrderSummaryDTO[] = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.orders)
+          ? res.orders
+          : [];
+      const computedCount: number =
+        typeof res?.count === 'number'
+          ? res.count
+          : typeof res?.total === 'number'
+            ? res.total
+            : ordersList.length;
+
+      return {
+        ...res,
+        count: computedCount,
+        total: typeof res?.total === 'number' ? res.total : computedCount,
+        data: ordersList,
+        orders: ordersList,
+      };
     },
 
     recordPickup: async (orderId: string, payload: OrderPickupRequest): Promise<OrderDetailDTO> => {
@@ -523,6 +570,27 @@ export const apiClient = {
       if (endDate) params.append('endDate', endDate);
       const qs = params.toString();
       return await request<DashboardSummaryDTO>(`/api/dashboard/summary${qs ? `?${qs}` : ''}`);
+    },
+  },
+
+  notifications: {
+    list: async (params?: {
+      eventType?: string;
+      status?: string;
+      orderId?: string;
+    }): Promise<{ success: boolean; data: NotificationDTO[] }> => {
+      const searchParams = new URLSearchParams();
+      if (params?.eventType) searchParams.append('eventType', params.eventType);
+      if (params?.status) searchParams.append('status', params.status);
+      if (params?.orderId) searchParams.append('orderId', params.orderId);
+      const qs = searchParams.toString();
+      return await request<{ success: boolean; data: NotificationDTO[] }>(
+        `/api/notifications${qs ? `?${qs}` : ''}`,
+      );
+    },
+
+    getById: async (id: string): Promise<{ success: boolean; data: NotificationDTO }> => {
+      return await request<{ success: boolean; data: NotificationDTO }>(`/api/notifications/${id}`);
     },
   },
 };

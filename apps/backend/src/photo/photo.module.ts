@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PhotoController } from './photo.controller';
 import { PhotoService } from './photo.service';
+import { PhotoCleanupService } from './photo-cleanup.service';
 import { PhotoStorageService } from './photo-storage.service';
 import { LocalStorageProvider } from './providers/local-storage.provider';
 import { R2StorageProvider } from './providers/r2-storage.provider';
@@ -11,6 +12,7 @@ import { R2StorageProvider } from './providers/r2-storage.provider';
  * Provides:
  * - PhotoController (HTTP endpoints)
  * - PhotoService (business logic)
+ * - PhotoCleanupService (10-day retention automated cleanup)
  * - PhotoStorageService (abstract storage, bound to R2StorageProvider or LocalStorageProvider)
  *
  * The storage provider is selected via a factory pattern reading
@@ -20,6 +22,7 @@ import { R2StorageProvider } from './providers/r2-storage.provider';
   controllers: [PhotoController],
   providers: [
     PhotoService,
+    PhotoCleanupService,
     {
       provide: PhotoStorageService,
       useFactory: () => {
@@ -31,6 +34,6 @@ import { R2StorageProvider } from './providers/r2-storage.provider';
       },
     },
   ],
-  exports: [PhotoService, PhotoStorageService],
+  exports: [PhotoService, PhotoCleanupService, PhotoStorageService],
 })
 export class PhotoModule {}

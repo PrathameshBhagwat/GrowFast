@@ -541,9 +541,30 @@ export class DeliveryService {
   private async mapToDto(delivery: any) {
     let resolvedProofPhotoUrl: string | null = delivery.proofPhotoUrl || null;
 
+    // 10-day retention gatekeeping: do not expose proof photo if order was delivered >= 10 days ago
+    const deliveryOrderDeliveredAt = delivery.order?.deliveredAt || delivery.completedAt;
+    if (deliveryOrderDeliveredAt && (delivery.order?.status === OrderStatus.DELIVERED || delivery.status === DeliveryStatus.COMPLETED)) {
+      const deliveredTime = new Date(deliveryOrderDeliveredAt).getTime();
+      if (!isNaN(deliveredTime) && Date.now() - deliveredTime >= 10 * 24 * 60 * 60 * 1000) {
+        resolvedProofPhotoUrl = null;
+      }
+    }
+
     if (resolvedProofPhotoUrl && this.photoStorage) {
       try {
-        resolvedProofPhotoUrl = await this.photoStorage.getAccessUrl(resolvedProofPhotoUrl);
+        let maxExpirySeconds: number | undefined;
+        if (deliveryOrderDeliveredAt) {
+          const deliveredTime = new Date(deliveryOrderDeliveredAt).getTime();
+          if (!isNaN(deliveredTime)) {
+            const retentionEndMs = deliveredTime + 10 * 24 * 60 * 60 * 1000;
+            const remaining = Math.floor((retentionEndMs - Date.now()) / 1000);
+            maxExpirySeconds = Math.min(3600, Math.max(60, remaining));
+          }
+        }
+        resolvedProofPhotoUrl =
+          maxExpirySeconds !== undefined
+            ? await this.photoStorage.getAccessUrl(resolvedProofPhotoUrl, maxExpirySeconds)
+            : await this.photoStorage.getAccessUrl(resolvedProofPhotoUrl);
       } catch (error) {
         this.logger.error(
           `Failed to resolve proof photo URL for delivery ${delivery.id}`,

@@ -12,7 +12,9 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DeliveryRecordDTO, DeliveryStatus, Role } from '@growfast/shared-types';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
@@ -33,6 +35,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 ];
 
 export default function DeliveriesScreen() {
+  const insets = useSafeAreaInsets();
   const { isConnected } = useNetworkStatus();
   const [session, setSession] = useState<MobileUserSession | null>(null);
 
@@ -339,7 +342,7 @@ export default function DeliveriesScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ConnectionBanner />
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
         {/* Top Header */}
         <View style={styles.headerRow}>
           <View style={styles.userProfileGroup}>
@@ -457,6 +460,10 @@ export default function DeliveriesScreen() {
             data={filteredDeliveries}
             keyExtractor={(item) => item.id}
             renderItem={renderDeliveryCard}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS !== 'web'}
             contentContainerStyle={styles.listContent}
             refreshControl={
               <RefreshControl
