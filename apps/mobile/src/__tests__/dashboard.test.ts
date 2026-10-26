@@ -387,7 +387,7 @@ describe('GrowFast Mobile POS — Operational Dashboard (Phase 2)', () => {
       pageSize: 5,
       totalPages: 0,
     });
-    const emptyRes = await apiClient.orders.list({ limit: 5, page: 1 });
+    const emptyRes = await apiClient.orders.list({ pageSize: 5, page: 1 });
     assert.equal(emptyRes.data.length, 0, 'Empty data returns 0 orders to show empty state');
 
     // 8c. Error state & Retry
@@ -408,13 +408,13 @@ describe('GrowFast Mobile POS — Operational Dashboard (Phase 2)', () => {
     };
 
     await assert.rejects(
-      async () => await apiClient.orders.list({ limit: 5, page: 1 }),
+      async () => await apiClient.orders.list({ pageSize: 5, page: 1 }),
       (err: any) => err.statusCode === 504,
       'First attempt fails with 504',
     );
 
     // Retry succeeds
-    const retryRes = await apiClient.orders.list({ limit: 5, page: 1 });
+    const retryRes = await apiClient.orders.list({ pageSize: 5, page: 1 });
     assert.equal(retryRes.data[0].orderNumber, 'GF-9999', 'Retry succeeds');
     assert.equal(attempts, 2, 'Retry executed second call');
 

@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Platform } from 'react-native';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { getDatabase } from '../src/db/sqlite';
+import { onUnauthorized } from '../src/api/client';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
@@ -20,57 +21,59 @@ function ProtectedRoutes({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
+
+  // Clear query cache on unauthorized response to protect user data
+  useEffect(() => {
+    const unsubscribe = onUnauthorized(() => {
+      queryClient.clear();
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
+    // 1. Never attempt navigation before the root navigator state key exists
+    if (!rootNavigationState?.key) return;
+
+    // 2. Never attempt navigation while authentication state is loading
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inProtectedGroup = segments[0] === '(tabs)';
+    const isAtRoot = !segments[0] || (segments[0] as string) === 'index';
 
-    if (!isAuthenticated && !inAuthGroup) {
-      // Redirect to login screen if unauthenticated
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Redirect to main tabs if already authenticated
-      router.replace('/(tabs)');
+    if (!isAuthenticated) {
+      // Unauthenticated: if at root or inside protected tabs, redirect to login
+      if (isAtRoot || inProtectedGroup) {
+        router.replace('/(auth)/login');
+      }
+    } else {
+      // Authenticated: if at root or on login screen, redirect to main tabs
+      if (isAtRoot || inAuthGroup) {
+        router.replace('/(tabs)');
+      }
     }
-  }, [isLoading, isAuthenticated, segments, router]);
+  }, [isLoading, isAuthenticated, segments, rootNavigationState?.key, router]);
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f46e5" />
-      </View>
-    );
-  }
-
+  // Unconditionally render children so the root navigator (<Stack>) mounts on the first render
   return <>{children}</>;
 }
 
 export default function RootLayout() {
-  const [isDbReady, setIsDbReady] = useState(false);
-
   useEffect(() => {
     async function initApp() {
       try {
-        // Initialize SQLite local database and migrations
-        await getDatabase();
+        if (Platform.OS !== 'web') {
+          // Initialize SQLite local database and migrations asynchronously
+          await getDatabase();
+        }
       } catch (err) {
         console.error('Failed to initialize mobile app foundation:', err);
-      } finally {
-        setIsDbReady(true);
       }
     }
 
     initApp();
   }, []);
-
-  if (!isDbReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f46e5" />
-      </View>
-    );
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -80,6 +83,7 @@ export default function RootLayout() {
             <StatusBar style="auto" />
             <ConnectionBanner />
             <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
               <Stack.Screen name="(auth)/login" />
               <Stack.Screen name="(tabs)" />
             </Stack>

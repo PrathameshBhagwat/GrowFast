@@ -1,6 +1,6 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { apiClient, setApiConfig, ApiError } from '../api/client';
+import { apiClient, setApiConfig, ApiError, onUnauthorized, triggerUnauthorized, _resetUnauthorizedLock } from '../api/client';
 import {
   saveAuthToken,
   getAuthToken,
@@ -9,6 +9,7 @@ import {
   getUserSession,
   clearUserSession,
 } from '../storage/secure-store';
+import { parseJwtPayload } from '../contexts/AuthContext';
 
 describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
   const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:3000';
@@ -18,7 +19,7 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
     setApiConfig({ baseUrl: BACKEND_URL });
     try {
       const res = await fetch(`${BACKEND_URL}/api/auth/directory`, {
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
         isBackendRunning = true;
@@ -196,4 +197,201 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
       'http://192.168.1.38:3000/api/auth/login',
     );
   });
+
+  function makeMockJwt(payload: object): string {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const sig = 'mock_signature_bytes';
+    return `${header}.${body}.${sig}`;
+  }
+
+  it('8. parseJwtPayload parses valid JWT and extracts exp and sub', () => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeMockJwt({ sub: 'emp-counter-001', exp, role: 'COUNTER' });
+    const payload = parseJwtPayload(token);
+    assert.ok(payload);
+    assert.equal(payload.sub, 'emp-counter-001');
+    assert.equal(payload.exp, exp);
+  });
+
+  it('9. parseJwtPayload handles expired and malformed tokens', () => {
+    // Malformed token
+    assert.equal(parseJwtPayload('invalid.token'), null);
+    assert.equal(parseJwtPayload(''), null);
+    assert.equal(parseJwtPayload('a.b'), null);
+
+    // Expired token (1 hour in the past)
+    const pastExp = Math.floor(Date.now() / 1000) - 3600;
+    const expiredToken = makeMockJwt({ sub: 'emp-expired', exp: pastExp });
+    const payload = parseJwtPayload(expiredToken);
+    assert.ok(payload);
+    assert.ok(payload.exp! * 1000 <= Date.now(), 'Token must be identified as expired');
+  });
+
+  it('10. Startup session validation: missing token or user cleans up storage', async () => {
+    await clearUserSession();
+    // Case A: token exists but user is missing
+    await saveAuthToken('sample-token');
+    let token = await getAuthToken();
+    let user = await getUserSession();
+    assert.ok(token);
+    assert.equal(user, null);
+
+    // Validate logic: if either missing, clear
+    if (!token || !user) {
+      await clearUserSession();
+    }
+    assert.equal(await getAuthToken(), null);
+    assert.equal(await getUserSession(), null);
+
+    // Case B: user exists but token is missing
+    await saveUserSession({
+      id: 'emp-1',
+      name: 'Test',
+      phone: '',
+      role: 'COUNTER',
+      storeId: 'store-1',
+      storeName: 'Test Store',
+    });
+    token = await getAuthToken();
+    user = await getUserSession();
+    assert.equal(token, null);
+    assert.ok(user);
+
+    if (!token || !user) {
+      await clearUserSession();
+    }
+    assert.equal(await getAuthToken(), null);
+    assert.equal(await getUserSession(), null);
+  });
+
+  it('11. Startup session validation: expired JWT triggers session clearance', async () => {
+    await clearUserSession();
+    const pastExp = Math.floor(Date.now() / 1000) - 7200; // 2 hours ago
+    const expiredToken = makeMockJwt({ sub: 'emp-counter-001', exp: pastExp });
+
+    await saveAuthToken(expiredToken);
+    await saveUserSession({
+      id: 'emp-counter-001',
+      name: 'Counter Staff',
+      phone: '',
+      role: 'COUNTER',
+      storeId: 'store-kp-001',
+      storeName: 'Koregaon Park Branch',
+    });
+
+    const storedToken = await getAuthToken();
+    const storedUser = await getUserSession();
+    assert.ok(storedToken && storedUser);
+
+    const payload = parseJwtPayload(storedToken);
+    if (payload?.exp && payload.exp * 1000 <= Date.now()) {
+      await clearUserSession();
+    }
+
+    assert.equal(await getAuthToken(), null);
+    assert.equal(await getUserSession(), null);
+  });
+
+  it('12. Protected API call without stored token throws 401 and triggers unauthorized handler', async () => {
+    await clearUserSession();
+    let unauthorizedTriggered = false;
+    const unsub = onUnauthorized(() => {
+      unauthorizedTriggered = true;
+    });
+
+    try {
+      await apiClient.orders.list();
+      assert.fail('Protected call should fail when no token exists');
+    } catch (err: any) {
+      assert.ok(err instanceof ApiError);
+      assert.equal(err.statusCode, 401);
+      assert.match(err.message, /Authentication required/i);
+    } finally {
+      unsub();
+    }
+
+    assert.ok(unauthorizedTriggered, 'onUnauthorized listener must be invoked');
+  });
+
+  it('13. Debounces concurrent 401 responses to prevent multiple competing logouts', async () => {
+    _resetUnauthorizedLock();
+    let callCount = 0;
+    const unsub = onUnauthorized(() => {
+      callCount++;
+    });
+
+    try {
+      // Simulate 5 simultaneous 401 triggers
+      await Promise.all([
+        triggerUnauthorized(),
+        triggerUnauthorized(),
+        triggerUnauthorized(),
+        triggerUnauthorized(),
+        triggerUnauthorized(),
+      ]);
+
+      assert.equal(callCount, 1, 'Concurrent 401 triggers must be debounced to a single execution');
+    } finally {
+      unsub();
+    }
+  });
+
+  it('14. Route guard decisions route unauthenticated users to login and authenticated users to tabs', () => {
+    // Pure function logic mirroring ProtectedRoutes in _layout.tsx
+    function resolveGuardedRoute(
+      currentPath: string,
+      isAuthenticated: boolean,
+    ): string | null {
+      const inAuthGroup = currentPath.startsWith('/(auth)') || currentPath === '/login';
+      const inTabsGroup = currentPath.startsWith('/(tabs)') || currentPath === '/dashboard';
+      const isAtRoot = currentPath === '/' || currentPath === '';
+
+      if (!isAuthenticated && (inTabsGroup || isAtRoot)) {
+        return '/(auth)/login';
+      }
+      if (isAuthenticated && (inAuthGroup || isAtRoot)) {
+        return '/(tabs)';
+      }
+      return null;
+    }
+
+    // Unauthenticated user attempting to access root
+    assert.equal(resolveGuardedRoute('/', false), '/(auth)/login');
+    // Unauthenticated user attempting to access tabs/dashboard
+    assert.equal(resolveGuardedRoute('/(tabs)', false), '/(auth)/login');
+    assert.equal(resolveGuardedRoute('/(tabs)/orders', false), '/(auth)/login');
+    // Unauthenticated user already at login stays at login
+    assert.equal(resolveGuardedRoute('/(auth)/login', false), null);
+
+    // Authenticated user at login route is redirected to tabs
+    assert.equal(resolveGuardedRoute('/(auth)/login', true), '/(tabs)');
+    // Authenticated user at root is redirected to tabs
+    assert.equal(resolveGuardedRoute('/', true), '/(tabs)');
+    // Authenticated user inside tabs stays inside tabs
+    assert.equal(resolveGuardedRoute('/(tabs)/orders', true), null);
+  });
+
+  it('15. Live backend getMe with valid token returns authenticated user profile', async (t) => {
+    if (!isBackendRunning) {
+      t.skip(`Backend is not reachable at ${BACKEND_URL}`);
+      return;
+    }
+
+    const loginRes = await apiClient.auth.login({
+      employeeId: 'emp-counter-001',
+      pin: '333333',
+    });
+    await saveAuthToken(loginRes.accessToken);
+
+    const meRes = await apiClient.auth.getMe();
+    const profile = (meRes as any).data || meRes;
+    assert.ok(profile);
+    assert.equal(profile.id, 'emp-counter-001');
+    assert.equal(profile.role, 'COUNTER');
+
+    // Clean up
+    await clearUserSession();
+  });
 });
+

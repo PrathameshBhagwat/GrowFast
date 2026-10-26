@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { useSyncManager } from '../../src/hooks/useSyncManager';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import {
   listDrafts,
@@ -142,8 +143,9 @@ export default function OrdersScreen() {
   const router = useRouter();
   const { isConnected } = useNetworkStatus();
   const { syncDraft, syncAll, isSyncingAll } = useSyncManager();
+  const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const session = authUser;
 
-  const [session, setSession] = useState<MobileUserSession | null>(null);
   const [drafts, setDrafts] = useState<OrderDraft[]>([]);
   const [serverOrders, setServerOrders] = useState<OrderSummaryDTO[]>(REFERENCE_ORDERS);
   const [loading, setLoading] = useState(false);
@@ -160,6 +162,12 @@ export default function OrdersScreen() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!isAuthenticated || isAuthLoading) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       const allDrafts = await listDrafts({ storeId: session?.storeId });
       setDrafts(allDrafts);
@@ -173,7 +181,7 @@ export default function OrdersScreen() {
         const resp = await apiClient.orders.list({
           search: searchQuery.trim() || undefined,
           status: statusParam,
-          limit: 30,
+          pageSize: 30,
         });
 
         if (resp && resp.data && resp.data.length > 0) {
@@ -192,19 +200,16 @@ export default function OrdersScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [session?.storeId, isConnected, searchQuery, activeFilter]);
+  }, [session?.storeId, isConnected, searchQuery, activeFilter, isAuthenticated, isAuthLoading]);
 
   useEffect(() => {
-    getUserSession().then((sess) => {
-      setSession(sess);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (session) {
+    if (isAuthenticated && !isAuthLoading && session) {
       loadData();
+    } else if (!isAuthenticated) {
+      setServerOrders(REFERENCE_ORDERS);
+      setDrafts([]);
     }
-  }, [session, loadData]);
+  }, [isAuthenticated, isAuthLoading, session, loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -570,6 +575,10 @@ export default function OrdersScreen() {
           onOrderSavedOrSubmitted={() => {
             setEditorVisible(false);
             loadData();
+          }}
+          onViewOrderDetail={(orderId) => {
+            setEditorVisible(false);
+            handleOpenOrderDetail(orderId);
           }}
         />
 

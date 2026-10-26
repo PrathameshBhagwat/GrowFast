@@ -292,7 +292,7 @@ describe('GrowFast Mobile POS — Customer Hub & Order History (Phase 1B)', () =
       };
     };
 
-    const history = await apiClient.orders.list({ customerId: 'cust-test-1', limit: 20 });
+    const history = await apiClient.orders.list({ customerId: 'cust-test-1', pageSize: 20 });
     assert.equal(capturedParams.customerId, 'cust-test-1');
     assert.equal(history.data.length, 2);
     assert.equal(history.data[0].orderNumber, 'GF-1024');
@@ -348,5 +348,269 @@ describe('GrowFast Mobile POS — Customer Hub & Order History (Phase 1B)', () =
 
     assert.equal(draftPayload.customerId, 'cust-prefill');
     assert.equal(draftPayload.customerName, 'Tanvi Shah');
+  });
+
+  // ==========================================
+  // WORKSTREAM 1: CUSTOMER ORDER HISTORY TESTS
+  // ==========================================
+
+  // 11. Order history filtering by status using backend query contract
+  it('11. Customer order history queries with status filter using backend contract', async () => {
+    let capturedParams: any = null;
+
+    apiClient.orders.list = async (params) => {
+      capturedParams = params;
+      return {
+        success: true,
+        data: [
+          mockOrderSummary({ id: 'ord-ready-1', orderNumber: 'GF-2001', status: OrderStatus.READY }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      };
+    };
+
+    const res = await apiClient.orders.list({
+      customerId: 'cust-test-1',
+      status: OrderStatus.READY,
+      page: 1,
+      pageSize: 10,
+    });
+
+    assert.equal(capturedParams.customerId, 'cust-test-1');
+    assert.equal(capturedParams.status, OrderStatus.READY);
+    assert.equal(capturedParams.pageSize, 10);
+    assert.equal(res.data.length, 1);
+    assert.equal(res.data[0].status, OrderStatus.READY);
+    assert.equal(res.data[0].orderNumber, 'GF-2001');
+  });
+
+  // 12. Order history filtering by payment status (PENDING due vs PAID)
+  it('12. Customer order history queries with paymentStatus filter', async () => {
+    let capturedParams: any = null;
+
+    apiClient.orders.list = async (params) => {
+      capturedParams = params;
+      return {
+        success: true,
+        data: [
+          mockOrderSummary({
+            id: 'ord-pending-1',
+            orderNumber: 'GF-2002',
+            paymentStatus: PaymentStatus.PENDING,
+            totalAmount: 350,
+            amountPaid: 0,
+            amountDue: 350,
+          }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      };
+    };
+
+    const res = await apiClient.orders.list({
+      customerId: 'cust-test-1',
+      paymentStatus: PaymentStatus.PENDING,
+      page: 1,
+      pageSize: 10,
+    });
+
+    assert.equal(capturedParams.customerId, 'cust-test-1');
+    assert.equal(capturedParams.paymentStatus, PaymentStatus.PENDING);
+    assert.equal(res.data[0].paymentStatus, PaymentStatus.PENDING);
+    assert.equal(res.data[0].amountDue, 350);
+  });
+
+  // 13. Customer order history search by official order number
+  it('13. Customer order history search passes search query to backend without extra non-whitelisted params', async () => {
+    let capturedParams: any = null;
+
+    apiClient.orders.list = async (params) => {
+      capturedParams = params;
+      return {
+        success: true,
+        data: [mockOrderSummary({ id: 'ord-search-1', orderNumber: 'GF-3030' })],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      };
+    };
+
+    const res = await apiClient.orders.list({
+      customerId: 'cust-test-1',
+      search: '3030',
+      page: 1,
+      pageSize: 10,
+    });
+
+    assert.equal(capturedParams.customerId, 'cust-test-1');
+    assert.equal(capturedParams.search, '3030');
+    assert.equal(capturedParams.limit, undefined, 'Must not contain deprecated limit parameter');
+    assert.equal(res.data[0].orderNumber, 'GF-3030');
+  });
+
+  // 14. Pagination and incremental loading logic
+  it('14. Customer order history supports pagination and incremental loading across pages', async () => {
+    const allMockOrders = Array.from({ length: 25 }, (_, i) =>
+      mockOrderSummary({
+        id: `ord-page-${i + 1}`,
+        orderNumber: `GF-${4000 + i + 1}`,
+        totalAmount: 100 + i * 10,
+      }),
+    );
+
+    apiClient.orders.list = async (params) => {
+      const page = params?.page || 1;
+      const pageSize = params?.pageSize || 10;
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize;
+      const slice = allMockOrders.slice(start, end);
+
+      return {
+        success: true,
+        data: slice,
+        total: allMockOrders.length,
+        page,
+        pageSize,
+      };
+    };
+
+    // Page 1
+    const p1 = await apiClient.orders.list({ customerId: 'cust-1', page: 1, pageSize: 10 });
+    assert.equal(p1.data.length, 10);
+    assert.equal(p1.total, 25);
+    const hasMoreP1 = (p1.page * p1.pageSize) < p1.total;
+    assert.equal(hasMoreP1, true, 'Page 1 should indicate hasMoreOrders');
+
+    // Page 2
+    const p2 = await apiClient.orders.list({ customerId: 'cust-1', page: 2, pageSize: 10 });
+    assert.equal(p2.data.length, 10);
+    const hasMoreP2 = (p2.page * p2.pageSize) < p2.total;
+    assert.equal(hasMoreP2, true, 'Page 2 should indicate hasMoreOrders');
+
+    // Page 3
+    const p3 = await apiClient.orders.list({ customerId: 'cust-1', page: 3, pageSize: 10 });
+    assert.equal(p3.data.length, 5);
+    const hasMoreP3 = (p3.page * p3.pageSize) < p3.total;
+    assert.equal(hasMoreP3, false, 'Page 3 should indicate hasMoreOrders = false');
+
+    // Total aggregated orders
+    const combined = [...p1.data, ...p2.data, ...p3.data];
+    assert.equal(combined.length, 25);
+    assert.equal(combined[0].orderNumber, 'GF-4001');
+    assert.equal(combined[24].orderNumber, 'GF-4025');
+  });
+
+  // 15. Stale results prevention when rapidly switching customers
+  it('15. Stale responses are discarded when rapidly switching customers or search queries', async () => {
+    let activeCustomerRef: string | null = null;
+    let requestIdCounter = 0;
+    const finalState: { customerId: string | null; orders: OrderSummaryDTO[] } = {
+      customerId: null,
+      orders: [],
+    };
+
+    // Simulate async fetch with variable delay
+    const simulateFetch = async (customerId: string, delayMs: number, orders: OrderSummaryDTO[]) => {
+      const currentReqId = ++requestIdCounter;
+      activeCustomerRef = customerId;
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+      // Guard check: drop response if customer changed or a newer request was dispatched
+      if (currentReqId !== requestIdCounter || activeCustomerRef !== customerId) {
+        return { ignored: true };
+      }
+
+      finalState.customerId = customerId;
+      finalState.orders = orders;
+      return { ignored: false };
+    };
+
+    const custAOrders = [mockOrderSummary({ id: 'ord-custA', orderNumber: 'GF-A01' })];
+    const custBOrders = [mockOrderSummary({ id: 'ord-custB', orderNumber: 'GF-B01' })];
+
+    // Staff clicks Customer A (slow network, 60ms)
+    const promiseA = simulateFetch('cust-A', 60, custAOrders);
+
+    // Staff quickly clicks Customer B 10ms later (fast network, 20ms)
+    await new Promise((r) => setTimeout(r, 10));
+    const promiseB = simulateFetch('cust-B', 20, custBOrders);
+
+    const [resA, resB] = await Promise.all([promiseA, promiseB]);
+
+    assert.equal(resB.ignored, false, 'Customer B request should be accepted');
+    assert.equal(resA.ignored, true, 'Customer A slow request must be ignored');
+    assert.equal(finalState.customerId, 'cust-B');
+    assert.equal(finalState.orders[0].orderNumber, 'GF-B01');
+  });
+
+  // 16. Essential order fields verification
+  it('16. Historical order items contain all required display fields', () => {
+    const sample = mockOrderSummary({
+      orderNumber: 'GF-9090',
+      orderDate: '2026-10-24T12:00:00Z',
+      status: OrderStatus.READY,
+      totalAmount: 500,
+      amountPaid: 300,
+      amountDue: 200,
+    });
+
+    assert.ok(sample.orderNumber, 'Must have order number');
+    assert.ok(sample.orderDate, 'Must have order date');
+    assert.ok(sample.status, 'Must have status');
+    assert.equal(sample.totalAmount, 500);
+    assert.equal(sample.amountPaid, 300);
+    assert.equal(sample.amountDue, 200);
+
+    // Outstanding balance computation check
+    const calculatedDue = sample.amountDue ?? (sample.totalAmount - (sample.amountPaid ?? 0));
+    assert.equal(calculatedDue, 200);
+  });
+
+  // 17. Failed history and retry states
+  it('17. Error states preserve filter arguments on retry and recover upon success', async () => {
+    let callCount = 0;
+    let lastParams: any = null;
+
+    apiClient.orders.list = async (params) => {
+      callCount++;
+      lastParams = params;
+      if (callCount === 1) {
+        throw new ApiError('Connection reset by peer', 500);
+      }
+      return {
+        success: true,
+        data: [mockOrderSummary({ id: 'ord-retry-ok', orderNumber: 'GF-RETRY' })],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      };
+    };
+
+    const queryFilters = {
+      customerId: 'cust-retry-user',
+      status: OrderStatus.PROCESSING,
+      paymentStatus: PaymentStatus.PENDING,
+      search: 'RETRY',
+      page: 1,
+      pageSize: 10,
+    };
+
+    // First attempt fails
+    await assert.rejects(async () => {
+      await apiClient.orders.list(queryFilters);
+    });
+    assert.equal(callCount, 1);
+
+    // Retry succeeds with identical filter arguments
+    const retryRes = await apiClient.orders.list(queryFilters);
+    assert.equal(callCount, 2);
+    assert.equal(lastParams.status, OrderStatus.PROCESSING);
+    assert.equal(lastParams.paymentStatus, PaymentStatus.PENDING);
+    assert.equal(lastParams.search, 'RETRY');
+    assert.equal(retryRes.data[0].orderNumber, 'GF-RETRY');
   });
 });

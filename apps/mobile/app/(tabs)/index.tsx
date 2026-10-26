@@ -19,6 +19,7 @@ import {
   DashboardSummaryDTO,
 } from '@growfast/shared-types';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { apiClient } from '../../src/api/client';
 import { ConnectionBanner } from '../../src/components/ConnectionBanner';
@@ -40,7 +41,8 @@ export interface DashboardMetrics {
 export default function HomeScreen() {
   const router = useRouter();
   const { isConnected } = useNetworkStatus();
-  const [session, setSession] = useState<MobileUserSession | null>(null);
+  const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const session = authUser;
 
   // Operational KPI state
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -71,12 +73,6 @@ export default function HomeScreen() {
   // Stale request guard
   const refreshIdRef = useRef(0);
 
-  useEffect(() => {
-    getUserSession().then((user) => {
-      setSession(user);
-    });
-  }, []);
-
   /**
    * Load local SQLite pending draft count.
    */
@@ -101,6 +97,12 @@ export default function HomeScreen() {
    */
   const loadOperationalMetrics = useCallback(
     async (currentSession: MobileUserSession | null) => {
+      // Never query protected dashboard metrics if unauthenticated or loading auth
+      if (!isAuthenticated || isAuthLoading) {
+        setLoadingMetrics(false);
+        return;
+      }
+
       setLoadingMetrics(true);
       const draftCount = await loadOfflineDraftCount();
 
@@ -116,7 +118,7 @@ export default function HomeScreen() {
       try {
         // 1. Ready for Pickup: GET /api/orders?status=READY
         const readyPromise = apiClient.orders
-          .list({ status: OrderStatus.READY, limit: 1 })
+          .list({ status: OrderStatus.READY, pageSize: 1 })
           .then((res) => res.total)
           .catch(() => null);
 
@@ -128,7 +130,7 @@ export default function HomeScreen() {
 
         // 3. Unpaid Orders: GET /api/orders?paymentStatus=PENDING
         const unpaidPromise = apiClient.orders
-          .list({ paymentStatus: PaymentStatus.PENDING, limit: 1 })
+          .list({ paymentStatus: PaymentStatus.PENDING, pageSize: 1 })
           .then((res) => res.total)
           .catch(() => null);
 
@@ -186,13 +188,20 @@ export default function HomeScreen() {
         setLoadingMetrics(false);
       }
     },
-    [isConnected, loadOfflineDraftCount],
+    [isAuthenticated, isAuthLoading, isConnected, loadOfflineDraftCount],
   );
 
   /**
    * Load compact list of real recent orders from server.
    */
   const loadRecentOrders = useCallback(async () => {
+    // Never query protected orders endpoint if unauthenticated or loading auth
+    if (!isAuthenticated || isAuthLoading) {
+      setLoadingOrders(false);
+      setRecentOrders([]);
+      return;
+    }
+
     const currentRefreshId = ++refreshIdRef.current;
     setLoadingOrders(true);
     setOrdersError(null);
@@ -204,7 +213,7 @@ export default function HomeScreen() {
     }
 
     try {
-      const resp = await apiClient.orders.list({ limit: 5, page: 1 });
+      const resp = await apiClient.orders.list({ pageSize: 5, page: 1 });
       if (currentRefreshId !== refreshIdRef.current) return;
 
       if (resp && resp.data) {
@@ -223,13 +232,26 @@ export default function HomeScreen() {
         setLoadingOrders(false);
       }
     }
-  }, [isConnected]);
+  }, [isAuthenticated, isAuthLoading, isConnected]);
 
   // Initial load when session or connection changes
   useEffect(() => {
+    if (!isAuthenticated || isAuthLoading) {
+      setRecentOrders([]);
+      setMetrics({
+        readyCount: null,
+        dueTodayCount: null,
+        deliveriesTodayCount: null,
+        unpaidCount: null,
+        offlineDraftCount: 0,
+        ownerRevenue: null,
+        ownerOrdersCount: null,
+      });
+      return;
+    }
     loadOperationalMetrics(session);
     loadRecentOrders();
-  }, [session, isConnected, loadOperationalMetrics, loadRecentOrders]);
+  }, [session, isAuthenticated, isAuthLoading, isConnected, loadOperationalMetrics, loadRecentOrders]);
 
   /**
    * Manual refresh of dashboard metrics, drafts, and recent orders.
@@ -657,6 +679,11 @@ export default function HomeScreen() {
           setWizardVisible(false);
           loadOperationalMetrics(session);
           loadRecentOrders();
+        }}
+        onViewOrderDetail={(orderId) => {
+          setWizardVisible(false);
+          setActiveOrderId(orderId);
+          setOrderDetailVisible(true);
         }}
       />
 

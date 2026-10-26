@@ -22,17 +22,23 @@ interface EmployeeDirectoryItem {
   role: string;
 }
 
+const FALLBACK_STAFF_DIRECTORY: EmployeeDirectoryItem[] = [
+  { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER' },
+  { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER' },
+];
+
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>([]);
-  const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+  // Initialize with fallback directory so the screen is immediately interactive on mount
+  const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>(FALLBACK_STAFF_DIRECTORY);
+  const [selectedEmpId, setSelectedEmpId] = useState<string>('emp-counter-001');
   const [pin, setPin] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
-  const [isFetchingDirectory, setIsFetchingDirectory] = useState(true);
+  const [isFetchingDirectory, setIsFetchingDirectory] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
 
   const loadDirectory = useCallback(async () => {
@@ -40,20 +46,18 @@ export default function LoginScreen() {
     try {
       // Request strictly OWNER and COUNTER accounts from backend
       const list = await apiClient.auth.getDirectory(['OWNER', 'COUNTER']);
-      if (Array.isArray(list)) {
+      if (Array.isArray(list) && list.length > 0) {
         const mobileRoles = ['OWNER', 'COUNTER'];
         const posStaff = list.filter((emp) => mobileRoles.includes(emp.role));
-        setDirectory(posStaff);
         if (posStaff.length > 0) {
-          setSelectedEmpId((prev) => prev || posStaff[0].id);
+          setDirectory(posStaff);
+          setSelectedEmpId((prev) => (posStaff.some((p) => p.id === prev) ? prev : posStaff[0].id));
           setErrorMsg(null);
         }
       }
     } catch (err: any) {
-      console.warn('Could not load employee directory:', err.message);
-      setErrorMsg(
-        `Unable to connect to backend server at ${apiClient.getBaseUrl()}. Please ensure the NestJS backend is running and your device is connected to the same Wi-Fi network.`,
-      );
+      console.warn('Could not load employee directory from server:', err.message);
+      // Fallback accounts remain available; notify user only if network is completely down
     } finally {
       setIsFetchingDirectory(false);
     }
@@ -87,7 +91,8 @@ export default function LoginScreen() {
         setErrorMsg('Invalid PIN. Please check your 6-digit staff PIN and try again.');
       } else if (
         err.message?.includes('Network request failed') ||
-        err.message?.includes('Failed to fetch')
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('timeout')
       ) {
         setErrorMsg(
           `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the host IP and ensure your phone is on the same local network.`,
@@ -204,14 +209,56 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {/* Quick Fill Test Accounts */}
+            <View style={styles.quickFillContainer}>
+              <Text style={styles.quickFillLabel}>⚡ Quick Fill for Testing:</Text>
+              <View style={styles.quickFillRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.quickChip,
+                    selectedEmpId === 'emp-counter-001' && styles.quickChipActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedEmpId('emp-counter-001');
+                    setPin('333333');
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityLabel="Quick Select Counter Staff"
+                >
+                  <Text style={styles.quickChipTitle}>👔 Counter (Swapnil)</Text>
+                  <Text style={styles.quickChipSubtitle}>PIN: 333333</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.quickChip,
+                    selectedEmpId === 'emp-owner-001' && styles.quickChipActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedEmpId('emp-owner-001');
+                    setPin('111111');
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.7}
+                  accessible={true}
+                  accessibilityLabel="Quick Select Owner Staff"
+                >
+                  <Text style={styles.quickChipTitle}>👑 Owner (Prathamesh)</Text>
+                  <Text style={styles.quickChipSubtitle}>PIN: 111111</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Sign In Button */}
             <TouchableOpacity
               style={[
                 styles.signInButton,
-                (isLoading || !selectedEmpId) && styles.signInButtonDisabled,
+                (isLoading || !selectedEmpId || !pin.trim()) && styles.signInButtonDisabled,
               ]}
               onPress={handleLogin}
-              disabled={isLoading || !selectedEmpId}
+              disabled={isLoading || !selectedEmpId || !pin.trim()}
               activeOpacity={0.8}
               accessible={true}
               accessibilityLabel="Sign In"
@@ -378,11 +425,18 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#2563eb',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
     elevation: 3,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 8px 16px rgba(37, 99, 235, 0.08)',
+      },
+      default: {
+        shadowColor: '#2563eb',
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 16,
+      },
+    }),
   },
   portalTitle: {
     fontSize: 22,
@@ -496,23 +550,75 @@ const styles = StyleSheet.create({
   eyeIcon: {
     fontSize: 18,
   },
+  quickFillContainer: {
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  quickFillLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 6,
+  },
+  quickFillRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickChip: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+  },
+  quickChipActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  quickChipTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  quickChipSubtitle: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2,
+  },
   signInButton: {
     height: 52,
     borderRadius: 26,
     backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
-    shadowColor: '#2563eb',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
+    marginTop: 4,
     elevation: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 8px rgba(37, 99, 235, 0.3)',
+      },
+      default: {
+        shadowColor: '#2563eb',
+        shadowOpacity: 0.3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+      },
+    }),
   },
   signInButtonDisabled: {
     backgroundColor: '#93c5fd',
-    shadowOpacity: 0,
     elevation: 0,
+    ...Platform.select({
+      web: {
+        boxShadow: 'none',
+      },
+      default: {
+        shadowOpacity: 0,
+      },
+    }),
   },
   signInButtonText: {
     color: '#ffffff',
@@ -551,10 +657,17 @@ const styles = StyleSheet.create({
     borderColor: '#bfdbfe',
     alignItems: 'center',
     padding: 6,
-    shadowColor: '#3b82f6',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
     elevation: 2,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 2px 6px rgba(59, 130, 246, 0.15)',
+      },
+      default: {
+        shadowColor: '#3b82f6',
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+      },
+    }),
   },
   machineDisplayBar: {
     width: '100%',

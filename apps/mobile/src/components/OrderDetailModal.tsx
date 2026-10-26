@@ -347,23 +347,28 @@ export function OrderDetailModal({
                 {/* Tab Content 1: Items */}
                 {activeTab === 'ITEMS' ? (
                   <View style={styles.itemsListContainer}>
-                    {order.items.map((item) => (
-                      <View key={item.id} style={styles.itemRowCard}>
-                        <View style={styles.garmentIconBox}>
-                          <Text style={styles.garmentEmoji}>👔</Text>
+                    {order.items.map((item) => {
+                      const isWeight = item.weight != null && item.weight > 0;
+                      return (
+                        <View key={item.id} style={styles.itemRowCard}>
+                          <View style={styles.garmentIconBox}>
+                            <Text style={styles.garmentEmoji}>{isWeight ? '⚖️' : '👔'}</Text>
+                          </View>
+                          <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                            <Text style={styles.itemGarmentName}>{item.garmentName}</Text>
+                            <Text style={styles.itemServiceName}>
+                              {(item as any).serviceName || item.serviceType} •{' '}
+                              {isWeight
+                                ? `${item.weight} kg (${item.quantity} pcs in bag)`
+                                : `${item.quantity} pc${item.quantity > 1 ? 's' : ''}`}
+                            </Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.itemPrice}>₹ {item.lineTotal.toFixed(0)}</Text>
+                          </View>
                         </View>
-                        <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                          <Text style={styles.itemGarmentName}>{item.garmentName}</Text>
-                          <Text style={styles.itemServiceName}>
-                            {(item as any).serviceName || item.serviceType} • {item.quantity} pc
-                            {item.quantity > 1 ? 's' : ''}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={styles.itemPrice}>₹ {item.lineTotal.toFixed(0)}</Text>
-                        </View>
-                      </View>
-                    ))}
+                      );
+                    })}
 
                     {/* Physical Garments Processing checklist */}
                     {order.items.some(

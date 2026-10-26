@@ -170,47 +170,74 @@ export function CatalogGridStep({
           </Text>
         </View>
 
-        {/* Action Controls */}
+        {/* Action Controls (Workstream 2: Bulk Item Intake) */}
         {cartQty > 0 && !isWeight ? (
-          <View style={styles.stepperRow}>
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => onQuickDecrementItem(item.id)}
-              accessible={true}
-              accessibilityLabel={`Remove one ${item.name}`}
-            >
-              <Text style={styles.stepperBtnText}>−</Text>
-            </TouchableOpacity>
+          <View style={styles.actionRowContainer}>
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => onQuickDecrementItem(item.id)}
+                accessible={true}
+                accessibilityLabel={`Remove one ${item.name}`}
+              >
+                <Text style={styles.stepperBtnText}>−</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                style={styles.stepperQtyBox}
+                onPress={() => onOpenItemConfig(item)}
+                accessible={true}
+                accessibilityLabel={`Edit details for ${item.name}`}
+              >
+                <Text style={styles.stepperQtyText}>{cartQty}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => onQuickAddItem(item, selectedServiceId, price)}
+                accessible={true}
+                accessibilityLabel={`Add one more ${item.name}`}
+              >
+                <Text style={styles.stepperBtnText}>＋</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={styles.stepperQtyBox}
+              style={styles.itemConfigIconBtn}
               onPress={() => onOpenItemConfig(item)}
               accessible={true}
-              accessibilityLabel={`Edit details for ${item.name}`}
+              accessibilityLabel={`Edit notes and photos for ${item.name}`}
             >
-              <Text style={styles.stepperQtyText}>{cartQty}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.stepperBtn}
-              onPress={() => onQuickAddItem(item, selectedServiceId, price)}
-              accessible={true}
-              accessibilityLabel={`Add one more ${item.name}`}
-            >
-              <Text style={styles.stepperBtnText}>＋</Text>
+              <Text style={styles.itemConfigIconText}>⚙️</Text>
             </TouchableOpacity>
           </View>
-        ) : (
+        ) : isWeight ? (
           <TouchableOpacity
-            style={[styles.addButton, isWeight && styles.addWeightButton]}
+            style={[styles.addButton, styles.addWeightButton]}
             onPress={() => onOpenItemConfig(item)}
             accessible={true}
-            accessibilityLabel={`Configure and add ${item.name}`}
+            accessibilityLabel={`Enter weight for ${item.name}`}
           >
-            <Text style={styles.addButtonText}>
-              {isWeight ? '⚖️ Enter Weight' : '＋ Add Garment'}
-            </Text>
+            <Text style={styles.addButtonText}>⚖️ Enter Weight</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={styles.quickAddRow}>
+            <TouchableOpacity
+              style={styles.quickAddMainBtn}
+              onPress={() => onQuickAddItem(item, selectedServiceId, price)}
+              accessible={true}
+              accessibilityLabel={`Quick add 1 ${item.name}`}
+            >
+              <Text style={styles.quickAddMainBtnText}>＋ Quick Add</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickAddConfigBtn}
+              onPress={() => onOpenItemConfig(item)}
+              accessible={true}
+              accessibilityLabel={`Configure notes and photos for ${item.name}`}
+            >
+              <Text style={styles.quickAddConfigBtnText}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     );
@@ -527,7 +554,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  actionRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   stepperRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -561,6 +594,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#1d4ed8',
+  },
+  itemConfigIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemConfigIconText: {
+    fontSize: 14,
+  },
+  quickAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickAddMainBtn: {
+    flex: 1,
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
+  },
+  quickAddMainBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  quickAddConfigBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickAddConfigBtnText: {
+    fontSize: 14,
   },
   centeredContainer: {
     flex: 1,

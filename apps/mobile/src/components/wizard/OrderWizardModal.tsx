@@ -449,6 +449,25 @@ export function OrderWizardModal({
     setItems(items.filter((_, idx) => idx !== index));
   };
 
+  // Direct quantity update from review screen (Workstream 2)
+  const handleUpdateItemQuantity = (index: number, newQty: number) => {
+    if (index < 0 || index >= items.length) return;
+    if (newQty <= 0) {
+      handleRemoveCartItem(index);
+      return;
+    }
+    const updated = [...items];
+    const target = { ...updated[index] };
+    target.quantity = newQty;
+    // Keep pieces array synchronized
+    target.pieces = Array.from({ length: newQty }, (_, i) => ({
+      unitNumber: i + 1,
+      photoCount: photos.filter((p) => p.garmentId === target.garmentCatalogId).length,
+    }));
+    updated[index] = target;
+    setItems(updated);
+  };
+
   // Submit order to server
   const handleSubmitOrder = async () => {
     await persistDraftToStorage('QUEUED');
@@ -668,6 +687,7 @@ export function OrderWizardModal({
               onRemoveItem={handleRemoveCartItem}
               onAddMoreItems={() => setCurrentStepIndex(2)}
               onContinueToFinalReview={handleNext}
+              onUpdateItemQuantity={handleUpdateItemQuantity}
             />
           )}
 

@@ -18,10 +18,59 @@ import {
   UpdateCustomerRequest,
   DashboardSummaryDTO,
 } from '@growfast/shared-types';
-import { getAuthToken } from '../storage/secure-store';
+import { getAuthToken, clearUserSession } from '../storage/secure-store';
 
 export interface ApiClientConfig {
   baseUrl: string;
+}
+
+type UnauthorizedHandler = () => void;
+const unauthorizedHandlers = new Set<UnauthorizedHandler>();
+
+/**
+ * Register a listener to be notified when a protected endpoint returns HTTP 401.
+ * Returns an unsubscription function.
+ */
+export function onUnauthorized(handler: UnauthorizedHandler): () => void {
+  unauthorizedHandlers.add(handler);
+  return () => {
+    unauthorizedHandlers.delete(handler);
+  };
+}
+
+let unauthorizedPromise: Promise<void> | null = null;
+
+/**
+ * Centrally handle an HTTP 401 Unauthorized response from a protected endpoint.
+ * Debounces concurrent 401s so multiple simultaneous requests do not trigger competing operations.
+ */
+export async function triggerUnauthorized(): Promise<void> {
+  if (unauthorizedPromise) {
+    return unauthorizedPromise;
+  }
+
+  unauthorizedPromise = (async () => {
+    try {
+      unauthorizedHandlers.forEach((handler) => {
+        try {
+          handler();
+        } catch (err) {
+          console.error('[apiClient] Error in unauthorized handler:', err);
+        }
+      });
+      await clearUserSession();
+    } finally {
+      setTimeout(() => {
+        unauthorizedPromise = null;
+      }, 1000);
+    }
+  })();
+
+  return unauthorizedPromise;
+}
+
+export function _resetUnauthorizedLock(): void {
+  unauthorizedPromise = null;
 }
 
 // Configurable base URL with dynamic environment resolution
@@ -63,8 +112,13 @@ function resolveDefaultBaseUrl(): string {
     return envUrl;
   }
 
-  // 4. Fallback for physical device on local development Wi-Fi
-  return 'http://192.168.1.38:3000';
+  // 4. In test or node environments without Expo, default to localhost
+  if (typeof window === 'undefined' && !process.env.EXPO_PUBLIC_API_URL) {
+    return 'http://localhost:3000';
+  }
+
+  // 5. Fallback for physical device on local development Wi-Fi
+  return 'http://192.168.1.17:3000';
 }
 
 let config: ApiClientConfig = {
@@ -76,11 +130,7 @@ export function setApiConfig(newConfig: Partial<ApiClientConfig>) {
 }
 
 export function getBaseUrl(): string {
-  if (
-    config.baseUrl &&
-    !config.baseUrl.includes('10.0.2.2') &&
-    !config.baseUrl.includes('localhost')
-  ) {
+  if (config.baseUrl) {
     return config.baseUrl;
   }
   const resolved = resolveDefaultBaseUrl();
@@ -120,6 +170,21 @@ export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken();
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const isPublicEndpoint =
+    cleanEndpoint === '/api/auth/login' ||
+    cleanEndpoint.startsWith('/api/auth/login') ||
+    cleanEndpoint === '/api/auth/directory' ||
+    cleanEndpoint.startsWith('/api/auth/directory');
+
+  // If endpoint is protected and no token is present, do not send doomed request
+  if (!isPublicEndpoint && !token) {
+    const errorMsg = `Authentication required. No active session for ${cleanEndpoint}.`;
+    console.warn(`[apiClient] 401 Unauthorized: ${errorMsg}`);
+    await triggerUnauthorized();
+    throw new ApiError(errorMsg, 401, null);
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -131,19 +196,26 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const baseUrl = getBaseUrl();
   const url = normalizeApiUrl(baseUrl, endpoint);
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+  // Add a 8-second network timeout so mobile UI never hangs indefinitely
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
   let response: Response;
   try {
     response = await fetch(url, {
       ...options,
       headers,
+      signal: options.signal || controller.signal,
     });
   } catch (netErr: any) {
-    const isNetworkFailed = netErr?.message === 'Network request failed';
-    const detail = isNetworkFailed
-      ? `Server unreachable at ${baseUrl}. Ensure backend is running and phone is on the same Wi-Fi network.`
-      : netErr?.message || 'Network request failed';
+    const isAborted = controller.signal.aborted || netErr?.name === 'AbortError';
+    const isNetworkFailed = netErr?.message === 'Network request failed' || isAborted;
+    const detail = isAborted
+      ? `Connection timed out after 8s connecting to ${baseUrl}. Check Wi-Fi connection and host server IP.`
+      : isNetworkFailed
+        ? `Server unreachable at ${baseUrl}. Ensure backend is running and phone is on the same Wi-Fi network.`
+        : netErr?.message || 'Network request failed';
 
     // Log diagnostic message without exposing tokens, PINs, or request payloads
     console.warn(
@@ -156,6 +228,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       targetUrl: url,
       originalError: netErr?.message,
     });
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let responseData: any = null;
@@ -163,6 +237,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     responseData = await response.json();
   } catch (jsonErr: any) {
     if (!response.ok) {
+      if (response.status === 401 && !isPublicEndpoint) {
+        await triggerUnauthorized();
+      }
       const statusDetail = `HTTP ${response.status} (${response.statusText || 'Error'}) from ${cleanEndpoint}`;
       console.warn(`[apiClient] HTTP error without JSON body: ${statusDetail}`);
       throw new ApiError(statusDetail, response.status, null);
@@ -174,6 +251,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
+    // If a protected endpoint returns 401, centrally trigger session cleanup and logout
+    if (response.status === 401 && !isPublicEndpoint) {
+      await triggerUnauthorized();
+    }
+
     const errorMessage =
       responseData?.message || responseData?.error || `Request failed with HTTP ${response.status}`;
     const formattedError = Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage;
@@ -230,6 +312,14 @@ export const apiClient = {
       return await request<{ id: string; name: string; role: string }[]>(
         `/api/auth/directory${qs}`,
       );
+    },
+
+    getProfile: async () => {
+      return await request<any>('/api/auth/me');
+    },
+
+    getMe: async () => {
+      return await request<any>('/api/auth/me');
     },
   },
 
@@ -320,9 +410,8 @@ export const apiClient = {
       if (params?.customerId) searchParams.append('customerId', params.customerId);
       if (params?.paymentStatus) searchParams.append('paymentStatus', params.paymentStatus);
       if (params?.page) searchParams.append('page', String(params.page));
-      const size = params?.pageSize || params?.limit;
+      const size = params?.pageSize ?? params?.limit;
       if (size) {
-        searchParams.append('limit', String(size));
         searchParams.append('pageSize', String(size));
       }
       const qs = searchParams.toString();

@@ -16,7 +16,10 @@ import {
   MembershipTier,
   OrderStatus,
   ItemStatus,
+  PaymentMode,
+  PaymentStatus,
   calculateOrderTotals,
+  roundCurrency,
   deriveOrderStatus,
   CreateOrderRequest,
 } from '@growfast/shared-types';
@@ -47,12 +50,13 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     setApiConfig({ baseUrl: BACKEND_URL });
     try {
       const res = await fetch(`${BACKEND_URL}/api/auth/directory`, {
-        signal: AbortSignal.timeout(1000),
+        signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
         isBackendRunning = true;
       }
-    } catch {
+    } catch (err: any) {
+      console.log('Live backend probe failed:', err?.message || err);
       isBackendRunning = false;
     }
   });
@@ -483,8 +487,209 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     assert.ok(order.totalAmount > 0, 'Total amount must be present');
   });
 
-  // 14. Session Cleanup / Logout
-  it('14. Staff logout cleans secure store without touching database records', async (t) => {
+  // 14. Comprehensive Per-Weight & Per-Piece End-to-End Verification (Website Parity)
+  it('14. Creates per-weight and per-piece orders, verifying website calculation and tagging parity', async (t) => {
+    if (skipIfBackendOffline(t)) return;
+
+    // Load prices to get exact rates
+    const pricing = await apiClient.catalog.getPricing();
+    const piecePriceObj = pricing.find(
+      (p) => p.garmentCatalogId === perPieceGarmentId && p.serviceTypeId === laundryServiceId,
+    );
+    const weightPriceObj = pricing.find(
+      (p) => p.garmentCatalogId === weightGarmentId && p.serviceTypeId === laundryServiceId,
+    );
+
+    const pieceRate = piecePriceObj?.price || 60;
+    const weightRate = weightPriceObj?.price || 80;
+
+    // ─── A. Pure Per-Weight Order (mode: WEIGHT) ────────────────────────
+    const weightDraftId = `draft-e2e-pure-wt-${Date.now()}`;
+    const measuredWeight = 3.25; // >= 2.00 kg
+    const garmentsInWeightBag = 4; // 4 garments in the laundry bag
+
+    const weightOrderPayload: CreateOrderRequest = {
+      clientDraftId: weightDraftId,
+      customerId: testCustomerId,
+      isExpress: false,
+      pickupType: PickupType.STORE_PICKUP,
+      workflow: 'LAUNDRY',
+      entryMode: 'WEIGHT',
+      notes: 'Phase 4 Weight Order Website Parity Test',
+      items: [
+        {
+          garmentCatalogId: weightGarmentId,
+          serviceTypeId: laundryServiceId,
+          quantity: garmentsInWeightBag,
+          weight: measuredWeight,
+          pieces: Array.from({ length: garmentsInWeightBag }, (_, i) => ({
+            unitNumber: i + 1,
+            photoCount: 1,
+          })),
+        },
+      ],
+    };
+
+    const createdWeightOrder = await apiClient.orders.create(weightOrderPayload);
+    assert.ok(createdWeightOrder.id);
+    assert.ok(createdWeightOrder.orderNumber.startsWith('ORD-'));
+    assert.equal(createdWeightOrder.items.length, 1);
+
+    // Verify Weight Item line total = roundCurrency(unitPrice * weight)
+    const wtItem = createdWeightOrder.items[0];
+    assert.equal(wtItem.weight, measuredWeight);
+    assert.equal(wtItem.quantity, garmentsInWeightBag);
+    assert.ok(wtItem.unitPrice > 0, 'Authoritative rate per kg must be applied');
+    const expectedWeightLineTotal = roundCurrency(wtItem.unitPrice * measuredWeight);
+    assert.equal(wtItem.lineTotal, expectedWeightLineTotal);
+
+    // Verify Subtotal, 18% GST Tax, and Total
+    assert.equal(createdWeightOrder.subtotal, expectedWeightLineTotal);
+    const expectedWtTax = roundCurrency(expectedWeightLineTotal * 0.18);
+    assert.equal(createdWeightOrder.taxAmount, expectedWtTax);
+    assert.equal(createdWeightOrder.totalAmount, roundCurrency(expectedWeightLineTotal + expectedWtTax));
+
+    // Verify physical garments generated (4 garments inside the bag, each with physical tag)
+    assert.equal(wtItem.physicalGarments?.length, garmentsInWeightBag);
+    assert.ok(wtItem.physicalGarments?.[0].tagId, 'Physical tag must be generated for weight piece');
+
+    // ─── B. Pure Per-Piece Order (mode: PIECES) ─────────────────────────
+    const pieceDraftId = `draft-e2e-pure-pc-${Date.now()}`;
+    const pieceQuantity = 3;
+
+    const pieceOrderPayload: CreateOrderRequest = {
+      clientDraftId: pieceDraftId,
+      customerId: testCustomerId,
+      isExpress: false,
+      pickupType: PickupType.STORE_PICKUP,
+      workflow: 'LAUNDRY',
+      entryMode: 'PIECES',
+      notes: 'Phase 4 Piece Order Website Parity Test',
+      items: [
+        {
+          garmentCatalogId: perPieceGarmentId,
+          serviceTypeId: laundryServiceId,
+          quantity: pieceQuantity,
+          pieces: Array.from({ length: pieceQuantity }, (_, i) => ({
+            unitNumber: i + 1,
+            photoCount: 1,
+          })),
+        },
+      ],
+    };
+
+    const createdPieceOrder = await apiClient.orders.create(pieceOrderPayload);
+    assert.ok(createdPieceOrder.id);
+    assert.ok(createdPieceOrder.orderNumber.startsWith('ORD-'));
+    assert.equal(createdPieceOrder.items.length, 1);
+
+    // Verify Piece Item line total = roundCurrency(unitPrice * quantity)
+    const pcItem = createdPieceOrder.items[0];
+    assert.equal(pcItem.quantity, pieceQuantity);
+    assert.equal(pcItem.weight, null);
+    assert.ok(pcItem.unitPrice > 0, 'Authoritative price per piece must be applied');
+    const expectedPieceLineTotal = roundCurrency(pcItem.unitPrice * pieceQuantity);
+    assert.equal(pcItem.lineTotal, expectedPieceLineTotal);
+
+    // Verify Subtotal, 18% GST Tax, and Total
+    assert.equal(createdPieceOrder.subtotal, expectedPieceLineTotal);
+    const expectedPcTax = roundCurrency(expectedPieceLineTotal * 0.18);
+    assert.equal(createdPieceOrder.taxAmount, expectedPcTax);
+    assert.equal(createdPieceOrder.totalAmount, roundCurrency(expectedPieceLineTotal + expectedPcTax));
+
+    // Verify physical garments generated (3 individual pieces with physical tags)
+    assert.equal(pcItem.physicalGarments?.length, pieceQuantity);
+    assert.ok(pcItem.physicalGarments?.[0].tagId, 'Physical tag must be generated for piece item');
+  });
+
+  // 15. Financial Integrity & Payments Lifecycle (Workstream E)
+  it('15. Records partial and full payments, verifying idempotency and balance calculations', async (t) => {
+    if (skipIfBackendOffline(t)) return;
+
+    // Check confirmed order status initially
+    const initialOrder = await apiClient.orders.getById(confirmedOrderId);
+    assert.equal(initialOrder.paymentStatus, PaymentStatus.PENDING);
+    assert.equal(initialOrder.amountPaid, 0);
+    assert.equal(initialOrder.amountDue, initialOrder.totalAmount);
+
+    // A. Record Partial Payment
+    const partialAmount = 50.0;
+    const partialIdempotencyKey = `pay-idem-${Date.now()}-1`;
+    const payment1 = await apiClient.payments.record({
+      orderId: confirmedOrderId,
+      amount: partialAmount,
+      mode: PaymentMode.CASH,
+      reference: 'PARTIAL-CASH-REC',
+      idempotencyKey: partialIdempotencyKey,
+    });
+
+    assert.ok(payment1.id);
+    assert.equal(payment1.amount, partialAmount);
+
+    // B. Verify Idempotent Retry of same payment request
+    const retryPayment1 = await apiClient.payments.record({
+      orderId: confirmedOrderId,
+      amount: partialAmount,
+      mode: PaymentMode.CASH,
+      reference: 'PARTIAL-CASH-REC',
+      idempotencyKey: partialIdempotencyKey,
+    });
+    assert.equal(retryPayment1.id, payment1.id, 'Idempotent retry must return identical payment record');
+
+    // Verify partial status on order
+    const afterPartialOrder = await apiClient.orders.getById(confirmedOrderId);
+    assert.equal(afterPartialOrder.paymentStatus, PaymentStatus.PARTIAL);
+    assert.equal(afterPartialOrder.amountPaid, partialAmount);
+    assert.equal(afterPartialOrder.amountDue, roundCurrency(afterPartialOrder.totalAmount - partialAmount));
+
+    // C. Record Full Remaining Balance Payment
+    const remainingBalance = afterPartialOrder.amountDue;
+    const payment2 = await apiClient.payments.record({
+      orderId: confirmedOrderId,
+      amount: remainingBalance,
+      mode: PaymentMode.UPI,
+      reference: 'UPI-REF-FINAL',
+      idempotencyKey: `pay-idem-${Date.now()}-2`,
+    });
+    assert.ok(payment2.id);
+
+    // Verify fully paid status on order
+    const fullyPaidOrder = await apiClient.orders.getById(confirmedOrderId);
+    assert.equal(fullyPaidOrder.paymentStatus, PaymentStatus.PAID);
+    assert.equal(fullyPaidOrder.amountPaid, fullyPaidOrder.totalAmount);
+    assert.equal(fullyPaidOrder.amountDue, 0);
+
+    // D. Verify Payment Summary Consistency
+    const summary = await apiClient.payments.getSummary(confirmedOrderId);
+    assert.equal(summary.isConsistent, true);
+    assert.equal(summary.paymentCount, 2);
+    assert.equal(summary.amountPaid, fullyPaidOrder.totalAmount);
+    assert.equal(summary.amountDue, 0);
+  });
+
+  // 16. Customer Order History Search & Pagination (Workstream C)
+  it('16. Queries customer historical orders with search, filters, and pageSize pagination', async (t) => {
+    if (skipIfBackendOffline(t)) return;
+
+    // Query orders for testCustomerId
+    const historyRes = await apiClient.orders.list({
+      customerId: testCustomerId,
+      page: 1,
+      pageSize: 10,
+    });
+
+    assert.ok(historyRes.data);
+    assert.ok(historyRes.data.length >= 1, 'Should find orders created for testCustomerId');
+    assert.ok(historyRes.total >= 1);
+    assert.equal(historyRes.page, 1);
+    assert.equal(historyRes.pageSize, 10);
+
+    const match = historyRes.data.find((o) => o.id === confirmedOrderId);
+    assert.ok(match, 'Confirmed order must be present in customer history');
+  });
+
+  // 17. Session Cleanup / Logout
+  it('17. Staff logout cleans secure store without touching database records', async (t) => {
     if (skipIfBackendOffline(t)) return;
     await removeAuthToken();
     const tokenAfterLogout = await getAuthToken();
