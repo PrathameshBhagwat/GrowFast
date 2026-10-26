@@ -543,11 +543,10 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     const expectedWeightLineTotal = roundCurrency(wtItem.unitPrice * measuredWeight);
     assert.equal(wtItem.lineTotal, expectedWeightLineTotal);
 
-    // Verify Subtotal, 18% GST Tax, and Total
+    // Verify Subtotal, Tax (tax-inclusive), and Total
     assert.equal(createdWeightOrder.subtotal, expectedWeightLineTotal);
-    const expectedWtTax = roundCurrency(expectedWeightLineTotal * 0.18);
-    assert.equal(createdWeightOrder.taxAmount, expectedWtTax);
-    assert.equal(createdWeightOrder.totalAmount, roundCurrency(expectedWeightLineTotal + expectedWtTax));
+    assert.equal(createdWeightOrder.taxAmount, 0);
+    assert.equal(createdWeightOrder.totalAmount, expectedWeightLineTotal);
 
     // Verify physical garments generated (4 garments inside the bag, each with physical tag)
     assert.equal(wtItem.physicalGarments?.length, garmentsInWeightBag);
@@ -591,11 +590,10 @@ describe('GrowFast Mobile Phase E — Live Backend & E2E Integration Suite', () 
     const expectedPieceLineTotal = roundCurrency(pcItem.unitPrice * pieceQuantity);
     assert.equal(pcItem.lineTotal, expectedPieceLineTotal);
 
-    // Verify Subtotal, 18% GST Tax, and Total
+    // Verify Subtotal, Tax (tax-inclusive), and Total
     assert.equal(createdPieceOrder.subtotal, expectedPieceLineTotal);
-    const expectedPcTax = roundCurrency(expectedPieceLineTotal * 0.18);
-    assert.equal(createdPieceOrder.taxAmount, expectedPcTax);
-    assert.equal(createdPieceOrder.totalAmount, roundCurrency(expectedPieceLineTotal + expectedPcTax));
+    assert.equal(createdPieceOrder.taxAmount, 0);
+    assert.equal(createdPieceOrder.totalAmount, expectedPieceLineTotal);
 
     // Verify physical garments generated (3 individual pieces with physical tags)
     assert.equal(pcItem.physicalGarments?.length, pieceQuantity);

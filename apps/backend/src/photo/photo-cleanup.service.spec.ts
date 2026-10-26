@@ -428,8 +428,7 @@ describe('PhotoCleanupService & 10-Day Retention Rules', () => {
     it('17. Presigned URL lifetime clamped to remaining retention duration when near the 10-day deadline', async () => {
       // Order delivered 9 days, 23 hours, and 30 minutes ago
       // Remaining retention = 30 minutes = 1800 seconds (< standard 3600s / 1hr)
-      const nearExpiredDeliveredAt = new Date('2026-10-15T12:30:00.000Z');
-      const testNow = new Date('2026-10-25T12:00:00.000Z');
+      const nearExpiredDeliveredAt = new Date(Date.now() - (10 * 24 * 3600 * 1000 - 1800 * 1000));
 
       mockPrisma.order.findUnique.mockResolvedValue({
         id: 'order-near-expiry',

@@ -254,6 +254,8 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
     assert.equal(canSubmitLogin('emp-counter-001', '', false), false);
     assert.equal(canSubmitLogin('emp-counter-001', '333333', true), false);
     assert.equal(canSubmitLogin('emp-counter-001', '333333', false), true);
+  });
+
   function makeMockJwt(payload: object): string {
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');

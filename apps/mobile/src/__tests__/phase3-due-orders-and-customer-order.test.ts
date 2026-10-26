@@ -237,6 +237,7 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
       });
 
       assert.equal(totals.subtotal, 280.0); // 3.5 * 80 = 280
+      assert.equal(totals.taxAmount, 0.0);
       assert.equal(totals.totalAmount, 280.0);
     });
 
@@ -259,6 +260,7 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
         expressDeliveryOption: ExpressDeliveryOption.REGULAR,
       });
       assert.equal(regularTotals.expressSurcharge, 0);
+      assert.equal(regularTotals.taxAmount, 0);
       assert.equal(regularTotals.totalAmount, 100);
 
       // Next Day Evening (1.5x)
@@ -266,6 +268,7 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
         expressDeliveryOption: ExpressDeliveryOption.NEXT_DAY_EVENING,
       });
       assert.equal(nextDayTotals.expressSurcharge, 50); // 0.5 * 100
+      assert.equal(nextDayTotals.taxAmount, 0);
       assert.equal(nextDayTotals.totalAmount, 150);
 
       // Same Day (2.0x)
@@ -273,6 +276,7 @@ describe('GrowFast Phase 3: Due Orders Synchronization & Customer Order Workflow
         expressDeliveryOption: ExpressDeliveryOption.SAME_DAY,
       });
       assert.equal(sameDayTotals.expressSurcharge, 100); // 1.0 * 100
+      assert.equal(sameDayTotals.taxAmount, 0);
       assert.equal(sameDayTotals.totalAmount, 200);
     });
 

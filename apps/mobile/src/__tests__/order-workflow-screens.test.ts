@@ -940,14 +940,14 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       // Verification of math:
       // Subtotal = 520
       // Discount 10% = 52.00 -> After discount = 468.00
-      // Express 20% base on 468 = 93.60 * 2.0x (Same Day) = 187.20 -> Taxable = 655.20
-      // Tax 18% on 655.20 = 117.94
-      // Total = 655.20 + 117.94 = 773.14
+      // Express 2.0x multiplier (Same Day) surcharge = 468.00 (discountedSubtotal * (2.0 - 1.0))
+      // Tax (tax-inclusive pricing, TAX_RATE = 0) = 0
+      // Total = 468.00 + 468.00 = 936.00
       assert.equal(totals.subtotal, 520);
       assert.equal(totals.discountAmount, 52);
-      assert.equal(totals.expressSurcharge, 187.2);
-      assert.equal(totals.taxAmount, 117.94);
-      assert.equal(totals.totalAmount, 773.14);
+      assert.equal(totals.expressSurcharge, 468);
+      assert.equal(totals.taxAmount, 0);
+      assert.equal(totals.totalAmount, 936);
     });
 
     // 34. Item-specific notes, defect tags, and photo associations are preserved across multi-item intake

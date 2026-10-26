@@ -1115,11 +1115,6 @@ export default function HomeScreen() {
           setActiveOrderId(orderId);
           setOrderDetailVisible(true);
         }}
-        onViewOrderDetail={(orderId) => {
-          setWizardVisible(false);
-          setActiveOrderId(orderId);
-          setOrderDetailVisible(true);
-        }}
       />
 
       {/* Order Detail Modal integration */}
