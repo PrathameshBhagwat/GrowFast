@@ -18,6 +18,7 @@ import {
   UpdateCustomerRequest,
   DashboardSummaryDTO,
   NotificationDTO,
+  OrderPhotoDTO,
 } from '@growfast/shared-types';
 import { getAuthToken, clearUserSession } from '../storage/secure-store';
 
@@ -591,6 +592,10 @@ export const apiClient = {
         return responseData.data;
       }
       return responseData;
+    },
+
+    getByOrder: async (orderId: string): Promise<OrderPhotoDTO[]> => {
+      return await request<OrderPhotoDTO[]>(`/api/orders/${orderId}/photos`);
     },
   },
 

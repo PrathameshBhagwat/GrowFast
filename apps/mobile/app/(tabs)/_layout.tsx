@@ -49,7 +49,6 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarStyle: { display: 'none' },
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.tabIconBox}>
               <Icon name={focused ? 'home' : 'home-outline'} size={22} color={color} />

@@ -25,6 +25,7 @@ import {
   formatCatalogServiceName,
 } from '@growfast/shared-types';
 import { PendingPhoto } from '../../db/photos';
+import { PhotoQueueView } from '../PhotoQueueView';
 
 export interface FinalReviewStepProps {
   clientDraftId: string;
@@ -53,6 +54,7 @@ export interface FinalReviewStepProps {
     error?: string;
   }>;
   onOrderSuccess: (order: { orderId: string; orderNumber: string }) => void;
+  onPhotosUpdated?: () => void;
 }
 
 export function FinalReviewStep({
@@ -76,6 +78,7 @@ export function FinalReviewStep({
   onSaveDraft,
   onSubmitOrder,
   onOrderSuccess,
+  onPhotosUpdated,
 }: FinalReviewStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -396,7 +399,49 @@ export function FinalReviewStep({
         </View>
       </View>
 
-      {/* 4. Order Notes Input */}
+      {/* 4. Garment Intake Photos */}
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Intake & Garment Photos</Text>
+          <View
+            style={[
+              styles.membershipBadge,
+              photoRequired && photos.length === 0
+                ? styles.badgeDangerStyle
+                : styles.badgeSuccessStyle,
+            ]}
+          >
+            <Text
+              style={[
+                styles.membershipBadgeText,
+                photoRequired && photos.length === 0
+                  ? styles.badgeDangerTextStyle
+                  : styles.badgeSuccessTextStyle,
+              ]}
+            >
+              {photoRequired
+                ? photos.length === 0
+                  ? '⚠️ PHOTO REQUIRED'
+                  : '✓ PHOTO ATTACHED'
+                : 'OPTIONAL'}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.photoPolicyText}>
+          {photoRequired
+            ? 'Store walk-in policy requires at least one intake photograph of garments before workshop submission.'
+            : 'Capture or select photos of garments, tags, or special care requirements.'}
+        </Text>
+
+        <PhotoQueueView
+          clientDraftId={clientDraftId}
+          photos={photos}
+          onPhotosChanged={onPhotosUpdated || (() => {})}
+        />
+      </View>
+
+      {/* 5. Order Notes Input */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Special Instructions / Notes</Text>
         <TextInput
@@ -546,6 +591,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#b45309',
+  },
+  photoPolicyText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  badgeDangerStyle: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#fca5a5',
+  },
+  badgeDangerTextStyle: {
+    color: '#b91c1c',
+  },
+  badgeSuccessStyle: {
+    backgroundColor: '#dcfce7',
+    borderColor: '#86efac',
+  },
+  badgeSuccessTextStyle: {
+    color: '#15803d',
   },
   customerName: {
     fontSize: 16,

@@ -844,6 +844,7 @@ export function OrderWizardModal({
               onSaveDraft={persistDraftToStorage}
               onSubmitOrder={handleSubmitOrder}
               onOrderSuccess={handleOrderCreatedSuccess}
+              onPhotosUpdated={refreshPhotos}
             />
           )}
 

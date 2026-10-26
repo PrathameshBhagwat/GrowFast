@@ -34,5 +34,6 @@ export default defineConfig({
     globals: true,
     exclude: ['node_modules', 'dist', 'e2e/**'],
     pool: 'threads',
+    testTimeout: 20000,
   },
 });

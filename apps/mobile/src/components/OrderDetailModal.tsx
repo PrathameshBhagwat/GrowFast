@@ -10,7 +10,9 @@ import {
   Alert,
   SafeAreaView,
   Platform,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import {
   OrderDetailDTO,
   PaymentDTO,
@@ -20,6 +22,8 @@ import {
   PaymentStatus,
   ItemStatus,
   NotificationDTO,
+  PhotoType,
+  OrderPhotoDTO,
 } from '@growfast/shared-types';
 import { apiClient } from '../api/client';
 import { PaymentHistoryView } from './PaymentHistoryView';
@@ -47,6 +51,8 @@ export function OrderDetailModal({
   const [payments, setPayments] = useState<PaymentDTO[]>([]);
   const [summary, setSummary] = useState<PaymentSummaryDTO | null>(null);
   const [orderPhotos, setOrderPhotos] = useState<any[]>([]);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,18 +74,37 @@ export function OrderDetailModal({
     setError(null);
 
     try {
-      const [orderData, paymentsData, summaryData, notifsRes] = await Promise.all([
+      const [orderData, paymentsData, summaryData, notifsRes, photosRes] = await Promise.all([
         apiClient.orders.getById(orderId),
         apiClient.payments.getOrderPayments(orderId).catch(() => []),
         apiClient.payments.getSummary(orderId).catch(() => null),
         apiClient.notifications.list({ orderId }).catch(() => ({ success: true, data: [] })),
+        apiClient.photos.getByOrder(orderId).catch(() => []),
       ]);
 
       setOrder(orderData);
       setPayments(paymentsData);
       setSummary(summaryData);
-      setOrderPhotos((orderData as any)?.photos || []);
       setNotifications(notifsRes?.data || []);
+
+      const combinedPhotos: any[] = [];
+      if (Array.isArray(photosRes) && photosRes.length > 0) {
+        combinedPhotos.push(...photosRes);
+      } else if (orderData?.items) {
+        for (const item of orderData.items) {
+          if (item.photos && Array.isArray(item.photos)) {
+            combinedPhotos.push(...item.photos);
+          }
+          if (item.physicalGarments) {
+            for (const pg of item.physicalGarments) {
+              if (pg.photos && Array.isArray(pg.photos)) {
+                combinedPhotos.push(...pg.photos);
+              }
+            }
+          }
+        }
+      }
+      setOrderPhotos(combinedPhotos);
     } catch (err: any) {
       setError(err.message || 'Failed to load order details from server.');
     } finally {
@@ -132,6 +157,87 @@ export function OrderDetailModal({
     } finally {
       setOperatingGarmentId(null);
     }
+  };
+
+  const resolvePhotoUrl = (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://')) {
+      return url;
+    }
+    const base = apiClient.getBaseUrl().replace(/\/+$/, '');
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    return `${base}${cleanPath}`;
+  };
+
+  const handleTakePhoto = async () => {
+    if (!order) return;
+    try {
+      setIsUploadingPhoto(true);
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please grant camera permissions in settings to capture photos for this order.',
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        await apiClient.photos.upload({
+          uri: asset.uri,
+          orderId: order.id,
+          photoType: PhotoType.FRONT,
+        });
+        Alert.alert('Photo Uploaded', 'Garment photo attached successfully.');
+        fetchOrderData();
+        onOrderUpdated?.();
+      }
+    } catch (err: any) {
+      Alert.alert('Upload Failed', err.message || 'Could not upload garment photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handlePickGallery = async () => {
+    if (!order) return;
+    try {
+      setIsUploadingPhoto(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        await apiClient.photos.upload({
+          uri: asset.uri,
+          orderId: order.id,
+          photoType: PhotoType.FRONT,
+        });
+        Alert.alert('Photo Uploaded', 'Garment photo attached successfully.');
+        fetchOrderData();
+        onOrderUpdated?.();
+      }
+    } catch (err: any) {
+      Alert.alert('Upload Failed', err.message || 'Could not select photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleAddPhotoAction = () => {
+    Alert.alert('Add Garment Photo', 'Choose how you want to add a photo to this order:', [
+      { text: '📷 Take Photo', onPress: handleTakePhoto },
+      { text: '🖼️ Choose from Gallery', onPress: handlePickGallery },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   // Derive canonical status using shared contract
@@ -445,15 +551,79 @@ export function OrderDetailModal({
                 ) : activeTab === 'PHOTOS' ? (
                   /* Tab Content 2: Photos */
                   <View style={styles.photosTabContainer}>
-                    <Text style={styles.photosTabTitle}>Order Garment Intake Photos</Text>
-                    <View style={styles.photoGrid}>
-                      {[1, 2, 3].map((idx) => (
-                        <View key={idx} style={styles.photoPlaceholderCard}>
-                          <Text style={styles.photoIcon}>📷</Text>
-                          <Text style={styles.photoLabel}>Garment Photo #{idx}</Text>
-                        </View>
-                      ))}
+                    <View style={styles.photosTabHeaderRow}>
+                      <View>
+                        <Text style={styles.photosTabTitle}>Order Garment Intake Photos</Text>
+                        <Text style={styles.photosTabSubtitle}>
+                          {orderPhotos.length} photo(s) recorded for this order
+                        </Text>
+                      </View>
+                      <View style={styles.photosActionRow}>
+                        <TouchableOpacity
+                          style={styles.actionBtnSmall}
+                          onPress={handleTakePhoto}
+                          disabled={isUploadingPhoto}
+                          accessible={true}
+                          accessibilityLabel="Take Photo with Camera"
+                        >
+                          <Text style={styles.actionBtnSmallText}>📷 Camera</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtnSmall, styles.actionBtnSmallSecondary]}
+                          onPress={handlePickGallery}
+                          disabled={isUploadingPhoto}
+                          accessible={true}
+                          accessibilityLabel="Select from Gallery"
+                        >
+                          <Text style={styles.actionBtnSmallText}>🖼️ Gallery</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
+
+                    {isUploadingPhoto && (
+                      <View style={styles.uploadingBox}>
+                        <ActivityIndicator size="small" color="#2563eb" />
+                        <Text style={styles.uploadingText}>Uploading photo to server...</Text>
+                      </View>
+                    )}
+
+                    {orderPhotos.length === 0 ? (
+                      <View style={styles.emptyPhotosContainer}>
+                        <Text style={styles.emptyPhotosIcon}>📷</Text>
+                        <Text style={styles.emptyPhotosText}>
+                          No photos recorded for this order yet.
+                        </Text>
+                        <Text style={styles.emptyPhotosSubtext}>
+                          Tap 'Camera' or 'Gallery' above to attach garment intake photos.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.photoGrid}>
+                        {orderPhotos.map((photo, idx) => {
+                          const fullUrl = resolvePhotoUrl(photo.url);
+                          return (
+                            <TouchableOpacity
+                              key={photo.id || idx}
+                              style={styles.photoCard}
+                              onPress={() => setSelectedPhotoUrl(fullUrl)}
+                              activeOpacity={0.8}
+                              accessible={true}
+                              accessibilityLabel={`View Garment Photo ${idx + 1}`}
+                            >
+                              <Image
+                                source={{ uri: fullUrl }}
+                                style={styles.photoImage}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.photoCardOverlay}>
+                                <Text style={styles.photoCardBadge}>{photo.type || 'PHOTO'}</Text>
+                                <Text style={styles.photoCardIdx}>#{idx + 1}</Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 ) : (
                   /* Tab Content 3: History */
@@ -511,10 +681,15 @@ export function OrderDetailModal({
               <View style={styles.bottomBar}>
                 <TouchableOpacity
                   style={styles.addPhotoBtn}
-                  onPress={() => Alert.alert('Add Photo', 'Take or select a garment photo')}
+                  onPress={handleAddPhotoAction}
                   activeOpacity={0.8}
+                  disabled={isUploadingPhoto}
+                  accessible={true}
+                  accessibilityLabel="Add Photo to Order"
                 >
-                  <Text style={styles.addPhotoBtnText}>📷 Add Photo</Text>
+                  <Text style={styles.addPhotoBtnText}>
+                    {isUploadingPhoto ? '⏳ Uploading...' : '📷 Add Photo'}
+                  </Text>
                 </TouchableOpacity>
 
                 {effectiveDue > 0 ? (
@@ -566,6 +741,27 @@ export function OrderDetailModal({
               onOrderUpdated?.();
             }}
           />
+
+          {/* Photo Lightbox Modal */}
+          {selectedPhotoUrl && (
+            <Modal visible={true} transparent={true} animationType="fade">
+              <View style={styles.lightboxBackdrop}>
+                <TouchableOpacity
+                  style={styles.lightboxCloseBtn}
+                  onPress={() => setSelectedPhotoUrl(null)}
+                  accessible={true}
+                  accessibilityLabel="Close photo preview"
+                >
+                  <Text style={styles.lightboxCloseText}>✕ Close</Text>
+                </TouchableOpacity>
+                <Image
+                  source={{ uri: selectedPhotoUrl }}
+                  style={styles.lightboxImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </Modal>
+          )}
         </View>
       </SafeAreaView>
     </Modal>
@@ -841,35 +1037,147 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  photosTabHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
   photosTabTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: '#0f172a',
+  },
+  photosTabSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  photosActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtnSmall: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnSmallSecondary: {
+    backgroundColor: '#64748b',
+  },
+  actionBtnSmallText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  uploadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#eff6ff',
+    padding: 10,
+    borderRadius: 8,
     marginBottom: 12,
+  },
+  uploadingText: {
+    fontSize: 12,
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  emptyPhotosContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyPhotosIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyPhotosText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 4,
+  },
+  emptyPhotosSubtext: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
   },
   photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
-  photoPlaceholderCard: {
+  photoCard: {
     width: '30%',
     aspectRatio: 1,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
+    position: 'relative',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  photoIcon: {
-    fontSize: 24,
-    marginBottom: 4,
+  photoImage: {
+    width: '100%',
+    height: '100%',
   },
-  photoLabel: {
+  photoCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  photoCardBadge: {
     fontSize: 9,
-    color: '#64748b',
-    textAlign: 'center',
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  photoCardIdx: {
+    fontSize: 9,
+    color: '#93c5fd',
+    fontWeight: '700',
+  },
+  lightboxBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  lightboxCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 10,
+  },
+  lightboxCloseText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  lightboxImage: {
+    width: '100%',
+    height: '80%',
   },
   historyTabContainer: {
     gap: 16,
