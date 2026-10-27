@@ -180,6 +180,18 @@ export default function LoginScreen() {
     loadDirectory();
   }, [loadDirectory]);
 
+  // Navigate to main tabs when authenticated
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
+  // If already authenticated and done loading, redirect without violating hook rules
+  if (!isAuthLoading && isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
+
   const handleLogin = async () => {
     if (lockoutUntil) return;
 

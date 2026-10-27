@@ -34,6 +34,28 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function safeBase64Decode(str: string): string {
+  if (typeof atob === 'function') {
+    return atob(str);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(str, 'base64').toString('utf-8');
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let output = '';
+  const cleanStr = String(str).replace(/=+$/, '');
+  for (let bc = 0, bs = 0, buffer, idx = 0; (buffer = cleanStr.charAt(idx++));) {
+    const charIndex = chars.indexOf(buffer);
+    if (~charIndex) {
+      bs = bc % 4 ? bs * 64 + charIndex : charIndex;
+      if (bc++ % 4) {
+        output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+      }
+    }
+  }
+  return output;
+}
+
 export function parseJwtPayload(token: string): { exp?: number; sub?: string } | null {
   try {
     const parts = token.split('.');
@@ -42,8 +64,7 @@ export function parseJwtPayload(token: string): { exp?: number; sub?: string } |
     while (base64.length % 4) {
       base64 += '=';
     }
-    const decoded =
-      typeof atob === 'function' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
+    const decoded = safeBase64Decode(base64);
     return JSON.parse(decoded);
   } catch {
     return null;
@@ -97,8 +118,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 2. Validate JWT expiration locally
+        // 2. Validate JWT structure and expiration locally
         const payload = parseJwtPayload(storedToken);
+        if (!payload) {
+          console.warn('[AuthProvider] Stored JWT could not be parsed. Clearing session.');
+          await clearUserSession();
+          if (isMounted) {
+            setToken(null);
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+          return;
+        }
+
         if (payload?.exp && payload.exp * 1000 <= Date.now()) {
           console.warn('[AuthProvider] Persisted JWT has expired locally. Clearing session.');
           await clearUserSession();
@@ -137,10 +169,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         } catch (apiErr: unknown) {
-          const is401 = apiErr instanceof ApiError && apiErr.statusCode === 401;
-          if (is401) {
+          const statusCode =
+            (apiErr as any)?.statusCode ??
+            (apiErr as any)?.status ??
+            (apiErr as any)?.response?.status;
+          const errorMsg = String((apiErr as any)?.message || '');
+          const isServerRejection =
+            (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) ||
+            errorMsg.includes('401') ||
+            errorMsg.includes('Unauthorized') ||
+            errorMsg.includes('Forbidden');
+
+          if (isServerRejection) {
             console.warn(
-              '[AuthProvider] Stored session rejected by backend (401). Clearing session.',
+              `[AuthProvider] Stored session rejected by backend (${statusCode || '4xx'}). Clearing session.`,
             );
             await clearUserSession();
             if (isMounted) {
@@ -149,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setIsAuthenticated(false);
             }
           } else {
-            // Network failure: preserve valid, non-expired offline session on mobile hardware
+            // Genuine network failure (statusCode 0 / server unreachable): preserve valid unexpired offline session
             console.log(
               '[AuthProvider] Server unreachable on startup; preserving valid offline session.',
             );

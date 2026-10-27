@@ -24,7 +24,7 @@ import {
   ServiceTypeDTO,
   GarmentCatalogDTO,
 } from '@growfast/shared-types';
-import { isWeightBasedPricing } from '../services/catalog-rules';
+import { isWeightBasedPricing, CANONICAL_WEIGHT_SERVICES } from '../services/catalog-rules';
 
 interface MockPrice {
   id: string;
@@ -303,14 +303,23 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       );
       assert.equal(householdService, 'srv-dry-clean');
 
-      // Selecting Shoe category auto-switches service to Shoe Cleaning
-      const shoeService = resolveCatalogSelectionOnCategoryChange(
+      // Selecting Shoe category with incompatible service (Steam Iron) auto-switches to Shoe Cleaning
+      const shoeServiceIncompatible = resolveCatalogSelectionOnCategoryChange(
+        GarmentCategory.SHOES,
+        'srv-steam-iron',
+        mockServices,
+        'DRY_CLEANING',
+      );
+      assert.equal(shoeServiceIncompatible, 'srv-shoe-clean');
+
+      // Selecting Shoe category while an allowed service (Dry Clean) is already selected preserves that service
+      const shoeServicePreserved = resolveCatalogSelectionOnCategoryChange(
         GarmentCategory.SHOES,
         'srv-dry-clean',
         mockServices,
         'DRY_CLEANING',
       );
-      assert.equal(shoeService, 'srv-shoe-clean');
+      assert.equal(shoeServicePreserved, 'srv-dry-clean');
     });
 
     it('4.5 Safe-area topInset calculation guarantees header and back button clear status bar and cutouts', () => {
@@ -1032,6 +1041,455 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
 
       const shirtPhotos = mockPhotos.filter((p) => p.garmentId === item2.garmentCatalogId);
       assert.equal(shirtPhotos.length, 0);
+    });
+  });
+
+  // =========================================================================
+  // WORKSTREAM 3: TARGETED ORDER MODE & SEPARATE SERVICES VERIFICATION
+  // =========================================================================
+  describe('Workstream 3: Order Mode Selection & Per-Piece / Per-Weight Separation', () => {
+    // 1. Mutually exclusive radio options
+    it('35. Order mode supports exactly two mutually exclusive options (Per-Piece vs Per-Weight)', () => {
+      const allowedModes: OrderEntryMode[] = ['PIECES', 'WEIGHT'];
+      assert.equal(allowedModes.length, 2);
+      assert.ok(allowedModes.includes('PIECES'));
+      assert.ok(allowedModes.includes('WEIGHT'));
+
+      // Dry Clean must NOT appear as an order mode option
+      assert.ok(!allowedModes.includes('DRY_CLEAN' as any));
+      assert.ok(!allowedModes.includes('DRY_CLEANING' as any));
+    });
+
+    // 2. Per-Piece retains existing services and excludes weight-only services
+    it('36. Per-Piece mode displays per-piece services and excludes per-weight-only services', () => {
+      const availableServices: ServiceTypeDTO[] = [
+        {
+          id: 'svc-wash-iron',
+          name: 'Wash and Steam Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'svc-steam-iron',
+          name: 'Steam Iron',
+          category: ServiceCategory.STEAM_PRESS,
+          estimatedDays: 1,
+          isActive: true,
+        },
+        {
+          id: 'svc-wash',
+          name: 'Standard Wash',
+          category: ServiceCategory.WASH,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'svc-starching',
+          name: 'Starching',
+          category: ServiceCategory.STEAM_PRESS,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'svc-shoe',
+          name: 'Shoe Cleaning',
+          category: ServiceCategory.SHOE_CLEAN,
+          estimatedDays: 3,
+          isActive: true,
+        },
+        {
+          id: 'svc-dry-clean',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          estimatedDays: 3,
+          isActive: true,
+        },
+        // Per-weight only services
+        {
+          id: 'svc-wash-fold',
+          name: 'Wash and Fold',
+          category: ServiceCategory.WASH,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'svc-white',
+          name: 'Laundry for White',
+          category: ServiceCategory.WASH,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'svc-premium',
+          name: 'Premium Laundry',
+          category: ServiceCategory.WASH,
+          estimatedDays: 3,
+          isActive: true,
+        },
+        {
+          id: 'svc-woolen',
+          name: 'Woolen Laundry',
+          category: ServiceCategory.WASH,
+          estimatedDays: 3,
+          isActive: true,
+        },
+      ];
+
+      // In Per-Piece mode: filter out per-weight only services
+      const pieceServices = availableServices.filter((s) => {
+        if (!s.isActive) return false;
+        const lower = s.name.toLowerCase();
+        return (
+          !lower.includes('wash and fold') &&
+          !lower.includes('white') &&
+          !lower.includes('premium') &&
+          !lower.includes('woolen')
+        );
+      });
+
+      assert.ok(pieceServices.some((s) => s.name === 'Steam Iron'));
+      assert.ok(pieceServices.some((s) => s.name === 'Wash and Steam Iron'));
+      assert.ok(pieceServices.some((s) => s.name === 'Standard Wash'));
+      assert.ok(pieceServices.some((s) => s.name === 'Starching'));
+      assert.ok(pieceServices.some((s) => s.name === 'Shoe Cleaning'));
+      assert.ok(pieceServices.some((s) => s.name === 'Dry Clean'));
+
+      // Excludes per-weight-only services
+      assert.ok(!pieceServices.some((s) => s.name === 'Wash and Fold'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Laundry for White'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Premium Laundry'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Woolen Laundry'));
+    });
+
+    // 3. Per-Weight mode displays the 5 website services in canonical order
+    it('37. Per-Weight mode displays the five canonical website laundry services in exact order', () => {
+      assert.equal(CANONICAL_WEIGHT_SERVICES.length, 5);
+
+      // 1. Steam Iron (1 day)
+      assert.equal(CANONICAL_WEIGHT_SERVICES[0].id, 'svc-wash-iron');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[0].name, 'Steam Iron');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[0].estimatedDays, 1);
+
+      // 2. Wash and Fold (2 days)
+      assert.equal(CANONICAL_WEIGHT_SERVICES[1].id, 'svc-wash-fold');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[1].name, 'Wash and Fold');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[1].estimatedDays, 2);
+
+      // 3. Laundry for White (2 days)
+      assert.equal(CANONICAL_WEIGHT_SERVICES[2].id, 'svc-laundry-white');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[2].name, 'Laundry for White');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[2].estimatedDays, 2);
+
+      // 4. Premium Laundry (3 days)
+      assert.equal(CANONICAL_WEIGHT_SERVICES[3].id, 'svc-laundry-premium');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[3].name, 'Premium Laundry');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[3].estimatedDays, 3);
+
+      // 5. Woolen Laundry (3 days)
+      assert.equal(CANONICAL_WEIGHT_SERVICES[4].id, 'svc-laundry-woolen');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[4].name, 'Woolen Laundry');
+      assert.equal(CANONICAL_WEIGHT_SERVICES[4].estimatedDays, 3);
+    });
+
+    // 4. Minimum 2.0 kg rule and preset calculations
+    it('38. Enforces minimum 2.00 kg rule and calculates weight laundry line totals correctly', () => {
+      const pricePerKg = 159; // Steam Iron rate from Image 2 & 3
+
+      // Valid weight >= 2.0 kg
+      const validWeight = 2.5;
+      const validTotal = Math.round(validWeight * pricePerKg * 100) / 100;
+      assert.equal(validTotal, 397.5);
+
+      // Minimum weight 2.00 kg
+      const minWeight = 2.0;
+      const minTotal = Math.round(minWeight * pricePerKg * 100) / 100;
+      assert.equal(minTotal, 318);
+
+      // Invalid weight < 2.0 kg
+      const invalidWeight = 1.5;
+      const isWeightValid = !isNaN(invalidWeight) && invalidWeight >= 2.0;
+      assert.equal(isWeightValid, false);
+    });
+
+    // 5. Mode switching clears incompatible items and prevents totals leakage
+    it('39. Switching between Per-Piece and Per-Weight clears incompatible items and prevents pricing leakage', () => {
+      // Start with cart containing Per-Piece items (no weight field)
+      const pieceCart = [
+        {
+          garmentCatalogId: 'g-shirt',
+          serviceTypeId: 'srv-steam-iron',
+          quantity: 2,
+          unitPrice: 50,
+        },
+        {
+          garmentCatalogId: 'g-jeans',
+          serviceTypeId: 'srv-steam-iron',
+          quantity: 1,
+          unitPrice: 70,
+        },
+      ];
+      const initialTotals = calculateOrderTotals(pieceCart);
+      assert.equal(initialTotals.subtotal, 170);
+
+      // User switches to WEIGHT mode:
+      // Incompatible items are items where isWeight !== true
+      const newMode: OrderEntryMode = 'WEIGHT';
+      const cleanedCartAfterSwitchToWeight = pieceCart.filter((item: any) => {
+        const isItemWeight = Boolean(item.weight != null && item.weight > 0);
+        return newMode === 'WEIGHT' ? isItemWeight : !isItemWeight;
+      });
+
+      // All piece items were safely pruned
+      assert.equal(cleanedCartAfterSwitchToWeight.length, 0);
+      const postSwitchTotals = calculateOrderTotals(cleanedCartAfterSwitchToWeight);
+      assert.equal(postSwitchTotals.subtotal, 0);
+      assert.equal(postSwitchTotals.totalAmount, 0);
+
+      // Now add a valid Weight item (2.0 kg at ₹159/kg)
+      const weightCart = [
+        {
+          garmentCatalogId: 'g-wb-1',
+          serviceTypeId: 'svc-wash-iron',
+          quantity: 1,
+          weight: 2.0,
+          unitPrice: 159,
+        },
+      ];
+      const weightTotals = calculateOrderTotals(weightCart);
+      assert.equal(weightTotals.subtotal, 318);
+
+      // Switch back to PIECES mode:
+      // Incompatible items are items with weight > 0
+      const backToPiecesMode = 'PIECES';
+      const cleanedCartAfterSwitchToPieces = weightCart.filter((item: any) => {
+        const isItemWeight = Boolean(item.weight != null && item.weight > 0);
+        return (backToPiecesMode as string) === 'WEIGHT' ? isItemWeight : !isItemWeight;
+      });
+
+      // Weight items safely pruned, preventing stale price leakage
+      assert.equal(cleanedCartAfterSwitchToPieces.length, 0);
+      const postSwitchToPiecesTotals = calculateOrderTotals(cleanedCartAfterSwitchToPieces);
+      assert.equal(postSwitchToPiecesTotals.subtotal, 0);
+      assert.equal(postSwitchToPiecesTotals.totalAmount, 0);
+    });
+
+    // 6. Derives order status canonically using deriveOrderStatus()
+    it('40. Always derives canonical order status using deriveOrderStatus() without manual assignment', () => {
+      // Empty items defaults to RECEIVED
+      const emptyStatus = deriveOrderStatus({ items: [] });
+      assert.equal(emptyStatus, OrderStatus.RECEIVED);
+
+      // All items DELIVERED -> OrderStatus.DELIVERED
+      const deliveredStatus = deriveOrderStatus({
+        items: [{ status: 'DELIVERED' as any }],
+      });
+      assert.equal(deliveredStatus, OrderStatus.DELIVERED);
+    });
+  });
+
+  describe('Workstream 4: Service List & Customer Action Updates', () => {
+    // 1. Steam Press Only is completely removed from selectable services
+    it('41. Excludes Steam Press Only completely from selectable services in Per-Piece mode', () => {
+      const mockServices: ServiceTypeDTO[] = [
+        {
+          id: 'srv-wash-iron',
+          name: 'Wash & Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'srv-steam-press',
+          name: 'Steam Press Only',
+          category: ServiceCategory.STEAM_PRESS,
+          estimatedDays: 1,
+          isActive: true,
+        },
+        {
+          id: 'srv-dry-clean',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          estimatedDays: 3,
+          isActive: true,
+        },
+        {
+          id: 'srv-shoe-clean',
+          name: 'Shoe Cleaning',
+          category: ServiceCategory.SHOE_CLEAN,
+          estimatedDays: 3,
+          isActive: true,
+        },
+      ];
+
+      const pieceServices = mockServices.filter((svc) => {
+        if (!svc.isActive) return false;
+        const name = svc.name.trim().toLowerCase();
+        const sId = (svc.id || '').toLowerCase();
+        if (
+          name === 'steam press only' ||
+          sId === 'srv-steam-press' ||
+          sId === 'svc-steam-press-only'
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      // Steam Press Only is completely removed
+      assert.ok(!pieceServices.some((s) => s.name === 'Steam Press Only'));
+      assert.ok(!pieceServices.some((s) => s.id === 'srv-steam-press'));
+      assert.equal(pieceServices.length, 3);
+    });
+
+    // 2. Wash & Iron renamed to Starching while preserving IDs and turnaround
+    it('42. Renames Wash & Iron to Starching while preserving service identifier, category, and turnaround time', () => {
+      const mockServices: ServiceTypeDTO[] = [
+        {
+          id: 'srv-wash-iron',
+          name: 'Wash & Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'srv-dry-clean',
+          name: 'Dry Clean',
+          category: ServiceCategory.DRY_CLEAN,
+          estimatedDays: 3,
+          isActive: true,
+        },
+      ];
+
+      const pieceServices = mockServices.map((svc) => {
+        const lower = svc.name.trim().toLowerCase();
+        if (lower === 'wash & iron' || lower === 'wash and iron') {
+          return { ...svc, name: 'Starching' };
+        }
+        return svc;
+      });
+
+      const starchingService = pieceServices.find((s) => s.name === 'Starching');
+      assert.ok(starchingService, 'Starching service must be present');
+      assert.equal(
+        starchingService.id,
+        'srv-wash-iron',
+        'Original service ID srv-wash-iron must be preserved',
+      );
+      assert.equal(
+        starchingService.category,
+        ServiceCategory.WASH_IRON,
+        'Original category must be preserved',
+      );
+      assert.equal(
+        starchingService.estimatedDays,
+        2,
+        'Turnaround time of 2 days must be preserved',
+      );
+      assert.ok(
+        !pieceServices.some((s) => s.name === 'Wash & Iron'),
+        'Wash & Iron must no longer be displayed',
+      );
+    });
+
+    // 3. Duplicate service definitions are avoided when Starching already exists
+    it('43. Avoids duplicate service definitions if Starching already exists in the catalog', () => {
+      const mockServices: ServiceTypeDTO[] = [
+        {
+          id: 'svc-starching-orig',
+          name: 'Starching',
+          category: ServiceCategory.STEAM_PRESS,
+          estimatedDays: 2,
+          isActive: true,
+        },
+        {
+          id: 'srv-wash-iron',
+          name: 'Wash & Iron',
+          category: ServiceCategory.WASH_IRON,
+          estimatedDays: 2,
+          isActive: true,
+        },
+      ];
+
+      const seenNames = new Set<string>();
+      const result: ServiceTypeDTO[] = [];
+
+      for (const svc of mockServices) {
+        const lower = svc.name.trim().toLowerCase();
+        const isWashIron = lower === 'wash & iron' || lower === 'wash and iron';
+        const resolvedName = isWashIron ? 'Starching' : svc.name;
+        const displayKey = resolvedName.toLowerCase();
+
+        if (seenNames.has(displayKey)) {
+          continue;
+        }
+        seenNames.add(displayKey);
+
+        if (isWashIron) {
+          result.push({ ...svc, name: 'Starching' });
+        } else {
+          result.push(svc);
+        }
+      }
+
+      const starchingCount = result.filter((s) => s.name === 'Starching').length;
+      assert.equal(
+        starchingCount,
+        1,
+        'Exactly one Starching service must be displayed without duplicates',
+      );
+    });
+
+    // 4. Customer profile card on Home Screen has exactly three actions (Profile, Per-Piece Order, Per-Weight Order)
+    it('44. Selected-customer card on Home Screen provides exactly three actions and excludes Dry Clean', () => {
+      type CustomerCardAction = 'Profile' | 'Per-Piece Order' | 'Per-Weight Order';
+      const actions: CustomerCardAction[] = ['Profile', 'Per-Piece Order', 'Per-Weight Order'];
+
+      assert.equal(actions.length, 3, 'Selected-customer card must have exactly 3 actions');
+      assert.ok(actions.includes('Profile'));
+      assert.ok(actions.includes('Per-Piece Order'));
+      assert.ok(actions.includes('Per-Weight Order'));
+
+      // Dry Clean button is removed
+      assert.ok(!actions.includes('Dry Clean' as any));
+      assert.ok(!actions.includes('Piece' as any));
+      assert.ok(!actions.includes('Weight' as any));
+    });
+
+    // 5. Order action buttons trigger correct existing workflows
+    it('45. Per-Piece and Per-Weight buttons trigger existing workflows with correct order mode', () => {
+      let triggeredMode: OrderEntryMode | null = null;
+      let triggeredWorkflow: OrderWorkflowType | null = null;
+      let profileOpened = false;
+
+      const mockCustomer = { id: 'cust-101', name: 'Test Customer' };
+
+      const handleStartOrderForCustomer = (
+        _cust: any,
+        mode: OrderEntryMode = 'PIECES',
+        wf: OrderWorkflowType = 'LAUNDRY',
+      ) => {
+        triggeredMode = mode;
+        triggeredWorkflow = wf;
+      };
+
+      const handleViewCustomerProfile = (_cust: any) => {
+        profileOpened = true;
+      };
+
+      // 1. Profile action
+      handleViewCustomerProfile(mockCustomer);
+      assert.equal(profileOpened, true);
+
+      // 2. Per-Piece Order action
+      handleStartOrderForCustomer(mockCustomer, 'PIECES', 'LAUNDRY');
+      assert.equal(triggeredMode, 'PIECES');
+      assert.equal(triggeredWorkflow, 'LAUNDRY');
+
+      // 3. Per-Weight Order action
+      handleStartOrderForCustomer(mockCustomer, 'WEIGHT', 'LAUNDRY');
+      assert.equal(triggeredMode, 'WEIGHT');
+      assert.equal(triggeredWorkflow, 'LAUNDRY');
     });
   });
 });

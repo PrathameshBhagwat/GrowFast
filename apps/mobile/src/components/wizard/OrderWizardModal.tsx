@@ -27,6 +27,8 @@ import {
   resolveCatalogSelectionOnServiceSelect,
   resolveCatalogSelectionOnCategoryChange,
   isItemCompatibleWithWorkflow,
+  calculateOrderTotals,
+  isDryCleanService,
 } from '@growfast/shared-types';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../../db/drafts';
@@ -83,6 +85,12 @@ const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
     isActive: true,
   },
   {
+    id: 'g-wb-1',
+    name: 'Weight Based Laundry',
+    category: GarmentCategory.WEIGHT_BASED,
+    isActive: true,
+  },
+  {
     id: 'cat-kg-wash',
     name: 'Wash & Fold (Per Kg)',
     category: GarmentCategory.WEIGHT_BASED,
@@ -98,8 +106,43 @@ const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
 
 const FALLBACK_SERVICES: ServiceTypeDTO[] = [
   {
+    id: 'svc-wash-iron',
+    name: 'Steam Iron',
+    category: ServiceCategory.WASH_IRON,
+    estimatedDays: 1,
+    isActive: true,
+  },
+  {
+    id: 'svc-wash-fold',
+    name: 'Wash and Fold',
+    category: ServiceCategory.WASH,
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-white',
+    name: 'Laundry for White',
+    category: ServiceCategory.WASH,
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-premium',
+    name: 'Premium Laundry',
+    category: ServiceCategory.WASH,
+    estimatedDays: 3,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-woolen',
+    name: 'Woolen Laundry',
+    category: ServiceCategory.WASH,
+    estimatedDays: 3,
+    isActive: true,
+  },
+  {
     id: 'srv-wash-iron',
-    name: 'Wash & Iron',
+    name: 'Starching',
     category: ServiceCategory.WASH_IRON,
     estimatedDays: 2,
     isActive: true,
@@ -112,17 +155,10 @@ const FALLBACK_SERVICES: ServiceTypeDTO[] = [
     isActive: true,
   },
   {
-    id: 'srv-steam-press',
-    name: 'Steam Press Only',
-    category: ServiceCategory.STEAM_PRESS,
-    estimatedDays: 1,
-    isActive: true,
-  },
-  {
-    id: 'srv-premium-wash',
-    name: 'Premium Wash & Fold',
-    category: ServiceCategory.WASH,
-    estimatedDays: 2,
+    id: 'srv-shoe-clean',
+    name: 'Shoe Cleaning',
+    category: ServiceCategory.SHOE_CLEAN,
+    estimatedDays: 3,
     isActive: true,
   },
 ];
@@ -138,8 +174,14 @@ const FALLBACK_PRICES = [
   { garmentCatalogId: 'cat-saree', serviceTypeId: 'srv-wash-iron', price: 100 },
   { garmentCatalogId: 'cat-bedsheet', serviceTypeId: 'srv-wash-iron', price: 90 },
   { garmentCatalogId: 'cat-blanket', serviceTypeId: 'srv-dry-clean', price: 200 },
-  { garmentCatalogId: 'cat-kg-wash', serviceTypeId: 'srv-premium-wash', price: 80 },
-  { garmentCatalogId: 'cat-kg-iron', serviceTypeId: 'srv-wash-iron', price: 120 },
+  { garmentCatalogId: 'cat-kg-wash', serviceTypeId: 'svc-wash-fold', price: 80 },
+  { garmentCatalogId: 'cat-kg-iron', serviceTypeId: 'svc-wash-iron', price: 95 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-wash-iron', price: 95 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-wash-fold', price: 80 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-laundry-white', price: 110 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-laundry-premium', price: 120 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-laundry-woolen', price: 140 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'srv-wash-iron', price: 95 },
 ];
 
 interface OrderWizardModalProps {
@@ -584,6 +626,75 @@ export function OrderWizardModal({
     refreshPhotos();
   };
 
+  // Order Mode switch handler: reconciles entryMode, workflow, service, category, and safely handles incompatible items
+  const handleEntryModeChange = (newMode: OrderEntryMode) => {
+    if (newMode === entryMode) return;
+
+    // Check for incompatible items in current cart:
+    // In WEIGHT mode, items without weight are incompatible.
+    // In PIECES mode, items with weight are incompatible.
+    const incompatible = items.filter((item) => {
+      const isItemWeight = Boolean(item.weight != null && item.weight > 0);
+      return newMode === 'WEIGHT' ? !isItemWeight : isItemWeight;
+    });
+
+    const executeModeSwitch = () => {
+      setEntryMode(newMode);
+      if (newMode === 'WEIGHT') {
+        setWorkflow('LAUNDRY');
+        const firstWeightSvc = services.find(
+          (s) =>
+            s.id === 'svc-wash-iron' ||
+            s.id === 'srv-wash-iron' ||
+            s.name.toLowerCase().includes('wash and steam iron') ||
+            s.name.toLowerCase().includes('steam iron'),
+        );
+        setSelectedServiceId(firstWeightSvc?.id || 'svc-wash-iron');
+        setSelectedCategory(GarmentCategory.WEIGHT_BASED);
+      } else {
+        // Per-Piece mode: select first per-piece service
+        const firstPieceSvc = services.find((s) => {
+          if (!s.isActive) return false;
+          const lower = s.name.toLowerCase();
+          return (
+            !lower.includes('wash and fold') &&
+            !lower.includes('white') &&
+            !lower.includes('premium') &&
+            !lower.includes('woolen') &&
+            !lower.includes('free shoe')
+          );
+        });
+        const targetSvcId = firstPieceSvc?.id || 'srv-wash-iron';
+        setSelectedServiceId(targetSvcId);
+        setSelectedCategory('ALL');
+        const isDc = firstPieceSvc ? isDryCleanService(firstPieceSvc.id, services) : false;
+        setWorkflow(isDc ? 'DRY_CLEANING' : 'LAUNDRY');
+      }
+
+      if (incompatible.length > 0) {
+        setItems((prev) =>
+          prev.filter((item) => {
+            const isItemWeight = Boolean(item.weight != null && item.weight > 0);
+            return newMode === 'WEIGHT' ? isItemWeight : !isItemWeight;
+          }),
+        );
+      }
+    };
+
+    if (incompatible.length > 0) {
+      Alert.alert(
+        'Switch Order Mode',
+        `Switching to ${newMode === 'WEIGHT' ? 'Per-Weight' : 'Per-Piece'} will remove ${incompatible.length} incompatible item(s) from your order. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch & Remove', style: 'destructive', onPress: executeModeSwitch },
+        ],
+      );
+    } else {
+      executeModeSwitch();
+    }
+  };
+
   // Workflow switch handler: reconciles service, category, entryMode, and handles incompatible items
   const handleWorkflowChange = (newWorkflow: OrderWorkflowType) => {
     if (newWorkflow === workflow) return;
@@ -630,19 +741,27 @@ export function OrderWizardModal({
 
   // Service selection handler: enforces service selection rules and reconciles category/entryMode
   const handleSelectService = (newServiceId: string) => {
-    const resolved = resolveCatalogSelectionOnServiceSelect(
-      newServiceId,
-      selectedCategory,
-      services,
-      workflow,
-    );
-    setSelectedServiceId(resolved.serviceId);
-    if (resolved.category) {
-      setSelectedCategory(String(resolved.category));
+    setSelectedServiceId(newServiceId);
+    const svc = services.find((s) => s.id === newServiceId);
+    if (svc) {
+      if (entryMode === 'WEIGHT') {
+        setWorkflow('LAUNDRY');
+        setSelectedCategory(GarmentCategory.WEIGHT_BASED);
+      } else {
+        const isDc = isDryCleanService(svc.id, services);
+        const targetWorkflow: OrderWorkflowType = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
+        setWorkflow(targetWorkflow);
+        const resolved = resolveCatalogSelectionOnServiceSelect(
+          newServiceId,
+          selectedCategory,
+          services,
+          targetWorkflow,
+        );
+        if (resolved.category) {
+          setSelectedCategory(String(resolved.category));
+        }
+      }
     }
-    const svc = services.find((s) => s.id === resolved.serviceId);
-    const isWeight = isWeightBasedPricing(workflow, svc);
-    setEntryMode(isWeight ? 'WEIGHT' : 'PIECES');
   };
 
   // Category selection handler: updates category and reconciles service constraints
@@ -723,6 +842,41 @@ export function OrderWizardModal({
     setConfirmedOrder(null);
     setCurrentStepIndex(0);
   };
+
+  const isExpress = expressOption !== ExpressDeliveryOption.REGULAR;
+  const effectiveSurchargeRate =
+    storeConfig?.expressSurchargePercent != null ? storeConfig.expressSurchargePercent : 50;
+  const discountPercent = selectedCustomer?.discountPercent || 0;
+
+  const orderTotals = useMemo(() => {
+    const pricingItems = items.map((it) => ({
+      quantity: it.quantity || 1,
+      unitPrice: it.unitPrice || 0,
+      weight: it.weight ?? null,
+    }));
+    return calculateOrderTotals(pricingItems, {
+      isExpress,
+      expressSurchargePercent: isExpress ? effectiveSurchargeRate : undefined,
+      expressDeliveryOption: expressOption,
+      discountPercent,
+    });
+  }, [items, isExpress, effectiveSurchargeRate, expressOption, discountPercent]);
+
+  const itemsSummaryList = useMemo(() => {
+    return items.map((it) => {
+      const g = garments.find((gar) => gar.id === it.garmentCatalogId);
+      const s = services.find((svc) => svc.id === it.serviceTypeId);
+      const mult = it.weight && it.weight > 0 ? it.weight : it.quantity || 1;
+      return {
+        garmentName: g?.name || 'Garment Item',
+        serviceName: s?.name || 'Service',
+        quantity: it.quantity || 1,
+        weight: it.weight ?? null,
+        unitPrice: it.unitPrice || 0,
+        lineTotal: (it.unitPrice || 0) * mult,
+      };
+    });
+  }, [items, garments, services]);
 
   const currentStep = STEPS[currentStepIndex];
 
@@ -839,7 +993,7 @@ export function OrderWizardModal({
               cartItemCount={items.length}
               onContinue={handleNext}
               entryMode={entryMode}
-              onEntryModeChange={setEntryMode}
+              onEntryModeChange={handleEntryModeChange}
             />
           )}
 
@@ -863,6 +1017,9 @@ export function OrderWizardModal({
               onProceedToReview={() => setCurrentStepIndex(3)}
               onBackToService={() => setCurrentStepIndex(1)}
               isLoadingCatalog={isLoadingCatalog}
+              clientDraftId={clientDraftId}
+              photos={photos}
+              onRefreshPhotos={refreshPhotos}
             />
           )}
 
@@ -927,12 +1084,17 @@ export function OrderWizardModal({
               orderNumber={confirmedOrder.orderNumber}
               isOfflineQueued={Boolean(confirmedOrder.isOfflineQueued)}
               totalPieces={items.reduce((s, it) => s + (it.quantity || 1), 0)}
-              totalAmount={items.reduce((s, it) => {
-                const multiplier = it.weight && it.weight > 0 ? it.weight : it.quantity || 1;
-                return s + (it.unitPrice || 0) * multiplier;
-              }, 0)}
+              totalAmount={orderTotals.totalAmount}
+              subtotal={orderTotals.subtotal}
+              discountAmount={orderTotals.discountAmount}
+              expressSurcharge={orderTotals.expressSurcharge}
+              taxAmount={orderTotals.taxAmount}
               customerName={selectedCustomer?.name || manualCustomerName}
               customerPhone={selectedCustomer?.phone || manualCustomerPhone}
+              customerAddress={selectedCustomer?.address}
+              itemsList={itemsSummaryList}
+              paymentStatus="PENDING"
+              amountDue={orderTotals.totalAmount}
               onViewOrder={(orderId) => {
                 onClose();
                 onViewOrderDetail?.(orderId);

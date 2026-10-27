@@ -634,7 +634,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Four Authoritative Customer Actions (Profile + 3 Order Modes) */}
+              {/* Three Authoritative Customer Actions: Profile, Per-Piece Order, Per-Weight Order */}
               <View style={styles.customerActionButtonsRow}>
                 {/* 1. View Profile Action */}
                 <TouchableOpacity
@@ -665,7 +665,7 @@ export default function HomeScreen() {
                 >
                   <Icon name="shirt-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
                   <Text style={styles.customerPerPieceBtnText} numberOfLines={1}>
-                    Piece
+                    Per-Piece Order
                   </Text>
                 </TouchableOpacity>
 
@@ -679,28 +679,7 @@ export default function HomeScreen() {
                 >
                   <Icon name="scale-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
                   <Text style={styles.customerPerWeightBtnText} numberOfLines={1}>
-                    Weight
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 4. Create Dry Cleaning Order */}
-                <TouchableOpacity
-                  style={styles.customerDryCleanBtn}
-                  onPress={() =>
-                    handleStartOrderForCustomer(selectedCustomer, 'PIECES', 'DRY_CLEANING')
-                  }
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Create Dry Cleaning Order for ${selectedCustomer.name}`}
-                >
-                  <Icon
-                    name="sparkles-outline"
-                    size={14}
-                    color="#FFFFFF"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.customerDryCleanBtnText} numberOfLines={1}>
-                    Dry Clean
+                    Per-Weight Order
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1572,7 +1551,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   customerProfileBtn: {
-    flex: 1,
+    flex: 0.85,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
@@ -1585,11 +1564,11 @@ const styles = StyleSheet.create({
   },
   customerProfileBtnText: {
     color: '#0284C7',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   customerPerPieceBtn: {
-    flex: 1,
+    flex: 1.15,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#1765F5',
@@ -1605,11 +1584,11 @@ const styles = StyleSheet.create({
   },
   customerPerPieceBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   customerPerWeightBtn: {
-    flex: 1,
+    flex: 1.15,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#0284C7',
@@ -1625,27 +1604,7 @@ const styles = StyleSheet.create({
   },
   customerPerWeightBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
-    fontWeight: '700',
-  },
-  customerDryCleanBtn: {
-    flex: 1.15,
-    minHeight: 44,
-    borderRadius: 10,
-    backgroundColor: '#4F46E5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  customerDryCleanBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
 

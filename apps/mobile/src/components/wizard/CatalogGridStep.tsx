@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,11 @@ import {
   ActivityIndicator,
   ScrollView,
   Platform,
+  Modal,
+  Image,
+  Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import {
   GarmentCatalogDTO,
   ServiceTypeDTO,
@@ -20,8 +24,13 @@ import {
   formatCatalogServiceName,
   filterCategoriesForService,
   isWeightBasedCategory,
+  DEFAULT_TOP_UP_SERVICES,
+  TopUpServiceItem,
+  PhotoType,
+  roundCurrency,
 } from '@growfast/shared-types';
 import { isWeightBasedPricing } from '../../services/catalog-rules';
+import { PendingPhoto, savePhotoLocally, deletePhoto } from '../../db/photos';
 
 export interface CatalogGridStepProps {
   workflow?: OrderWorkflowType;
@@ -47,17 +56,33 @@ export interface CatalogGridStepProps {
   onProceedToReview: () => void;
   onBackToService: () => void;
   isLoadingCatalog?: boolean;
+  clientDraftId?: string;
+  photos?: PendingPhoto[];
+  onRefreshPhotos?: () => Promise<void>;
 }
 
 const CATEGORY_TABS: { key: string; label: string }[] = [
-  { key: 'ALL', label: 'All' },
+  { key: 'ALL', label: 'All Items' },
   { key: GarmentCategory.MEN, label: 'Men' },
   { key: GarmentCategory.WOMEN, label: 'Women' },
   { key: GarmentCategory.KIDS, label: 'Kids' },
   { key: GarmentCategory.HOUSEHOLD, label: 'Household' },
-  { key: GarmentCategory.SHOES, label: 'Shoes' },
-  { key: GarmentCategory.OTHERS, label: 'Others' },
+  { key: GarmentCategory.SHOES, label: 'Shoe' },
+  { key: GarmentCategory.OTHERS, label: 'Other' },
 ];
+
+const DEFECT_QUICK_TAGS = [
+  'Collar Stain',
+  'Torn Hem',
+  'Missing Button',
+  'Color Bleed',
+  'Faded Fabric',
+];
+
+interface LocalWeightPhoto {
+  id: string;
+  uri: string;
+}
 
 export function CatalogGridStep({
   workflow = 'LAUNDRY',
@@ -77,13 +102,27 @@ export function CatalogGridStep({
   onProceedToReview,
   onBackToService,
   isLoadingCatalog = false,
+  clientDraftId,
+  photos = [],
+  onRefreshPhotos,
 }: CatalogGridStepProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Weight entry state for weight-based laundry workflow
+  // Weight entry state for weight-based laundry workflow (Image 2 Screen 3b & Image 3)
   const [weightInput, setWeightInput] = useState('2.00');
-  const [garmentsCountInput, setGarmentsCountInput] = useState(5);
+  const [garmentsCountInput, setGarmentsCountInput] = useState(1);
   const [weightError, setWeightError] = useState<string | null>(null);
+
+  // Add-ons & Garment Details Modals state
+  const [isAddonModalOpen, setIsAddonModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedAddOns, setSelectedAddOns] = useState<TopUpServiceItem[]>([]);
+  const [garmentBreakdown, setGarmentBreakdown] = useState('');
+  const [defectNotes, setDefectNotes] = useState('');
+
+  // Local photos state for the current weight intake item
+  const [uploadedPhotos, setUploadedPhotos] = useState<LocalWeightPhoto[]>([]);
+  const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
 
   // Selected service object
   const currentService = useMemo(() => {
@@ -92,7 +131,7 @@ export function CatalogGridStep({
 
   const serviceDisplayName = currentService
     ? formatCatalogServiceName(currentService.name)
-    : 'Selected Service';
+    : 'Steam Iron';
 
   // Determine whether active selection is weight-based pricing
   const isWeightBased = useMemo(() => {
@@ -116,7 +155,7 @@ export function CatalogGridStep({
     if (name.includes('woolen')) return 140;
     if (name.includes('premium')) return 120;
     if (name.includes('white')) return 110;
-    if (name.includes('iron') || name.includes('steam')) return 95;
+    if (name.includes('iron') || name.includes('steam')) return 159;
     return 80;
   }, [prices, selectedServiceId, currentService]);
 
@@ -206,7 +245,7 @@ export function CatalogGridStep({
     setWeightInput(text);
     const parsed = parseFloat(text);
     if (isNaN(parsed) || parsed < 2.0) {
-      setWeightError('Minimum permitted weight is 2.00 kg (e.g. 2.50 kg).');
+      setWeightError('Minimum permitted weight is 2.00 kg.');
     } else {
       setWeightError(null);
     }
@@ -224,10 +263,100 @@ export function CatalogGridStep({
     setWeightError(null);
   };
 
+  // Photo Capture & Upload Handlers
+  const handleTakePhoto = async () => {
+    try {
+      setIsCapturingPhoto(true);
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Camera Permission',
+          'Camera access is required to photograph intake garments.',
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        let photoId = `w-photo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        if (clientDraftId) {
+          const saved = await savePhotoLocally({
+            clientDraftId,
+            sourceUri: asset.uri,
+            garmentId: 'g-wb-1',
+            unitNumber: uploadedPhotos.length + 1,
+            photoType: PhotoType.FRONT,
+          });
+          photoId = saved.id;
+          await onRefreshPhotos?.();
+        }
+        setUploadedPhotos((prev) => [...prev, { id: photoId, uri: asset.uri }]);
+      }
+    } catch (err: any) {
+      Alert.alert('Camera Error', err.message || 'Could not capture photo');
+    } finally {
+      setIsCapturingPhoto(false);
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      setIsCapturingPhoto(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsMultipleSelection: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newPhotos: LocalWeightPhoto[] = [];
+        for (let i = 0; i < result.assets.length; i++) {
+          const asset = result.assets[i];
+          let photoId = `w-photo-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`;
+          if (clientDraftId) {
+            const saved = await savePhotoLocally({
+              clientDraftId,
+              sourceUri: asset.uri,
+              garmentId: 'g-wb-1',
+              unitNumber: uploadedPhotos.length + i + 1,
+              photoType: PhotoType.FRONT,
+            });
+            photoId = saved.id;
+          }
+          newPhotos.push({ id: photoId, uri: asset.uri });
+        }
+        if (clientDraftId) {
+          await onRefreshPhotos?.();
+        }
+        setUploadedPhotos((prev) => [...prev, ...newPhotos]);
+      }
+    } catch (err: any) {
+      Alert.alert('Gallery Error', err.message || 'Could not pick images');
+    } finally {
+      setIsCapturingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async (photoId: string) => {
+    setUploadedPhotos((prev) => prev.filter((p) => p.id !== photoId));
+    try {
+      await deletePhoto(photoId);
+      await onRefreshPhotos?.();
+    } catch {
+      // Best effort cleanup
+    }
+  };
+
+  // Add weight laundry item to cart
   const handleAddWeightToCart = () => {
     const wt = parseFloat(weightInput);
     if (isNaN(wt) || wt < 2.0) {
-      setWeightError('Minimum permitted weight is 2.00 kg (e.g. 2.50 kg).');
+      setWeightError('Minimum permitted weight is 2.00 kg.');
       return;
     }
     setWeightError(null);
@@ -235,6 +364,7 @@ export function CatalogGridStep({
     const weightGarment = garments.find(
       (g) => g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category),
     ) ||
+      garments.find((g) => g.id === 'g-wb-1') ||
       garments[0] || {
         id: 'g-wb-1',
         name: 'Weight Based Laundry',
@@ -243,15 +373,25 @@ export function CatalogGridStep({
       };
 
     const count = Math.max(1, garmentsCountInput || 1);
+    const combinedNotes = [
+      garmentBreakdown.trim() ? `Breakdown: ${garmentBreakdown.trim()}` : '',
+      defectNotes.trim() ? `Notes: ${defectNotes.trim()}` : '',
+    ]
+      .filter(Boolean)
+      .join(' | ');
+
     const newItem: CreateOrderItemRequest = {
       garmentCatalogId: weightGarment.id,
       serviceTypeId: selectedServiceId,
       quantity: count,
       weight: wt,
       unitPrice: pricePerKg,
+      defectNotes: combinedNotes || undefined,
+      addOnIds: selectedAddOns.map((a) => a.id),
       pieces: Array.from({ length: count }, (_, i) => ({
         unitNumber: i + 1,
-        photoCount: 0,
+        defectNotes: i === 0 && garmentBreakdown ? garmentBreakdown : undefined,
+        photoCount: uploadedPhotos.length,
       })),
     };
 
@@ -260,20 +400,42 @@ export function CatalogGridStep({
     } else {
       onQuickAddItem(weightGarment, selectedServiceId, pricePerKg);
     }
+
+    // Reset weight intake form to clean defaults (ready for next weight item)
+    setWeightInput('2.00');
+    setGarmentsCountInput(1);
+    setSelectedAddOns([]);
+    setGarmentBreakdown('');
+    setDefectNotes('');
+    setUploadedPhotos([]);
+    setWeightError(null);
   };
 
-  // Render per-piece garment card
+  // Render per-piece garment card (matching Image 2 Screen 3a)
   const renderGarmentCard = ({ item }: { item: GarmentCatalogDTO }) => {
     const price = getGarmentPrice(item.id);
     const cartQty = cartQuantityByGarment.get(item.id) || 0;
+
+    const getGarmentEmoji = (cat: string) => {
+      switch (cat) {
+        case GarmentCategory.WOMEN:
+          return '👗';
+        case GarmentCategory.KIDS:
+          return '🧒';
+        case GarmentCategory.HOUSEHOLD:
+          return '🛏️';
+        case GarmentCategory.SHOES:
+          return '👟';
+        default:
+          return '👔';
+      }
+    };
 
     return (
       <View style={[styles.garmentCard, cartQty > 0 && styles.garmentCardInCart]}>
         <View style={styles.garmentHeaderRow}>
           <View style={styles.garmentIconCircle}>
-            <Text style={styles.garmentIconEmoji}>
-              {item.category === GarmentCategory.WOMEN ? '👗' : '👔'}
-            </Text>
+            <Text style={styles.garmentIconEmoji}>{getGarmentEmoji(item.category)}</Text>
           </View>
           {cartQty > 0 && (
             <View style={styles.qtyBadge}>
@@ -289,7 +451,7 @@ export function CatalogGridStep({
 
         <View style={styles.priceRow}>
           <Text style={styles.priceText}>
-            ₹{price.toFixed(2)}
+            ₹{price}
             <Text style={styles.priceUnit}> / pc</Text>
           </Text>
         </View>
@@ -359,169 +521,295 @@ export function CatalogGridStep({
   };
 
   const parsedWeightVal = parseFloat(weightInput) || 0;
-  const currentLineTotal = Math.round(parsedWeightVal * pricePerKg * 100) / 100;
+  const isWeightValid = !isNaN(parsedWeightVal) && parsedWeightVal >= 2.0;
+  const targetCount = Math.max(1, garmentsCountInput || 1);
+  const uploadedCount = uploadedPhotos.length;
+  const remainingCount = Math.max(0, targetCount - uploadedCount);
+
+  // Selected Category Label for Per-Piece context
+  const selectedCategoryLabel = useMemo(() => {
+    const tab = CATEGORY_TABS.find((t) => t.key === selectedCategory);
+    return tab ? tab.label : selectedCategory;
+  }, [selectedCategory]);
 
   return (
     <View style={styles.container}>
-      {/* Top Context Bar: Selected Service + Change Service CTA */}
+      {/* Top Context Bar: Selected Service + Change CTA (Matches Image 2 Screen 3a & 3b) */}
       <View style={styles.contextHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.contextServiceLabel}>
-            {isWeightBased ? 'ACTIVE WEIGHT SERVICE' : 'ACTIVE SERVICE'}
+        <TouchableOpacity
+          style={styles.contextBackArrow}
+          onPress={onBackToService}
+          accessible={true}
+          accessibilityLabel="Back to service selection"
+        >
+          <Text style={styles.contextBackArrowText}>‹</Text>
+        </TouchableOpacity>
+
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={styles.contextServiceName} numberOfLines={1}>
+            {isWeightBased
+              ? `${serviceDisplayName} (Laundry / kg)`
+              : `${serviceDisplayName} • ${selectedCategoryLabel}`}
           </Text>
-          <Text style={styles.contextServiceName}>{serviceDisplayName}</Text>
         </View>
+
         <TouchableOpacity
           style={styles.changeServiceBtn}
           onPress={onBackToService}
           accessible={true}
-          accessibilityLabel="Change selected service or workflow"
+          accessibilityLabel="Change selected service"
         >
-          <Text style={styles.changeServiceBtnText}>Change Service ↺</Text>
+          <Text style={styles.changeServiceBtnText}>Change</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ── WEIGHT-BASED LAUNDRY FLOW (Matches Website Rules) ── */}
+      {/* ── WEIGHT-BASED LAUNDRY FLOW (Image 2 Screen 3b & Image 3 Website Functionality) ── */}
       {isWeightBased ? (
         <ScrollView style={styles.weightScroll} contentContainerStyle={styles.weightScrollContent}>
-          {/* Rate Per KG Info Card */}
-          <View style={styles.weightRateCard}>
-            <View style={styles.weightRateRow}>
-              <View>
-                <Text style={styles.weightRateLabel}>RATE PER KG</Text>
-                <Text style={styles.weightRateAmount}>₹{pricePerKg.toFixed(2)} / kg</Text>
-              </View>
-              <View style={styles.weightMinBadge}>
-                <Text style={styles.weightMinBadgeText}>Minimum 2.00 kg</Text>
-              </View>
-            </View>
-            <Text style={styles.weightRateSubtext}>
-              Turnaround: {currentService?.estimatedDays || 2} days • Batch washed per bag
-            </Text>
-          </View>
+          {/* Card 1: Weight (KG) */}
+          <View style={styles.weightCard}>
+            <Text style={styles.fieldSectionLabel}>Weight (KG)</Text>
 
-          {/* Weight Intake Measurement Card */}
-          <View style={styles.weightIntakeCard}>
-            <Text style={styles.cardSectionTitle}>Weigh Laundry Bag</Text>
-            <Text style={styles.cardSectionSubtitle}>
-              Enter measured scale weight in kg (minimum 2.00 kg)
-            </Text>
-
-            {/* Numeric Input & Steppers */}
-            <View style={styles.weightInputRow}>
+            {/* Stepper display [ - ]  2.00  [ + ] */}
+            <View style={styles.weightStepperContainer}>
               <TouchableOpacity
-                style={styles.weightStepBtn}
+                style={styles.weightBigStepBtn}
                 onPress={() => handleAdjustWeight(-0.5)}
                 accessible={true}
                 accessibilityLabel="Decrease weight by 0.5 kg"
               >
-                <Text style={styles.weightStepBtnText}>− 0.5</Text>
+                <Text style={styles.weightBigStepBtnText}>−</Text>
               </TouchableOpacity>
 
-              <View style={styles.weightDisplayBox}>
+              <View style={styles.weightDisplayValueBox}>
                 <TextInput
-                  style={styles.weightInputText}
+                  style={styles.weightBigValueText}
                   value={weightInput}
                   onChangeText={handleWeightChange}
                   keyboardType="numeric"
                   accessible={true}
-                  accessibilityLabel="Measured weight in kg"
+                  accessibilityLabel="Enter weight in kilograms"
                 />
-                <Text style={styles.weightUnitLabel}>kg</Text>
               </View>
 
               <TouchableOpacity
-                style={styles.weightStepBtn}
+                style={[styles.weightBigStepBtn, styles.weightBigStepBtnPrimary]}
                 onPress={() => handleAdjustWeight(0.5)}
                 accessible={true}
                 accessibilityLabel="Increase weight by 0.5 kg"
               >
-                <Text style={styles.weightStepBtnText}>+ 0.5</Text>
+                <Text style={[styles.weightBigStepBtnText, styles.weightBigStepBtnTextPrimary]}>
+                  ＋
+                </Text>
               </TouchableOpacity>
             </View>
 
+            {/* Preset chips row: [-0.5 kg] [+0.5 kg] | [2 kg] [3 kg] [5 kg] [10 kg]   Min: 2.00 kg */}
+            <View style={styles.presetsAndMinRow}>
+              <View style={styles.presetsGroup}>
+                <TouchableOpacity
+                  style={styles.presetSmallChip}
+                  onPress={() => handleAdjustWeight(-0.5)}
+                >
+                  <Text style={styles.presetSmallChipText}>-0.5 kg</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.presetSmallChip}
+                  onPress={() => handleAdjustWeight(0.5)}
+                >
+                  <Text style={styles.presetSmallChipText}>+0.5 kg</Text>
+                </TouchableOpacity>
+
+                <View style={styles.presetDivider} />
+
+                {[2, 3, 5, 10].map((presetKg) => {
+                  const isActive = parsedWeightVal === presetKg;
+                  return (
+                    <TouchableOpacity
+                      key={presetKg}
+                      style={[styles.presetKgChip, isActive && styles.presetKgChipActive]}
+                      onPress={() => handleSetPresetWeight(presetKg)}
+                    >
+                      <Text
+                        style={[styles.presetKgChipText, isActive && styles.presetKgChipTextActive]}
+                      >
+                        {presetKg} kg
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.minWeightLabel}>Min: 2.00 kg</Text>
+            </View>
+
             {weightError && (
-              <View style={styles.weightErrorBox}>
-                <Text style={styles.weightErrorText}>⚠️ {weightError}</Text>
+              <View style={styles.weightErrorBanner}>
+                <Text style={styles.weightErrorBannerText}>⚠️ {weightError}</Text>
               </View>
             )}
+          </View>
 
-            {/* Quick Preset Buttons */}
-            <Text style={styles.presetLabel}>Quick Weight Presets:</Text>
-            <View style={styles.presetChipsRow}>
-              {[2.0, 3.0, 4.0, 5.0, 8.0, 10.0].map((preset) => (
-                <TouchableOpacity
-                  key={preset}
-                  style={[styles.presetChip, parsedWeightVal === preset && styles.presetChipActive]}
-                  onPress={() => handleSetPresetWeight(preset)}
-                  accessible={true}
-                  accessibilityLabel={`Set weight to ${preset.toFixed(2)} kg`}
-                >
-                  <Text
-                    style={[
-                      styles.presetChipText,
-                      parsedWeightVal === preset && styles.presetChipTextActive,
-                    ]}
-                  >
-                    {preset.toFixed(1)} kg
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Card 2: Price / KG */}
+          <View style={styles.infoRowCard}>
+            <Text style={styles.infoRowLabel}>Price / KG</Text>
+            <View style={styles.priceWithLockRow}>
+              <Text style={styles.priceWithLockAmount}>₹ {pricePerKg}</Text>
+              <Text style={styles.priceLockIcon}>🔒</Text>
             </View>
+          </View>
 
-            {/* Garments Count in Bag */}
-            <View style={styles.garmentCountSection}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.garmentCountTitle}>Pieces in Bag</Text>
-                <Text style={styles.garmentCountSubtitle}>
-                  Physical count for intake verification
+          {/* Card 3: No. of Garments */}
+          <View style={styles.infoRowCard}>
+            <Text style={styles.infoRowLabel}>No. of Garments</Text>
+            <View style={styles.stepperContainerSmall}>
+              <TouchableOpacity
+                style={styles.stepperBtnSmall}
+                onPress={() => setGarmentsCountInput((c) => Math.max(1, c - 1))}
+                accessible={true}
+                accessibilityLabel="Decrease garment count"
+              >
+                <Text style={styles.stepperBtnSmallText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.stepperCountText}>{garmentsCountInput}</Text>
+              <TouchableOpacity
+                style={[styles.stepperBtnSmall, styles.stepperBtnSmallActive]}
+                onPress={() => setGarmentsCountInput((c) => c + 1)}
+                accessible={true}
+                accessibilityLabel="Increase garment count"
+              >
+                <Text style={[styles.stepperBtnSmallText, styles.stepperBtnSmallTextActive]}>
+                  ＋
                 </Text>
-              </View>
-              <View style={styles.countStepperRow}>
-                <TouchableOpacity
-                  style={styles.countBtn}
-                  onPress={() => setGarmentsCountInput((c) => Math.max(1, c - 1))}
-                  accessible={true}
-                  accessibilityLabel="Decrease garment count"
-                >
-                  <Text style={styles.countBtnText}>−</Text>
-                </TouchableOpacity>
-                <View style={styles.countNumberBox}>
-                  <Text style={styles.countNumberText}>{garmentsCountInput}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.countBtn}
-                  onPress={() => setGarmentsCountInput((c) => c + 1)}
-                  accessible={true}
-                  accessibilityLabel="Increase garment count"
-                >
-                  <Text style={styles.countBtnText}>＋</Text>
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             </View>
+          </View>
 
-            {/* Line Calculation Summary */}
-            <View style={styles.calcSummaryRow}>
-              <Text style={styles.calcSummaryLabel}>Estimated Line Total:</Text>
-              <Text style={styles.calcSummaryValue}>₹{currentLineTotal.toFixed(2)}</Text>
-            </View>
-
-            {/* Add to Cart CTA */}
+          {/* Actions: Add-on & Garment Details (Matches Image 2 & Image 3) */}
+          <View style={styles.detailsButtonRow}>
             <TouchableOpacity
-              style={[
-                styles.addWeightCta,
-                (isNaN(parsedWeightVal) || parsedWeightVal < 2.0) && styles.addWeightCtaDisabled,
-              ]}
-              onPress={handleAddWeightToCart}
-              disabled={isNaN(parsedWeightVal) || parsedWeightVal < 2.0}
+              style={styles.addonActionBtn}
+              onPress={() => setIsAddonModalOpen(true)}
               accessible={true}
-              accessibilityLabel="Add weight laundry to order"
+              accessibilityLabel="Select add-on services"
             >
-              <Text style={styles.addWeightCtaText}>＋ Add Weight Laundry to Cart</Text>
+              <Text style={styles.addonActionBtnText}>
+                🏷️ Add on {selectedAddOns.length > 0 ? `(${selectedAddOns.length})` : ''}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.detailsActionBtn}
+              onPress={() => setIsDetailsModalOpen(true)}
+              accessible={true}
+              accessibilityLabel="Add garment details and defect notes"
+            >
+              <Text style={styles.detailsActionBtnText}>📄 Garment Details (Optional) ›</Text>
             </TouchableOpacity>
           </View>
 
-          {/* List of Weight Items currently in Cart */}
+          {/* Preview tags if details or add-ons exist */}
+          {(selectedAddOns.length > 0 || garmentBreakdown || defectNotes) && (
+            <View style={styles.selectedAddonsRow}>
+              {selectedAddOns.map((addon) => (
+                <View key={addon.id} style={styles.addonTagChip}>
+                  <Text style={styles.addonTagChipText}>
+                    {addon.name} (+₹{addon.price})
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setSelectedAddOns((prev) => prev.filter((a) => a.id !== addon.id))
+                    }
+                  >
+                    <Text style={styles.addonTagRemoveText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {garmentBreakdown.trim().length > 0 && (
+                <View style={styles.notesTagChip}>
+                  <Text style={styles.notesTagChipText} numberOfLines={1}>
+                    Breakdown: {garmentBreakdown}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Card 5: Upload Photos (Image 2 Screen 3b & Image 3) */}
+          <View style={styles.photoUploadCard}>
+            <View style={styles.photoHeaderRow}>
+              <Text style={styles.photoHeaderTitle}>
+                📷 Upload Photos ({targetCount <= 50 ? '1 required' : 'optional'})
+              </Text>
+              <Text style={styles.photoHeaderCount}>
+                {uploadedCount} / {targetCount}
+              </Text>
+            </View>
+            <Text style={styles.photoProgressSubtext}>
+              {uploadedCount} of {targetCount} garment photos uploaded — {remainingCount} remaining.
+            </Text>
+
+            {/* Photo Action Buttons */}
+            <View style={styles.photoActionButtonsRow}>
+              <TouchableOpacity
+                style={styles.photoAddBtn}
+                onPress={handleTakePhoto}
+                disabled={isCapturingPhoto}
+                accessible={true}
+                accessibilityLabel="Take photo with camera"
+              >
+                <Text style={styles.photoAddBtnText}>📷 Take Photo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.photoUploadMultipleBtn}
+                onPress={handlePickFromGallery}
+                disabled={isCapturingPhoto}
+                accessible={true}
+                accessibilityLabel="Upload multiple photos from gallery"
+              >
+                <Text style={styles.photoUploadMultipleBtnText}>🖼️ Upload Multiple</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Uploaded Thumbnails Preview */}
+            {uploadedPhotos.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.photoThumbList}
+              >
+                {uploadedPhotos.map((p, idx) => (
+                  <View key={p.id} style={styles.photoThumbWrapper}>
+                    <Image source={{ uri: p.uri }} style={styles.photoThumbImage} />
+                    <TouchableOpacity
+                      style={styles.photoThumbRemoveBtn}
+                      onPress={() => handleRemovePhoto(p.id)}
+                      accessible={true}
+                      accessibilityLabel={`Remove photo ${idx + 1}`}
+                    >
+                      <Text style={styles.photoThumbRemoveText}>✕</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.photoThumbLabel}>Garment {idx + 1}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* Add to Cart CTA (Image 2 Screen 3b) */}
+          <TouchableOpacity
+            style={[styles.addWeightMainCta, !isWeightValid && styles.addWeightMainCtaDisabled]}
+            onPress={handleAddWeightToCart}
+            disabled={!isWeightValid}
+            accessible={true}
+            accessibilityLabel="Add to Cart"
+          >
+            <Text style={styles.addWeightMainCtaText}>Add to Cart →</Text>
+          </TouchableOpacity>
+
+          {/* Weight Items in Cart List (if any exist) */}
           {cartWeightItems.length > 0 && (
             <View style={styles.cartWeightListCard}>
               <Text style={styles.cartWeightListTitle}>
@@ -536,6 +824,7 @@ export function CatalogGridStep({
                     <Text style={styles.cartWeightItemSub}>
                       {item.quantity} pieces • ₹
                       {((item.weight || 0) * (item.unitPrice || 0)).toFixed(2)}
+                      {item.defectNotes ? ` • ${item.defectNotes}` : ''}
                     </Text>
                   </View>
                   {onRemoveItem && (
@@ -554,14 +843,14 @@ export function CatalogGridStep({
           )}
         </ScrollView>
       ) : (
-        /* ── PER-PIECE GARMENT FLOW (Only for Per-Piece Services) ── */
+        /* ── PER-PIECE GARMENT FLOW (Image 2 Screen 3a) ── */
         <>
           {/* Search Input Bar */}
           <View style={styles.searchBarContainer}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search garments by name (e.g. Saree, Shirt)..."
+              placeholder="Search garments..."
               placeholderTextColor="#94a3b8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -636,7 +925,7 @@ export function CatalogGridStep({
         </>
       )}
 
-      {/* Persistent Bottom Sticky Cart Bar */}
+      {/* Persistent Bottom Sticky Cart Bar (Matches Image 2 & 3) */}
       {items.length > 0 && (
         <View style={styles.stickyCartBar}>
           <View style={styles.cartBarInfo}>
@@ -652,10 +941,138 @@ export function CatalogGridStep({
             accessible={true}
             accessibilityLabel="Proceed to Order Review"
           >
-            <Text style={styles.cartBarReviewText}>Review Cart →</Text>
+            <Text style={styles.cartBarReviewText}>View Cart →</Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* ── MODAL: TOP-UP ADD-ON SERVICES ── */}
+      <Modal visible={isAddonModalOpen} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>🏷️ Top-Up Add-on Services</Text>
+              <TouchableOpacity onPress={() => setIsAddonModalOpen(false)}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              {DEFAULT_TOP_UP_SERVICES.map((addon) => {
+                const isChecked = selectedAddOns.some((a) => a.id === addon.id);
+                return (
+                  <TouchableOpacity
+                    key={addon.id}
+                    style={[styles.addonModalItem, isChecked && styles.addonModalItemActive]}
+                    onPress={() => {
+                      if (isChecked) {
+                        setSelectedAddOns((prev) => prev.filter((a) => a.id !== addon.id));
+                      } else {
+                        setSelectedAddOns((prev) => [...prev, addon]);
+                      }
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.addonModalItemName}>{addon.name}</Text>
+                      {addon.description && (
+                        <Text style={styles.addonModalItemDesc}>{addon.description}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.addonModalItemPrice}>+₹{addon.price}</Text>
+                    <View style={[styles.addonCheckbox, isChecked && styles.addonCheckboxActive]}>
+                      {isChecked && <Text style={styles.addonCheckmark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalDoneBtn}
+              onPress={() => setIsAddonModalOpen(false)}
+            >
+              <Text style={styles.modalDoneBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── MODAL: GARMENT DETAILS & DEFECT NOTES ── */}
+      <Modal visible={isDetailsModalOpen} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📄 Garment Details & Notes</Text>
+              <TouchableOpacity onPress={() => setIsDetailsModalOpen(false)}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <Text style={styles.modalInputLabel}>Garment Breakdown (Optional)</Text>
+              <TextInput
+                style={styles.modalTextInput}
+                placeholder="e.g. 2 Shirts, 1 Trouser, 1 Bedsheet"
+                placeholderTextColor="#94a3b8"
+                value={garmentBreakdown}
+                onChangeText={setGarmentBreakdown}
+              />
+
+              <Text style={styles.modalInputLabel}>Defect / Special Notes (Optional)</Text>
+              <TextInput
+                style={[styles.modalTextInput, { height: 70 }]}
+                placeholder="e.g. Broken button on blue shirt, ink stain"
+                placeholderTextColor="#94a3b8"
+                value={defectNotes}
+                onChangeText={setDefectNotes}
+                multiline
+              />
+
+              <Text style={styles.modalQuickTagTitle}>Quick Defect Tags:</Text>
+              <View style={styles.modalTagsRow}>
+                {DEFECT_QUICK_TAGS.map((tag) => {
+                  const isPresent = defectNotes.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[styles.quickTagChip, isPresent && styles.quickTagChipActive]}
+                      onPress={() => {
+                        if (isPresent) {
+                          setDefectNotes((prev) =>
+                            prev
+                              .split(',')
+                              .map((s) => s.trim())
+                              .filter((s) => s !== tag)
+                              .join(', '),
+                          );
+                        } else {
+                          setDefectNotes((prev) => (prev ? `${prev}, ${tag}` : tag));
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.quickTagChipText,
+                          isPresent && styles.quickTagChipTextActive,
+                        ]}
+                      >
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalDoneBtn}
+              onPress={() => setIsDetailsModalOpen(false)}
+            >
+              <Text style={styles.modalDoneBtnText}>Save Details</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -668,32 +1085,33 @@ const styles = StyleSheet.create({
   contextHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#ffffff',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
-  contextServiceLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.5,
+  contextBackArrow: {
+    paddingRight: 6,
+    paddingVertical: 4,
+  },
+  contextBackArrowText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   contextServiceName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1d4ed8',
+    color: '#0f172a',
   },
   changeServiceBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
-    minHeight: 36,
     justifyContent: 'center',
   },
   changeServiceBtnText: {
@@ -701,6 +1119,452 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+
+  // ── WEIGHT INTAKE STYLES (Image 2 Screen 3b) ──
+  weightScroll: {
+    flex: 1,
+  },
+  weightScrollContent: {
+    padding: 16,
+    paddingBottom: 110,
+  },
+  weightCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 12,
+  },
+  fieldSectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 10,
+  },
+  weightStepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  weightBigStepBtn: {
+    width: 52,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  weightBigStepBtnPrimary: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  weightBigStepBtnText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  weightBigStepBtnTextPrimary: {
+    color: '#ffffff',
+  },
+  weightDisplayValueBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  weightBigValueText: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+    minWidth: 100,
+  },
+  presetsAndMinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  presetsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  presetSmallChip: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  presetSmallChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  presetDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: '#cbd5e1',
+    marginHorizontal: 2,
+  },
+  presetKgChip: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  presetKgChipActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  presetKgChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  presetKgChipTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  minWeightLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    marginLeft: 'auto',
+  },
+  weightErrorBanner: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 10,
+  },
+  weightErrorBannerText: {
+    fontSize: 12,
+    color: '#b91c1c',
+    fontWeight: '600',
+  },
+
+  // Row Card (Price / KG, No. of Garments)
+  infoRowCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  infoRowLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  priceWithLockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priceWithLockAmount: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  priceLockIcon: {
+    fontSize: 14,
+  },
+  stepperContainerSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stepperBtnSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperBtnSmallActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  stepperBtnSmallText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  stepperBtnSmallTextActive: {
+    color: '#ffffff',
+  },
+  stepperCountText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    minWidth: 28,
+    textAlign: 'center',
+  },
+
+  // Details and Addon Action Buttons
+  detailsButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  addonActionBtn: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addonActionBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  detailsActionBtn: {
+    flex: 1.3,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailsActionBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  selectedAddonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  addonTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  addonTagChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#1d4ed8',
+  },
+  addonTagRemoveText: {
+    fontSize: 11,
+    color: '#ef4444',
+    fontWeight: '700',
+  },
+  notesTagChip: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxWidth: '100%',
+  },
+  notesTagChipText: {
+    fontSize: 11,
+    color: '#475569',
+  },
+
+  // Photo Upload Card
+  photoUploadCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 14,
+  },
+  photoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  photoHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  photoHeaderCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  photoProgressSubtext: {
+    fontSize: 11,
+    color: '#64748b',
+    marginBottom: 12,
+  },
+  photoActionButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  photoAddBtn: {
+    flex: 1,
+    backgroundColor: '#eff6ff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoAddBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  photoUploadMultipleBtn: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoUploadMultipleBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  photoThumbList: {
+    marginTop: 12,
+  },
+  photoThumbWrapper: {
+    marginRight: 10,
+    position: 'relative',
+    alignItems: 'center',
+  },
+  photoThumbImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  photoThumbRemoveBtn: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoThumbRemoveText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  photoThumbLabel: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 4,
+  },
+
+  // Add to Cart Main CTA
+  addWeightMainCta: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  addWeightMainCtaDisabled: {
+    backgroundColor: '#94a3b8',
+  },
+  addWeightMainCtaText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // Weight Items in Cart List
+  cartWeightListCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  cartWeightListTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 10,
+  },
+  cartWeightItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  cartWeightItemName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  cartWeightItemSub: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  removeWeightItemBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  removeWeightItemText: {
+    color: '#dc2626',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  // ── PER-PIECE STYLES (Image 2 Screen 3a) ──
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -764,18 +1628,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   gridContent: {
-    padding: 12,
-    paddingBottom: 24,
+    padding: 8,
+    paddingBottom: 20,
   },
   gridRow: {
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   garmentCard: {
     width: '48.5%',
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 10,
+    padding: 8,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
   },
@@ -787,80 +1651,81 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   garmentIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   garmentIconEmoji: {
-    fontSize: 16,
+    fontSize: 13,
   },
   qtyBadge: {
     backgroundColor: '#dbeafe',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   qtyBadgeText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#1d4ed8',
   },
   garmentName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#1e293b',
-    minHeight: 34,
+    minHeight: 28,
+    lineHeight: 14,
   },
   garmentCategory: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     color: '#64748b',
     textTransform: 'uppercase',
-    marginTop: 2,
+    marginTop: 1,
   },
   priceRow: {
-    marginTop: 6,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 6,
   },
   priceText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: '#0f172a',
   },
   priceUnit: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     color: '#64748b',
   },
   actionRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   stepperRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
-    height: 38,
+    height: 32,
   },
   stepperBtn: {
-    width: 32,
-    height: 38,
+    width: 28,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#e2e8f0',
   },
   stepperBtnText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1e293b',
   },
@@ -868,47 +1733,47 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 38,
+    height: 32,
   },
   stepperQtyText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#0f172a',
   },
   itemConfigIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
     backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   itemConfigIconText: {
-    fontSize: 14,
+    fontSize: 12,
   },
   quickAddRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   quickAddMainBtn: {
     flex: 1,
     backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 8,
+    borderRadius: 6,
+    paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 38,
+    minHeight: 32,
   },
   quickAddMainBtnText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   quickAddConfigBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: '#cbd5e1',
@@ -916,7 +1781,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quickAddConfigBtnText: {
-    fontSize: 14,
+    fontSize: 12,
   },
   centeredContainer: {
     flex: 1,
@@ -939,6 +1804,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1e293b',
   },
+
+  // Sticky Bottom Bar
   stickyCartBar: {
     position: 'absolute',
     bottom: 0,
@@ -993,298 +1860,150 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Weight-based flow styles
-  weightScroll: {
+  // ── MODAL STYLES ──
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
-  weightScrollContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  weightRateCard: {
+  modalContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    marginBottom: 14,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
   },
-  weightRateRow: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  weightRateLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.5,
-  },
-  weightRateAmount: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1d4ed8',
-    marginTop: 2,
-  },
-  weightMinBadge: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  weightMinBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#2563eb',
-  },
-  weightRateSubtext: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 6,
-  },
-  weightIntakeCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    marginBottom: 14,
-  },
-  cardSectionTitle: {
+  modalTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#0f172a',
   },
-  cardSectionSubtitle: {
-    fontSize: 12,
+  modalCloseText: {
+    fontSize: 18,
     color: '#64748b',
-    marginTop: 2,
-    marginBottom: 14,
+    fontWeight: 'bold',
+    padding: 4,
   },
-  weightInputRow: {
+  modalScroll: {
+    maxHeight: 320,
+  },
+  addonModalItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
     marginBottom: 10,
   },
-  weightStepBtn: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
+  addonModalItemActive: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
   },
-  weightStepBtnText: {
+  addonModalItemName: {
     fontSize: 14,
     fontWeight: '700',
     color: '#1e293b',
   },
-  weightDisplayBox: {
-    flex: 1,
-    flexDirection: 'row',
+  addonModalItemDesc: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  addonModalItemPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    marginRight: 10,
+  },
+  addonCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    backgroundColor: '#ffffff',
+  },
+  addonCheckboxActive: {
+    backgroundColor: '#2563eb',
     borderColor: '#2563eb',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 52,
-    backgroundColor: '#eff6ff',
   },
-  weightInputText: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1d4ed8',
-    textAlign: 'center',
-    minWidth: 70,
-  },
-  weightUnitLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#3b82f6',
-    marginLeft: 4,
-  },
-  weightErrorBox: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 10,
-  },
-  weightErrorText: {
+  addonCheckmark: {
+    color: '#ffffff',
     fontSize: 12,
-    color: '#b91c1c',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  presetLabel: {
+  modalInputLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  modalTextInput: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+  },
+  modalQuickTagTitle: {
     fontSize: 12,
     fontWeight: '700',
     color: '#475569',
-    marginTop: 6,
-    marginBottom: 6,
+    marginTop: 14,
+    marginBottom: 8,
   },
-  presetChipsRow: {
+  modalTagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  presetChip: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    paddingHorizontal: 12,
+  quickTagChip: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 14,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    minHeight: 34,
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  presetChipActive: {
+  quickTagChipActive: {
     backgroundColor: '#2563eb',
     borderColor: '#2563eb',
   },
-  presetChipText: {
+  quickTagChipText: {
     fontSize: 12,
-    fontWeight: '600',
     color: '#334155',
-  },
-  presetChipTextActive: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  garmentCountSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    marginBottom: 14,
-  },
-  garmentCountTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  garmentCountSubtitle: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  countStepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  countBtn: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
-  },
-  countBtnText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  countNumberBox: {
-    paddingHorizontal: 14,
-    height: 38,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  countNumberText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  calcSummaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  calcSummaryLabel: {
-    fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
   },
-  calcSummaryValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  addWeightCta: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  addWeightCtaDisabled: {
-    backgroundColor: '#94a3b8',
-  },
-  addWeightCtaText: {
+  quickTagChipTextActive: {
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
   },
-  cartWeightListCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  cartWeightListTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 10,
-  },
-  cartWeightItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  cartWeightItemName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  cartWeightItemSub: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  removeWeightItemBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#fee2e2',
+  modalDoneBtn: {
+    backgroundColor: '#2563eb',
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    marginTop: 16,
   },
-  removeWeightItemText: {
-    color: '#dc2626',
-    fontWeight: '700',
+  modalDoneBtnText: {
+    color: '#ffffff',
     fontSize: 14,
+    fontWeight: '700',
   },
 });
