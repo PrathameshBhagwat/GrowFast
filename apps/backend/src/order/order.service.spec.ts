@@ -1450,7 +1450,9 @@ describe('OrderService', () => {
       };
       mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(mockOrder);
       mockPrismaService.physicalGarment = {
-        findUnique: jest.fn().mockResolvedValue({ id: 'g1', orderItemId: 'item1', isCancelled: false }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'g1', orderItemId: 'item1', isCancelled: false }),
         findMany: jest.fn().mockResolvedValue([{ id: 'g1', isCancelled: false }]),
         update: jest.fn(),
       };
@@ -1474,7 +1476,9 @@ describe('OrderService', () => {
       };
       mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(mockOrder);
       mockPrismaService.physicalGarment = {
-        findUnique: jest.fn().mockResolvedValue({ id: 'g1', orderItemId: 'item1', isCancelled: false }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'g1', orderItemId: 'item1', isCancelled: false }),
         findMany: jest.fn().mockResolvedValue([{ id: 'g1', isReady: true, isCancelled: false }]),
         update: jest.fn(),
       };
@@ -1484,7 +1488,10 @@ describe('OrderService', () => {
       mockPrismaService.orderItem.update = jest.fn();
       mockPrismaService.orderItem.findMany = jest.fn().mockResolvedValue([{ itemStatus: 'READY' }]);
       mockPrismaService.order.update = jest.fn();
-      service.findOrderById = jest.fn().mockResolvedValue({ ...mockOrder, items: [{ id: 'item1', itemStatus: ItemStatus.READY }] });
+      service.findOrderById = jest.fn().mockResolvedValue({
+        ...mockOrder,
+        items: [{ id: 'item1', itemStatus: ItemStatus.READY }],
+      });
 
       await service.markPhysicalGarmentReady('o1', 'item1', 'g1', true, 'store1');
       expect(mockPrismaService.physicalGarment.update).toHaveBeenCalledWith(

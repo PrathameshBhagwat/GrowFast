@@ -395,7 +395,11 @@ export class SyncEngine {
               );
             }
 
-            if (!matchedPg && matchedItem.physicalGarments && matchedItem.physicalGarments.length > 0) {
+            if (
+              !matchedPg &&
+              matchedItem.physicalGarments &&
+              matchedItem.physicalGarments.length > 0
+            ) {
               matchedPg = matchedItem.physicalGarments[0];
             }
 

@@ -576,7 +576,11 @@ describe('GrowFast Mobile — Garment-Specific Cart Photo Intake & Review Workfl
       const res1 = resolveGarment(pendingPhotoPiece1);
       assert.equal(res1.orderItemId, 'item-srv-1');
       assert.equal(res1.physicalGarmentId, 'pg-srv-001');
-      assert.notEqual(res1.physicalGarmentId, 'g-shirt-cat', 'Must NEVER pass catalog ID as physicalGarmentId');
+      assert.notEqual(
+        res1.physicalGarmentId,
+        'g-shirt-cat',
+        'Must NEVER pass catalog ID as physicalGarmentId',
+      );
 
       const res2 = resolveGarment(pendingPhotoPiece2);
       assert.equal(res2.orderItemId, 'item-srv-1');
@@ -594,11 +598,17 @@ describe('GrowFast Mobile — Garment-Specific Cart Photo Intake & Review Workfl
       // "Rendered more hooks than during the previous render."
 
       // Render cycle 1: order = null (modal mounting or closed)
-      const renderCycle = (order: any, selectedIds: Set<string>, legacyQty: Record<string, number>) => {
+      const renderCycle = (
+        order: any,
+        selectedIds: Set<string>,
+        legacyQty: Record<string, number>,
+      ) => {
         // Unconditional hook counts simulation
-        const physicalItems = order?.items?.filter((it: any) => it.physicalGarments?.length > 0) || [];
+        const physicalItems =
+          order?.items?.filter((it: any) => it.physicalGarments?.length > 0) || [];
         const legacyItems = order?.items?.filter((it: any) => !it.physicalGarments?.length) || [];
-        const totalSelected = selectedIds.size + Object.values(legacyQty).reduce((s, q) => s + q, 0);
+        const totalSelected =
+          selectedIds.size + Object.values(legacyQty).reduce((s, q) => s + q, 0);
 
         // This is the isFinalHandover useMemo computation
         const isFinalHandover = (() => {
