@@ -12,6 +12,7 @@ import {
 } from '@growfast/shared-types';
 import { CustomerCreateModal } from '../components/CustomerCreateModal';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { GrowFastLogo } from '../components/GrowFastLogo';
 import { apiFetch, ApiError, friendlyErrorMessage } from '../services/api';
 import {
   LogOut,
@@ -499,15 +500,15 @@ export const HomePage: React.FC = () => {
                 minWidth: '42px',
                 minHeight: '42px',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)',
+                background: '#EFF6FF',
+                border: '1px solid #DBEAFE',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#FFFFFF',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.15)',
               }}
             >
-              <Shirt size={22} />
+              <GrowFastLogo size={32} />
             </div>
             <div style={{ minWidth: 0 }}>
               <h1

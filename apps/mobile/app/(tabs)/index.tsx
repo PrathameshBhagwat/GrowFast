@@ -35,6 +35,7 @@ import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { CustomerProfileModal } from '../../src/components/CustomerProfileModal';
 import { listDrafts } from '../../src/db/drafts';
+import { GrowFastLogo } from '../../src/components/GrowFastLogo';
 
 // Safe component wrapper for Ionicons across React 18/19 type definitions
 const Icon = Ionicons as unknown as React.ComponentType<{
@@ -391,7 +392,7 @@ export default function HomeScreen() {
             {/* Left: Brand Icon + Brand Name + Branch */}
             <View style={styles.headerLeftGroup}>
               <View style={styles.brandIconSquircle}>
-                <Icon name="shirt-outline" size={24} color="#FFFFFF" />
+                <GrowFastLogo size={34} />
               </View>
               <View style={styles.brandTextGroup}>
                 <Text style={styles.brandTitleText}>
@@ -633,7 +634,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Four Authoritative Customer Actions (Profile + 3 Order Modes) */}
+              {/* Three Authoritative Customer Actions: Profile, Per-Piece Order, Per-Weight Order */}
               <View style={styles.customerActionButtonsRow}>
                 {/* 1. View Profile Action */}
                 <TouchableOpacity
@@ -664,7 +665,7 @@ export default function HomeScreen() {
                 >
                   <Icon name="shirt-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
                   <Text style={styles.customerPerPieceBtnText} numberOfLines={1}>
-                    Piece
+                    Per-Piece Order
                   </Text>
                 </TouchableOpacity>
 
@@ -678,28 +679,7 @@ export default function HomeScreen() {
                 >
                   <Icon name="scale-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
                   <Text style={styles.customerPerWeightBtnText} numberOfLines={1}>
-                    Weight
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 4. Create Dry Cleaning Order */}
-                <TouchableOpacity
-                  style={styles.customerDryCleanBtn}
-                  onPress={() =>
-                    handleStartOrderForCustomer(selectedCustomer, 'PIECES', 'DRY_CLEANING')
-                  }
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Create Dry Cleaning Order for ${selectedCustomer.name}`}
-                >
-                  <Icon
-                    name="sparkles-outline"
-                    size={14}
-                    color="#FFFFFF"
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.customerDryCleanBtnText} numberOfLines={1}>
-                    Dry Clean
+                    Per-Weight Order
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1224,14 +1204,16 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 13,
-    backgroundColor: '#1765F5',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#1765F5',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   brandTextGroup: {
     marginLeft: 12,
@@ -1569,7 +1551,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   customerProfileBtn: {
-    flex: 1,
+    flex: 0.85,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
@@ -1582,11 +1564,11 @@ const styles = StyleSheet.create({
   },
   customerProfileBtnText: {
     color: '#0284C7',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   customerPerPieceBtn: {
-    flex: 1,
+    flex: 1.15,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#1765F5',
@@ -1602,11 +1584,11 @@ const styles = StyleSheet.create({
   },
   customerPerPieceBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   customerPerWeightBtn: {
-    flex: 1,
+    flex: 1.15,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#0284C7',
@@ -1622,27 +1604,7 @@ const styles = StyleSheet.create({
   },
   customerPerWeightBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
-    fontWeight: '700',
-  },
-  customerDryCleanBtn: {
-    flex: 1.15,
-    minHeight: 44,
-    borderRadius: 10,
-    backgroundColor: '#4F46E5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  customerDryCleanBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
 

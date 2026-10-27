@@ -92,6 +92,26 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    name: 'add_piece_id_to_pending_photos',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      const addColumn = async (table: string, colDef: string) => {
+        try {
+          await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${colDef};`);
+        } catch {
+          // Column may already exist in development snapshots
+        }
+      };
+
+      await addColumn('pending_photos', 'piece_id TEXT');
+      await addColumn('pending_photos', 'order_item_id TEXT');
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_pending_photos_piece ON pending_photos(piece_id);
+      `);
+    },
+  },
 ];
 
 export { MIGRATIONS };

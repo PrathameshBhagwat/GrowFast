@@ -25,6 +25,7 @@ import {
   isWeightBasedCategory,
 } from '@growfast/shared-types';
 import { PendingPhoto, savePhotoLocally, deletePhoto, getPhotosForDraft } from '../../db/photos';
+import { generateUUID } from '../../db/drafts';
 
 export interface ItemDetailsModalProps {
   visible: boolean;
@@ -236,13 +237,27 @@ export function ItemDetailsModal({
       return;
     }
 
-    // 4. Build pieces array with photo counts matching website contract
-    const pieces = Array.from({ length: qtyNum }, (_, i) => ({
-      unitNumber: i + 1,
-      photoCount: itemPhotos.length > 0 ? 1 : 0,
-    }));
+    // 4. Build pieces array with stable pieceId and photo counts matching website contract
+    const itemId = initialItem?.id || generateUUID();
+    const pieces = Array.from({ length: qtyNum }, (_, i) => {
+      const u = i + 1;
+      const existingPiece = initialItem?.pieces?.find((p) => p.unitNumber === u);
+      const pieceId = existingPiece?.pieceId || generateUUID();
+      const piecePhotos = itemPhotos.filter(
+        (p) =>
+          (p.pieceId && p.pieceId === pieceId) ||
+          p.unitNumber === u ||
+          (qtyNum === 1 && !p.unitNumber),
+      );
+      return {
+        pieceId,
+        unitNumber: u,
+        photoCount: piecePhotos.length,
+      };
+    });
 
     const item: CreateOrderItemRequest = {
+      id: itemId,
       garmentCatalogId: garment.id,
       serviceTypeId: service?.id || 'srv-wash-iron',
       quantity: qtyNum,

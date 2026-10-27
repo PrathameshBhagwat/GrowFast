@@ -472,9 +472,16 @@ export function resolveCatalogSelectionOnCategoryChange<
     return services.find((s) => isServiceAllowedInWorkflow(s, 'LAUNDRY'));
   };
 
-  // Rule 1: Shoe category -> Shoe Cleaning
+  // Rule 1: Shoe category -> Shoe Cleaning (or preserve Dry Clean in DRY_CLEANING workflow)
   if (isShoeCategory(newCategory)) {
     const currentService = services.find((s) => s.id === currentServiceId);
+    if (
+      workflow === 'DRY_CLEANING' &&
+      currentService &&
+      isDryCleanService(currentService.id, services)
+    ) {
+      return currentServiceId;
+    }
     if (currentService && SHOE_VALID_SERVICES.includes(currentService.name.trim().toLowerCase())) {
       return currentServiceId;
     }

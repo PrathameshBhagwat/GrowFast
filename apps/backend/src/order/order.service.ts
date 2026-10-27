@@ -453,6 +453,7 @@ export class OrderService {
           serviceCounts.set(service.name, (serviceCounts.get(service.name) || 0) + item.quantity);
 
           const orderItemData: any = {
+            ...(item.id ? { id: item.id } : {}),
             garmentCatalogId: garment.id,
             serviceTypeId: service.id,
             quantity: item.quantity,
@@ -466,11 +467,16 @@ export class OrderService {
           // Every physical garment gets an individual PhysicalGarment record and a permanent, unique tag identity.
           // For weight-based laundry orders, item.quantity is the declared garment count.
           orderItemData.physicalGarments = {
-            create: Array.from({ length: item.quantity }, (_, i) => ({
-              unitNumber: i + 1,
-              tagId: this.generateTagId(),
-              isReady: false,
-            })),
+            create: Array.from({ length: item.quantity }, (_, i) => {
+              const u = i + 1;
+              const matchedPiece = item.pieces?.find((p) => p.unitNumber === u);
+              return {
+                ...(matchedPiece?.pieceId ? { id: matchedPiece.pieceId } : {}),
+                unitNumber: u,
+                tagId: this.generateTagId(),
+                isReady: false,
+              };
+            }),
           };
 
           orderItemsData.push(orderItemData);
@@ -2414,6 +2420,7 @@ export class OrderService {
       clientDraftId: order.clientDraftId || null,
       items: order.items.map((item: any) => ({
         id: item.id,
+        garmentCatalogId: item.garmentCatalogId,
         garmentName: item.garmentCatalog.name,
         garmentCategory: item.garmentCatalog.category,
         serviceType: item.serviceType.category,

@@ -9,6 +9,7 @@ import {
 import { fetchDashboardSummary } from '../services/dashboard.api';
 import { useAuth } from '../contexts/AuthContext';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { GrowFastLogo } from '../components/GrowFastLogo';
 import { DashboardTrendChart } from '../components/DashboardTrendChart';
 import { DashboardBreakdownChart } from '../components/DashboardBreakdownChart';
 import { DashboardActionCenter, type ActionQueueType } from '../components/DashboardActionCenter';
@@ -372,18 +373,18 @@ export const DashboardPage: React.FC = () => {
         >
           <div
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: '#EFF6FF',
+              border: '1px solid #DBEAFE',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#FFFFFF',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.15)',
             }}
           >
-            <Shirt size={18} />
+            <GrowFastLogo size={28} />
           </div>
           <span
             style={{

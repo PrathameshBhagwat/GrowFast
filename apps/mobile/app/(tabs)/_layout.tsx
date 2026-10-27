@@ -3,6 +3,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { Text, View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { GrowFastLogo } from '../../src/components/GrowFastLogo';
 
 const Icon = Ionicons as unknown as React.ComponentType<{
   name: string;
@@ -17,6 +18,7 @@ export default function TabsLayout() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
+        <GrowFastLogo size={80} containerStyle={{ marginBottom: 16 }} />
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );

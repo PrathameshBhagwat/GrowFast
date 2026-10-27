@@ -440,7 +440,7 @@ export function OrderDetailModal({
                         activeTab === 'PHOTOS' && styles.tabItemTextActive,
                       ]}
                     >
-                      Photos ({orderPhotos.length || 3})
+                      Photos ({orderPhotos.length})
                     </Text>
                   </TouchableOpacity>
 

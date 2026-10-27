@@ -23,6 +23,7 @@ export function isWeightBasedPricing(
   if (workflow === 'DRY_CLEANING') return false;
   if (entryMode === 'WEIGHT') return true;
   if (category && isWeightBasedCategory(category)) return true;
+  if (entryMode === 'PIECES') return false;
   if (!service) return true; // Default laundry in GrowFast is weight-based
   const cat = service.category;
   if (
@@ -49,3 +50,41 @@ export function isWeightBasedPricing(
   ];
   return canonicalNames.some((n) => name.includes(n));
 }
+
+export const CANONICAL_WEIGHT_SERVICES = [
+  {
+    id: 'svc-wash-iron',
+    name: 'Steam Iron',
+    category: ServiceCategory.WASH_IRON,
+    estimatedDays: 1,
+    isActive: true,
+  },
+  {
+    id: 'svc-wash-fold',
+    name: 'Wash and Fold',
+    category: ServiceCategory.WASH,
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-white',
+    name: 'Laundry for White',
+    category: ServiceCategory.WASH,
+    estimatedDays: 2,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-premium',
+    name: 'Premium Laundry',
+    category: ServiceCategory.WASH,
+    estimatedDays: 3,
+    isActive: true,
+  },
+  {
+    id: 'svc-laundry-woolen',
+    name: 'Woolen Laundry',
+    category: ServiceCategory.WASH,
+    estimatedDays: 3,
+    isActive: true,
+  },
+] as const;

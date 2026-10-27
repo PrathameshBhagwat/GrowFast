@@ -62,42 +62,43 @@ export class WebStorageAdapter implements StorageAdapter {
   async getItem(key: string): Promise<string | null> {
     if (this.isLocalStorageAvailable()) {
       try {
-        return window.localStorage.getItem(key);
+        const val = window.localStorage.getItem(key);
+        if (val !== null) return val;
       } catch {
-        return this.fallback.getItem(key);
+        // Fall back to memory
       }
     }
     return this.fallback.getItem(key);
   }
 
   async setItem(key: string, value: string): Promise<void> {
+    await this.fallback.setItem(key, value);
     if (this.isLocalStorageAvailable()) {
       try {
         window.localStorage.setItem(key, value);
         return;
       } catch {
-        return this.fallback.setItem(key, value);
+        // Fall back gracefully
       }
     }
-    return this.fallback.setItem(key, value);
   }
 
   async removeItem(key: string): Promise<void> {
+    await this.fallback.removeItem(key);
     if (this.isLocalStorageAvailable()) {
       try {
         window.localStorage.removeItem(key);
         return;
       } catch {
-        return this.fallback.removeItem(key);
+        // Fall back gracefully
       }
     }
-    return this.fallback.removeItem(key);
   }
 }
 
 /**
  * Native Android/iOS SecureStore adapter using expo-secure-store.
- * Strictly checks isAvailableAsync() before executing native bridge calls.
+ * Strictly guards against web/unsupported runtimes and falls back to in-memory storage.
  */
 export class NativeSecureStoreAdapter implements StorageAdapter {
   private secureStore: any = null;
@@ -125,7 +126,11 @@ export class NativeSecureStoreAdapter implements StorageAdapter {
 
     try {
       const store = await import('expo-secure-store');
-      if (store && typeof store.isAvailableAsync === 'function') {
+      if (
+        store &&
+        typeof store.isAvailableAsync === 'function' &&
+        typeof store.getItemAsync === 'function'
+      ) {
         const isAvail = await store.isAvailableAsync();
         if (isAvail) {
           this.secureStore = store;
@@ -133,8 +138,9 @@ export class NativeSecureStoreAdapter implements StorageAdapter {
           return this.secureStore;
         }
       }
-    } catch {
+    } catch (err) {
       // SecureStore not available or unsupported
+      console.warn('[SecureStore] Native store initialization check failed:', err);
     }
 
     this.available = false;
@@ -145,38 +151,41 @@ export class NativeSecureStoreAdapter implements StorageAdapter {
     try {
       const store = await this.getNativeStore();
       if (store && typeof store.getItemAsync === 'function') {
-        return await store.getItemAsync(key);
+        const val = await store.getItemAsync(key);
+        if (val !== null && val !== undefined) {
+          return val;
+        }
       }
-    } catch {
-      // Native SecureStore failed, fall back
+    } catch (err) {
+      console.warn('[SecureStore] Native getItemAsync error, falling back:', err);
     }
     return this.fallback.getItem(key);
   }
 
   async setItem(key: string, value: string): Promise<void> {
+    await this.fallback.setItem(key, value);
     try {
       const store = await this.getNativeStore();
       if (store && typeof store.setItemAsync === 'function') {
         await store.setItemAsync(key, value);
         return;
       }
-    } catch {
-      // Native SecureStore failed, fall back
+    } catch (err) {
+      console.warn('[SecureStore] Native setItemAsync error, stored in fallback:', err);
     }
-    return this.fallback.setItem(key, value);
   }
 
   async removeItem(key: string): Promise<void> {
+    await this.fallback.removeItem(key);
     try {
       const store = await this.getNativeStore();
       if (store && typeof store.deleteItemAsync === 'function') {
         await store.deleteItemAsync(key);
         return;
       }
-    } catch {
-      // Native SecureStore failed, fall back
+    } catch (err) {
+      console.warn('[SecureStore] Native deleteItemAsync error, removed from fallback:', err);
     }
-    return this.fallback.removeItem(key);
   }
 }
 

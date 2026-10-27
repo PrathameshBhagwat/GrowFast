@@ -25,7 +25,6 @@ import {
   formatCatalogServiceName,
 } from '@growfast/shared-types';
 import { PendingPhoto } from '../../db/photos';
-import { PhotoQueueView } from '../PhotoQueueView';
 
 export interface FinalReviewStepProps {
   clientDraftId: string;
@@ -55,6 +54,7 @@ export interface FinalReviewStepProps {
   }>;
   onOrderSuccess: (order: { orderId: string; orderNumber: string }) => void;
   onPhotosUpdated?: () => void;
+  onNavigateToCart?: () => void;
 }
 
 export function FinalReviewStep({
@@ -79,6 +79,7 @@ export function FinalReviewStep({
   onSubmitOrder,
   onOrderSuccess,
   onPhotosUpdated,
+  onNavigateToCart,
 }: FinalReviewStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -177,12 +178,44 @@ export function FinalReviewStep({
       return;
     }
 
-    if (photoRequired && photos.length === 0) {
-      Alert.alert(
-        'Intake Photo Required',
-        'Store walk-in policy requires at least one intake photograph of garments before workshop submission.',
-      );
-      return;
+    if (photoRequired) {
+      const missingPieces: string[] = [];
+      items.forEach((item) => {
+        const garment = garments.find((g) => g.id === item.garmentCatalogId);
+        const name = garment?.name || 'Garment';
+        const pieceCount = item.quantity || 1;
+        for (let u = 1; u <= pieceCount; u++) {
+          const piece = item.pieces?.find((p) => p.unitNumber === u);
+          const count = photos.filter((p) => {
+            if (piece?.pieceId && p.pieceId === piece.pieceId) return true;
+            return (
+              p.garmentId === item.garmentCatalogId &&
+              (p.unitNumber === u || (pieceCount === 1 && !p.unitNumber))
+            );
+          }).length;
+          if (count === 0) {
+            missingPieces.push(pieceCount > 1 ? `• ${name} — Piece #${u}` : `• ${name}`);
+          }
+        }
+      });
+
+      if (missingPieces.length > 0) {
+        Alert.alert(
+          'Intake Photos Required',
+          `Store walk-in policy requires intake photos for each physical piece (≤50 pieces).\n\nMissing photos:\n${missingPieces.join('\n')}`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Go to Cart',
+              style: 'default',
+              onPress: () => {
+                onNavigateToCart?.();
+              },
+            },
+          ],
+        );
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -209,7 +242,21 @@ export function FinalReviewStep({
             orderNumber: 'QUEUED',
           });
         } else {
-          Alert.alert('Submission Error', result.error || 'Failed to submit order to server.');
+          const errMsg = result.error || 'Failed to submit order to server.';
+          if (errMsg.includes('missing photos') || errMsg.includes('Photos are required')) {
+            Alert.alert('Photo Validation Error', errMsg, [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Go to Cart',
+                style: 'default',
+                onPress: () => {
+                  onNavigateToCart?.();
+                },
+              },
+            ]);
+          } else {
+            Alert.alert('Submission Error', errMsg);
+          }
         }
       }
     } catch (err: any) {
@@ -399,48 +446,6 @@ export function FinalReviewStep({
         </View>
       </View>
 
-      {/* 4. Garment Intake Photos */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Intake & Garment Photos</Text>
-          <View
-            style={[
-              styles.membershipBadge,
-              photoRequired && photos.length === 0
-                ? styles.badgeDangerStyle
-                : styles.badgeSuccessStyle,
-            ]}
-          >
-            <Text
-              style={[
-                styles.membershipBadgeText,
-                photoRequired && photos.length === 0
-                  ? styles.badgeDangerTextStyle
-                  : styles.badgeSuccessTextStyle,
-              ]}
-            >
-              {photoRequired
-                ? photos.length === 0
-                  ? '⚠️ PHOTO REQUIRED'
-                  : '✓ PHOTO ATTACHED'
-                : 'OPTIONAL'}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.photoPolicyText}>
-          {photoRequired
-            ? 'Store walk-in policy requires at least one intake photograph of garments before workshop submission.'
-            : 'Capture or select photos of garments, tags, or special care requirements.'}
-        </Text>
-
-        <PhotoQueueView
-          clientDraftId={clientDraftId}
-          photos={photos}
-          onPhotosChanged={onPhotosUpdated || (() => {})}
-        />
-      </View>
-
       {/* 5. Order Notes Input */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Special Instructions / Notes</Text>
@@ -591,26 +596,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#b45309',
-  },
-  photoPolicyText: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 8,
-    lineHeight: 16,
-  },
-  badgeDangerStyle: {
-    backgroundColor: '#fee2e2',
-    borderColor: '#fca5a5',
-  },
-  badgeDangerTextStyle: {
-    color: '#b91c1c',
-  },
-  badgeSuccessStyle: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#86efac',
-  },
-  badgeSuccessTextStyle: {
-    color: '#15803d',
   },
   customerName: {
     fontSize: 16,

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../src/api/client';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { GrowFastLogo } from '../../src/components/GrowFastLogo';
 
 // Safe component wrapper for vector icons across React 18/19 type definitions
 const Icon = Ionicons as unknown as React.ComponentType<{
@@ -98,7 +99,7 @@ function LaundryIllustration() {
 }
 
 const FALLBACK_STAFF_DIRECTORY: EmployeeDirectoryItem[] = [
-  { id: 'emp-counter-001', name: 'Sarthak kumkar', role: 'COUNTER' },
+  { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER' },
   { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER' },
 ];
 
@@ -109,10 +110,6 @@ export default function LoginScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  if (!isAuthLoading && isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
-  }
 
   // Initialize with fallback directory so the screen is immediately interactive on mount
   const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>(FALLBACK_STAFF_DIRECTORY);
@@ -183,6 +180,18 @@ export default function LoginScreen() {
     loadDirectory();
   }, [loadDirectory]);
 
+  // Navigate to main tabs when authenticated
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
+  // If already authenticated and done loading, redirect without violating hook rules
+  if (!isAuthLoading && isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
+
   const handleLogin = async () => {
     if (lockoutUntil) return;
 
@@ -245,6 +254,10 @@ export default function LoginScreen() {
   const selectedEmployee = directory.find((d) => d.id === selectedEmpId);
   const isCompactScreen = windowHeight < 720;
 
+  if (!isAuthLoading && isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
+
   return (
     <View
       style={[
@@ -290,6 +303,10 @@ export default function LoginScreen() {
 
           {/* Wordmark Header: GrowFast & Tagline */}
           <View style={styles.brandHeader}>
+            <GrowFastLogo
+              size={isCompactScreen ? 68 : 88}
+              containerStyle={styles.brandLogoContainer}
+            />
             <View style={styles.wordmarkRow}>
               <Text style={styles.brandGrow}>Grow</Text>
               <Text style={styles.brandFast}>Fast</Text>
@@ -300,9 +317,9 @@ export default function LoginScreen() {
 
           {/* Main White Login Card */}
           <View style={styles.card}>
-            {/* Center Top Laundry / T-Shirt Icon Badge */}
+            {/* Center Top Laundry / Official Logo Badge */}
             <View style={styles.shirtIconContainer}>
-              <Icon name="shirt" size={32} color="#ffffff" />
+              <GrowFastLogo size={40} />
             </View>
 
             {/* Welcome Back & Subtitle */}
@@ -687,6 +704,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     zIndex: 1,
   },
+  brandLogoContainer: {
+    marginBottom: 8,
+  },
   wordmarkRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -746,15 +766,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#f0f7ff',
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#dbeafe',
     shadowColor: '#2563eb',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 3,
     marginBottom: 14,
   },
   cardHeading: {
