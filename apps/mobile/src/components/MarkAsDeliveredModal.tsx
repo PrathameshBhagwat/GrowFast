@@ -118,21 +118,13 @@ export function MarkAsDeliveredModal({
     }
   }, [visible, order, physicalItems, legacyItems]);
 
-  if (!order) return null;
-
-  const todayStr = new Date().toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-
   const selectedPhysicalCount = selectedGarmentIds.size;
   const selectedLegacyCount = Object.values(legacyQuantities).reduce((sum, q) => sum + (q || 0), 0);
   const totalSelectedCount = selectedPhysicalCount + selectedLegacyCount;
 
   // Check if this pickup would deliver all remaining active items (final handover)
   const isFinalHandover = useMemo(() => {
-    if (totalSelectedCount === 0) return false;
+    if (!order || totalSelectedCount === 0) return false;
 
     for (const item of physicalItems) {
       for (const pg of item.physicalGarments || []) {
@@ -153,7 +145,15 @@ export function MarkAsDeliveredModal({
     }
 
     return true;
-  }, [physicalItems, legacyItems, selectedGarmentIds, legacyQuantities, totalSelectedCount]);
+  }, [order, physicalItems, legacyItems, selectedGarmentIds, legacyQuantities, totalSelectedCount]);
+
+  if (!order) return null;
+
+  const todayStr = new Date().toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 
   const toggleGarment = (id: string) => {
     setSelectedGarmentIds((prev) => {

@@ -110,10 +110,6 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  if (!isAuthLoading && isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
-  }
-
   // Initialize with fallback directory so the screen is immediately interactive on mount
   const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>(FALLBACK_STAFF_DIRECTORY);
   const [selectedEmpId, setSelectedEmpId] = useState<string>('emp-counter-001');
@@ -182,6 +178,18 @@ export default function LoginScreen() {
   useEffect(() => {
     loadDirectory();
   }, [loadDirectory]);
+
+  // Navigate to main tabs when authenticated
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
+  // If already authenticated and done loading, redirect without violating hook rules
+  if (!isAuthLoading && isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   const handleLogin = async () => {
     if (lockoutUntil) return;

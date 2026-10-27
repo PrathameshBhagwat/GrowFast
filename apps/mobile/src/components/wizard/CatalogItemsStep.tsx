@@ -72,7 +72,7 @@ const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
 const FALLBACK_SERVICES: ServiceTypeDTO[] = [
   {
     id: 'srv-wash-iron',
-    name: 'Wash & Iron',
+    name: 'Starching',
     category: ServiceCategory.WASH_IRON,
     estimatedDays: 2,
     isActive: true,
@@ -82,13 +82,6 @@ const FALLBACK_SERVICES: ServiceTypeDTO[] = [
     name: 'Dry Clean',
     category: ServiceCategory.DRY_CLEAN,
     estimatedDays: 3,
-    isActive: true,
-  },
-  {
-    id: 'srv-steam-press',
-    name: 'Steam Press Only',
-    category: ServiceCategory.STEAM_PRESS,
-    estimatedDays: 1,
     isActive: true,
   },
   {
