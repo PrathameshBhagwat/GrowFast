@@ -9,6 +9,8 @@ export interface PendingPhoto {
   id: string;
   clientDraftId: string;
   garmentId?: string | null;
+  orderItemId?: string | null;
+  pieceId?: string | null;
   unitNumber?: number | null;
   localFileUri: string;
   photoType: PhotoType;
@@ -27,6 +29,8 @@ interface RawPhotoRow {
   id: string;
   client_draft_id: string;
   garment_id: string | null;
+  order_item_id?: string | null;
+  piece_id?: string | null;
   unit_number: number | null;
   local_file_uri: string;
   photo_type: string;
@@ -46,6 +50,8 @@ function mapRowToPhoto(row: RawPhotoRow): PendingPhoto {
     id: row.id,
     clientDraftId: row.client_draft_id,
     garmentId: row.garment_id,
+    orderItemId: row.order_item_id || null,
+    pieceId: row.piece_id || null,
     unitNumber: row.unit_number,
     localFileUri: row.local_file_uri,
     photoType: (row.photo_type || PhotoType.FRONT) as PhotoType,
@@ -123,6 +129,8 @@ export async function savePhotoLocally(params: {
   sourceUri: string;
   photoType?: PhotoType;
   garmentId?: string;
+  orderItemId?: string;
+  pieceId?: string;
   unitNumber?: number;
 }): Promise<PendingPhoto> {
   const photoId = generateUUID();
@@ -153,13 +161,15 @@ export async function savePhotoLocally(params: {
   const db = await getDatabase();
   await db.runAsync(
     `INSERT INTO pending_photos (
-      id, client_draft_id, garment_id, unit_number, local_file_uri,
+      id, client_draft_id, garment_id, order_item_id, piece_id, unit_number, local_file_uri,
       photo_type, sync_status, retry_count, file_size, mime_type, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, 'image/jpeg', ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, 'image/jpeg', ?, ?)`,
     [
       photoId,
       params.clientDraftId,
       params.garmentId || null,
+      params.orderItemId || null,
+      params.pieceId || null,
       params.unitNumber || null,
       finalUri,
       photoType,

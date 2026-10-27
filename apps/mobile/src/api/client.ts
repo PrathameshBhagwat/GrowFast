@@ -186,11 +186,12 @@ export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const normalizedPath = cleanEndpoint.startsWith('/api/') ? cleanEndpoint : `/api${cleanEndpoint}`;
   const isPublicEndpoint =
-    cleanEndpoint === '/api/auth/login' ||
-    cleanEndpoint.startsWith('/api/auth/login') ||
-    cleanEndpoint === '/api/auth/directory' ||
-    cleanEndpoint.startsWith('/api/auth/directory');
+    normalizedPath === '/api/auth/login' ||
+    normalizedPath.startsWith('/api/auth/login') ||
+    normalizedPath === '/api/auth/directory' ||
+    normalizedPath.startsWith('/api/auth/directory');
 
   // If endpoint is protected and no token is present, do not send doomed request
   if (!isPublicEndpoint && !token) {

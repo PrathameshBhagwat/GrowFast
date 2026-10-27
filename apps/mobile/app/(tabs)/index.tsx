@@ -35,6 +35,7 @@ import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { CustomerProfileModal } from '../../src/components/CustomerProfileModal';
 import { listDrafts } from '../../src/db/drafts';
+import { GrowFastLogo } from '../../src/components/GrowFastLogo';
 
 // Safe component wrapper for Ionicons across React 18/19 type definitions
 const Icon = Ionicons as unknown as React.ComponentType<{
@@ -391,7 +392,7 @@ export default function HomeScreen() {
             {/* Left: Brand Icon + Brand Name + Branch */}
             <View style={styles.headerLeftGroup}>
               <View style={styles.brandIconSquircle}>
-                <Icon name="shirt-outline" size={24} color="#FFFFFF" />
+                <GrowFastLogo size={34} />
               </View>
               <View style={styles.brandTextGroup}>
                 <Text style={styles.brandTitleText}>
@@ -1224,14 +1225,16 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 13,
-    backgroundColor: '#1765F5',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#1765F5',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   brandTextGroup: {
     marginLeft: 12,

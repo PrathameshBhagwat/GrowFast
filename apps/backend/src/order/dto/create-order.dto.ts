@@ -22,6 +22,10 @@ import {
 } from '@growfast/shared-types';
 
 export class CreateOrderPieceDto implements CreateOrderPieceRequest {
+  @IsOptional()
+  @IsString()
+  pieceId?: string;
+
   @IsInt()
   @Min(1)
   unitNumber!: number;
@@ -38,6 +42,10 @@ export class CreateOrderPieceDto implements CreateOrderPieceRequest {
 }
 
 export class CreateOrderItemDto implements CreateOrderItemRequest {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @IsString()
   garmentCatalogId!: string;
 

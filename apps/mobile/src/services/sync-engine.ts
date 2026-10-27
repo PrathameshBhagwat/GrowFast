@@ -320,8 +320,9 @@ export class SyncEngine {
     }
 
     // Reconnection safety check: verify order is not already expired under the 10-day retention rule
+    let serverOrder: any = null;
     try {
-      const serverOrder = await apiClient.orders.getById(serverOrderId);
+      serverOrder = await apiClient.orders.getById(serverOrderId);
       if (serverOrder && serverOrder.status === 'DELIVERED' && serverOrder.deliveredAt) {
         const deliveredDate = new Date(serverOrder.deliveredAt);
         const isExpired = Date.now() - deliveredDate.getTime() >= 10 * 24 * 60 * 60 * 1000;
@@ -358,11 +359,58 @@ export class SyncEngine {
 
         await updatePhotoSyncStatus(photo.id, 'UPLOADING');
 
+        // Resolve server physicalGarmentId matching the physical piece unitNumber or pieceId
+        let physicalGarmentId: string | undefined = undefined;
+        let orderItemId: string | undefined = photo.orderItemId || undefined;
+
+        if (serverOrder?.items) {
+          let matchedItem = photo.orderItemId
+            ? serverOrder.items.find((it: any) => it.id === photo.orderItemId)
+            : undefined;
+
+          if (!matchedItem) {
+            matchedItem = serverOrder.items.find(
+              (it: any) =>
+                (it.garmentCatalogId && it.garmentCatalogId === photo.garmentId) ||
+                (it.garmentName &&
+                  (it.garmentName === photo.garmentId ||
+                    it.garmentName.toLowerCase() === (photo.garmentId || '').toLowerCase())),
+            );
+          }
+
+          if (!matchedItem && serverOrder.items.length === 1) {
+            matchedItem = serverOrder.items[0];
+          }
+
+          if (matchedItem) {
+            orderItemId = matchedItem.id;
+            const targetUnit = photo.unitNumber || 1;
+            let matchedPg = photo.pieceId
+              ? matchedItem.physicalGarments?.find((pg: any) => pg.id === photo.pieceId)
+              : undefined;
+
+            if (!matchedPg) {
+              matchedPg = matchedItem.physicalGarments?.find(
+                (pg: any) => pg.unitNumber === targetUnit,
+              );
+            }
+
+            if (!matchedPg && matchedItem.physicalGarments && matchedItem.physicalGarments.length > 0) {
+              matchedPg = matchedItem.physicalGarments[0];
+            }
+
+            if (matchedPg) {
+              physicalGarmentId = matchedPg.id;
+            }
+          }
+        }
+
         const uploadResult = await apiClient.photos.upload({
           uri: photo.localFileUri,
           orderId: serverOrderId,
+          orderItemId,
           photoType: photo.photoType,
-          physicalGarmentId: photo.garmentId || undefined,
+          physicalGarmentId,
         });
 
         await updatePhotoSyncStatus(photo.id, 'UPLOADED', {

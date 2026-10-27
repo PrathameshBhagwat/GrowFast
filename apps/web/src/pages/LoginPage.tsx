@@ -5,6 +5,7 @@ import { Eye, EyeOff, User, Lock, ArrowRight, Shield, ShieldCheck } from 'lucide
 import { Dropdown, DropdownOption } from '@growfast/ui';
 import { apiFetch } from '../services/api';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { GrowFastLogo } from '../components/GrowFastLogo';
 
 export const LoginPage: React.FC = () => {
   const { login, error } = useAuth();
@@ -434,7 +435,11 @@ export const LoginPage: React.FC = () => {
         {/* ── Left Column: GrowFast Branding & Statement ── */}
         <div className="w-full lg:w-1/2 flex flex-col justify-between py-2 lg:py-8 max-w-xl text-left">
           <div>
-            {/* Brand Logo */}
+            {/* Official GrowFast Brand Logo */}
+            <div className="mb-4">
+              <GrowFastLogo size={76} />
+            </div>
+            {/* Brand Wordmark */}
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] xl:text-[3.75rem] font-black tracking-tight leading-none text-slate-900 dark:text-slate-100 flex items-center gap-0.5">
               <span>Grow</span>
               <span className="text-blue-600 dark:text-blue-500">Fast</span>
@@ -478,20 +483,9 @@ export const LoginPage: React.FC = () => {
                 '0 25px 60px -15px rgba(160, 175, 200, 0.35), 0 10px 24px -6px rgba(160, 175, 200, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.95)',
             }}
           >
-            {/* 1. Brand Icon */}
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[20px] sm:rounded-[22px] bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shadow-[0_8px_20px_rgba(37,99,235,0.35)]">
-              <svg
-                width="30"
-                height="30"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
-              </svg>
+            {/* 1. Official Brand Logo */}
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[20px] sm:rounded-[22px] bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700/60 flex items-center justify-center shadow-[0_8px_20px_rgba(37,99,235,0.15)]">
+              <GrowFastLogo size={42} />
             </div>
 
             {/* 2. Welcome Greeting */}

@@ -1440,6 +1440,60 @@ describe('OrderService', () => {
         service.markPhysicalGarmentReady('o1', 'item1', 'g1', true, 'store1'),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should throw BadRequestException if walk-in garment has no photo when marking ready', async () => {
+      const mockOrder = {
+        id: 'o1',
+        storeId: 'store1',
+        pickupType: PickupType.STORE_PICKUP,
+        items: [{ id: 'item1' }],
+      };
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(mockOrder);
+      mockPrismaService.physicalGarment = {
+        findUnique: jest.fn().mockResolvedValue({ id: 'g1', orderItemId: 'item1', isCancelled: false }),
+        findMany: jest.fn().mockResolvedValue([{ id: 'g1', isCancelled: false }]),
+        update: jest.fn(),
+      };
+      mockPrismaService.orderPhoto = {
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        service.markPhysicalGarmentReady('o1', 'item1', 'g1', true, 'store1'),
+      ).rejects.toThrow('A photo is required for this garment before it can be marked ready.');
+    });
+
+    it('should successfully mark ready when garment has 1 valid photo', async () => {
+      const mockOrder = {
+        id: 'o1',
+        storeId: 'store1',
+        pickupType: PickupType.STORE_PICKUP,
+        status: 'RECEIVED',
+        items: [{ id: 'item1', itemStatus: 'RECEIVED' }],
+      };
+      mockPrismaService.order.findUnique = jest.fn().mockResolvedValue(mockOrder);
+      mockPrismaService.physicalGarment = {
+        findUnique: jest.fn().mockResolvedValue({ id: 'g1', orderItemId: 'item1', isCancelled: false }),
+        findMany: jest.fn().mockResolvedValue([{ id: 'g1', isReady: true, isCancelled: false }]),
+        update: jest.fn(),
+      };
+      mockPrismaService.orderPhoto = {
+        count: jest.fn().mockResolvedValue(1),
+      };
+      mockPrismaService.orderItem.update = jest.fn();
+      mockPrismaService.orderItem.findMany = jest.fn().mockResolvedValue([{ itemStatus: 'READY' }]);
+      mockPrismaService.order.update = jest.fn();
+      service.findOrderById = jest.fn().mockResolvedValue({ ...mockOrder, items: [{ id: 'item1', itemStatus: ItemStatus.READY }] });
+
+      await service.markPhysicalGarmentReady('o1', 'item1', 'g1', true, 'store1');
+      expect(mockPrismaService.physicalGarment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'g1' },
+          data: { isReady: true },
+        }),
+      );
+    });
   });
 
   describe('notifyPartialReady', () => {

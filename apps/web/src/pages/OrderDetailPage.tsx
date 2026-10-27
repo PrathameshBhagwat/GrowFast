@@ -255,7 +255,10 @@ export function OrderDetailPage() {
           body: JSON.stringify({ isReady }),
         },
       );
-      if (!res.ok) throw new Error('Failed to update garment readiness');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to update garment readiness');
+      }
       await fetchOrder(true);
     } catch (err: any) {
       alert(err.message);

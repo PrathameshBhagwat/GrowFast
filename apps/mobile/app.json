@@ -7,7 +7,9 @@
     "scheme": "growfast",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/Growfast_Logo_WithoutBG.png",
     "splash": {
+      "image": "./assets/Growfast_Logo_WithoutBG.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,6 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/Growfast_Logo_WithoutBG.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.infystent.growfast"

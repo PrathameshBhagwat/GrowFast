@@ -30,7 +30,7 @@ import {
 } from '@growfast/shared-types';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../../db/drafts';
-import { getPhotosForDraft, PendingPhoto } from '../../db/photos';
+import { getPhotosForDraft, PendingPhoto, deletePhoto } from '../../db/photos';
 import { syncEngine } from '../../services/sync-engine';
 import { apiClient } from '../../api/client';
 
@@ -43,6 +43,7 @@ import { ItemDetailsModal } from './ItemDetailsModal';
 import { OrderItemsReviewStep } from './OrderItemsReviewStep';
 import { FinalReviewStep } from './FinalReviewStep';
 import { OrderCreatedStep } from './OrderCreatedStep';
+import { GrowFastLogo } from '../GrowFastLogo';
 
 export type WizardStep =
   | 'CUSTOMER' // Screen 3 (Dev C)
@@ -344,13 +345,26 @@ export function OrderWizardModal({
       notes: notes.trim() || undefined,
       items: items.map((item) => {
         const pieceCount = item.quantity || 1;
-        const pieces =
-          item.pieces && item.pieces.length === pieceCount
-            ? item.pieces
-            : Array.from({ length: pieceCount }, (_, i) => ({
-                unitNumber: i + 1,
-                photoCount: photos.filter((p) => p.garmentId === item.garmentCatalogId).length,
-              }));
+        const pieces = Array.from({ length: pieceCount }, (_, i) => {
+          const unitNumber = i + 1;
+          const existingPiece = item.pieces?.find((p) => p.unitNumber === unitNumber);
+          const pieceId = existingPiece?.pieceId;
+
+          const piecePhotos = photos.filter((p) => {
+            if (pieceId && p.pieceId === pieceId) return true;
+            return (
+              p.garmentId === item.garmentCatalogId &&
+              (p.unitNumber === unitNumber || (pieceCount === 1 && !p.unitNumber))
+            );
+          });
+
+          return {
+            pieceId,
+            unitNumber,
+            photoCount: piecePhotos.length,
+          };
+        });
+
         return {
           ...item,
           pieces,
@@ -435,6 +449,82 @@ export function OrderWizardModal({
     }
   };
 
+  // Delete item from cart and clean up associated draft photos safely
+  const handleRemoveCartItem = async (index: number) => {
+    const removedItem = items[index];
+    if (!removedItem) return;
+
+    const remainingItems = items.filter((_, idx) => idx !== index);
+    setItems(remainingItems);
+
+    if (clientDraftId) {
+      const removedPieces = removedItem.pieces || [];
+      const pieceIds = new Set(removedPieces.map((p) => p.pieceId).filter(Boolean));
+
+      // Photos matching this item's specific piece IDs or order item ID
+      // Or if no other items share this garmentCatalogId, delete photos with that garmentId
+      const stillHasGarment = remainingItems.some(
+        (it) => it.garmentCatalogId === removedItem.garmentCatalogId,
+      );
+
+      const photosToDelete = photos.filter((p) => {
+        if (p.pieceId && pieceIds.has(p.pieceId)) return true;
+        if (removedItem.id && p.orderItemId === removedItem.id) return true;
+        if (!stillHasGarment && p.garmentId === removedItem.garmentCatalogId) return true;
+        return false;
+      });
+
+      for (const p of photosToDelete) {
+        await deletePhoto(p.id).catch(() => {});
+      }
+      await refreshPhotos();
+    }
+  };
+
+  // Direct quantity update from review / cart screen
+  const handleUpdateItemQuantity = async (index: number, newQty: number) => {
+    if (index < 0 || index >= items.length) return;
+    if (newQty <= 0) {
+      await handleRemoveCartItem(index);
+      return;
+    }
+    const updated = [...items];
+    const target = { ...updated[index] };
+    const oldQty = target.quantity || 1;
+    target.quantity = newQty;
+
+    const currentPieces = target.pieces || [];
+    if (newQty < oldQty) {
+      // Find dropped pieces
+      const droppedPieces = currentPieces.slice(newQty);
+      for (const dp of droppedPieces) {
+        const dpPhotos = photos.filter(
+          (p) =>
+            (dp.pieceId && p.pieceId === dp.pieceId) ||
+            (p.garmentId === target.garmentCatalogId && p.unitNumber === dp.unitNumber),
+        );
+        for (const p of dpPhotos) {
+          await deletePhoto(p.id).catch(() => {});
+        }
+      }
+      target.pieces = currentPieces.slice(0, newQty);
+      await refreshPhotos();
+    } else if (newQty > oldQty) {
+      // Expanding quantity: preserve existing pieces and append new ones with stable pieceIds
+      const newPieces = [...currentPieces];
+      for (let u = currentPieces.length + 1; u <= newQty; u++) {
+        newPieces.push({
+          pieceId: generateUUID(),
+          unitNumber: u,
+          photoCount: 0,
+        });
+      }
+      target.pieces = newPieces;
+    }
+    updated[index] = target;
+    setItems(updated);
+  };
+
   // Quick add item from catalog
   const handleQuickAddItem = (garment: GarmentCatalogDTO, serviceId: string, unitPrice: number) => {
     const existingIndex = items.findIndex(
@@ -442,18 +532,15 @@ export function OrderWizardModal({
     );
 
     if (existingIndex >= 0) {
-      const updated = [...items];
-      const target = { ...updated[existingIndex] };
-      target.quantity = (target.quantity || 1) + 1;
-      updated[existingIndex] = target;
-      setItems(updated);
+      handleUpdateItemQuantity(existingIndex, (items[existingIndex].quantity || 1) + 1);
     } else {
       const newItem: CreateOrderItemRequest = {
+        id: generateUUID(),
         garmentCatalogId: garment.id,
         serviceTypeId: serviceId,
         quantity: 1,
         unitPrice,
-        pieces: [{ unitNumber: 1, photoCount: 0 }],
+        pieces: [{ pieceId: generateUUID(), unitNumber: 1, photoCount: 0 }],
       };
       setItems([...items, newItem]);
     }
@@ -463,14 +550,7 @@ export function OrderWizardModal({
   const handleQuickDecrementItem = (garmentId: string) => {
     const existingIndex = items.findIndex((it) => it.garmentCatalogId === garmentId);
     if (existingIndex >= 0) {
-      const target = items[existingIndex];
-      if ((target.quantity || 1) > 1) {
-        const updated = [...items];
-        updated[existingIndex] = { ...target, quantity: (target.quantity || 1) - 1 };
-        setItems(updated);
-      } else {
-        setItems(items.filter((_, idx) => idx !== existingIndex));
-      }
+      handleUpdateItemQuantity(existingIndex, (items[existingIndex].quantity || 1) - 1);
     }
   };
 
@@ -484,18 +564,24 @@ export function OrderWizardModal({
 
   // Save item from ItemDetailsModal
   const handleSaveConfiguredItem = (item: CreateOrderItemRequest, existingIndex?: number) => {
+    const safeItem: CreateOrderItemRequest = {
+      ...item,
+      id: item.id || generateUUID(),
+      pieces: (item.pieces || []).map((p, idx) => ({
+        ...p,
+        pieceId: p.pieceId || generateUUID(),
+        unitNumber: p.unitNumber || idx + 1,
+      })),
+    };
+
     if (existingIndex != null && existingIndex >= 0) {
       const updated = [...items];
-      updated[existingIndex] = item;
+      updated[existingIndex] = safeItem;
       setItems(updated);
     } else {
-      setItems([...items, item]);
+      setItems([...items, safeItem]);
     }
-  };
-
-  // Delete item from cart
-  const handleRemoveCartItem = (index: number) => {
-    setItems(items.filter((_, idx) => idx !== index));
+    refreshPhotos();
   };
 
   // Workflow switch handler: reconciles service, category, entryMode, and handles incompatible items
@@ -571,25 +657,6 @@ export function OrderWizardModal({
     if (resolvedServiceId !== selectedServiceId) {
       setSelectedServiceId(resolvedServiceId);
     }
-  };
-
-  // Direct quantity update from review screen (Workstream 2)
-  const handleUpdateItemQuantity = (index: number, newQty: number) => {
-    if (index < 0 || index >= items.length) return;
-    if (newQty <= 0) {
-      handleRemoveCartItem(index);
-      return;
-    }
-    const updated = [...items];
-    const target = { ...updated[index] };
-    target.quantity = newQty;
-    // Keep pieces array synchronized
-    target.pieces = Array.from({ length: newQty }, (_, i) => ({
-      unitNumber: i + 1,
-      photoCount: photos.filter((p) => p.garmentId === target.garmentCatalogId).length,
-    }));
-    updated[index] = target;
-    setItems(updated);
   };
 
   // Submit order to server
@@ -687,7 +754,9 @@ export function OrderWizardModal({
                 : 'New Mobile Order'}
           </Text>
 
-          <View style={styles.headerRightSpacer} />
+          <View style={styles.headerRightSpacer}>
+            <GrowFastLogo size={26} />
+          </View>
         </View>
 
         {/* Step Progress Segment Bar */}
@@ -800,6 +869,7 @@ export function OrderWizardModal({
           {/* STEP 3: Order Items Review & Line Totals (Screen 7 - Dev B) */}
           {currentStepIndex === 3 && (
             <OrderItemsReviewStep
+              clientDraftId={clientDraftId}
               items={items}
               garments={garments}
               services={services}
@@ -818,6 +888,7 @@ export function OrderWizardModal({
               onAddMoreItems={() => setCurrentStepIndex(2)}
               onContinueToFinalReview={handleNext}
               onUpdateItemQuantity={handleUpdateItemQuantity}
+              onPhotosUpdated={refreshPhotos}
             />
           )}
 
@@ -845,6 +916,7 @@ export function OrderWizardModal({
               onSubmitOrder={handleSubmitOrder}
               onOrderSuccess={handleOrderCreatedSuccess}
               onPhotosUpdated={refreshPhotos}
+              onNavigateToCart={() => setCurrentStepIndex(3)}
             />
           )}
 
@@ -938,6 +1010,9 @@ const styles = StyleSheet.create({
   },
   headerRightSpacer: {
     width: 60,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 4,
   },
   progressContainer: {
     paddingHorizontal: 16,

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
+import { GrowFastLogo } from '../src/components/GrowFastLogo';
 
 export default function IndexScreen() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -9,7 +10,8 @@ export default function IndexScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <GrowFastLogo size={100} containerStyle={styles.logoContainer} />
+        <ActivityIndicator size="large" color="#2563eb" style={styles.spinner} />
       </View>
     );
   }
@@ -26,6 +28,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f6ff',
+    backgroundColor: '#ffffff',
+  },
+  logoContainer: {
+    marginBottom: 20,
+  },
+  spinner: {
+    marginTop: 8,
   },
 });

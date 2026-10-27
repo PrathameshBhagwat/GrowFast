@@ -572,4 +572,97 @@ describe('GrowFast Mobile Auth & Session Persistence Suite', () => {
     // Only when fully loaded and authenticated does it render tabs
     assert.equal(evaluateTabAccess(false, true), 'RENDER_PROTECTED_TABS');
   });
+
+  it('22. Live backend authentication succeeds for both OWNER and COUNTER credentials with full profile verification', async (t) => {
+    if (!isBackendRunning) {
+      t.skip(`Backend is not reachable at ${BACKEND_URL}`);
+      return;
+    }
+
+    // 1. Counter Login Flow
+    const counterRes = await apiClient.auth.login({
+      employeeId: 'emp-counter-001',
+      pin: '333333',
+    });
+    assert.ok(counterRes.accessToken, 'Counter must receive access token');
+    assert.equal(counterRes.user.id, 'emp-counter-001');
+    assert.equal(counterRes.user.role, 'COUNTER');
+    assert.equal(counterRes.user.name, 'Swapnil Shinde');
+
+    // 2. Owner Login Flow
+    const ownerRes = await apiClient.auth.login({
+      employeeId: 'emp-owner-001',
+      pin: '111111',
+    });
+    assert.ok(ownerRes.accessToken, 'Owner must receive access token');
+    assert.equal(ownerRes.user.id, 'emp-owner-001');
+    assert.equal(ownerRes.user.role, 'OWNER');
+    assert.equal(ownerRes.user.name, 'Prathamesh Bhagwat');
+  });
+
+  it('23. Role-based authorization guard strictly enforces 403 Forbidden for COUNTER on admin endpoints', async (t) => {
+    if (!isBackendRunning) {
+      t.skip(`Backend is not reachable at ${BACKEND_URL}`);
+      return;
+    }
+
+    // Authenticate as Counter
+    const counterRes = await apiClient.auth.login({
+      employeeId: 'emp-counter-001',
+      pin: '333333',
+    });
+    await saveAuthToken(counterRes.accessToken);
+
+    // Calling admin-test with COUNTER role must be rejected by RolesGuard with 403
+    const adminUrl = `${BACKEND_URL}/api/auth/admin-test`;
+    const counterReq = await fetch(adminUrl, {
+      headers: { Authorization: `Bearer ${counterRes.accessToken}` },
+    });
+    assert.equal(
+      counterReq.status,
+      403,
+      'COUNTER role must receive HTTP 403 Forbidden on admin endpoint',
+    );
+
+    // Authenticate as Owner
+    const ownerRes = await apiClient.auth.login({
+      employeeId: 'emp-owner-001',
+      pin: '111111',
+    });
+    await saveAuthToken(ownerRes.accessToken);
+
+    // Calling admin-test with OWNER role must succeed with 200 OK
+    const ownerReq = await fetch(adminUrl, {
+      headers: { Authorization: `Bearer ${ownerRes.accessToken}` },
+    });
+    assert.equal(ownerReq.status, 200, 'OWNER role must receive HTTP 200 OK on admin endpoint');
+    const ownerData = await ownerReq.json();
+    assert.equal(ownerData.role, 'OWNER');
+    assert.equal(ownerData.success, true);
+  });
+
+  it('24. LoginScreen structure adheres strictly to React Rules of Hooks (no early returns before hooks)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const loginFilePath = path.resolve(__dirname, '../../app/(auth)/login.tsx');
+    const content = fs.readFileSync(loginFilePath, 'utf8');
+
+    // The early return must NOT appear before state and effect declarations
+    const indexOfScreen = content.indexOf('export default function LoginScreen()');
+    assert.ok(indexOfScreen > 0, 'LoginScreen component must exist');
+
+    const screenBody = content.slice(indexOfScreen);
+    const indexOfState = screenBody.indexOf('useState');
+    const indexOfRedirect = screenBody.indexOf('<Redirect');
+
+    // All hook declarations must occur before any redirect return
+    const lastUseState = screenBody.lastIndexOf('useState');
+    const lastUseEffect = screenBody.lastIndexOf('useEffect');
+    const maxHookIndex = Math.max(lastUseState, lastUseEffect);
+
+    assert.ok(
+      indexOfRedirect > maxHookIndex,
+      'Early return / Redirect must be positioned AFTER all React hooks are initialized to prevent hook count mismatch',
+    );
+  });
 });

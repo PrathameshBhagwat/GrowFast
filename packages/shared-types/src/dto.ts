@@ -172,6 +172,7 @@ export interface OrderDetailDTO extends OrderSummaryDTO {
 
 export interface OrderItemDTO {
   id: string;
+  garmentCatalogId?: string;
   garmentName: string;
   garmentCategory: GarmentCategory;
   serviceType: ServiceCategory;
@@ -215,12 +216,14 @@ export interface CreateOrderRequest {
 }
 
 export interface CreateOrderPieceRequest {
+  pieceId?: string;
   unitNumber: number;
   photoCount?: number;
   photos?: string[];
 }
 
 export interface CreateOrderItemRequest {
+  id?: string;
   garmentCatalogId: string;
   serviceTypeId: string;
   quantity: number;
