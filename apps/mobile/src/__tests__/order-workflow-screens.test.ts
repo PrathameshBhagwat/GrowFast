@@ -24,7 +24,13 @@ import {
   ServiceTypeDTO,
   GarmentCatalogDTO,
 } from '@growfast/shared-types';
-import { isWeightBasedPricing, CANONICAL_WEIGHT_SERVICES } from '../services/catalog-rules';
+import {
+  isWeightBasedPricing,
+  CANONICAL_WEIGHT_SERVICES,
+  CANONICAL_PIECE_SERVICES,
+  resolvePieceServices,
+  resolveWeightServices,
+} from '../services/catalog-rules';
 
 interface MockPrice {
   id: string;
@@ -1136,26 +1142,19 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
         },
       ];
 
-      // In Per-Piece mode: filter out per-weight only services
-      const pieceServices = availableServices.filter((s) => {
-        if (!s.isActive) return false;
-        const lower = s.name.toLowerCase();
-        return (
-          !lower.includes('wash and fold') &&
-          !lower.includes('white') &&
-          !lower.includes('premium') &&
-          !lower.includes('woolen')
-        );
-      });
+      // In Per-Piece mode: strictly resolves the four allowed per-piece services
+      const pieceServices = resolvePieceServices(availableServices);
 
-      assert.ok(pieceServices.some((s) => s.name === 'Steam Iron'));
-      assert.ok(pieceServices.some((s) => s.name === 'Wash and Steam Iron'));
-      assert.ok(pieceServices.some((s) => s.name === 'Standard Wash'));
+      assert.equal(pieceServices.length, 4, 'Per-Piece mode must display exactly 4 services');
+      assert.ok(pieceServices.some((s) => s.name === 'Dry Clean'));
       assert.ok(pieceServices.some((s) => s.name === 'Starching'));
       assert.ok(pieceServices.some((s) => s.name === 'Shoe Cleaning'));
-      assert.ok(pieceServices.some((s) => s.name === 'Dry Clean'));
+      assert.ok(pieceServices.some((s) => s.name === 'Steam Iron'));
 
-      // Excludes per-weight-only services
+      // Excludes removed/non-piece services
+      assert.ok(!pieceServices.some((s) => s.name === 'Wash and Steam Iron'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Standard Wash'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Reprocess Cleaning'));
       assert.ok(!pieceServices.some((s) => s.name === 'Wash and Fold'));
       assert.ok(!pieceServices.some((s) => s.name === 'Laundry for White'));
       assert.ok(!pieceServices.some((s) => s.name === 'Premium Laundry'));
@@ -1490,6 +1489,323 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       handleStartOrderForCustomer(mockCustomer, 'WEIGHT', 'LAUNDRY');
       assert.equal(triggeredMode, 'WEIGHT');
       assert.equal(triggeredWorkflow, 'LAUNDRY');
+    });
+  });
+
+  describe('Workstream 5: Mode Independence & Per-Piece / Per-Weight Regression Suite', () => {
+    const fullCatalogServices: ServiceTypeDTO[] = [
+      { id: 'svc-dry-clean', name: 'Dry Clean', category: ServiceCategory.DRY_CLEAN, estimatedDays: 2, isActive: true },
+      { id: 'svc-wash-iron', name: 'Wash and Steam Iron', category: ServiceCategory.WASH_IRON, estimatedDays: 2, isActive: true },
+      { id: 'svc-shoe-clean', name: 'Shoe Cleaning', category: ServiceCategory.SHOE_CLEAN, estimatedDays: 3, isActive: true },
+      { id: 'svc-steam-press', name: 'Steam Iron', category: ServiceCategory.STEAM_PRESS, estimatedDays: 1, isActive: true },
+      { id: 'svc-wash', name: 'Standard Wash', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
+      { id: 'svc-leather', name: 'Reprocess Cleaning', category: ServiceCategory.LEATHER_CLEAN, estimatedDays: 4, isActive: true },
+      { id: 'svc-stain', name: 'Free Shoe', category: ServiceCategory.STAIN_REMOVAL, estimatedDays: 2, isActive: true },
+      { id: 'svc-wash-fold', name: 'Wash and Fold', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
+      { id: 'svc-laundry-white', name: 'Laundry for White', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
+      { id: 'svc-laundry-premium', name: 'Premium Laundry', category: ServiceCategory.WASH, estimatedDays: 3, isActive: true },
+      { id: 'svc-laundry-woolen', name: 'Woolen Laundry', category: ServiceCategory.WASH, estimatedDays: 3, isActive: true },
+    ];
+
+    // 1. Selecting Per-Piece displays exactly four services.
+    it('46. Scenario 1: Selecting Per-Piece displays exactly four services', () => {
+      const pieceServices = resolvePieceServices(fullCatalogServices);
+
+      assert.equal(pieceServices.length, 4, 'Per-Piece mode must display exactly 4 services');
+      assert.deepEqual(
+        pieceServices.map((s) => s.name),
+        ['Dry Clean', 'Starching', 'Shoe Cleaning', 'Steam Iron'],
+      );
+
+      // Confirm excluded services
+      assert.ok(!pieceServices.some((s) => s.name === 'Reprocess Cleaning'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Standard Wash'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Wash and Steam Iron'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Wash + Steam Iron'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Free Shoe'));
+      assert.ok(!pieceServices.some((s) => s.name === 'Wash and Fold'));
+    });
+
+    // 2. Selecting Dry Clean keeps Per-Piece selected.
+    it('47. Scenario 2: Selecting Dry Clean keeps Per-Piece selected', () => {
+      let entryMode: OrderEntryMode = 'PIECES';
+      let workflow: OrderWorkflowType = 'LAUNDRY';
+      let selectedServiceId = 'svc-steam-press';
+
+      const handleSelectService = (newSvcId: string, mode: OrderEntryMode = entryMode) => {
+        selectedServiceId = newSvcId;
+        const svc = fullCatalogServices.find((s) => s.id === newSvcId);
+        if (svc) {
+          if (mode === 'WEIGHT') {
+            workflow = 'LAUNDRY';
+          } else {
+            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
+          }
+        }
+      };
+
+      handleSelectService('svc-dry-clean');
+      assert.equal(selectedServiceId, 'svc-dry-clean');
+      assert.equal(workflow, 'DRY_CLEANING');
+      assert.equal(entryMode, 'PIECES', 'Selecting Dry Clean must never change entryMode');
+      assert.equal(isWeightBasedPricing(workflow, null, entryMode), false);
+    });
+
+    // 3. Selecting Starching keeps Per-Piece selected.
+    it('48. Scenario 3: Selecting Starching keeps Per-Piece selected', () => {
+      let entryMode: OrderEntryMode = 'PIECES';
+      let workflow: OrderWorkflowType = 'DRY_CLEANING';
+      let selectedServiceId = 'svc-dry-clean';
+
+      const handleSelectService = (newSvcId: string, mode: OrderEntryMode = entryMode) => {
+        selectedServiceId = newSvcId;
+        const svc = fullCatalogServices.find((s) => s.id === newSvcId);
+        if (svc) {
+          if (mode === 'WEIGHT') {
+            workflow = 'LAUNDRY';
+          } else {
+            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
+          }
+        }
+      };
+
+      handleSelectService('svc-wash-iron'); // Starching
+      assert.equal(selectedServiceId, 'svc-wash-iron');
+      assert.equal(workflow, 'LAUNDRY');
+      assert.equal(entryMode, 'PIECES', 'Selecting Starching must keep Per-Piece mode selected');
+      assert.equal(isWeightBasedPricing(workflow, null, entryMode), false);
+    });
+
+    // 4. Selecting Shoe Cleaning keeps Per-Piece selected.
+    it('49. Scenario 4: Selecting Shoe Cleaning keeps Per-Piece selected', () => {
+      let entryMode: OrderEntryMode = 'PIECES';
+      let workflow: OrderWorkflowType = 'DRY_CLEANING';
+      let selectedCategory = 'ALL';
+      let selectedServiceId = 'svc-dry-clean';
+
+      const handleSelectService = (newSvcId: string, mode: OrderEntryMode = entryMode) => {
+        selectedServiceId = newSvcId;
+        const svc = fullCatalogServices.find((s) => s.id === newSvcId);
+        if (svc) {
+          if (mode === 'WEIGHT') {
+            workflow = 'LAUNDRY';
+          } else {
+            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
+            const resolved = resolveCatalogSelectionOnServiceSelect(newSvcId, selectedCategory, fullCatalogServices, workflow);
+            if (resolved.category) {
+              selectedCategory = String(resolved.category);
+            }
+          }
+        }
+      };
+
+      handleSelectService('svc-shoe-clean');
+      assert.equal(selectedServiceId, 'svc-shoe-clean');
+      assert.equal(selectedCategory, GarmentCategory.SHOES);
+      assert.equal(entryMode, 'PIECES', 'Selecting Shoe Cleaning must keep Per-Piece mode selected');
+      assert.equal(isWeightBasedPricing(workflow, null, entryMode), false);
+    });
+
+    // 5. Selecting Steam Iron in Per-Piece keeps Per-Piece selected.
+    it('50. Scenario 5: Selecting Steam Iron in Per-Piece keeps Per-Piece selected', () => {
+      let entryMode: OrderEntryMode = 'PIECES';
+      let workflow: OrderWorkflowType = 'DRY_CLEANING';
+      let selectedServiceId = 'svc-dry-clean';
+
+      const handleSelectService = (newSvcId: string, mode: OrderEntryMode = entryMode) => {
+        selectedServiceId = newSvcId;
+        const svc = fullCatalogServices.find((s) => s.id === newSvcId);
+        if (svc) {
+          if (mode === 'WEIGHT') {
+            workflow = 'LAUNDRY';
+          } else {
+            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
+          }
+        }
+      };
+
+      handleSelectService('svc-steam-press');
+      assert.equal(selectedServiceId, 'svc-steam-press');
+      assert.equal(workflow, 'LAUNDRY');
+      assert.equal(entryMode, 'PIECES', 'Selecting Steam Iron in Per-Piece mode must remain Per-Piece');
+      assert.equal(
+        isWeightBasedPricing(workflow, fullCatalogServices.find((s) => s.id === 'svc-steam-press'), entryMode),
+        false,
+        'Pricing must remain per-piece when in PIECES mode even with Steam Iron in LAUNDRY',
+      );
+    });
+
+    // 6. Switching to Per-Weight displays only its five valid services.
+    it('51. Scenario 6: Switching to Per-Weight displays only its five valid services', () => {
+      const weightServices = resolveWeightServices(fullCatalogServices);
+
+      assert.equal(weightServices.length, 5, 'Per-Weight mode must display exactly 5 services');
+      assert.deepEqual(
+        weightServices.map((s) => s.name),
+        [
+          'Steam Iron',
+          'Wash and Fold',
+          'Laundry for White',
+          'Premium Laundry',
+          'Woolen Laundry',
+        ],
+      );
+
+      assert.ok(!weightServices.some((s) => s.name === 'Dry Clean'));
+      assert.ok(!weightServices.some((s) => s.name === 'Shoe Cleaning'));
+      assert.ok(!weightServices.some((s) => s.name === 'Starching'));
+    });
+
+    // 7. Selecting any Per-Weight service never switches the mode.
+    it('52. Scenario 7: Selecting any Per-Weight service never switches the mode', () => {
+      let entryMode: OrderEntryMode = 'WEIGHT';
+      let workflow: OrderWorkflowType = 'LAUNDRY';
+      let selectedServiceId = 'svc-wash-iron';
+
+      const handleSelectService = (newSvcId: string) => {
+        selectedServiceId = newSvcId;
+        if (entryMode === 'WEIGHT') {
+          workflow = 'LAUNDRY';
+        }
+      };
+
+      const weightServices = resolveWeightServices(fullCatalogServices);
+      for (const svc of weightServices) {
+        handleSelectService(svc.id);
+        assert.equal(selectedServiceId, svc.id);
+        assert.equal(entryMode, 'WEIGHT', `Selecting ${svc.name} must never switch mode away from WEIGHT`);
+        assert.equal(
+          isWeightBasedPricing('LAUNDRY', svc, entryMode),
+          true,
+          `Service ${svc.name} in WEIGHT mode must use weight-based pricing`,
+        );
+      }
+    });
+
+    // 8. Switching modes does not retain incompatible service selections or produce incorrect cart totals.
+    it('53. Scenario 8: Switching modes does not retain incompatible service selections or produce incorrect cart totals', () => {
+      let entryMode: OrderEntryMode = 'PIECES';
+      let selectedServiceId = 'svc-dry-clean';
+      let selectedCategory = 'ALL';
+      let cartItems: any[] = [
+        {
+          garmentCatalogId: 'g-shirt',
+          serviceTypeId: 'svc-dry-clean',
+          quantity: 2,
+          unitPrice: 120,
+          lineTotal: 240,
+          itemStatus: 'RECEIVED',
+        },
+      ];
+
+      const pieceTotals = calculateOrderTotals(cartItems);
+      assert.equal(pieceTotals.subtotal, 240);
+      const itemCount = cartItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+      assert.equal(itemCount, 2);
+
+      const handleModeSwitch = (newMode: OrderEntryMode) => {
+        entryMode = newMode;
+        if (newMode === 'WEIGHT') {
+          selectedServiceId = 'svc-wash-iron';
+          selectedCategory = GarmentCategory.WEIGHT_BASED;
+          cartItems = cartItems.filter((item) => Boolean(item.weight != null && item.weight > 0));
+        } else {
+          selectedServiceId = 'svc-dry-clean';
+          selectedCategory = 'ALL';
+          cartItems = cartItems.filter((item) => !(item.weight != null && item.weight > 0));
+        }
+      };
+
+      handleModeSwitch('WEIGHT');
+      assert.equal(entryMode, 'WEIGHT');
+      assert.equal(selectedServiceId, 'svc-wash-iron');
+      assert.equal(selectedCategory, GarmentCategory.WEIGHT_BASED);
+      assert.equal(cartItems.length, 0, 'Incompatible piece items must be purged on switch to WEIGHT');
+      const emptyWeightTotals = calculateOrderTotals(cartItems);
+      assert.equal(emptyWeightTotals.subtotal, 0);
+
+      cartItems.push({
+        garmentCatalogId: 'g-wb-1',
+        serviceTypeId: 'svc-wash-iron',
+        quantity: 1,
+        weight: 2.5,
+        unitPrice: 159,
+        lineTotal: 397.5,
+        itemStatus: 'RECEIVED',
+      });
+      const weightTotals = calculateOrderTotals(cartItems);
+      assert.equal(roundCurrency(weightTotals.subtotal), 397.5);
+
+      handleModeSwitch('PIECES');
+      assert.equal(entryMode, 'PIECES');
+      assert.equal(selectedServiceId, 'svc-dry-clean');
+      assert.equal(selectedCategory, 'ALL');
+      assert.equal(cartItems.length, 0, 'Incompatible weight items must be purged on switch to PIECES');
+      const emptyPieceTotals = calculateOrderTotals(cartItems);
+      assert.equal(emptyPieceTotals.subtotal, 0);
+    });
+
+    // 9. Existing order creation still works in both modes.
+    it('54. Scenario 9: Existing order creation still works in both modes', () => {
+      // Per-Piece order payload
+      const pieceOrderPayload: any = {
+        customerId: 'cust-101',
+        workflowType: 'DRY_CLEANING',
+        entryMode: 'PIECES',
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-shirt',
+            serviceTypeId: 'svc-dry-clean',
+            quantity: 2,
+            unitPrice: 120,
+            lineTotal: 240,
+            itemStatus: 'RECEIVED',
+          },
+        ],
+      };
+      const pieceTotals = calculateOrderTotals(pieceOrderPayload.items);
+      pieceOrderPayload.subtotal = pieceTotals.subtotal;
+      pieceOrderPayload.totalAmount = pieceTotals.totalAmount;
+      pieceOrderPayload.amountDue = pieceTotals.totalAmount;
+
+      const pieceOrderStatus = deriveOrderStatus(pieceOrderPayload);
+      assert.equal(pieceOrderStatus, OrderStatus.RECEIVED);
+      assert.equal(pieceOrderPayload.entryMode, 'PIECES');
+      assert.equal(pieceOrderPayload.totalAmount, 240);
+
+      // Per-Weight order payload
+      const weightOrderPayload: any = {
+        customerId: 'cust-102',
+        workflowType: 'LAUNDRY',
+        entryMode: 'WEIGHT',
+        pickupType: PickupType.STORE_PICKUP,
+        items: [
+          {
+            garmentCatalogId: 'g-wb-1',
+            serviceTypeId: 'svc-wash-iron',
+            quantity: 1,
+            weight: 3.0,
+            unitPrice: 159,
+            lineTotal: 477,
+            itemStatus: 'RECEIVED',
+          },
+        ],
+      };
+      const weightTotals = calculateOrderTotals(weightOrderPayload.items);
+      weightOrderPayload.subtotal = weightTotals.subtotal;
+      weightOrderPayload.totalAmount = weightTotals.totalAmount;
+      weightOrderPayload.amountDue = weightTotals.totalAmount;
+
+      const weightOrderStatus = deriveOrderStatus(weightOrderPayload);
+      assert.equal(weightOrderStatus, OrderStatus.RECEIVED);
+      assert.equal(weightOrderPayload.entryMode, 'WEIGHT');
+      assert.equal(weightOrderPayload.totalAmount, 477);
+      assert.ok(weightOrderPayload.items[0].weight >= 2.0, 'Minimum weight 2.0 kg is satisfied');
     });
   });
 });

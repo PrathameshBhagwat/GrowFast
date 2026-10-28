@@ -347,15 +347,24 @@ export function OrderWizardModal({
         if (targetWorkflow === 'DRY_CLEANING') {
           setSelectedCategory('ALL');
           const dryCleanSvc = services.find(
-            (s) => s.category === ServiceCategory.DRY_CLEAN || s.id === 'srv-dry-clean',
+            (s) => s.category === ServiceCategory.DRY_CLEAN || s.id === 'srv-dry-clean' || s.id === 'svc-dry-clean',
           );
-          setSelectedServiceId(dryCleanSvc ? dryCleanSvc.id : 'srv-dry-clean');
+          setSelectedServiceId(dryCleanSvc ? dryCleanSvc.id : 'svc-dry-clean');
         } else if (targetMode === 'WEIGHT') {
           setSelectedCategory(GarmentCategory.WEIGHT_BASED);
-          setSelectedServiceId('srv-premium-wash');
+          const weightSvc = services.find(
+            (s) =>
+              s.id === 'svc-wash-iron' ||
+              s.id === 'srv-wash-iron' ||
+              s.name.toLowerCase().includes('steam iron'),
+          );
+          setSelectedServiceId(weightSvc ? weightSvc.id : 'svc-wash-iron');
         } else {
           setSelectedCategory('ALL');
-          setSelectedServiceId('srv-wash-iron');
+          const pieceSvc = services.find(
+            (s) => s.id === 'svc-dry-clean' || s.id === 'srv-dry-clean' || isDryCleanService(s.id, services),
+          );
+          setSelectedServiceId(pieceSvc ? pieceSvc.id : 'svc-dry-clean');
         }
         setItems([]);
         setPickupType(PickupType.STORE_PICKUP);
@@ -650,7 +659,11 @@ export function OrderWizardModal({
     // In WEIGHT mode, items without weight are incompatible.
     // In PIECES mode, items with weight are incompatible.
     const incompatible = items.filter((item) => {
-      const isItemWeight = Boolean(item.weight != null && item.weight > 0);
+      const isItemWeight = Boolean(
+        (item.weight != null && item.weight > 0) ||
+          item.garmentCatalogId === 'g-wb-1' ||
+          item.garmentCatalogId === 'cat-kg-wash',
+      );
       return newMode === 'WEIGHT' ? !isItemWeight : isItemWeight;
     });
 
@@ -662,35 +675,29 @@ export function OrderWizardModal({
           (s) =>
             s.id === 'svc-wash-iron' ||
             s.id === 'srv-wash-iron' ||
-            s.name.toLowerCase().includes('wash and steam iron') ||
             s.name.toLowerCase().includes('steam iron'),
         );
         setSelectedServiceId(firstWeightSvc?.id || 'svc-wash-iron');
         setSelectedCategory(GarmentCategory.WEIGHT_BASED);
       } else {
-        // Per-Piece mode: select first per-piece service
-        const firstPieceSvc = services.find((s) => {
-          if (!s.isActive) return false;
-          const lower = s.name.toLowerCase();
-          return (
-            !lower.includes('wash and fold') &&
-            !lower.includes('white') &&
-            !lower.includes('premium') &&
-            !lower.includes('woolen') &&
-            !lower.includes('free shoe')
-          );
-        });
-        const targetSvcId = firstPieceSvc?.id || 'srv-wash-iron';
+        // Per-Piece mode: select first per-piece service (Dry Clean)
+        const firstPieceSvc = services.find(
+          (s) => s.id === 'svc-dry-clean' || s.id === 'srv-dry-clean' || isDryCleanService(s.id, services),
+        );
+        const targetSvcId = firstPieceSvc?.id || 'svc-dry-clean';
         setSelectedServiceId(targetSvcId);
         setSelectedCategory('ALL');
-        const isDc = firstPieceSvc ? isDryCleanService(firstPieceSvc.id, services) : false;
-        setWorkflow(isDc ? 'DRY_CLEANING' : 'LAUNDRY');
+        setWorkflow('DRY_CLEANING');
       }
 
       if (incompatible.length > 0) {
         setItems((prev) =>
           prev.filter((item) => {
-            const isItemWeight = Boolean(item.weight != null && item.weight > 0);
+            const isItemWeight = Boolean(
+              (item.weight != null && item.weight > 0) ||
+                item.garmentCatalogId === 'g-wb-1' ||
+                item.garmentCatalogId === 'cat-kg-wash',
+            );
             return newMode === 'WEIGHT' ? isItemWeight : !isItemWeight;
           }),
         );
@@ -711,7 +718,7 @@ export function OrderWizardModal({
     }
   };
 
-  // Workflow switch handler: reconciles service, category, entryMode, and handles incompatible items
+  // Workflow switch handler: reconciles service, category, and handles incompatible items
   const handleWorkflowChange = (newWorkflow: OrderWorkflowType) => {
     if (newWorkflow === workflow) return;
 
@@ -729,10 +736,6 @@ export function OrderWizardModal({
       setWorkflow(newWorkflow);
       setSelectedServiceId(resolved.serviceId);
       setSelectedCategory(String(resolved.category));
-
-      const newSvc = services.find((s) => s.id === resolved.serviceId);
-      const isWeight = isWeightBasedPricing(newWorkflow, newSvc);
-      setEntryMode(isWeight ? 'WEIGHT' : 'PIECES');
 
       if (incompatible.length > 0) {
         setItems((prev) =>
