@@ -634,9 +634,53 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Three Authoritative Customer Actions: Profile, Per-Piece Order, Per-Weight Order */}
-              <View style={styles.customerActionButtonsRow}>
-                {/* 1. View Profile Action */}
+              {/* Responsive Customer Actions: Row 1 has the two primary order actions, Row 2 has the profile action */}
+              <View style={styles.customerActionButtonsContainer}>
+                <View style={styles.customerOrderActionsRow}>
+                  {/* 1. Create Per-Piece Order */}
+                  <TouchableOpacity
+                    style={styles.customerPerPieceBtn}
+                    onPress={() =>
+                      handleStartOrderForCustomer(selectedCustomer, 'PIECES', 'LAUNDRY')
+                    }
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Create Per-Piece Order for ${selectedCustomer.name}`}
+                  >
+                    <Icon
+                      name="shirt-outline"
+                      size={16}
+                      color="#FFFFFF"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.customerPerPieceBtnText} numberOfLines={1}>
+                      Per-Piece Order
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* 2. Create Per-Weight Order */}
+                  <TouchableOpacity
+                    style={styles.customerPerWeightBtn}
+                    onPress={() =>
+                      handleStartOrderForCustomer(selectedCustomer, 'WEIGHT', 'LAUNDRY')
+                    }
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Create Per-Weight Order for ${selectedCustomer.name}`}
+                  >
+                    <Icon
+                      name="scale-outline"
+                      size={16}
+                      color="#FFFFFF"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.customerPerWeightBtnText} numberOfLines={1}>
+                      Per-Weight Order
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 3. View Profile Action */}
                 <TouchableOpacity
                   style={styles.customerProfileBtn}
                   onPress={() => handleViewCustomerProfile(selectedCustomer)}
@@ -646,40 +690,12 @@ export default function HomeScreen() {
                 >
                   <Icon
                     name="person-outline"
-                    size={14}
+                    size={15}
                     color="#0284C7"
-                    style={{ marginRight: 4 }}
+                    style={{ marginRight: 6 }}
                   />
                   <Text style={styles.customerProfileBtnText} numberOfLines={1}>
                     Profile
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 2. Create Per-Piece Order */}
-                <TouchableOpacity
-                  style={styles.customerPerPieceBtn}
-                  onPress={() => handleStartOrderForCustomer(selectedCustomer, 'PIECES', 'LAUNDRY')}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Create Per-Piece Order for ${selectedCustomer.name}`}
-                >
-                  <Icon name="shirt-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.customerPerPieceBtnText} numberOfLines={1}>
-                    Per-Piece Order
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 3. Create Per-Weight Order */}
-                <TouchableOpacity
-                  style={styles.customerPerWeightBtn}
-                  onPress={() => handleStartOrderForCustomer(selectedCustomer, 'WEIGHT', 'LAUNDRY')}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Create Per-Weight Order for ${selectedCustomer.name}`}
-                >
-                  <Icon name="scale-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.customerPerWeightBtnText} numberOfLines={1}>
-                    Per-Weight Order
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1143,9 +1159,6 @@ export default function HomeScreen() {
         onCreatePerWeightOrder={(cust) => {
           handleStartOrderForCustomer(cust, 'WEIGHT', 'LAUNDRY');
         }}
-        onCreateDryCleanOrder={(cust) => {
-          handleStartOrderForCustomer(cust, 'PIECES', 'DRY_CLEANING');
-        }}
         onReturnToSearch={() => {
           handleClearSelectedCustomer();
         }}
@@ -1545,37 +1558,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0284C7',
   },
-  customerActionButtonsRow: {
-    flexDirection: 'row',
-    gap: 6,
+  customerActionButtonsContainer: {
     marginTop: 12,
+    gap: 8,
   },
-  customerProfileBtn: {
-    flex: 0.85,
-    minHeight: 44,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#BAE6FD',
+  customerOrderActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  customerProfileBtnText: {
-    color: '#0284C7',
-    fontSize: 11,
-    fontWeight: '700',
+    gap: 8,
   },
   customerPerPieceBtn: {
-    flex: 1.15,
+    flex: 1,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#1765F5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     shadowColor: '#1765F5',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
@@ -1584,18 +1583,18 @@ const styles = StyleSheet.create({
   },
   customerPerPieceBtnText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: '700',
   },
   customerPerWeightBtn: {
-    flex: 1.15,
+    flex: 1,
     minHeight: 44,
     borderRadius: 10,
     backgroundColor: '#0284C7',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     shadowColor: '#0284C7',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
@@ -1604,7 +1603,23 @@ const styles = StyleSheet.create({
   },
   customerPerWeightBtnText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  customerProfileBtn: {
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#BAE6FD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  customerProfileBtnText: {
+    color: '#0284C7',
+    fontSize: 13,
     fontWeight: '700',
   },
 

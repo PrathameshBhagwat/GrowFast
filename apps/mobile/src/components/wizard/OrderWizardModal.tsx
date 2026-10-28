@@ -374,8 +374,9 @@ export function OrderWizardModal({
   }, [clientDraftId]);
 
   // Build canonical CreateOrderRequest payload
-  const buildOrderPayload = (): CreateOrderRequest => {
+  const buildOrderPayload = (freshPhotos?: PendingPhoto[]): CreateOrderRequest => {
     const isExpress = expressOption !== ExpressDeliveryOption.REGULAR;
+    const photoList = freshPhotos || photos;
     return {
       clientDraftId,
       customerId: selectedCustomer?.id || draft?.customerId || 'cust-offline-temp',
@@ -390,10 +391,16 @@ export function OrderWizardModal({
         const pieces = Array.from({ length: pieceCount }, (_, i) => {
           const unitNumber = i + 1;
           const existingPiece = item.pieces?.find((p) => p.unitNumber === unitNumber);
-          const pieceId = existingPiece?.pieceId;
+          const pieceId = existingPiece?.pieceId || generateUUID();
 
-          const piecePhotos = photos.filter((p) => {
-            if (pieceId && p.pieceId === pieceId) return true;
+          const piecePhotos = photoList.filter((p) => {
+            if (pieceId && p.pieceId) return p.pieceId === pieceId;
+            if (item.id && p.orderItemId) {
+              return (
+                p.orderItemId === item.id &&
+                (p.unitNumber === unitNumber || (!p.unitNumber && unitNumber === 1))
+              );
+            }
             return (
               p.garmentId === item.garmentCatalogId &&
               (p.unitNumber === unitNumber || (pieceCount === 1 && !p.unitNumber))
@@ -409,6 +416,7 @@ export function OrderWizardModal({
 
         return {
           ...item,
+          id: item.id || generateUUID(),
           pieces,
         };
       }),
@@ -417,7 +425,14 @@ export function OrderWizardModal({
 
   // Persist draft to SQLite
   const persistDraftToStorage = async (statusOverride?: 'DRAFT' | 'QUEUED') => {
-    const payload = buildOrderPayload();
+    let freshPhotos = photos;
+    if (clientDraftId) {
+      try {
+        freshPhotos = await getPhotosForDraft(clientDraftId);
+        setPhotos(freshPhotos);
+      } catch {}
+    }
+    const payload = buildOrderPayload(freshPhotos);
     const custName = selectedCustomer?.name || manualCustomerName.trim() || null;
     const custPhone = selectedCustomer?.phone || manualCustomerPhone.trim() || null;
 
@@ -1012,7 +1027,30 @@ export function OrderWizardModal({
               onOpenItemConfig={handleOpenItemConfig}
               onQuickAddItem={handleQuickAddItem}
               onQuickDecrementItem={handleQuickDecrementItem}
-              onAddWeightItem={(weightItem) => setItems((prev) => [...prev, weightItem])}
+              onAddWeightItem={(weightItem) => {
+                const count = weightItem.quantity || 1;
+                const existingPieces = (
+                  weightItem.pieces && weightItem.pieces.length === count
+                    ? weightItem.pieces
+                    : Array.from({ length: count }, (_, i) => ({ unitNumber: i + 1 }))
+                ) as Array<{
+                  pieceId?: string;
+                  unitNumber?: number;
+                  photoCount?: number;
+                  defectNotes?: string;
+                }>;
+                const safeItem: CreateOrderItemRequest = {
+                  ...weightItem,
+                  id: weightItem.id || generateUUID(),
+                  pieces: existingPieces.map((p, idx) => ({
+                    ...p,
+                    pieceId: p.pieceId || generateUUID(),
+                    unitNumber: p.unitNumber || idx + 1,
+                    photoCount: p.photoCount || 0,
+                  })),
+                };
+                setItems((prev) => [...prev, safeItem]);
+              }}
               onRemoveItem={handleRemoveCartItem}
               onProceedToReview={() => setCurrentStepIndex(3)}
               onBackToService={() => setCurrentStepIndex(1)}

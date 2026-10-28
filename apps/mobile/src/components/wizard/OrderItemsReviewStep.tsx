@@ -65,6 +65,7 @@ export function OrderItemsReviewStep({
     garmentName: string;
     unitNumber: number;
     pieceId?: string;
+    orderItemId?: string;
   } | null>(null);
 
   // Piece selector modal state for multi-piece items
@@ -72,6 +73,7 @@ export function OrderItemsReviewStep({
     garmentCatalogId: string;
     garmentName: string;
     quantity: number;
+    orderItemId?: string;
     pieces: { unitNumber: number; pieceId?: string }[];
   } | null>(null);
 
@@ -98,9 +100,16 @@ export function OrderItemsReviewStep({
     unitNumber: number,
     pieceId?: string | null,
     totalPiecesInItem: number = 1,
+    orderItemId?: string | null,
   ): PendingPhoto[] => {
     return photos.filter((p) => {
-      if (pieceId && p.pieceId === pieceId) return true;
+      if (pieceId && p.pieceId) return p.pieceId === pieceId;
+      if (orderItemId && p.orderItemId) {
+        return (
+          p.orderItemId === orderItemId &&
+          (p.unitNumber === unitNumber || (totalPiecesInItem === 1 && !p.unitNumber))
+        );
+      }
       if (p.garmentId === garmentId) {
         if (p.unitNumber === unitNumber) return true;
         if (totalPiecesInItem === 1 && (p.unitNumber == null || p.unitNumber === 1)) {
@@ -146,6 +155,7 @@ export function OrderItemsReviewStep({
     garmentName: string;
     unitNumber: number;
     pieceId?: string;
+    orderItemId?: string;
   }) => {
     if (!clientDraftId) {
       Alert.alert('Draft Unavailable', 'Draft ID missing. Please save the order first.');
@@ -175,6 +185,7 @@ export function OrderItemsReviewStep({
           sourceUri: asset.uri,
           photoType: PhotoType.FRONT,
           garmentId: target.garmentCatalogId,
+          orderItemId: target.orderItemId,
           pieceId: target.pieceId,
           unitNumber: target.unitNumber,
         });
@@ -195,6 +206,7 @@ export function OrderItemsReviewStep({
     garmentName: string;
     unitNumber: number;
     pieceId?: string;
+    orderItemId?: string;
   }) => {
     if (!clientDraftId) {
       Alert.alert('Draft Unavailable', 'Draft ID missing. Please save the order first.');
@@ -224,6 +236,7 @@ export function OrderItemsReviewStep({
           sourceUri: asset.uri,
           photoType: PhotoType.FRONT,
           garmentId: target.garmentCatalogId,
+          orderItemId: target.orderItemId,
           pieceId: target.pieceId,
           unitNumber: target.unitNumber,
         });
@@ -397,7 +410,13 @@ export function OrderItemsReviewStep({
                 // Single piece item
                 (() => {
                   const piece = it.pieces?.[0];
-                  const piecePhotos = getPhotosForPiece(it.garmentCatalogId, 1, piece?.pieceId, 1);
+                  const piecePhotos = getPhotosForPiece(
+                    it.garmentCatalogId,
+                    1,
+                    piece?.pieceId,
+                    1,
+                    it.id,
+                  );
                   return (
                     <View style={styles.pieceSection}>
                       <View style={styles.pieceHeaderRow}>
@@ -472,6 +491,7 @@ export function OrderItemsReviewStep({
                               garmentName,
                               unitNumber: 1,
                               pieceId: piece?.pieceId,
+                              orderItemId: it.id,
                             })
                           }
                           accessible={true}
@@ -508,6 +528,7 @@ export function OrderItemsReviewStep({
                       u,
                       piece?.pieceId,
                       pieceCount,
+                      it.id,
                     );
                     const isLast = u === pieceCount;
 
@@ -590,6 +611,7 @@ export function OrderItemsReviewStep({
                                 garmentName,
                                 unitNumber: u,
                                 pieceId: piece?.pieceId,
+                                orderItemId: it.id,
                               })
                             }
                             accessible={true}
@@ -638,12 +660,14 @@ export function OrderItemsReviewStep({
                         garmentName,
                         unitNumber: 1,
                         pieceId: it.pieces?.[0]?.pieceId,
+                        orderItemId: it.id,
                       });
                     } else {
                       setPieceSelectorItem({
                         garmentCatalogId: it.garmentCatalogId,
                         garmentName,
                         quantity: pieceCount,
+                        orderItemId: it.id,
                         pieces: Array.from({ length: pieceCount }, (_, i) => ({
                           unitNumber: i + 1,
                           pieceId: it.pieces?.find((p) => p.unitNumber === i + 1)?.pieceId,
@@ -852,6 +876,7 @@ export function OrderItemsReviewStep({
                       garmentName: sel.garmentName,
                       unitNumber: piece.unitNumber,
                       pieceId: piece.pieceId,
+                      orderItemId: sel.orderItemId,
                     });
                   }}
                   accessible={true}

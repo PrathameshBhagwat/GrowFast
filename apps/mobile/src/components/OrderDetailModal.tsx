@@ -52,6 +52,8 @@ export function OrderDetailModal({
   const [summary, setSummary] = useState<PaymentSummaryDTO | null>(null);
   const [orderPhotos, setOrderPhotos] = useState<any[]>([]);
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number>(0);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -87,24 +89,46 @@ export function OrderDetailModal({
       setSummary(summaryData);
       setNotifications(notifsRes?.data || []);
 
-      const combinedPhotos: any[] = [];
-      if (Array.isArray(photosRes) && photosRes.length > 0) {
-        combinedPhotos.push(...photosRes);
-      } else if (orderData?.items) {
-        for (const item of orderData.items) {
-          if (item.photos && Array.isArray(item.photos)) {
-            combinedPhotos.push(...item.photos);
+      const photosMap = new Map<string, any>();
+      if (Array.isArray(photosRes)) {
+        for (const p of photosRes) {
+          if (p && (p.id || p.url)) {
+            photosMap.set(p.id || p.url, p);
           }
-          if (item.physicalGarments) {
+        }
+      }
+      if (orderData?.items) {
+        for (const item of orderData.items) {
+          if (Array.isArray(item.photos)) {
+            for (const p of item.photos) {
+              const key = p?.id || p?.url;
+              if (key) {
+                const existing = photosMap.get(key) || {};
+                photosMap.set(key, { ...existing, ...p, orderItemId: item.id });
+              }
+            }
+          }
+          if (Array.isArray(item.physicalGarments)) {
             for (const pg of item.physicalGarments) {
-              if (pg.photos && Array.isArray(pg.photos)) {
-                combinedPhotos.push(...pg.photos);
+              if (Array.isArray(pg.photos)) {
+                for (const p of pg.photos) {
+                  const key = p?.id || p?.url;
+                  if (key) {
+                    const existing = photosMap.get(key) || {};
+                    photosMap.set(key, {
+                      ...existing,
+                      ...p,
+                      orderItemId: item.id,
+                      physicalGarmentId: pg.id,
+                    });
+                  }
+                }
               }
             }
           }
         }
       }
-      setOrderPhotos(combinedPhotos);
+      setOrderPhotos(Array.from(photosMap.values()));
     } catch (err: any) {
       setError(err.message || 'Failed to load order details from server.');
     } finally {
@@ -169,8 +193,125 @@ export function OrderDetailModal({
     return `${base}${cleanPath}`;
   };
 
-  const handleTakePhoto = async () => {
-    if (!order) return;
+  const openLightbox = (photoUrls: string[], initialIndex: number = 0) => {
+    if (!photoUrls || photoUrls.length === 0) return;
+    const resolvedUrls = photoUrls.map((u) => resolvePhotoUrl(u));
+    setLightboxPhotos(resolvedUrls);
+    const validIndex = Math.max(0, Math.min(initialIndex, resolvedUrls.length - 1));
+    setLightboxIndex(validIndex);
+    setSelectedPhotoUrl(resolvedUrls[validIndex]);
+  };
+
+  const handleNextPhoto = () => {
+    if (lightboxIndex < lightboxPhotos.length - 1) {
+      const nextIdx = lightboxIndex + 1;
+      setLightboxIndex(nextIdx);
+      setSelectedPhotoUrl(lightboxPhotos[nextIdx]);
+    }
+  };
+
+  const handlePrevPhoto = () => {
+    if (lightboxIndex > 0) {
+      const prevIdx = lightboxIndex - 1;
+      setLightboxIndex(prevIdx);
+      setSelectedPhotoUrl(lightboxPhotos[prevIdx]);
+    }
+  };
+
+  const handleViewInPhotosTab = () => {
+    setSelectedPhotoUrl(null);
+    setLightboxPhotos([]);
+    setActiveTab('PHOTOS');
+  };
+
+  const getItemPhotos = (item: any): any[] => {
+    const seen = new Set<string>();
+    const result: any[] = [];
+
+    const addPhoto = (p: any) => {
+      if (!p) return;
+      const key = p.id || p.url;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(p);
+      }
+    };
+
+    // 1. Photos directly on item
+    if (Array.isArray(item.photos)) {
+      item.photos.forEach(addPhoto);
+    }
+
+    // 2. Photos on physical garments of this item
+    if (Array.isArray(item.physicalGarments)) {
+      const pgIds = new Set(item.physicalGarments.map((pg: any) => pg.id));
+      item.physicalGarments.forEach((pg: any) => {
+        if (Array.isArray(pg.photos)) {
+          pg.photos.forEach(addPhoto);
+        }
+      });
+
+      orderPhotos.forEach((p) => {
+        if (p.physicalGarmentId && pgIds.has(p.physicalGarmentId)) {
+          addPhoto(p);
+        }
+      });
+    }
+
+    // 3. Photos in orderPhotos with orderItemId === item.id
+    orderPhotos.forEach((p) => {
+      if (p.orderItemId === item.id) {
+        addPhoto(p);
+      }
+    });
+
+    // 4. Single-item order: order-level photos belong to this item
+    if (order && order.items && order.items.length === 1) {
+      orderPhotos.forEach((p) => {
+        if (!p.orderItemId && !p.physicalGarmentId) {
+          addPhoto(p);
+        }
+      });
+    }
+
+    return result;
+  };
+
+  const getGarmentPhotos = (garmentId: string): any[] => {
+    const seen = new Set<string>();
+    const result: any[] = [];
+
+    const addPhoto = (p: any) => {
+      if (!p) return;
+      const key = p.id || p.url;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(p);
+      }
+    };
+
+    if (order && Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (Array.isArray(item.physicalGarments)) {
+          const pg = item.physicalGarments.find((g: any) => g.id === garmentId);
+          if (pg && Array.isArray(pg.photos)) {
+            pg.photos.forEach(addPhoto);
+          }
+        }
+      }
+    }
+
+    orderPhotos.forEach((p) => {
+      if (p.physicalGarmentId === garmentId) {
+        addPhoto(p);
+      }
+    });
+
+    return result;
+  };
+
+  const handleTakePhoto = async (target?: { orderItemId?: string; physicalGarmentId?: string }) => {
+    if (!order || isUploadingPhoto) return;
     try {
       setIsUploadingPhoto(true);
       const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -192,10 +333,12 @@ export function OrderDetailModal({
         await apiClient.photos.upload({
           uri: asset.uri,
           orderId: order.id,
+          orderItemId: target?.orderItemId,
+          physicalGarmentId: target?.physicalGarmentId,
           photoType: PhotoType.FRONT,
         });
         Alert.alert('Photo Uploaded', 'Garment photo attached successfully.');
-        fetchOrderData();
+        await fetchOrderData();
         onOrderUpdated?.();
       }
     } catch (err: any) {
@@ -205,8 +348,11 @@ export function OrderDetailModal({
     }
   };
 
-  const handlePickGallery = async () => {
-    if (!order) return;
+  const handlePickGallery = async (target?: {
+    orderItemId?: string;
+    physicalGarmentId?: string;
+  }) => {
+    if (!order || isUploadingPhoto) return;
     try {
       setIsUploadingPhoto(true);
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -219,10 +365,12 @@ export function OrderDetailModal({
         await apiClient.photos.upload({
           uri: asset.uri,
           orderId: order.id,
+          orderItemId: target?.orderItemId,
+          physicalGarmentId: target?.physicalGarmentId,
           photoType: PhotoType.FRONT,
         });
         Alert.alert('Photo Uploaded', 'Garment photo attached successfully.');
-        fetchOrderData();
+        await fetchOrderData();
         onOrderUpdated?.();
       }
     } catch (err: any) {
@@ -232,10 +380,10 @@ export function OrderDetailModal({
     }
   };
 
-  const handleAddPhotoAction = () => {
+  const handleAddPhotoAction = (target?: { orderItemId?: string; physicalGarmentId?: string }) => {
     Alert.alert('Add Garment Photo', 'Choose how you want to add a photo to this order:', [
-      { text: '📷 Take Photo', onPress: handleTakePhoto },
-      { text: '🖼️ Choose from Gallery', onPress: handlePickGallery },
+      { text: '📷 Take Photo', onPress: () => handleTakePhoto(target) },
+      { text: '🖼️ Choose from Gallery', onPress: () => handlePickGallery(target) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -464,22 +612,115 @@ export function OrderDetailModal({
                   <View style={styles.itemsListContainer}>
                     {order.items.map((item) => {
                       const isWeight = item.weight != null && item.weight > 0;
+                      const itemPhotos = getItemPhotos(item);
+                      const maxThumbnails = 3;
+                      const visibleThumbnails = itemPhotos.slice(0, maxThumbnails);
+                      const extraPhotosCount = Math.max(0, itemPhotos.length - maxThumbnails);
+
                       return (
                         <View key={item.id} style={styles.itemRowCard}>
-                          <View style={styles.garmentIconBox}>
-                            <Text style={styles.garmentEmoji}>{isWeight ? '⚖️' : '👔'}</Text>
+                          <View style={styles.itemMainRow}>
+                            <View style={styles.garmentIconBox}>
+                              <Text style={styles.garmentEmoji}>{isWeight ? '⚖️' : '👔'}</Text>
+                            </View>
+                            <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                              <Text style={styles.itemGarmentName}>{item.garmentName}</Text>
+                              <Text style={styles.itemServiceName}>
+                                {(item as any).serviceName || item.serviceType} •{' '}
+                                {isWeight
+                                  ? `${item.weight} kg (${item.quantity} pcs in bag)`
+                                  : `${item.quantity} pc${item.quantity > 1 ? 's' : ''}`}
+                              </Text>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={styles.itemPrice}>₹ {item.lineTotal.toFixed(0)}</Text>
+                            </View>
                           </View>
-                          <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                            <Text style={styles.itemGarmentName}>{item.garmentName}</Text>
-                            <Text style={styles.itemServiceName}>
-                              {(item as any).serviceName || item.serviceType} •{' '}
-                              {isWeight
-                                ? `${item.weight} kg (${item.quantity} pcs in bag)`
-                                : `${item.quantity} pc${item.quantity > 1 ? 's' : ''}`}
-                            </Text>
-                          </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={styles.itemPrice}>₹ {item.lineTotal.toFixed(0)}</Text>
+
+                          {/* Compact Photo Preview Strip */}
+                          <View style={styles.itemPhotoStripContainer}>
+                            {itemPhotos.length > 0 ? (
+                              <View style={styles.itemThumbnailsRow}>
+                                {visibleThumbnails.map((photo, phIdx) => {
+                                  const fullUrl = resolvePhotoUrl(photo.url);
+                                  return (
+                                    <TouchableOpacity
+                                      key={photo.id || phIdx}
+                                      style={styles.compactThumbBtn}
+                                      onPress={() =>
+                                        openLightbox(
+                                          itemPhotos.map((p) => p.url),
+                                          phIdx,
+                                        )
+                                      }
+                                      accessible={true}
+                                      accessibilityLabel={`View photo ${phIdx + 1} for ${item.garmentName}`}
+                                      activeOpacity={0.8}
+                                    >
+                                      <Image
+                                        source={{ uri: fullUrl }}
+                                        style={styles.compactThumbImage}
+                                        resizeMode="cover"
+                                      />
+                                    </TouchableOpacity>
+                                  );
+                                })}
+
+                                {extraPhotosCount > 0 && (
+                                  <TouchableOpacity
+                                    style={styles.compactExtraBadgeBtn}
+                                    onPress={() =>
+                                      openLightbox(
+                                        itemPhotos.map((p) => p.url),
+                                        maxThumbnails,
+                                      )
+                                    }
+                                    accessible={true}
+                                    accessibilityLabel={`View ${extraPhotosCount} more photos`}
+                                    activeOpacity={0.8}
+                                  >
+                                    <Text style={styles.compactExtraBadgeText}>
+                                      +{extraPhotosCount}
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+
+                                <TouchableOpacity
+                                  style={styles.compactAddMorePhotoBtn}
+                                  onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
+                                  accessible={true}
+                                  accessibilityLabel={`Add photo for ${item.garmentName}`}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={styles.compactAddMorePhotoText}>📷 +</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={styles.compactViewAllLink}
+                                  onPress={() => setActiveTab('PHOTOS')}
+                                  accessible={true}
+                                  accessibilityLabel="View all order photos in Photos tab"
+                                >
+                                  <Text style={styles.compactViewAllText}>
+                                    {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} •
+                                    View All ›
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <View style={styles.noPhotosRow}>
+                                <TouchableOpacity
+                                  style={styles.addPhotoInlineBtn}
+                                  onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
+                                  accessible={true}
+                                  accessibilityLabel={`Add photo for ${item.garmentName}`}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={styles.addPhotoInlineText}>📷 + Add Photo</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.noPhotosLabel}>No photos attached</Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                       );
@@ -492,35 +733,68 @@ export function OrderDetailModal({
                       <View style={styles.garmentChecklistCard}>
                         <Text style={styles.checklistTitle}>Garment Readiness Checklist</Text>
                         {order.items.map((item) =>
-                          item.physicalGarments?.map((g) => (
-                            <TouchableOpacity
-                              key={g.id}
-                              style={styles.garmentCheckRow}
-                              onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
-                              disabled={operatingGarmentId === g.id}
-                            >
-                              <View
-                                style={[
-                                  styles.checkboxCircle,
-                                  g.isReady && styles.checkboxCircleActive,
-                                ]}
+                          item.physicalGarments?.map((g) => {
+                            const pgPhotos = getGarmentPhotos(g.id);
+                            return (
+                              <TouchableOpacity
+                                key={g.id}
+                                style={styles.garmentCheckRow}
+                                onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
+                                disabled={operatingGarmentId === g.id}
                               >
-                                {g.isReady && <Text style={styles.checkmarkIcon}>✓</Text>}
-                              </View>
-                              <Text style={styles.garmentCheckText}>
-                                {item.garmentName} #{g.unitNumber}{' '}
-                                {g.tagId ? `(Tag: ${g.tagId})` : ''}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.garmentStatusLabel,
-                                  g.isReady ? styles.statusReady : styles.statusWaiting,
-                                ]}
-                              >
-                                {g.isReady ? 'Ready' : 'In Processing'}
-                              </Text>
-                            </TouchableOpacity>
-                          )),
+                                <View
+                                  style={[
+                                    styles.checkboxCircle,
+                                    g.isReady && styles.checkboxCircleActive,
+                                  ]}
+                                >
+                                  {g.isReady && <Text style={styles.checkmarkIcon}>✓</Text>}
+                                </View>
+                                <Text style={styles.garmentCheckText}>
+                                  {item.garmentName} #{g.unitNumber}{' '}
+                                  {g.tagId ? `(Tag: ${g.tagId})` : ''}
+                                </Text>
+
+                                {pgPhotos.length > 0 && (
+                                  <TouchableOpacity
+                                    style={styles.garmentPiecePhotoBtn}
+                                    onPress={(e) => {
+                                      e.stopPropagation?.();
+                                      openLightbox(
+                                        pgPhotos.map((p) => p.url),
+                                        0,
+                                      );
+                                    }}
+                                    accessible={true}
+                                    accessibilityLabel={`View ${pgPhotos.length} photo(s) for ${item.garmentName} #${g.unitNumber}`}
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                  >
+                                    <Image
+                                      source={{ uri: resolvePhotoUrl(pgPhotos[0].url) }}
+                                      style={styles.garmentPieceThumbImage}
+                                      resizeMode="cover"
+                                    />
+                                    {pgPhotos.length > 1 && (
+                                      <View style={styles.garmentPieceBadge}>
+                                        <Text style={styles.garmentPieceBadgeText}>
+                                          +{pgPhotos.length - 1}
+                                        </Text>
+                                      </View>
+                                    )}
+                                  </TouchableOpacity>
+                                )}
+
+                                <Text
+                                  style={[
+                                    styles.garmentStatusLabel,
+                                    g.isReady ? styles.statusReady : styles.statusWaiting,
+                                  ]}
+                                >
+                                  {g.isReady ? 'Ready' : 'In Processing'}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          }),
                         )}
                       </View>
                     ) : null}
@@ -561,7 +835,7 @@ export function OrderDetailModal({
                       <View style={styles.photosActionRow}>
                         <TouchableOpacity
                           style={styles.actionBtnSmall}
-                          onPress={handleTakePhoto}
+                          onPress={() => handleTakePhoto()}
                           disabled={isUploadingPhoto}
                           accessible={true}
                           accessibilityLabel="Take Photo with Camera"
@@ -570,7 +844,7 @@ export function OrderDetailModal({
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.actionBtnSmall, styles.actionBtnSmallSecondary]}
-                          onPress={handlePickGallery}
+                          onPress={() => handlePickGallery()}
                           disabled={isUploadingPhoto}
                           accessible={true}
                           accessibilityLabel="Select from Gallery"
@@ -605,7 +879,12 @@ export function OrderDetailModal({
                             <TouchableOpacity
                               key={photo.id || idx}
                               style={styles.photoCard}
-                              onPress={() => setSelectedPhotoUrl(fullUrl)}
+                              onPress={() =>
+                                openLightbox(
+                                  orderPhotos.map((p) => p.url),
+                                  idx,
+                                )
+                              }
                               activeOpacity={0.8}
                               accessible={true}
                               accessibilityLabel={`View Garment Photo ${idx + 1}`}
@@ -681,7 +960,7 @@ export function OrderDetailModal({
               <View style={styles.bottomBar}>
                 <TouchableOpacity
                   style={styles.addPhotoBtn}
-                  onPress={handleAddPhotoAction}
+                  onPress={() => handleAddPhotoAction()}
                   activeOpacity={0.8}
                   disabled={isUploadingPhoto}
                   accessible={true}
@@ -746,19 +1025,76 @@ export function OrderDetailModal({
           {selectedPhotoUrl && (
             <Modal visible={true} transparent={true} animationType="fade">
               <View style={styles.lightboxBackdrop}>
-                <TouchableOpacity
-                  style={styles.lightboxCloseBtn}
-                  onPress={() => setSelectedPhotoUrl(null)}
-                  accessible={true}
-                  accessibilityLabel="Close photo preview"
-                >
-                  <Text style={styles.lightboxCloseText}>✕ Close</Text>
-                </TouchableOpacity>
-                <Image
-                  source={{ uri: selectedPhotoUrl }}
-                  style={styles.lightboxImage}
-                  resizeMode="contain"
-                />
+                <View style={styles.lightboxHeader}>
+                  <Text style={styles.lightboxTitle}>
+                    {lightboxPhotos.length > 1
+                      ? `Photo ${lightboxIndex + 1} of ${lightboxPhotos.length}`
+                      : 'Photo Preview'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.lightboxCloseBtn}
+                    onPress={() => {
+                      setSelectedPhotoUrl(null);
+                      setLightboxPhotos([]);
+                    }}
+                    accessible={true}
+                    accessibilityLabel="Close photo preview"
+                  >
+                    <Text style={styles.lightboxCloseText}>✕ Close</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.lightboxImageContainer}>
+                  <Image
+                    source={{ uri: selectedPhotoUrl }}
+                    style={styles.lightboxImage}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                <View style={styles.lightboxFooter}>
+                  {lightboxPhotos.length > 1 && (
+                    <View style={styles.lightboxNavRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.lightboxNavBtn,
+                          lightboxIndex === 0 && styles.lightboxNavBtnDisabled,
+                        ]}
+                        onPress={handlePrevPhoto}
+                        disabled={lightboxIndex === 0}
+                        accessible={true}
+                        accessibilityLabel="Previous Photo"
+                      >
+                        <Text style={styles.lightboxNavBtnText}>‹ Previous</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.lightboxNavBtn,
+                          lightboxIndex === lightboxPhotos.length - 1 &&
+                            styles.lightboxNavBtnDisabled,
+                        ]}
+                        onPress={handleNextPhoto}
+                        disabled={lightboxIndex === lightboxPhotos.length - 1}
+                        accessible={true}
+                        accessibilityLabel="Next Photo"
+                      >
+                        <Text style={styles.lightboxNavBtnText}>Next ›</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.lightboxTabSwitchBtn}
+                    onPress={handleViewInPhotosTab}
+                    accessible={true}
+                    accessibilityLabel="Go to Photos Tab"
+                  >
+                    <Text style={styles.lightboxTabSwitchText}>
+                      Open Complete Photos Tab ({orderPhotos.length}) →
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </Modal>
           )}
@@ -907,13 +1243,137 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   itemRowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#ffffff',
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  itemMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemPhotoStripContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  itemThumbnailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  compactThumbBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    overflow: 'hidden',
+    backgroundColor: '#f8fafc',
+  },
+  compactThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  compactExtraBadgeBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#94a3b8',
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactExtraBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  compactAddMorePhotoBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactAddMorePhotoText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  compactViewAllLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  compactViewAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  noPhotosRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addPhotoInlineBtn: {
+    minHeight: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoInlineText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  noPhotosLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  garmentPiecePhotoBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    overflow: 'hidden',
+    backgroundColor: '#f8fafc',
+    marginRight: 6,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  garmentPieceThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  garmentPieceBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    borderTopLeftRadius: 4,
+  },
+  garmentPieceBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '700',
   },
   garmentIconBox: {
     width: 44,
@@ -1155,29 +1615,89 @@ const styles = StyleSheet.create({
   },
   lightboxBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.92)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.94)',
+    justifyContent: 'space-between',
+    paddingVertical: 40,
+    paddingHorizontal: 16,
+  },
+  lightboxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 8,
+    paddingTop: Platform.OS === 'android' ? 20 : 10,
+    zIndex: 10,
+  },
+  lightboxTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   lightboxCloseBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 16,
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
-    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   lightboxCloseText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
   },
+  lightboxImageContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
   lightboxImage: {
     width: '100%',
-    height: '80%',
+    height: '100%',
+  },
+  lightboxFooter: {
+    gap: 12,
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  lightboxNavRow: {
+    flexDirection: 'row',
+    gap: 16,
+    justifyContent: 'center',
+  },
+  lightboxNavBtn: {
+    minHeight: 44,
+    minWidth: 100,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  lightboxNavBtnDisabled: {
+    opacity: 0.3,
+  },
+  lightboxNavBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  lightboxTabSwitchBtn: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightboxTabSwitchText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   historyTabContainer: {
     gap: 16,

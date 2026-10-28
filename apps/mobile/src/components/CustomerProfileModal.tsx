@@ -33,7 +33,6 @@ export interface CustomerProfileModalProps {
   onClose: () => void;
   onCreatePerPieceOrder?: (customer: CustomerDTO) => void;
   onCreatePerWeightOrder?: (customer: CustomerDTO) => void;
-  onCreateDryCleanOrder?: (customer: CustomerDTO) => void;
   onReturnToSearch?: () => void;
   onViewOrder?: (orderId: string) => void;
 }
@@ -67,7 +66,6 @@ export function CustomerProfileModal({
   onClose,
   onCreatePerPieceOrder,
   onCreatePerWeightOrder,
-  onCreateDryCleanOrder,
   onReturnToSearch,
   onViewOrder,
 }: CustomerProfileModalProps) {
@@ -147,7 +145,7 @@ export function CustomerProfileModal({
             </TouchableOpacity>
           </View>
 
-          {/* Quick Action Buttons for Ordering (Three Website Modes) */}
+          {/* Quick Action Buttons for Ordering (Two Primary Modes) */}
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity
               style={styles.orderPerPieceBtn}
@@ -159,7 +157,7 @@ export function CustomerProfileModal({
               accessibilityRole="button"
               accessibilityLabel={`Create Per-Piece Order for ${customer.name}`}
             >
-              <Icon name="shirt-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+              <Icon name="shirt-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
               <Text style={styles.orderPerPieceBtnText} numberOfLines={1}>
                 Per-Piece
               </Text>
@@ -175,25 +173,9 @@ export function CustomerProfileModal({
               accessibilityRole="button"
               accessibilityLabel={`Create Per-Weight Order for ${customer.name}`}
             >
-              <Icon name="scale-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+              <Icon name="scale-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
               <Text style={styles.orderPerWeightBtnText} numberOfLines={1}>
                 Per-Weight
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.orderDryCleanBtn}
-              onPress={() => {
-                onClose();
-                onCreateDryCleanOrder?.(customer);
-              }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel={`Create Dry Cleaning Order for ${customer.name}`}
-            >
-              <Icon name="sparkles-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.orderDryCleanBtnText} numberOfLines={1}>
-                Dry Clean
               </Text>
             </TouchableOpacity>
           </View>
@@ -504,26 +486,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  orderDryCleanBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#4F46E5',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  orderDryCleanBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+
   subBarRow: {
     paddingHorizontal: 16,
     paddingVertical: 8,

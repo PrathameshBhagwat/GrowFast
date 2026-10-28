@@ -632,9 +632,9 @@ export function CatalogItemsStep({
                     placeholder="2.00"
                     placeholderTextColor="#94a3b8"
                   />
-                  {weightValidationError && (
+                  {weightValidationError ? (
                     <Text style={styles.errorText}>⚠️ {weightValidationError}</Text>
-                  )}
+                  ) : null}
                 </View>
               )}
 

@@ -31,6 +31,7 @@ import {
 } from '@growfast/shared-types';
 import { isWeightBasedPricing } from '../../services/catalog-rules';
 import { PendingPhoto, savePhotoLocally, deletePhoto } from '../../db/photos';
+import { generateUUID } from '../../db/drafts';
 
 export interface CatalogGridStepProps {
   workflow?: OrderWorkflowType;
@@ -380,7 +381,9 @@ export function CatalogGridStep({
       .filter(Boolean)
       .join(' | ');
 
+    const newItemId = generateUUID();
     const newItem: CreateOrderItemRequest = {
+      id: newItemId,
       garmentCatalogId: weightGarment.id,
       serviceTypeId: selectedServiceId,
       quantity: count,
@@ -389,9 +392,10 @@ export function CatalogGridStep({
       defectNotes: combinedNotes || undefined,
       addOnIds: selectedAddOns.map((a) => a.id),
       pieces: Array.from({ length: count }, (_, i) => ({
+        pieceId: generateUUID(),
         unitNumber: i + 1,
         defectNotes: i === 0 && garmentBreakdown ? garmentBreakdown : undefined,
-        photoCount: uploadedPhotos.length,
+        photoCount: 0,
       })),
     };
 
@@ -644,11 +648,11 @@ export function CatalogGridStep({
               <Text style={styles.minWeightLabel}>Min: 2.00 kg</Text>
             </View>
 
-            {weightError && (
+            {weightError ? (
               <View style={styles.weightErrorBanner}>
                 <Text style={styles.weightErrorBannerText}>⚠️ {weightError}</Text>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Card 2: Price / KG */}
@@ -735,68 +739,6 @@ export function CatalogGridStep({
               )}
             </View>
           )}
-
-          {/* Card 5: Upload Photos (Image 2 Screen 3b & Image 3) */}
-          <View style={styles.photoUploadCard}>
-            <View style={styles.photoHeaderRow}>
-              <Text style={styles.photoHeaderTitle}>
-                📷 Upload Photos ({targetCount <= 50 ? '1 required' : 'optional'})
-              </Text>
-              <Text style={styles.photoHeaderCount}>
-                {uploadedCount} / {targetCount}
-              </Text>
-            </View>
-            <Text style={styles.photoProgressSubtext}>
-              {uploadedCount} of {targetCount} garment photos uploaded — {remainingCount} remaining.
-            </Text>
-
-            {/* Photo Action Buttons */}
-            <View style={styles.photoActionButtonsRow}>
-              <TouchableOpacity
-                style={styles.photoAddBtn}
-                onPress={handleTakePhoto}
-                disabled={isCapturingPhoto}
-                accessible={true}
-                accessibilityLabel="Take photo with camera"
-              >
-                <Text style={styles.photoAddBtnText}>📷 Take Photo</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.photoUploadMultipleBtn}
-                onPress={handlePickFromGallery}
-                disabled={isCapturingPhoto}
-                accessible={true}
-                accessibilityLabel="Upload multiple photos from gallery"
-              >
-                <Text style={styles.photoUploadMultipleBtnText}>🖼️ Upload Multiple</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Uploaded Thumbnails Preview */}
-            {uploadedPhotos.length > 0 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.photoThumbList}
-              >
-                {uploadedPhotos.map((p, idx) => (
-                  <View key={p.id} style={styles.photoThumbWrapper}>
-                    <Image source={{ uri: p.uri }} style={styles.photoThumbImage} />
-                    <TouchableOpacity
-                      style={styles.photoThumbRemoveBtn}
-                      onPress={() => handleRemovePhoto(p.id)}
-                      accessible={true}
-                      accessibilityLabel={`Remove photo ${idx + 1}`}
-                    >
-                      <Text style={styles.photoThumbRemoveText}>✕</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.photoThumbLabel}>Garment {idx + 1}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-          </View>
 
           {/* Add to Cart CTA (Image 2 Screen 3b) */}
           <TouchableOpacity
