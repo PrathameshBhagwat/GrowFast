@@ -562,6 +562,8 @@ export const HomePage: React.FC = () => {
                 <span className="hidden sm:inline">Dashboard</span>
               </Button>
             )}
+            {/* Temporarily hidden: Home Delivery feature is temporarily not offered */}
+            {/*
             <Button
               id="home-deliveries"
               variant="outline"
@@ -573,6 +575,7 @@ export const HomePage: React.FC = () => {
             >
               <span className="hidden sm:inline">Deliveries</span>
             </Button>
+            */}
             {/* Owner Settings Area (Exclusively for OWNER role) */}
             {employee.role === 'OWNER' ? (
               <div className="relative" ref={ownerMenuRef}>

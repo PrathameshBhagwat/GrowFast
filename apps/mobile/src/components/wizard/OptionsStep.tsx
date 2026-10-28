@@ -103,25 +103,7 @@ export function OptionsStep({
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.pickupCard,
-              pickupType === PickupType.HOME_DELIVERY && styles.pickupCardActive,
-            ]}
-            onPress={() => onPickupTypeChange(PickupType.HOME_DELIVERY)}
-            accessible={true}
-            accessibilityLabel="Select Home Delivery"
-          >
-            <View style={styles.radioCircle}>
-              {pickupType === PickupType.HOME_DELIVERY && <View style={styles.radioDot} />}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.pickupCardTitle}>🚚 Home Delivery</Text>
-              <Text style={styles.pickupCardDesc}>
-                Order is dispatched to customer address by delivery rider
-              </Text>
-            </View>
-          </TouchableOpacity>
+          {/* Home Delivery temporarily hidden while feature is not offered */}
         </View>
       </View>
 
