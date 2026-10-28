@@ -314,7 +314,8 @@ export function OrderWizardModal({
         }
 
         setWorkflow((draft.workflowType as OrderWorkflowType) || 'LAUNDRY');
-        setPickupType((draft.pickupType as PickupType) || PickupType.STORE_PICKUP);
+        // Force STORE_PICKUP while Home Delivery is temporarily not offered to prevent stale drafts from silently submitting home delivery
+        setPickupType(PickupType.STORE_PICKUP);
         setExpressOption(
           draft.payload?.expressDeliveryOption ||
             (draft.isExpress ? ExpressDeliveryOption.SAME_DAY : ExpressDeliveryOption.REGULAR),

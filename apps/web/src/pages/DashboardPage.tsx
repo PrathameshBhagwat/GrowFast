@@ -336,7 +336,8 @@ export const DashboardPage: React.FC = () => {
     { label: 'Customers', path: '/', show: true },
     { label: 'Catalog', path: '/catalog', show: true },
     { label: 'Staff', path: '/staff', show: isOwner },
-    { label: 'Deliveries', path: '/deliveries', show: true },
+    // Deliveries temporarily hidden while Home Delivery is not offered
+    { label: 'Deliveries', path: '/deliveries', show: false },
   ];
 
   return (
@@ -498,6 +499,8 @@ export const DashboardPage: React.FC = () => {
             <span>Customers</span>
           </button>
 
+          {/* Deliveries sidebar button temporarily hidden while Home Delivery is not offered */}
+          {/*
           <button
             type="button"
             onClick={() => navigate('/deliveries')}
@@ -522,6 +525,7 @@ export const DashboardPage: React.FC = () => {
             <Truck size={18} />
             <span>Deliveries</span>
           </button>
+          */}
 
           <button
             type="button"

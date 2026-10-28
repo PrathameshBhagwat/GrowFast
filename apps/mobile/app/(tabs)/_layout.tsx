@@ -72,6 +72,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="deliveries"
         options={{
+          href: null, // Temporarily hidden while Home Delivery is not offered
           title: 'Deliveries',
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.tabIconBox}>

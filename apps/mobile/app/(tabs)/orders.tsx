@@ -212,7 +212,7 @@ export default function OrdersScreen() {
   const handleApplyFilters = () => {
     setFilterStatus(tempStatus);
     setFilterPaymentStatus(tempPaymentStatus);
-    setFilterFulfillment(tempFulfillment);
+    setFilterFulfillment(tempFulfillment === 'HOME_DELIVERY' ? 'ALL' : tempFulfillment);
     setFilterPriority(tempPriority);
     setFilterDatePreset(tempDatePreset);
 
@@ -887,7 +887,7 @@ export default function OrdersScreen() {
                     {[
                       { key: 'ALL', label: 'All Types' },
                       { key: 'STORE_PICKUP', label: 'Counter Pickup' },
-                      { key: 'HOME_DELIVERY', label: 'Home Delivery' },
+                      // Home Delivery filter option temporarily hidden while feature is not offered
                     ].map((opt) => (
                       <TouchableOpacity
                         key={opt.key}

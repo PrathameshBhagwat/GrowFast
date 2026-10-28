@@ -325,24 +325,7 @@ export function FinalReviewStep({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.radioChip,
-              pickupType === PickupType.HOME_DELIVERY && styles.radioChipActive,
-            ]}
-            onPress={() => onPickupTypeChange(PickupType.HOME_DELIVERY)}
-            accessible={true}
-            accessibilityLabel="Home Delivery"
-          >
-            <Text
-              style={[
-                styles.radioChipText,
-                pickupType === PickupType.HOME_DELIVERY && styles.radioChipTextActive,
-              ]}
-            >
-              🚚 Home Delivery
-            </Text>
-          </TouchableOpacity>
+          {/* Home Delivery temporarily hidden while feature is not offered */}
         </View>
       </View>
 
