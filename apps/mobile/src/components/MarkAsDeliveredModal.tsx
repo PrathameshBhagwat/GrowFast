@@ -148,7 +148,30 @@ export function MarkAsDeliveredModal({
     return true;
   }, [order, physicalItems, legacyItems, selectedGarmentIds, legacyQuantities, totalSelectedCount]);
 
-  if (!order) return null;
+  if (!order) {
+    return (
+      <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.container}>
+            <View style={styles.headerRow}>
+              <TouchableOpacity
+                onPress={onClose}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.closeBtn}
+              >
+                <Text style={styles.backArrow}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Mark as Delivered</Text>
+              <View style={{ width: 44 }} />
+            </View>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#0284C7" />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
 
   const todayStr = new Date().toLocaleDateString('en-IN', {
     day: '2-digit',

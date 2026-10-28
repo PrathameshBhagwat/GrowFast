@@ -342,7 +342,7 @@ export function ItemDetailsModal({
                   accessible={true}
                   accessibilityLabel="Measured laundry weight in kilograms"
                 />
-                {weightError && <Text style={styles.errorText}>{weightError}</Text>}
+                {weightError ? <Text style={styles.errorText}>{weightError}</Text> : null}
 
                 {/* Quick Weight Presets (Workstream 2) */}
                 <View style={styles.quickChipsRow}>

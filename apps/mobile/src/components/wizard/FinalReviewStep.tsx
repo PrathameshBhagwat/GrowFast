@@ -187,7 +187,12 @@ export function FinalReviewStep({
         for (let u = 1; u <= pieceCount; u++) {
           const piece = item.pieces?.find((p) => p.unitNumber === u);
           const count = photos.filter((p) => {
-            if (piece?.pieceId && p.pieceId === piece.pieceId) return true;
+            if (piece?.pieceId && p.pieceId) return p.pieceId === piece.pieceId;
+            if (item.id && p.orderItemId) {
+              return (
+                p.orderItemId === item.id && (p.unitNumber === u || (!p.unitNumber && u === 1))
+              );
+            }
             return (
               p.garmentId === item.garmentCatalogId &&
               (p.unitNumber === u || (pieceCount === 1 && !p.unitNumber))

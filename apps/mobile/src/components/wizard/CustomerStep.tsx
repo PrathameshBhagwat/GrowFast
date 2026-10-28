@@ -245,7 +245,7 @@ export function CustomerStep({
               <Text style={styles.searchingText}>Searching customer registry...</Text>
             </View>
           )}
-          {searchError && <Text style={styles.errorText}>⚠️ {searchError}</Text>}
+          {searchError ? <Text style={styles.errorText}>⚠️ {searchError}</Text> : null}
         </View>
       )}
 
