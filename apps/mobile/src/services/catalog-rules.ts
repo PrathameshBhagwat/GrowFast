@@ -255,9 +255,7 @@ export function resolveWeightServices(services: ServiceTypeDTO[]): ServiceTypeDT
       }
       if (canonical.id === 'svc-laundry-premium') {
         return (
-          sId === 'svc-laundry-premium' ||
-          sId === 'srv-premium-wash' ||
-          sName.includes('premium')
+          sId === 'svc-laundry-premium' || sId === 'srv-premium-wash' || sName.includes('premium')
         );
       }
       if (canonical.id === 'svc-laundry-woolen') {

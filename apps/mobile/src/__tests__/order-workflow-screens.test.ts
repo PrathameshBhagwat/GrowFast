@@ -1494,17 +1494,83 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
 
   describe('Workstream 5: Mode Independence & Per-Piece / Per-Weight Regression Suite', () => {
     const fullCatalogServices: ServiceTypeDTO[] = [
-      { id: 'svc-dry-clean', name: 'Dry Clean', category: ServiceCategory.DRY_CLEAN, estimatedDays: 2, isActive: true },
-      { id: 'svc-wash-iron', name: 'Wash and Steam Iron', category: ServiceCategory.WASH_IRON, estimatedDays: 2, isActive: true },
-      { id: 'svc-shoe-clean', name: 'Shoe Cleaning', category: ServiceCategory.SHOE_CLEAN, estimatedDays: 3, isActive: true },
-      { id: 'svc-steam-press', name: 'Steam Iron', category: ServiceCategory.STEAM_PRESS, estimatedDays: 1, isActive: true },
-      { id: 'svc-wash', name: 'Standard Wash', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
-      { id: 'svc-leather', name: 'Reprocess Cleaning', category: ServiceCategory.LEATHER_CLEAN, estimatedDays: 4, isActive: true },
-      { id: 'svc-stain', name: 'Free Shoe', category: ServiceCategory.STAIN_REMOVAL, estimatedDays: 2, isActive: true },
-      { id: 'svc-wash-fold', name: 'Wash and Fold', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
-      { id: 'svc-laundry-white', name: 'Laundry for White', category: ServiceCategory.WASH, estimatedDays: 2, isActive: true },
-      { id: 'svc-laundry-premium', name: 'Premium Laundry', category: ServiceCategory.WASH, estimatedDays: 3, isActive: true },
-      { id: 'svc-laundry-woolen', name: 'Woolen Laundry', category: ServiceCategory.WASH, estimatedDays: 3, isActive: true },
+      {
+        id: 'svc-dry-clean',
+        name: 'Dry Clean',
+        category: ServiceCategory.DRY_CLEAN,
+        estimatedDays: 2,
+        isActive: true,
+      },
+      {
+        id: 'svc-wash-iron',
+        name: 'Wash and Steam Iron',
+        category: ServiceCategory.WASH_IRON,
+        estimatedDays: 2,
+        isActive: true,
+      },
+      {
+        id: 'svc-shoe-clean',
+        name: 'Shoe Cleaning',
+        category: ServiceCategory.SHOE_CLEAN,
+        estimatedDays: 3,
+        isActive: true,
+      },
+      {
+        id: 'svc-steam-press',
+        name: 'Steam Iron',
+        category: ServiceCategory.STEAM_PRESS,
+        estimatedDays: 1,
+        isActive: true,
+      },
+      {
+        id: 'svc-wash',
+        name: 'Standard Wash',
+        category: ServiceCategory.WASH,
+        estimatedDays: 2,
+        isActive: true,
+      },
+      {
+        id: 'svc-leather',
+        name: 'Reprocess Cleaning',
+        category: ServiceCategory.LEATHER_CLEAN,
+        estimatedDays: 4,
+        isActive: true,
+      },
+      {
+        id: 'svc-stain',
+        name: 'Free Shoe',
+        category: ServiceCategory.STAIN_REMOVAL,
+        estimatedDays: 2,
+        isActive: true,
+      },
+      {
+        id: 'svc-wash-fold',
+        name: 'Wash and Fold',
+        category: ServiceCategory.WASH,
+        estimatedDays: 2,
+        isActive: true,
+      },
+      {
+        id: 'svc-laundry-white',
+        name: 'Laundry for White',
+        category: ServiceCategory.WASH,
+        estimatedDays: 2,
+        isActive: true,
+      },
+      {
+        id: 'svc-laundry-premium',
+        name: 'Premium Laundry',
+        category: ServiceCategory.WASH,
+        estimatedDays: 3,
+        isActive: true,
+      },
+      {
+        id: 'svc-laundry-woolen',
+        name: 'Woolen Laundry',
+        category: ServiceCategory.WASH,
+        estimatedDays: 3,
+        isActive: true,
+      },
     ];
 
     // 1. Selecting Per-Piece displays exactly four services.
@@ -1539,7 +1605,9 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
           if (mode === 'WEIGHT') {
             workflow = 'LAUNDRY';
           } else {
-            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            const isDc =
+              svc.category === ServiceCategory.DRY_CLEAN ||
+              svc.name.toLowerCase().includes('dry clean');
             workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
           }
         }
@@ -1565,7 +1633,9 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
           if (mode === 'WEIGHT') {
             workflow = 'LAUNDRY';
           } else {
-            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            const isDc =
+              svc.category === ServiceCategory.DRY_CLEAN ||
+              svc.name.toLowerCase().includes('dry clean');
             workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
           }
         }
@@ -1592,9 +1662,16 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
           if (mode === 'WEIGHT') {
             workflow = 'LAUNDRY';
           } else {
-            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            const isDc =
+              svc.category === ServiceCategory.DRY_CLEAN ||
+              svc.name.toLowerCase().includes('dry clean');
             workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
-            const resolved = resolveCatalogSelectionOnServiceSelect(newSvcId, selectedCategory, fullCatalogServices, workflow);
+            const resolved = resolveCatalogSelectionOnServiceSelect(
+              newSvcId,
+              selectedCategory,
+              fullCatalogServices,
+              workflow,
+            );
             if (resolved.category) {
               selectedCategory = String(resolved.category);
             }
@@ -1605,7 +1682,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       handleSelectService('svc-shoe-clean');
       assert.equal(selectedServiceId, 'svc-shoe-clean');
       assert.equal(selectedCategory, GarmentCategory.SHOES);
-      assert.equal(entryMode, 'PIECES', 'Selecting Shoe Cleaning must keep Per-Piece mode selected');
+      assert.equal(
+        entryMode,
+        'PIECES',
+        'Selecting Shoe Cleaning must keep Per-Piece mode selected',
+      );
       assert.equal(isWeightBasedPricing(workflow, null, entryMode), false);
     });
 
@@ -1622,7 +1703,9 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
           if (mode === 'WEIGHT') {
             workflow = 'LAUNDRY';
           } else {
-            const isDc = svc.category === ServiceCategory.DRY_CLEAN || svc.name.toLowerCase().includes('dry clean');
+            const isDc =
+              svc.category === ServiceCategory.DRY_CLEAN ||
+              svc.name.toLowerCase().includes('dry clean');
             workflow = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
           }
         }
@@ -1631,9 +1714,17 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       handleSelectService('svc-steam-press');
       assert.equal(selectedServiceId, 'svc-steam-press');
       assert.equal(workflow, 'LAUNDRY');
-      assert.equal(entryMode, 'PIECES', 'Selecting Steam Iron in Per-Piece mode must remain Per-Piece');
       assert.equal(
-        isWeightBasedPricing(workflow, fullCatalogServices.find((s) => s.id === 'svc-steam-press'), entryMode),
+        entryMode,
+        'PIECES',
+        'Selecting Steam Iron in Per-Piece mode must remain Per-Piece',
+      );
+      assert.equal(
+        isWeightBasedPricing(
+          workflow,
+          fullCatalogServices.find((s) => s.id === 'svc-steam-press'),
+          entryMode,
+        ),
         false,
         'Pricing must remain per-piece when in PIECES mode even with Steam Iron in LAUNDRY',
       );
@@ -1646,13 +1737,7 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(weightServices.length, 5, 'Per-Weight mode must display exactly 5 services');
       assert.deepEqual(
         weightServices.map((s) => s.name),
-        [
-          'Steam Iron',
-          'Wash and Fold',
-          'Laundry for White',
-          'Premium Laundry',
-          'Woolen Laundry',
-        ],
+        ['Steam Iron', 'Wash and Fold', 'Laundry for White', 'Premium Laundry', 'Woolen Laundry'],
       );
 
       assert.ok(!weightServices.some((s) => s.name === 'Dry Clean'));
@@ -1677,7 +1762,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       for (const svc of weightServices) {
         handleSelectService(svc.id);
         assert.equal(selectedServiceId, svc.id);
-        assert.equal(entryMode, 'WEIGHT', `Selecting ${svc.name} must never switch mode away from WEIGHT`);
+        assert.equal(
+          entryMode,
+          'WEIGHT',
+          `Selecting ${svc.name} must never switch mode away from WEIGHT`,
+        );
         assert.equal(
           isWeightBasedPricing('LAUNDRY', svc, entryMode),
           true,
@@ -1724,7 +1813,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(entryMode, 'WEIGHT');
       assert.equal(selectedServiceId, 'svc-wash-iron');
       assert.equal(selectedCategory, GarmentCategory.WEIGHT_BASED);
-      assert.equal(cartItems.length, 0, 'Incompatible piece items must be purged on switch to WEIGHT');
+      assert.equal(
+        cartItems.length,
+        0,
+        'Incompatible piece items must be purged on switch to WEIGHT',
+      );
       const emptyWeightTotals = calculateOrderTotals(cartItems);
       assert.equal(emptyWeightTotals.subtotal, 0);
 
@@ -1744,7 +1837,11 @@ describe('GrowFast Mobile Developer B — Order Workflow Screens 4–9', () => {
       assert.equal(entryMode, 'PIECES');
       assert.equal(selectedServiceId, 'svc-dry-clean');
       assert.equal(selectedCategory, 'ALL');
-      assert.equal(cartItems.length, 0, 'Incompatible weight items must be purged on switch to PIECES');
+      assert.equal(
+        cartItems.length,
+        0,
+        'Incompatible weight items must be purged on switch to PIECES',
+      );
       const emptyPieceTotals = calculateOrderTotals(cartItems);
       assert.equal(emptyPieceTotals.subtotal, 0);
     });

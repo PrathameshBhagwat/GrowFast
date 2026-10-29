@@ -347,7 +347,10 @@ export function OrderWizardModal({
         if (targetWorkflow === 'DRY_CLEANING') {
           setSelectedCategory('ALL');
           const dryCleanSvc = services.find(
-            (s) => s.category === ServiceCategory.DRY_CLEAN || s.id === 'srv-dry-clean' || s.id === 'svc-dry-clean',
+            (s) =>
+              s.category === ServiceCategory.DRY_CLEAN ||
+              s.id === 'srv-dry-clean' ||
+              s.id === 'svc-dry-clean',
           );
           setSelectedServiceId(dryCleanSvc ? dryCleanSvc.id : 'svc-dry-clean');
         } else if (targetMode === 'WEIGHT') {
@@ -362,7 +365,10 @@ export function OrderWizardModal({
         } else {
           setSelectedCategory('ALL');
           const pieceSvc = services.find(
-            (s) => s.id === 'svc-dry-clean' || s.id === 'srv-dry-clean' || isDryCleanService(s.id, services),
+            (s) =>
+              s.id === 'svc-dry-clean' ||
+              s.id === 'srv-dry-clean' ||
+              isDryCleanService(s.id, services),
           );
           setSelectedServiceId(pieceSvc ? pieceSvc.id : 'svc-dry-clean');
         }
@@ -661,8 +667,8 @@ export function OrderWizardModal({
     const incompatible = items.filter((item) => {
       const isItemWeight = Boolean(
         (item.weight != null && item.weight > 0) ||
-          item.garmentCatalogId === 'g-wb-1' ||
-          item.garmentCatalogId === 'cat-kg-wash',
+        item.garmentCatalogId === 'g-wb-1' ||
+        item.garmentCatalogId === 'cat-kg-wash',
       );
       return newMode === 'WEIGHT' ? !isItemWeight : isItemWeight;
     });
@@ -682,7 +688,10 @@ export function OrderWizardModal({
       } else {
         // Per-Piece mode: select first per-piece service (Dry Clean)
         const firstPieceSvc = services.find(
-          (s) => s.id === 'svc-dry-clean' || s.id === 'srv-dry-clean' || isDryCleanService(s.id, services),
+          (s) =>
+            s.id === 'svc-dry-clean' ||
+            s.id === 'srv-dry-clean' ||
+            isDryCleanService(s.id, services),
         );
         const targetSvcId = firstPieceSvc?.id || 'svc-dry-clean';
         setSelectedServiceId(targetSvcId);
@@ -695,8 +704,8 @@ export function OrderWizardModal({
           prev.filter((item) => {
             const isItemWeight = Boolean(
               (item.weight != null && item.weight > 0) ||
-                item.garmentCatalogId === 'g-wb-1' ||
-                item.garmentCatalogId === 'cat-kg-wash',
+              item.garmentCatalogId === 'g-wb-1' ||
+              item.garmentCatalogId === 'cat-kg-wash',
             );
             return newMode === 'WEIGHT' ? isItemWeight : !isItemWeight;
           }),
