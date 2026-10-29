@@ -25,7 +25,7 @@ import {
 
 export interface ServiceCategoryStepProps {
   workflow: OrderWorkflowType;
-  onWorkflowChange: (workflow: OrderWorkflowType) => void;
+  onWorkflowChange?: (workflow: OrderWorkflowType) => void;
   selectedServiceId: string;
   onSelectService: (serviceId: string) => void;
   selectedCategory: string;
@@ -48,8 +48,20 @@ const CATEGORIES: { key: string; label: string; icon: string }[] = [
   { key: GarmentCategory.OTHERS, label: 'Others', icon: '📦' },
 ];
 
-import { isWeightBasedPricing, CANONICAL_WEIGHT_SERVICES } from '../../services/catalog-rules';
-export { CANONICAL_WEIGHT_SERVICES, isWeightBasedPricing };
+import {
+  isWeightBasedPricing,
+  CANONICAL_WEIGHT_SERVICES,
+  CANONICAL_PIECE_SERVICES,
+  resolvePieceServices,
+  resolveWeightServices,
+} from '../../services/catalog-rules';
+export {
+  CANONICAL_WEIGHT_SERVICES,
+  CANONICAL_PIECE_SERVICES,
+  resolvePieceServices,
+  resolveWeightServices,
+  isWeightBasedPricing,
+};
 
 export function ServiceCategoryStep({
   workflow,
@@ -68,125 +80,13 @@ export function ServiceCategoryStep({
   const isWeightMode = entryMode === 'WEIGHT';
 
   // Filter available services based on order mode (Per-Piece vs Per-Weight)
+  // Per-Weight: exactly the 5 website services (Steam Iron, Wash & Fold, White, Premium, Woolen)
+  // Per-Piece: exactly the 4 per-piece services (Dry Clean, Starching, Shoe Cleaning, Steam Iron)
   const availableServices: ServiceTypeDTO[] = useMemo(() => {
     if (isWeightMode) {
-      // Per-Weight mode: Display the five existing website laundry services
-      return CANONICAL_WEIGHT_SERVICES.map((canonical) => {
-        const match = services.find((s) => {
-          const sId = (s.id || '').toLowerCase();
-          const sName = (s.name || '').trim().toLowerCase();
-          if (sId === 'svc-wash' || sName === 'standard wash') return false;
-
-          if (canonical.id === 'svc-wash-iron') {
-            return (
-              sId === 'svc-wash-iron' ||
-              sId === 'srv-wash-iron' ||
-              sName === 'wash and steam iron' ||
-              sName === 'wash & steam iron' ||
-              sName === 'wash + steam iron' ||
-              (sName.includes('steam') && sName.includes('iron'))
-            );
-          }
-          if (canonical.id === 'svc-wash-fold') {
-            return (
-              sId === 'svc-wash-fold' ||
-              sId === 'srv-wash-fold' ||
-              sName === 'wash and fold' ||
-              sName === 'wash & fold' ||
-              (sName.includes('fold') && !sName.includes('iron'))
-            );
-          }
-          if (canonical.id === 'svc-laundry-white') {
-            return sId === 'svc-laundry-white' || sName.includes('white');
-          }
-          if (canonical.id === 'svc-laundry-premium') {
-            return (
-              sId === 'svc-laundry-premium' ||
-              sId === 'srv-premium-wash' ||
-              sName.includes('premium')
-            );
-          }
-          if (canonical.id === 'svc-laundry-woolen') {
-            return sId === 'svc-laundry-woolen' || sName.includes('woolen');
-          }
-          return false;
-        });
-
-        if (match) {
-          return {
-            ...match,
-            name: canonical.name,
-            estimatedDays: match.estimatedDays ?? canonical.estimatedDays,
-          };
-        }
-        return { ...canonical };
-      });
+      return resolveWeightServices(services);
     }
-
-    // Per-Piece mode:
-    // Retain existing per-piece services (Dry Clean, Steam Iron, Wash + Steam Iron, Standard Wash, Starching, Shoe Cleaning).
-    // Do NOT display per-weight-only services (Wash and Fold, Laundry for White, Premium Laundry, Woolen Laundry).
-    // Remove Steam Press Only completely from selectable services.
-    // Rename Wash & Iron to Starching while preserving IDs, pricing, turnaround times, and backend integration.
-    const pieceServices = services.filter((svc) => {
-      if (!svc.isActive) return false;
-      const name = svc.name.trim().toLowerCase();
-      const sId = (svc.id || '').toLowerCase();
-      if (name === 'free shoe' || sId === 'srv-free-shoe') return false;
-
-      // 1. Remove Steam Press Only completely from the selectable service list
-      if (
-        name === 'steam press only' ||
-        sId === 'srv-steam-press' ||
-        sId === 'svc-steam-press-only'
-      ) {
-        return false;
-      }
-
-      // Exclude weight-only services
-      const isWeightOnly =
-        sId === 'svc-wash-fold' ||
-        sId === 'srv-wash-fold' ||
-        name === 'wash and fold' ||
-        name === 'wash & fold' ||
-        sId === 'svc-laundry-white' ||
-        name.includes('white') ||
-        sId === 'svc-laundry-premium' ||
-        sId === 'srv-premium-wash' ||
-        name.includes('premium') ||
-        sId === 'svc-laundry-woolen' ||
-        name.includes('woolen');
-
-      if (isWeightOnly) return false;
-      return true;
-    });
-
-    const seenNames = new Set<string>();
-    const result: ServiceTypeDTO[] = [];
-
-    for (const svc of pieceServices) {
-      const lower = svc.name.trim().toLowerCase();
-      const isWashIron = lower === 'wash & iron' || lower === 'wash and iron';
-      const resolvedName = isWashIron ? 'Starching' : svc.name;
-      const displayKey = formatCatalogServiceName(resolvedName).toLowerCase();
-
-      // Avoid duplicate service definitions if an existing Starching service is already in list
-      if (seenNames.has(displayKey)) {
-        continue;
-      }
-      seenNames.add(displayKey);
-
-      if (isWashIron) {
-        result.push({
-          ...svc,
-          name: 'Starching',
-        });
-      } else {
-        result.push(svc);
-      }
-    }
-
-    return result;
+    return resolvePieceServices(services);
   }, [isWeightMode, services]);
 
   // Active service object
@@ -237,26 +137,20 @@ export function ServiceCategoryStep({
   }, [availableServices, selectedServiceId]);
 
   const handleSelectService = (svcId: string) => {
-    if (isWeightMode) {
-      onSelectService(svcId);
-      onWorkflowChange('LAUNDRY');
-      return;
-    }
-
-    const svc = services.find((s) => s.id === svcId);
-    const isDc = svc ? isDryCleanService(svc.id, services) : false;
-    const targetWorkflow: OrderWorkflowType = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
-    onWorkflowChange(targetWorkflow);
-
-    const resolved = resolveCatalogSelectionOnServiceSelect(
-      svcId,
-      selectedCategory,
-      services,
-      targetWorkflow,
-    );
-    onSelectService(resolved.serviceId);
-    if (resolved.category && String(resolved.category) !== selectedCategory) {
-      onSelectCategory(String(resolved.category));
+    onSelectService(svcId);
+    if (!isWeightMode) {
+      const svc = services.find((s) => s.id === svcId);
+      const isDc = svc ? isDryCleanService(svc.id, services) : false;
+      const targetWorkflow: OrderWorkflowType = isDc ? 'DRY_CLEANING' : 'LAUNDRY';
+      const resolved = resolveCatalogSelectionOnServiceSelect(
+        svcId,
+        selectedCategory,
+        services,
+        targetWorkflow,
+      );
+      if (resolved.category && String(resolved.category) !== selectedCategory) {
+        onSelectCategory(String(resolved.category));
+      }
     }
   };
 
