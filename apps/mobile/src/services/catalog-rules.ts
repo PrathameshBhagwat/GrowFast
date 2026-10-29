@@ -22,9 +22,9 @@ export function isWeightBasedPricing(
   category?: string | GarmentCategory,
 ): boolean {
   if (workflow === 'DRY_CLEANING') return false;
+  if (entryMode === 'PIECES') return false;
   if (entryMode === 'WEIGHT') return true;
   if (category && isWeightBasedCategory(category)) return true;
-  if (entryMode === 'PIECES') return false;
   if (!service) return true; // Default laundry in GrowFast is weight-based
   const cat = service.category;
   if (
@@ -274,3 +274,27 @@ export function resolveWeightServices(services: ServiceTypeDTO[]): ServiceTypeDT
     return { ...canonical };
   });
 }
+
+export const DEFAULT_MOBILE_CATEGORIES: { key: string; label: string; icon: string }[] = [
+  { key: 'ALL', label: 'All Items', icon: '🔲' },
+  { key: GarmentCategory.MEN, label: 'Men', icon: '👔' },
+  { key: GarmentCategory.WOMEN, label: 'Women', icon: '👗' },
+  { key: GarmentCategory.KIDS, label: 'Kids', icon: '🧒' },
+  { key: GarmentCategory.HOUSEHOLD, label: 'Household', icon: '🛏️' },
+  { key: GarmentCategory.SHOES, label: 'Shoes', icon: '👟' },
+  { key: GarmentCategory.SPECIAL, label: 'Special', icon: '🌟' },
+  { key: GarmentCategory.OTHERS, label: 'Others', icon: '📦' },
+  { key: GarmentCategory.WEIGHT_BASED, label: 'Weight Based (Exception)', icon: '⚖️' },
+];
+
+export const DEFAULT_CATEGORY_TABS: { key: string; label: string }[] = [
+  { key: 'ALL', label: 'All Items' },
+  { key: GarmentCategory.MEN, label: 'Men' },
+  { key: GarmentCategory.WOMEN, label: 'Women' },
+  { key: GarmentCategory.KIDS, label: 'Kids' },
+  { key: GarmentCategory.HOUSEHOLD, label: 'Household' },
+  { key: GarmentCategory.SHOES, label: 'Shoe' },
+  { key: GarmentCategory.SPECIAL, label: 'Special' },
+  { key: GarmentCategory.OTHERS, label: 'Other' },
+  { key: GarmentCategory.WEIGHT_BASED, label: 'Weight Based (Exception)' },
+];

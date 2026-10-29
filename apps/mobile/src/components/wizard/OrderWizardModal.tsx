@@ -29,6 +29,7 @@ import {
   isItemCompatibleWithWorkflow,
   calculateOrderTotals,
   isDryCleanService,
+  isWeightBasedCategory,
 } from '@growfast/shared-types';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../../db/drafts';
@@ -42,6 +43,7 @@ import { ServiceCategoryStep } from './ServiceCategoryStep';
 import { isWeightBasedPricing } from '../../services/catalog-rules';
 import { CatalogGridStep } from './CatalogGridStep';
 import { ItemDetailsModal } from './ItemDetailsModal';
+import { PieceExceptionModal } from './PieceExceptionModal';
 import { OrderItemsReviewStep } from './OrderItemsReviewStep';
 import { FinalReviewStep } from './FinalReviewStep';
 import { OrderCreatedStep } from './OrderCreatedStep';
@@ -73,6 +75,12 @@ const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
   { id: 'cat-saree', name: 'Saree (Silk/Cotton)', category: GarmentCategory.WOMEN, isActive: true },
   { id: 'cat-dress', name: 'Dress / Gown', category: GarmentCategory.WOMEN, isActive: true },
   {
+    id: 'cat-kids-frock',
+    name: 'Kids Frock / Shorts',
+    category: GarmentCategory.KIDS,
+    isActive: true,
+  },
+  {
     id: 'cat-bedsheet',
     name: 'Bedsheet / Linen',
     category: GarmentCategory.HOUSEHOLD,
@@ -85,9 +93,28 @@ const FALLBACK_GARMENTS: GarmentCatalogDTO[] = [
     isActive: true,
   },
   {
+    id: 'cat-shoes',
+    name: 'Sneakers / Sport Shoes',
+    category: GarmentCategory.SHOES,
+    isActive: true,
+  },
+  {
+    id: 'cat-special-suit',
+    name: 'Designer Suit / Blazer',
+    category: GarmentCategory.SPECIAL,
+    isActive: true,
+  },
+  {
+    id: 'cat-bag',
+    name: 'Bag / Backpack',
+    category: GarmentCategory.OTHERS,
+    isActive: true,
+  },
+  {
     id: 'g-wb-1',
-    name: 'Weight Based Laundry',
+    name: 'Weight Based',
     category: GarmentCategory.WEIGHT_BASED,
+    section: 'Per Piece Exception',
     isActive: true,
   },
   {
@@ -172,8 +199,13 @@ const FALLBACK_PRICES = [
   { garmentCatalogId: 'cat-suit', serviceTypeId: 'srv-dry-clean', price: 250 },
   { garmentCatalogId: 'cat-saree', serviceTypeId: 'srv-dry-clean', price: 180 },
   { garmentCatalogId: 'cat-saree', serviceTypeId: 'srv-wash-iron', price: 100 },
+  { garmentCatalogId: 'cat-kids-frock', serviceTypeId: 'srv-wash-iron', price: 35 },
+  { garmentCatalogId: 'cat-kids-frock', serviceTypeId: 'srv-dry-clean', price: 60 },
   { garmentCatalogId: 'cat-bedsheet', serviceTypeId: 'srv-wash-iron', price: 90 },
   { garmentCatalogId: 'cat-blanket', serviceTypeId: 'srv-dry-clean', price: 200 },
+  { garmentCatalogId: 'cat-shoes', serviceTypeId: 'srv-shoe-clean', price: 150 },
+  { garmentCatalogId: 'cat-special-suit', serviceTypeId: 'srv-dry-clean', price: 300 },
+  { garmentCatalogId: 'cat-bag', serviceTypeId: 'srv-dry-clean', price: 120 },
   { garmentCatalogId: 'cat-kg-wash', serviceTypeId: 'svc-wash-fold', price: 80 },
   { garmentCatalogId: 'cat-kg-iron', serviceTypeId: 'svc-wash-iron', price: 95 },
   { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-wash-iron', price: 95 },
@@ -182,6 +214,7 @@ const FALLBACK_PRICES = [
   { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-laundry-premium', price: 120 },
   { garmentCatalogId: 'g-wb-1', serviceTypeId: 'svc-laundry-woolen', price: 140 },
   { garmentCatalogId: 'g-wb-1', serviceTypeId: 'srv-wash-iron', price: 95 },
+  { garmentCatalogId: 'g-wb-1', serviceTypeId: 'srv-dry-clean', price: 40 },
 ];
 
 interface OrderWizardModalProps {
@@ -255,6 +288,18 @@ export function OrderWizardModal({
     undefined,
   );
   const [configuringInitialItem, setConfiguringInitialItem] =
+    useState<CreateOrderItemRequest | null>(null);
+
+  // Piece Weight Exception Modal State
+  const [pieceExceptionModalVisible, setPieceExceptionModalVisible] = useState(false);
+  const [pieceExceptionGarment, setPieceExceptionGarment] = useState<GarmentCatalogDTO | null>(
+    null,
+  );
+  const [pieceExceptionPrice, setPieceExceptionPrice] = useState<number>(40);
+  const [pieceExceptionExistingIndex, setPieceExceptionExistingIndex] = useState<
+    number | undefined
+  >(undefined);
+  const [pieceExceptionInitialItem, setPieceExceptionInitialItem] =
     useState<CreateOrderItemRequest | null>(null);
 
   // Confirmed Order State (Screen 9)
@@ -598,8 +643,101 @@ export function OrderWizardModal({
     setItems(updated);
   };
 
+  // Open Piece Exception Modal (Strictly Per-Piece Exception for Weight-Based Category)
+  const handleOpenPieceException = (
+    garment: GarmentCatalogDTO,
+    serviceId: string,
+    unitPrice: number,
+    existingIndex?: number,
+  ) => {
+    setPieceExceptionGarment(garment);
+    setPieceExceptionPrice(unitPrice > 0 ? unitPrice : 40);
+    setPieceExceptionExistingIndex(existingIndex);
+    setPieceExceptionInitialItem(existingIndex != null ? items[existingIndex] : null);
+    setPieceExceptionModalVisible(true);
+  };
+
+  // Confirm Piece Exception Modal
+  const handleConfirmPieceException = (data: {
+    garment: GarmentCatalogDTO;
+    serviceId: string;
+    unitPrice: number;
+    quantity: number;
+    defectNotes?: string;
+    brand?: string;
+    existingItemIndex?: number;
+  }) => {
+    const validQty = Math.max(1, Math.round(data.quantity || 1));
+    const validPrice = Math.max(0, data.unitPrice || 0);
+
+    const existingIndex =
+      data.existingItemIndex != null
+        ? data.existingItemIndex
+        : items.findIndex(
+            (it) =>
+              it.garmentCatalogId === data.garment.id &&
+              it.serviceTypeId === data.serviceId &&
+              it.weight == null,
+          );
+
+    const combinedNotes = data.defectNotes
+      ? `${data.defectNotes}${data.brand ? ` (Brand: ${data.brand})` : ''}`
+      : data.brand
+        ? `Brand: ${data.brand}`
+        : undefined;
+
+    if (existingIndex >= 0) {
+      const existing = items[existingIndex];
+      const currentPieces = existing.pieces || [];
+      const newPieces = Array.from({ length: validQty }, (_, idx) => ({
+        pieceId: currentPieces[idx]?.pieceId || generateUUID(),
+        unitNumber: idx + 1,
+        photoCount: currentPieces[idx]?.photoCount || 0,
+      }));
+
+      const updated = [...items];
+      updated[existingIndex] = {
+        ...existing,
+        quantity: validQty,
+        unitPrice: validPrice,
+        weight: undefined,
+        defectNotes: combinedNotes,
+        pieces: newPieces,
+      };
+      setItems(updated);
+    } else {
+      const newItem: CreateOrderItemRequest = {
+        id: generateUUID(),
+        garmentCatalogId: data.garment.id,
+        serviceTypeId: data.serviceId,
+        quantity: validQty,
+        unitPrice: validPrice,
+        weight: undefined,
+        defectNotes: combinedNotes,
+        pieces: Array.from({ length: validQty }, (_, idx) => ({
+          pieceId: generateUUID(),
+          unitNumber: idx + 1,
+          photoCount: 0,
+        })),
+      };
+      setItems([...items, newItem]);
+    }
+
+    setPieceExceptionModalVisible(false);
+    setPieceExceptionGarment(null);
+    setPieceExceptionInitialItem(null);
+    setPieceExceptionExistingIndex(undefined);
+  };
+
   // Quick add item from catalog
   const handleQuickAddItem = (garment: GarmentCatalogDTO, serviceId: string, unitPrice: number) => {
+    const isWeightGarment =
+      garment.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(garment.category);
+    if (entryMode === 'PIECES' && isWeightGarment) {
+      handleOpenPieceException(garment, serviceId, unitPrice);
+      return;
+    }
+
     const existingIndex = items.findIndex(
       (it) => it.garmentCatalogId === garment.id && it.serviceTypeId === serviceId,
     );
@@ -629,6 +767,15 @@ export function OrderWizardModal({
 
   // Open item configuration modal (Screen 6)
   const handleOpenItemConfig = (garment: GarmentCatalogDTO, existingIndex?: number) => {
+    const isWeightGarment =
+      garment.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(garment.category);
+    if (entryMode === 'PIECES' && isWeightGarment) {
+      const item = existingIndex != null ? items[existingIndex] : null;
+      const rate = item?.unitPrice ?? 40;
+      handleOpenPieceException(garment, selectedServiceId, rate, existingIndex);
+      return;
+    }
+
     setConfiguringGarment(garment);
     setConfiguringExistingIndex(existingIndex);
     setConfiguringInitialItem(existingIndex != null ? items[existingIndex] : null);
@@ -1017,6 +1164,7 @@ export function OrderWizardModal({
               selectedCategory={selectedCategory}
               onSelectCategory={handleSelectCategory}
               services={services}
+              garments={garments}
               isLoadingServices={isLoadingCatalog}
               cartItemCount={items.length}
               onContinue={handleNext}
@@ -1038,6 +1186,7 @@ export function OrderWizardModal({
               onCategoryChange={handleSelectCategory}
               items={items}
               onOpenItemConfig={handleOpenItemConfig}
+              onOpenPieceException={handleOpenPieceException}
               onQuickAddItem={handleQuickAddItem}
               onQuickDecrementItem={handleQuickDecrementItem}
               onAddWeightItem={(weightItem) => {
@@ -1185,6 +1334,24 @@ export function OrderWizardModal({
             onPhotosUpdated={refreshPhotos}
           />
         )}
+
+        {/* Modal: Piece Weight Exception Modal */}
+        <PieceExceptionModal
+          visible={pieceExceptionModalVisible}
+          garment={pieceExceptionGarment}
+          service={services.find((s) => s.id === selectedServiceId) || services[0] || null}
+          unitPrice={pieceExceptionPrice}
+          existingItemIndex={pieceExceptionExistingIndex}
+          initialItem={pieceExceptionInitialItem}
+          canModifyPrice={canModifyPrice}
+          onConfirm={handleConfirmPieceException}
+          onClose={() => {
+            setPieceExceptionModalVisible(false);
+            setPieceExceptionGarment(null);
+            setPieceExceptionInitialItem(null);
+            setPieceExceptionExistingIndex(undefined);
+          }}
+        />
       </View>
     </Modal>
   );

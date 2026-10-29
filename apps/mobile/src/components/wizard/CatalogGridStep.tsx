@@ -23,6 +23,7 @@ import {
   CreateOrderItemRequest,
   formatCatalogServiceName,
   filterCategoriesForService,
+  isCategoryAllowedInWorkflow,
   isWeightBasedCategory,
   DEFAULT_TOP_UP_SERVICES,
   TopUpServiceItem,
@@ -60,17 +61,22 @@ export interface CatalogGridStepProps {
   clientDraftId?: string;
   photos?: PendingPhoto[];
   onRefreshPhotos?: () => Promise<void>;
+  onOpenPieceException?: (garment: GarmentCatalogDTO, serviceId: string, unitPrice: number) => void;
 }
 
-const CATEGORY_TABS: { key: string; label: string }[] = [
+const DEFAULT_CATEGORY_TABS: { key: string; label: string }[] = [
   { key: 'ALL', label: 'All Items' },
   { key: GarmentCategory.MEN, label: 'Men' },
   { key: GarmentCategory.WOMEN, label: 'Women' },
   { key: GarmentCategory.KIDS, label: 'Kids' },
   { key: GarmentCategory.HOUSEHOLD, label: 'Household' },
   { key: GarmentCategory.SHOES, label: 'Shoe' },
+  { key: GarmentCategory.SPECIAL, label: 'Special' },
   { key: GarmentCategory.OTHERS, label: 'Other' },
+  { key: GarmentCategory.WEIGHT_BASED, label: 'Weight Based (Exception)' },
 ];
+
+export const CATEGORY_TABS = DEFAULT_CATEGORY_TABS;
 
 const DEFECT_QUICK_TAGS = [
   'Collar Stain',
@@ -106,8 +112,30 @@ export function CatalogGridStep({
   clientDraftId,
   photos = [],
   onRefreshPhotos,
+  onOpenPieceException,
 }: CatalogGridStepProps) {
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Dynamically build category tabs from defaults and active catalog items
+  const dynamicCategoryTabs = useMemo(() => {
+    const list = [...DEFAULT_CATEGORY_TABS];
+    if (garments && garments.length > 0) {
+      for (const g of garments) {
+        if (!g.isActive) continue;
+        if (
+          g.category &&
+          g.category !== GarmentCategory.HOME_CLEANING &&
+          !list.some((t) => t.key === g.category)
+        ) {
+          list.push({
+            key: g.category,
+            label: g.category.charAt(0) + g.category.slice(1).toLowerCase(),
+          });
+        }
+      }
+    }
+    return list;
+  }, [garments]);
 
   // Weight entry state for weight-based laundry workflow (Image 2 Screen 3b & Image 3)
   const [weightInput, setWeightInput] = useState('2.00');
@@ -139,6 +167,14 @@ export function CatalogGridStep({
     return isWeightBasedPricing(workflow, currentService, entryMode, selectedCategory);
   }, [workflow, currentService, entryMode, selectedCategory]);
 
+  // Helper to determine if a garment is a weight exception item in Per-Piece mode
+  const isWeightExceptionGarment = (g: GarmentCatalogDTO): boolean => {
+    return (
+      !isWeightBased &&
+      (g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category))
+    );
+  };
+
   // Rate per kg for active service in weight-based laundry
   const pricePerKg = useMemo(() => {
     const match = prices.find(
@@ -163,7 +199,12 @@ export function CatalogGridStep({
   // Allowed categories for per-piece workflow (filtered according to active service)
   const allowedCategories = useMemo(() => {
     if (isWeightBased) return [];
-    const base = CATEGORY_TABS.filter((t) => t.key !== GarmentCategory.WEIGHT_BASED);
+    const base = dynamicCategoryTabs.filter(
+      (t) =>
+        t.key !== GarmentCategory.HOME_CLEANING &&
+        t.key !== 'HOME_CLEANING' &&
+        (t.key === 'ALL' || isCategoryAllowedInWorkflow(t.key as GarmentCategory, workflow)),
+    );
     const filteredKeys = filterCategoriesForService(
       base.map((t) => t.key),
       selectedServiceId,
@@ -171,26 +212,71 @@ export function CatalogGridStep({
       workflow,
     );
     return base.filter((t) => filteredKeys.includes(t.key));
-  }, [isWeightBased, selectedServiceId, services, workflow]);
+  }, [isWeightBased, dynamicCategoryTabs, selectedServiceId, services, workflow]);
 
   // Helper to look up price for (garment, service) in per-piece catalog
   const getGarmentPrice = (garmentId: string): number => {
+    const isWeightPieceException =
+      !isWeightBased &&
+      (selectedCategory === 'WEIGHT_BASED' ||
+        selectedCategory === GarmentCategory.WEIGHT_BASED ||
+        garmentId === 'g-wb-1');
     const found = prices.find(
       (p) =>
         (p.garmentCatalogId === garmentId || p.garmentId === garmentId) &&
         (p.serviceTypeId === selectedServiceId || p.serviceId === selectedServiceId),
     );
     if (found && typeof found.price === 'number') return found.price;
-    return 50; // Fallback standard rate
+    return isWeightPieceException ? 40 : 50; // Fallback standard rate (₹40 for weight exception)
   };
 
   // Filter garments for per-piece catalog
   const filteredGarments = useMemo(() => {
     if (isWeightBased) return [];
+
+    const isDryCleanWeightCategory =
+      workflow === 'DRY_CLEANING' &&
+      (selectedCategory === 'WEIGHT_BASED' || selectedCategory === GarmentCategory.WEIGHT_BASED);
+
+    // In Per Pieces (DRY_CLEANING) workflow under WEIGHT_BASED category, display EXACTLY ONE card
+    if (isDryCleanWeightCategory) {
+      const existing =
+        garments.find(
+          (g) =>
+            (g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category)) &&
+            (g.id === 'g-wb-1' || g.name === 'Weight Based'),
+        ) ||
+        garments.find(
+          (g) => g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category),
+        );
+      const singleItem: GarmentCatalogDTO = {
+        id: existing?.id || 'g-wb-1',
+        name: existing?.name || 'Weight Based',
+        category: GarmentCategory.WEIGHT_BASED,
+        section: 'Per Piece Exception',
+        isActive: existing ? existing.isActive : true,
+      };
+
+      const q = searchQuery.toLowerCase().trim();
+      if (
+        q &&
+        !singleItem.name.toLowerCase().includes(q) &&
+        !(singleItem.section || '').toLowerCase().includes(q) &&
+        !'weight based'.includes(q)
+      ) {
+        return [];
+      }
+      return [singleItem];
+    }
+
     return garments.filter((g) => {
-      if (!g.isActive) return false;
-      // Per-piece catalog excludes weight-based items
-      if (g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category)) {
+      if (g.isActive === false) return false;
+      // Per-piece catalog excludes weight-based items unless WEIGHT_BASED is selected
+      if (
+        (g.category === GarmentCategory.WEIGHT_BASED || isWeightBasedCategory(g.category)) &&
+        selectedCategory !== GarmentCategory.WEIGHT_BASED &&
+        selectedCategory !== 'WEIGHT_BASED'
+      ) {
         return false;
       }
 
@@ -209,7 +295,7 @@ export function CatalogGridStep({
 
       return true;
     });
-  }, [isWeightBased, garments, selectedCategory, searchQuery]);
+  }, [isWeightBased, garments, selectedCategory, searchQuery, workflow]);
 
   // Map of garmentId -> quantity in current cart
   const cartQuantityByGarment = useMemo(() => {
@@ -419,6 +505,27 @@ export function CatalogGridStep({
   const renderGarmentCard = ({ item }: { item: GarmentCatalogDTO }) => {
     const price = getGarmentPrice(item.id);
     const cartQty = cartQuantityByGarment.get(item.id) || 0;
+    const isWeightException = isWeightExceptionGarment(item);
+
+    const handleGarmentClick = () => {
+      if (isWeightException) {
+        if (onOpenPieceException) {
+          onOpenPieceException(item, selectedServiceId, price);
+        } else {
+          onOpenItemConfig(item);
+        }
+      } else {
+        onQuickAddItem(item, selectedServiceId, price);
+      }
+    };
+
+    const handleConfigClick = () => {
+      if (isWeightException && onOpenPieceException) {
+        onOpenPieceException(item, selectedServiceId, price);
+      } else {
+        onOpenItemConfig(item);
+      }
+    };
 
     const getGarmentEmoji = (cat: string) => {
       switch (cat) {
@@ -430,6 +537,12 @@ export function CatalogGridStep({
           return '🛏️';
         case GarmentCategory.SHOES:
           return '👟';
+        case GarmentCategory.SPECIAL:
+          return '🌟';
+        case GarmentCategory.WEIGHT_BASED:
+          return '⚖️';
+        case GarmentCategory.OTHERS:
+          return '📦';
         default:
           return '👔';
       }
@@ -451,13 +564,20 @@ export function CatalogGridStep({
         <Text style={styles.garmentName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.garmentCategory}>{item.category}</Text>
+        <Text style={styles.garmentCategory}>
+          {isWeightException ? item.section || 'Per Piece Exception' : item.category}
+        </Text>
 
         <View style={styles.priceRow}>
           <Text style={styles.priceText}>
             ₹{price}
             <Text style={styles.priceUnit}> / pc</Text>
           </Text>
+          {isWeightException && (
+            <View style={styles.exceptionBadge}>
+              <Text style={styles.exceptionBadgeText}>Exception</Text>
+            </View>
+          )}
         </View>
 
         {/* Action Controls */}
@@ -475,7 +595,7 @@ export function CatalogGridStep({
 
               <TouchableOpacity
                 style={styles.stepperQtyBox}
-                onPress={() => onOpenItemConfig(item)}
+                onPress={handleConfigClick}
                 accessible={true}
                 accessibilityLabel={`Edit details for ${item.name}`}
               >
@@ -493,7 +613,7 @@ export function CatalogGridStep({
             </View>
             <TouchableOpacity
               style={styles.itemConfigIconBtn}
-              onPress={() => onOpenItemConfig(item)}
+              onPress={handleConfigClick}
               accessible={true}
               accessibilityLabel={`Edit notes and photos for ${item.name}`}
             >
@@ -504,7 +624,7 @@ export function CatalogGridStep({
           <View style={styles.quickAddRow}>
             <TouchableOpacity
               style={styles.quickAddMainBtn}
-              onPress={() => onQuickAddItem(item, selectedServiceId, price)}
+              onPress={handleGarmentClick}
               accessible={true}
               accessibilityLabel={`Quick add 1 ${item.name}`}
             >
@@ -512,7 +632,7 @@ export function CatalogGridStep({
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickAddConfigBtn}
-              onPress={() => onOpenItemConfig(item)}
+              onPress={handleConfigClick}
               accessible={true}
               accessibilityLabel={`Configure notes and photos for ${item.name}`}
             >
@@ -532,9 +652,9 @@ export function CatalogGridStep({
 
   // Selected Category Label for Per-Piece context
   const selectedCategoryLabel = useMemo(() => {
-    const tab = CATEGORY_TABS.find((t) => t.key === selectedCategory);
+    const tab = dynamicCategoryTabs.find((t) => t.key === selectedCategory);
     return tab ? tab.label : selectedCategory;
-  }, [selectedCategory]);
+  }, [selectedCategory, dynamicCategoryTabs]);
 
   return (
     <View style={styles.container}>
@@ -1644,6 +1764,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     color: '#64748b',
+  },
+  exceptionBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  exceptionBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#92400e',
   },
   actionRowContainer: {
     flexDirection: 'row',

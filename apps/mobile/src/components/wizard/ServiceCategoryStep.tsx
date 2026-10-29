@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {
   ServiceTypeDTO,
+  GarmentCatalogDTO,
   GarmentCategory,
   ServiceCategory,
   OrderWorkflowType,
@@ -31,6 +32,7 @@ export interface ServiceCategoryStepProps {
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
   services: ServiceTypeDTO[];
+  garments?: GarmentCatalogDTO[];
   isLoadingServices?: boolean;
   cartItemCount: number;
   onContinue: () => void;
@@ -38,15 +40,19 @@ export interface ServiceCategoryStepProps {
   onEntryModeChange?: (mode: OrderEntryMode) => void;
 }
 
-const CATEGORIES: { key: string; label: string; icon: string }[] = [
+const DEFAULT_CATEGORIES: { key: string; label: string; icon: string }[] = [
   { key: 'ALL', label: 'All Items', icon: '🔲' },
   { key: GarmentCategory.MEN, label: 'Men', icon: '👔' },
   { key: GarmentCategory.WOMEN, label: 'Women', icon: '👗' },
   { key: GarmentCategory.KIDS, label: 'Kids', icon: '🧒' },
   { key: GarmentCategory.HOUSEHOLD, label: 'Household', icon: '🛏️' },
   { key: GarmentCategory.SHOES, label: 'Shoes', icon: '👟' },
+  { key: GarmentCategory.SPECIAL, label: 'Special', icon: '🌟' },
   { key: GarmentCategory.OTHERS, label: 'Others', icon: '📦' },
+  { key: GarmentCategory.WEIGHT_BASED, label: 'Weight Based (Exception)', icon: '⚖️' },
 ];
+
+export const CATEGORIES = DEFAULT_CATEGORIES;
 
 import {
   isWeightBasedPricing,
@@ -71,6 +77,7 @@ export function ServiceCategoryStep({
   selectedCategory,
   onSelectCategory,
   services,
+  garments,
   isLoadingServices = false,
   cartItemCount,
   onContinue,
@@ -78,6 +85,28 @@ export function ServiceCategoryStep({
   onEntryModeChange,
 }: ServiceCategoryStepProps) {
   const isWeightMode = entryMode === 'WEIGHT';
+
+  // Dynamically resolve category options, incorporating any new categories from active catalog garments
+  const allCategories = useMemo(() => {
+    const list = [...DEFAULT_CATEGORIES];
+    if (garments && garments.length > 0) {
+      for (const g of garments) {
+        if (!g.isActive) continue;
+        if (
+          g.category &&
+          g.category !== GarmentCategory.HOME_CLEANING &&
+          !list.some((c) => c.key === g.category)
+        ) {
+          list.push({
+            key: g.category,
+            label: g.category.charAt(0) + g.category.slice(1).toLowerCase(),
+            icon: '👕',
+          });
+        }
+      }
+    }
+    return list;
+  }, [garments]);
 
   // Filter available services based on order mode (Per-Piece vs Per-Weight)
   // Per-Weight: exactly the 5 website services (Steam Iron, Wash & Fold, White, Premium, Woolen)
@@ -110,9 +139,8 @@ export function ServiceCategoryStep({
       // Critical business rule: Per-weight laundry must not display garment-category selector
       return [];
     }
-    const baseCategories = CATEGORIES.filter(
+    const baseCategories = allCategories.filter(
       (cat) =>
-        cat.key !== GarmentCategory.WEIGHT_BASED &&
         cat.key !== GarmentCategory.HOME_CLEANING &&
         cat.key !== 'HOME_CLEANING' &&
         (cat.key === 'ALL' || isCategoryAllowedInWorkflow(cat.key as GarmentCategory, workflow)),
@@ -124,7 +152,7 @@ export function ServiceCategoryStep({
       workflow,
     );
     return baseCategories.filter((c) => filteredKeys.includes(c.key));
-  }, [isWeightMode, workflow, selectedServiceId, services, availableServices]);
+  }, [isWeightMode, workflow, selectedServiceId, services, availableServices, allCategories]);
 
   // Auto-select first compatible service if current selection is invalid
   React.useEffect(() => {
