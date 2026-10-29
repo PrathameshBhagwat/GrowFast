@@ -221,6 +221,22 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } catch (err: any) {
       setPin('');
+      const isNetworkError =
+        err.statusCode === 0 ||
+        err.message?.includes('Network request failed') ||
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('Server unreachable') ||
+        err.message?.includes('timeout') ||
+        err.message?.includes('Connection timed out');
+
+      if (isNetworkError) {
+        // Network errors must not count against failed PIN lockout attempts
+        setErrorMsg(
+          `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the backend is running and your device is on the same network.`,
+        );
+        return;
+      }
+
       const attempts = failedAttempts + 1;
       setFailedAttempts(attempts);
 
@@ -233,15 +249,6 @@ export default function LoginScreen() {
       } else if (err.statusCode === 401 || err.message?.toLowerCase().includes('credential')) {
         setErrorMsg(
           `Invalid PIN. Please check your staff PIN and try again. (Attempt ${attempts}/5)`,
-        );
-      } else if (
-        err.message?.includes('Network request failed') ||
-        err.message?.includes('Failed to fetch') ||
-        err.message?.includes('Server unreachable') ||
-        err.message?.includes('timeout')
-      ) {
-        setErrorMsg(
-          `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the backend is running and your device is on the same network.`,
         );
       } else {
         setErrorMsg(err.message || 'Login failed. Please verify your PIN.');

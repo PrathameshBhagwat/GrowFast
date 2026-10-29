@@ -85,15 +85,126 @@ export function _resetUnauthorizedLock(): void {
   unauthorizedPromise = null;
 }
 
-// Configurable base URL with dynamic environment resolution
-// On physical devices, dynamically detects the development server IP from Expo Constants,
-// falling back to EXPO_PUBLIC_API_URL or the LAN host (http://192.168.1.38:3000).
-// Never defaults to Android-emulator-only 10.0.2.2 on physical hardware.
-function resolveDefaultBaseUrl(): string {
+// ─────────────────────────────────────────────────────────────────────────────
+// Base URL Resolution & Network Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BaseUrlValidationResult {
+  valid: boolean;
+  url: string;
+  error?: string;
+  warning?: string;
+}
+
+/**
+ * Validates that an API base URL is well-formed.
+ * Detects edge-cases like using 'localhost' on a physical device where it cannot resolve.
+ */
+export function validateApiBaseUrl(
+  url?: string,
+  options?: { isPhysicalPhone?: boolean },
+): BaseUrlValidationResult {
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    const error =
+      'Backend API base URL is missing. Set EXPO_PUBLIC_API_URL in apps/mobile/.env (e.g. http://192.168.1.37:3000) or ensure Expo is connected to your development machine.';
+    return { valid: false, url: '', error };
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    const error = `Invalid API base URL "${trimmed}". URL must begin with "http://" or "https://".`;
+    return { valid: false, url: trimmed, error };
+  }
+
+  let cleanUrl = trimmed.replace(/\/+$/, '');
+  if (cleanUrl.endsWith('/api')) {
+    cleanUrl = cleanUrl.slice(0, -4).replace(/\/+$/, '');
+  }
+
+  // Detect physical phone trying to use localhost / 127.0.0.1
+  const isLocalhost = cleanUrl.includes('://localhost') || cleanUrl.includes('://127.0.0.1');
+
+  if (isLocalhost && options?.isPhysicalPhone) {
+    const warning = `API base URL "${cleanUrl}" uses localhost on a physical mobile device. On physical hardware, "localhost" points to the phone itself and cannot reach your computer. Configure your development machine's LAN IP in apps/mobile/.env (e.g. http://192.168.1.37:3000).`;
+    return { valid: true, url: cleanUrl, warning };
+  }
+
+  return { valid: true, url: cleanUrl };
+}
+
+/**
+ * Dynamically extract the Metro development server host IP from Expo Constants.
+ * Works across Expo Go, Expo Dev Client, and standalone test runs in Expo SDK 52.
+ */
+export function getExpoMetroHost(): string | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const expoConstantsMod = require('expo-constants');
+    const Constants = expoConstantsMod?.default || expoConstantsMod;
+    const candidate =
+      Constants?.expoConfig?.hostUri ||
+      Constants?.manifest2?.extra?.expoClient?.hostUri ||
+      Constants?.manifest?.debuggerHost ||
+      Constants?.experienceUrl ||
+      Constants?.linkingUri;
+
+    if (candidate && typeof candidate === 'string') {
+      const withoutScheme = candidate.replace(/^[a-zA-Z]+:\/\//, '');
+      const hostPort = withoutScheme.split('/')[0];
+      const host = hostPort?.split(':')[0]?.trim();
+      if (host) {
+        return host;
+      }
+    }
+  } catch {
+    // Non-Expo or test runner context (e.g. node tsx unit tests)
+  }
+  return null;
+}
+
+/**
+ * Configurable base URL with dynamic environment resolution.
+ * Hierarchy:
+ * 1. Explicit EXPO_PUBLIC_API_URL environment variable if set and non-empty.
+ * 2. Web browser context: matches browser window location.
+ * 3. Dynamic Metro discovery: dynamically connects to the computer running Metro.
+ * 4. Emulator fallback: 10.0.2.2 for Android emulator, localhost for iOS simulator.
+ * 5. Default localhost: 127.0.0.1 for Node / test environments.
+ */
+export function resolveDefaultBaseUrl(): string {
   // 1. Explicit environment variable if provided
   const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (envUrl) {
-    return envUrl;
+    const validation = validateApiBaseUrl(envUrl);
+    if (!validation.valid) {
+      console.warn(`[apiClient] ${validation.error}`);
+    } else if (validation.warning) {
+      console.warn(`[apiClient] ${validation.warning}`);
+    }
+
+    // Diagnostic notice if configured LAN IP differs from active Metro host IP
+    const metroHost = getExpoMetroHost();
+    if (metroHost && metroHost !== 'localhost' && metroHost !== '127.0.0.1') {
+      try {
+        const withoutScheme = envUrl.replace(/^[a-zA-Z]+:\/\//, '');
+        const envHost = withoutScheme.split('/')[0]?.split(':')[0]?.trim();
+        if (
+          envHost &&
+          (envHost.startsWith('192.168.') ||
+            envHost.startsWith('10.') ||
+            envHost.startsWith('172.')) &&
+          envHost !== metroHost
+        ) {
+          console.warn(
+            `[apiClient] Notice: Configured EXPO_PUBLIC_API_URL (${envHost}) differs from active Metro host IP (${metroHost}). If your development machine's IP address changed, update apps/mobile/.env to http://${metroHost}:3000 or leave EXPO_PUBLIC_API_URL unset to use auto-discovery.`,
+          );
+        }
+      } catch {
+        // Ignore parse error
+      }
+    }
+
+    return validation.url || envUrl;
   }
 
   // 2. Web browser context: strictly match the browser's current host (e.g. localhost or LAN host)
@@ -104,30 +215,59 @@ function resolveDefaultBaseUrl(): string {
   }
 
   // 3. Dynamic discovery from Expo Metro host URI on physical Android or iOS device
-  try {
-    const Constants = require('expo-constants').default;
-    const hostUri =
-      Constants?.expoConfig?.hostUri ||
-      Constants?.manifest2?.extra?.expoClient?.hostUri ||
-      Constants?.manifest?.debuggerHost;
-
-    if (hostUri && typeof hostUri === 'string') {
-      const hostIp = hostUri.split(':')[0];
-      if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1') {
-        return `http://${hostIp}:3000`;
-      }
+  const metroHost = getExpoMetroHost();
+  if (metroHost) {
+    if (metroHost !== 'localhost' && metroHost !== '127.0.0.1') {
+      return `http://${metroHost}:3000`;
     }
-  } catch {
-    // Non-Expo or test runner context (e.g. tsx unit tests)
-  }
-
-  // 4. Default localhost for desktop / node / test environments
-  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+    // If Metro is bound to localhost (e.g. Android Emulator with adb reverse or iOS Simulator):
+    let platformOS: string | undefined;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { Platform } = require('react-native');
+      platformOS = Platform?.OS;
+    } catch {
+      // Ignore
+    }
+    if (platformOS === 'android') {
+      return 'http://10.0.2.2:3000';
+    }
     return 'http://localhost:3000';
   }
 
-  // 5. Fallback for mobile devices on local Wi-Fi
-  return 'http://192.168.1.17:3000';
+  // 4. Node / unit test runner environments
+  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+    return 'http://127.0.0.1:3000';
+  }
+
+  // 5. Standalone or fallback mobile context
+  let platformOS: string | undefined;
+  let isDevice = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Platform } = require('react-native');
+    platformOS = Platform?.OS;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const expoConstantsMod = require('expo-constants');
+    const Constants = expoConstantsMod?.default || expoConstantsMod;
+    isDevice = Boolean(Constants?.isDevice);
+  } catch {
+    // Ignore
+  }
+
+  if (platformOS === 'android') {
+    if (!isDevice) {
+      return 'http://10.0.2.2:3000';
+    }
+  }
+
+  if (isDevice) {
+    console.warn(
+      '[apiClient] Backend API URL is not configured. When running on a physical mobile device, set EXPO_PUBLIC_API_URL in apps/mobile/.env to your development machine’s LAN IP (e.g. http://192.168.1.37:3000).',
+    );
+  }
+
+  return 'http://localhost:3000';
 }
 
 let config: ApiClientConfig = {
@@ -188,6 +328,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const normalizedPath = cleanEndpoint.startsWith('/api/') ? cleanEndpoint : `/api${cleanEndpoint}`;
   const isPublicEndpoint =
+    normalizedPath === '/api/health' ||
+    normalizedPath.startsWith('/api/health') ||
     normalizedPath === '/api/auth/login' ||
     normalizedPath.startsWith('/api/auth/login') ||
     normalizedPath === '/api/auth/directory' ||
@@ -213,84 +355,103 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const baseUrl = getBaseUrl();
   const url = normalizeApiUrl(baseUrl, endpoint);
 
-  // Add a 8-second network timeout so mobile UI never hangs indefinitely
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  // Bounded retry configuration: GET requests allow at most 1 network-failure retry (800ms backoff).
+  // Non-GET requests (mutations) are strictly single-attempt to prevent duplicate actions.
+  const isGetRequest = !options.method || options.method.toUpperCase() === 'GET';
+  const maxAttempts = isGetRequest ? 2 : 1;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...options,
-      headers,
-      signal: options.signal || controller.signal,
-    });
-  } catch (netErr: any) {
-    const isAborted = controller.signal.aborted || netErr?.name === 'AbortError';
-    const isNetworkFailed = netErr?.message === 'Network request failed' || isAborted;
-    const detail = isAborted
-      ? `Connection timed out after 8s connecting to ${baseUrl}. Check Wi-Fi connection and host server IP.`
-      : isNetworkFailed
-        ? `Server unreachable at ${baseUrl}. Ensure backend is running and phone is on the same Wi-Fi network.`
-        : netErr?.message || 'Network request failed';
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Add an 8-second network timeout so mobile UI never hangs indefinitely
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    // Log diagnostic message without exposing tokens, PINs, or request payloads
-    console.warn(
-      `[apiClient] Network failure on [${options.method || 'GET'} ${endpoint}]: ${detail}`,
-    );
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+    } catch (netErr: any) {
+      clearTimeout(timeoutId);
+      const isAborted = controller.signal.aborted || netErr?.name === 'AbortError';
+      const isNetworkFailed = netErr?.message === 'Network request failed' || isAborted;
 
-    throw new ApiError(detail, 0, {
-      endpoint,
-      baseUrl,
-      targetUrl: url,
-      originalError: netErr?.message,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+      // If GET request fails with network error and has remaining attempts, wait and retry once
+      if (attempt < maxAttempts && isNetworkFailed) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        continue;
+      }
 
-  let responseData: any = null;
-  try {
-    responseData = await response.json();
-  } catch (jsonErr: any) {
+      const detail = isAborted
+        ? `Connection timed out after 8s connecting to ${baseUrl}. Check Wi-Fi connection and host server IP.`
+        : isNetworkFailed
+          ? `Server unreachable at ${baseUrl}. Ensure backend is running and phone is on the same Wi-Fi network.`
+          : netErr?.message || 'Network request failed';
+
+      // Log diagnostic message without exposing tokens, PINs, or request payloads
+      console.warn(
+        `[apiClient] Network failure on [${options.method || 'GET'} ${endpoint}]: ${detail}`,
+      );
+
+      throw new ApiError(detail, 0, {
+        endpoint,
+        baseUrl,
+        targetUrl: url,
+        originalError: netErr?.message,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    let responseData: any = null;
+    try {
+      responseData = await response.json();
+    } catch (jsonErr: any) {
+      if (!response.ok) {
+        if (response.status === 401 && !isPublicEndpoint) {
+          await triggerUnauthorized();
+        }
+        const statusDetail = `HTTP ${response.status} (${response.statusText || 'Error'}) from ${cleanEndpoint}`;
+        console.warn(`[apiClient] HTTP error without JSON body: ${statusDetail}`);
+        throw new ApiError(statusDetail, response.status, null);
+      }
+      console.warn(
+        `[apiClient] Invalid JSON response on [${options.method || 'GET'} ${cleanEndpoint}]`,
+      );
+      throw new ApiError(`Invalid server response from ${cleanEndpoint}`, response.status, null);
+    }
+
     if (!response.ok) {
+      // If a protected endpoint returns 401, centrally trigger session cleanup and logout
       if (response.status === 401 && !isPublicEndpoint) {
         await triggerUnauthorized();
       }
-      const statusDetail = `HTTP ${response.status} (${response.statusText || 'Error'}) from ${cleanEndpoint}`;
-      console.warn(`[apiClient] HTTP error without JSON body: ${statusDetail}`);
-      throw new ApiError(statusDetail, response.status, null);
+      const errorMessage =
+        responseData?.message ||
+        responseData?.error ||
+        `Request failed with HTTP ${response.status}`;
+      const formattedError = Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage;
+
+      console.warn(
+        `[apiClient] HTTP ${response.status} on [${options.method || 'GET'} ${cleanEndpoint}]: ${formattedError}`,
+      );
+
+      throw new ApiError(formattedError, response.status, responseData);
     }
-    console.warn(
-      `[apiClient] Invalid JSON response on [${options.method || 'GET'} ${cleanEndpoint}]`,
-    );
-    throw new ApiError(`Invalid server response from ${cleanEndpoint}`, response.status, null);
+
+    // Handle standard { success: true, data: T } wrapper or raw object
+    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
+      if ('total' in responseData) {
+        return responseData as T;
+      }
+      return responseData.data as T;
+    }
+
+    return responseData as T;
   }
 
-  if (!response.ok) {
-    // If a protected endpoint returns 401, centrally trigger session cleanup and logout
-    if (response.status === 401 && !isPublicEndpoint) {
-      await triggerUnauthorized();
-    }
-    const errorMessage =
-      responseData?.message || responseData?.error || `Request failed with HTTP ${response.status}`;
-    const formattedError = Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage;
-
-    console.warn(
-      `[apiClient] HTTP ${response.status} on [${options.method || 'GET'} ${cleanEndpoint}]: ${formattedError}`,
-    );
-
-    throw new ApiError(formattedError, response.status, responseData);
-  }
-
-  // Handle standard { success: true, data: T } wrapper or raw object
-  if (responseData && typeof responseData === 'object' && 'data' in responseData) {
-    if ('total' in responseData) {
-      return responseData as T;
-    }
-    return responseData.data as T;
-  }
-
-  return responseData as T;
+  throw new ApiError(`Failed request to ${cleanEndpoint}`, 0, null);
 }
 
 export const apiClient = {
@@ -339,6 +500,12 @@ export const apiClient = {
   },
 
   getBaseUrl: () => getBaseUrl(),
+
+  health: {
+    check: async (): Promise<{ status: string; timestamp: string; service: string }> => {
+      return await request<{ status: string; timestamp: string; service: string }>('/health');
+    },
+  },
 
   customers: {
     search: async (

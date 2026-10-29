@@ -161,6 +161,9 @@ export default function HomeScreen() {
     }
   }, []);
 
+  // Request guards
+  const isFetchingDueOrdersRef = useRef(false);
+
   /**
    * Load today's due orders directly from the canonical backend endpoint.
    */
@@ -171,12 +174,18 @@ export default function HomeScreen() {
       return;
     }
 
+    if (isFetchingDueOrdersRef.current) {
+      return;
+    }
+    isFetchingDueOrdersRef.current = true;
+
     setLoadingDueOrders(true);
     setDueOrdersError(null);
 
     if (!isConnected) {
       setLoadingDueOrders(false);
       setDueOrdersError('Offline: Reconnect to Wi-Fi to load today’s due orders.');
+      isFetchingDueOrdersRef.current = false;
       return;
     }
 
@@ -193,6 +202,7 @@ export default function HomeScreen() {
       setDueOrders([]);
     } finally {
       setLoadingDueOrders(false);
+      isFetchingDueOrdersRef.current = false;
     }
   }, [isConnected, session, isAuthenticated, isAuthLoading]);
 

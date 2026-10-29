@@ -56,7 +56,7 @@ async function bootstrap() {
   const host = process.env.HOST || '0.0.0.0';
   await app.listen(port, host);
   console.log(
-    `🚀 Backend running on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api`,
+    `🚀 Backend running on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api (listening on ${host} for mobile/LAN access)`,
   );
 }
 
