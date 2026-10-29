@@ -725,9 +725,9 @@ export function OrderItemsReviewStep({
           onPress={onContinueToFinalReview}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Review Order and continue to final checkout"
+          accessibilityLabel="Continue to Review"
         >
-          <Text style={styles.continueButtonText}>Review Order →</Text>
+          <Text style={styles.continueButtonText}>Continue to Review →</Text>
         </TouchableOpacity>
       </View>
 
@@ -1025,10 +1025,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addMoreButton: {
-    backgroundColor: '#eff6ff',
-    borderWidth: 1.5,
-    borderColor: '#bfdbfe',
-    borderRadius: 10,
+    backgroundColor: '#EDF5FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1036,7 +1036,7 @@ const styles = StyleSheet.create({
     minHeight: 46,
   },
   addMoreButtonText: {
-    color: '#2563eb',
+    color: '#0866F5',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1283,10 +1283,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   browseButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0866F5',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 10,
+    borderRadius: 14,
     minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1335,11 +1335,11 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   continueButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0866F5',
     paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 10,
-    minHeight: 46,
+    borderRadius: 14,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },

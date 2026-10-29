@@ -6,23 +6,29 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   ServiceTypeDTO,
   GarmentCatalogDTO,
   GarmentCategory,
-  ServiceCategory,
   OrderWorkflowType,
   OrderEntryMode,
   formatCatalogServiceName,
   filterCategoriesForService,
   resolveCatalogSelectionOnServiceSelect,
   resolveCatalogSelectionOnCategoryChange,
-  isWeightBasedCategory,
-  isServiceAllowedInWorkflow,
   isCategoryAllowedInWorkflow,
   isDryCleanService,
 } from '@growfast/shared-types';
+import {
+  isWeightBasedPricing,
+  CANONICAL_WEIGHT_SERVICES,
+  CANONICAL_PIECE_SERVICES,
+  resolvePieceServices,
+  resolveWeightServices,
+} from '../../services/catalog-rules';
+import { WizardIcon } from './WizardIcon';
 
 export interface ServiceCategoryStepProps {
   workflow: OrderWorkflowType;
@@ -53,14 +59,6 @@ const DEFAULT_CATEGORIES: { key: string; label: string; icon: string }[] = [
 ];
 
 export const CATEGORIES = DEFAULT_CATEGORIES;
-
-import {
-  isWeightBasedPricing,
-  CANONICAL_WEIGHT_SERVICES,
-  CANONICAL_PIECE_SERVICES,
-  resolvePieceServices,
-  resolveWeightServices,
-} from '../../services/catalog-rules';
 export {
   CANONICAL_WEIGHT_SERVICES,
   CANONICAL_PIECE_SERVICES,
@@ -86,31 +84,7 @@ export function ServiceCategoryStep({
 }: ServiceCategoryStepProps) {
   const isWeightMode = entryMode === 'WEIGHT';
 
-  // Dynamically resolve category options, incorporating any new categories from active catalog garments
-  const allCategories = useMemo(() => {
-    const list = [...DEFAULT_CATEGORIES];
-    if (garments && garments.length > 0) {
-      for (const g of garments) {
-        if (!g.isActive) continue;
-        if (
-          g.category &&
-          g.category !== GarmentCategory.HOME_CLEANING &&
-          !list.some((c) => c.key === g.category)
-        ) {
-          list.push({
-            key: g.category,
-            label: g.category.charAt(0) + g.category.slice(1).toLowerCase(),
-            icon: '👕',
-          });
-        }
-      }
-    }
-    return list;
-  }, [garments]);
-
   // Filter available services based on order mode (Per-Piece vs Per-Weight)
-  // Per-Weight: exactly the 5 website services (Steam Iron, Wash & Fold, White, Premium, Woolen)
-  // Per-Piece: exactly the 4 per-piece services (Dry Clean, Starching, Shoe Cleaning, Steam Iron)
   const availableServices: ServiceTypeDTO[] = useMemo(() => {
     if (isWeightMode) {
       return resolveWeightServices(services);
@@ -127,32 +101,6 @@ export function ServiceCategoryStep({
       null
     );
   }, [services, selectedServiceId, availableServices]);
-
-  // Is weight-based pricing active?
-  const isWeightBased = useMemo(() => {
-    return isWeightBasedPricing(workflow, activeService, entryMode, selectedCategory);
-  }, [workflow, activeService, entryMode, selectedCategory]);
-
-  // Filter available categories based on active service and workflow (for per-piece services only)
-  const availableCategories = useMemo(() => {
-    if (isWeightMode) {
-      // Critical business rule: Per-weight laundry must not display garment-category selector
-      return [];
-    }
-    const baseCategories = allCategories.filter(
-      (cat) =>
-        cat.key !== GarmentCategory.HOME_CLEANING &&
-        cat.key !== 'HOME_CLEANING' &&
-        (cat.key === 'ALL' || isCategoryAllowedInWorkflow(cat.key as GarmentCategory, workflow)),
-    );
-    const filteredKeys = filterCategoriesForService(
-      baseCategories.map((c) => c.key),
-      selectedServiceId,
-      availableServices.length > 0 ? availableServices : services,
-      workflow,
-    );
-    return baseCategories.filter((c) => filteredKeys.includes(c.key));
-  }, [isWeightMode, workflow, selectedServiceId, services, availableServices, allCategories]);
 
   // Auto-select first compatible service if current selection is invalid
   React.useEffect(() => {
@@ -182,566 +130,462 @@ export function ServiceCategoryStep({
     }
   };
 
-  const handleSelectCategory = (catKey: string) => {
-    onSelectCategory(catKey);
-    const resolvedSvcId = resolveCatalogSelectionOnCategoryChange(
-      catKey,
-      selectedServiceId,
-      services,
-      workflow,
-    );
-    if (resolvedSvcId !== selectedServiceId) {
-      onSelectService(resolvedSvcId);
-    }
+  const getServiceIconName = (name: string): string => {
+    const lower = name.toLowerCase();
+    if (lower.includes('dry clean')) return 'sparkles';
+    if (lower.includes('starch')) return 'shirt-outline';
+    if (lower.includes('iron') || lower.includes('press')) return 'flame-outline';
+    if (lower.includes('shoe')) return 'footsteps-outline';
+    if (lower.includes('fold')) return 'cube-outline';
+    if (lower.includes('white')) return 'water-outline';
+    if (lower.includes('premium')) return 'ribbon-outline';
+    if (lower.includes('woolen')) return 'shirt-outline';
+    return 'sparkles-outline';
   };
 
-  const getServiceIcon = (name: string): string => {
-    const lower = name.toLowerCase();
-    if (lower.includes('dry clean')) return '✨';
-    if (
-      lower.includes('starch') ||
-      lower.includes('wash & iron') ||
-      lower.includes('wash and iron')
-    )
-      return '👔';
-    if (lower.includes('iron') || lower.includes('press')) return '♨️';
-    if (lower.includes('fold')) return '🧺';
-    if (lower.includes('white')) return '🫧';
-    if (lower.includes('premium')) return '🌟';
-    if (lower.includes('woolen')) return '🧶';
-    if (lower.includes('shoe')) return '👟';
-    return '🧺';
+  const getEstimatedTurnaroundText = (svc: ServiceTypeDTO): string => {
+    const days = svc.estimatedDays || 2;
+    return `${days} ${days === 1 ? 'day' : 'days'}`;
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Step 2: Select Order Mode */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Select Order Mode</Text>
-        <Text style={styles.sectionSubtitle}>
-          Choose primary handling and pricing mode for this order
-        </Text>
-      </View>
-
-      <View style={styles.modeRow}>
-        <TouchableOpacity
-          style={[styles.modeCard, !isWeightMode && styles.modeCardActive]}
-          onPress={() => {
-            if (!isWeightMode) return;
-            onEntryModeChange?.('PIECES');
-          }}
-          accessible={true}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: !isWeightMode }}
-          accessibilityLabel="Per-Piece Order"
-        >
-          <View style={styles.modeCardContent}>
-            <View style={[styles.radioCircle, !isWeightMode && styles.radioCircleActive]}>
-              {!isWeightMode && <View style={styles.radioDot} />}
-            </View>
-            <View style={styles.modeTextContainer}>
-              <Text style={[styles.modeTitle, !isWeightMode && styles.modeTitleActive]}>
-                Per-Piece
-              </Text>
-              <Text style={styles.modeDesc}>Individual garment pricing & dry clean</Text>
-            </View>
+    <View style={styles.outerContainer}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        {/* ── SECTION 1: SELECT ORDER MODE (Screenshot 2) ── */}
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionIconBox}>
+            <WizardIcon name="layers-outline" size={20} color="#0866F5" fallbackText="📑" />
           </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modeCard, isWeightMode && styles.modeCardActive]}
-          onPress={() => {
-            if (isWeightMode) return;
-            onEntryModeChange?.('WEIGHT');
-          }}
-          accessible={true}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: isWeightMode }}
-          accessibilityLabel="Per-Weight Order"
-        >
-          <View style={styles.modeCardContent}>
-            <View style={[styles.radioCircle, isWeightMode && styles.radioCircleActive]}>
-              {isWeightMode && <View style={styles.radioDot} />}
-            </View>
-            <View style={styles.modeTextContainer}>
-              <Text style={[styles.modeTitle, isWeightMode && styles.modeTitleActive]}>
-                Per-Weight
-              </Text>
-              <Text style={styles.modeDesc}>Batch laundry weighed in kg (min 2.0 kg)</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Service Selection Grid */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          {isWeightMode ? 'Select Laundry Service' : 'Select Service Type'}
-        </Text>
-        <Text style={styles.sectionSubtitle}>
-          Applies context to catalog prices and estimated turnaround
-        </Text>
-      </View>
-
-      {isLoadingServices ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#2563eb" />
-          <Text style={styles.loadingText}>Loading available services...</Text>
-        </View>
-      ) : availableServices.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No services available for this mode.</Text>
-        </View>
-      ) : (
-        <View style={styles.serviceGrid}>
-          {availableServices.map((svc) => {
-            const isSelected = svc.id === selectedServiceId;
-            const displayName =
-              svc.name.trim().toLowerCase() === 'wash & iron' ||
-              svc.name.trim().toLowerCase() === 'wash and iron'
-                ? 'Starching'
-                : formatCatalogServiceName(svc.name);
-            return (
-              <TouchableOpacity
-                key={svc.id}
-                style={[styles.serviceCard, isSelected && styles.serviceCardActive]}
-                onPress={() => handleSelectService(svc.id)}
-                accessible={true}
-                accessibilityLabel={`Select service ${displayName}`}
-              >
-                <View
-                  style={[
-                    styles.serviceIconContainer,
-                    isSelected && styles.serviceIconContainerActive,
-                  ]}
-                >
-                  <Text style={styles.serviceIconEmoji}>{getServiceIcon(svc.name)}</Text>
-                </View>
-                <Text
-                  style={[styles.serviceName, isSelected && styles.serviceNameActive]}
-                  numberOfLines={2}
-                >
-                  {displayName}
-                </Text>
-                {svc.estimatedDays != null && (
-                  <Text
-                    style={[styles.serviceTurnaround, isSelected && styles.serviceTurnaroundActive]}
-                  >
-                    ⏱ {svc.estimatedDays} {svc.estimatedDays === 1 ? 'day' : 'days'}
-                  </Text>
-                )}
-                {isSelected && (
-                  <View style={styles.selectedBadge}>
-                    <Text style={styles.selectedBadgeText}>✓</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Critical Business Rule: Per-Weight Laundry hides garment category selector */}
-      {isWeightMode ? (
-        <View style={styles.weightIntakeNotice}>
-          <View style={styles.weightNoticeHeader}>
-            <View style={styles.weightNoticeIconCircle}>
-              <Text style={styles.weightNoticeIcon}>⚖️</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.weightNoticeTitle}>Per-Kg Weight Laundry</Text>
-              <Text style={styles.weightNoticeDesc}>
-                Garment-category filtering is hidden for per-kg laundry (min 2.00 kg). Batch laundry
-                is weighed directly with piece counts and photos in the next step.
-              </Text>
-            </View>
-          </View>
-          <View style={styles.weightBadgeRow}>
-            <View style={styles.weightBadge}>
-              <Text style={styles.weightBadgeText}>Min 2.00 kg</Text>
-            </View>
-            <View style={styles.weightBadge}>
-              <Text style={styles.weightBadgeText}>Bulk Weighing</Text>
-            </View>
-            <View style={styles.weightBadge}>
-              <Text style={styles.weightBadgeText}>Piece Tag Tracking</Text>
-            </View>
-          </View>
-        </View>
-      ) : (
-        <>
-          {/* Category Selection Grid (Only rendered for per-piece services) */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Filter Garment Category</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Select Order Mode</Text>
             <Text style={styles.sectionSubtitle}>
-              Narrow down catalog garments or select All Items
+              Choose primary handling and pricing mode for this order
             </Text>
           </View>
+        </View>
 
-          <View style={styles.categoryGrid}>
-            {availableCategories.map((cat) => {
-              const isSelected = selectedCategory === cat.key;
+        {/* Side-by-side Order Mode Cards */}
+        <View style={styles.modeRow}>
+          {/* Per-Piece Card */}
+          <TouchableOpacity
+            style={[
+              styles.modeCard,
+              !isWeightMode ? styles.modeCardActive : styles.modeCardInactive,
+            ]}
+            onPress={() => {
+              if (isWeightMode) {
+                onEntryModeChange?.('PIECES');
+              }
+            }}
+            accessible={true}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: !isWeightMode }}
+            accessibilityLabel="Per-Piece Order Mode"
+            activeOpacity={0.8}
+          >
+            <View style={styles.modeCardTop}>
+              <View
+                style={[
+                  styles.radioOuter,
+                  !isWeightMode ? styles.radioOuterActive : styles.radioOuterInactive,
+                ]}
+              >
+                {!isWeightMode && <View style={styles.radioInnerDot} />}
+              </View>
+            </View>
+
+            <View style={styles.modeIconCircle}>
+              <WizardIcon name="shirt-outline" size={22} color="#0866F5" fallbackText="👕" />
+            </View>
+
+            <Text style={styles.modeTitle}>Per-Piece</Text>
+            <Text style={styles.modeDesc}>Individual garment pricing & dry clean</Text>
+          </TouchableOpacity>
+
+          {/* Per-Weight Card */}
+          <TouchableOpacity
+            style={[
+              styles.modeCard,
+              isWeightMode ? styles.modeCardActive : styles.modeCardInactive,
+            ]}
+            onPress={() => {
+              if (!isWeightMode) {
+                onEntryModeChange?.('WEIGHT');
+              }
+            }}
+            accessible={true}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isWeightMode }}
+            accessibilityLabel="Per-Weight Order Mode"
+            activeOpacity={0.8}
+          >
+            <View style={styles.modeCardTop}>
+              <View
+                style={[
+                  styles.radioOuter,
+                  isWeightMode ? styles.radioOuterActive : styles.radioOuterInactive,
+                ]}
+              >
+                {isWeightMode && <View style={styles.radioInnerDot} />}
+              </View>
+            </View>
+
+            <View style={styles.modeIconCircle}>
+              <WizardIcon name="barbell-outline" size={22} color="#0866F5" fallbackText="⚖️" />
+            </View>
+
+            <Text style={styles.modeTitle}>Per-Weight</Text>
+            <Text style={styles.modeDesc}>Batch laundry weighed in kg (min 2.0 kg)</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── SECTION 2: SELECT SERVICE TYPE (Screenshot 2) ── */}
+        <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
+          <View style={styles.sectionIconBox}>
+            <WizardIcon name="sparkles-outline" size={20} color="#0866F5" fallbackText="✨" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>Select Service Type</Text>
+            <Text style={styles.sectionSubtitle}>
+              Applies context to catalog prices and estimated turnaround
+            </Text>
+          </View>
+        </View>
+
+        {/* 2-Column Grid of Service Cards */}
+        {isLoadingServices ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#0866F5" />
+            <Text style={styles.loadingText}>Loading available services...</Text>
+          </View>
+        ) : (
+          <View style={styles.servicesGrid}>
+            {availableServices.map((svc) => {
+              const isSelected = svc.id === selectedServiceId;
+              const iconName = getServiceIconName(svc.name);
+              const turnaround = getEstimatedTurnaroundText(svc);
+              const displayName = formatCatalogServiceName(svc.name);
+
               return (
                 <TouchableOpacity
-                  key={cat.key}
-                  style={[styles.categoryCard, isSelected && styles.categoryCardActive]}
-                  onPress={() => handleSelectCategory(cat.key)}
+                  key={svc.id}
+                  style={[
+                    styles.serviceCard,
+                    isSelected ? styles.serviceCardActive : styles.serviceCardInactive,
+                  ]}
+                  onPress={() => handleSelectService(svc.id)}
                   accessible={true}
-                  accessibilityLabel={`Select category ${cat.label}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Service: ${displayName}, estimated turnaround ${turnaround}`}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                  {/* Top Right Checkmark Badge when Selected */}
+                  {isSelected && (
+                    <View style={styles.selectedBadge}>
+                      <WizardIcon name="checkmark" size={13} color="#FFFFFF" fallbackText="✓" />
+                    </View>
+                  )}
+
+                  {/* Service Icon Circle */}
+                  <View
+                    style={[styles.serviceIconCircle, isSelected && styles.serviceIconCircleActive]}
+                  >
+                    <WizardIcon name={iconName} size={24} color="#0866F5" fallbackText="✨" />
+                  </View>
+
+                  {/* Service Name */}
                   <Text
-                    style={[styles.categoryLabel, isSelected && styles.categoryLabelActive]}
+                    style={[
+                      styles.serviceTitle,
+                      isSelected ? styles.serviceTitleActive : styles.serviceTitleInactive,
+                    ]}
                     numberOfLines={1}
                   >
-                    {cat.label}
+                    {displayName}
                   </Text>
+
+                  {/* Turnaround with Clock Icon */}
+                  <View style={styles.turnaroundRow}>
+                    <WizardIcon
+                      name="time-outline"
+                      size={14}
+                      color={isSelected ? '#0866F5' : '#647894'}
+                      fallbackText="⏱"
+                    />
+                    <Text
+                      style={[
+                        styles.turnaroundText,
+                        isSelected ? styles.turnaroundTextActive : styles.turnaroundTextInactive,
+                      ]}
+                    >
+                      {turnaround}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </View>
-        </>
-      )}
+        )}
+      </ScrollView>
 
-      {/* Bottom Action */}
-      <View style={styles.bottomBar}>
+      {/* Sticky Bottom Action (Screenshot 2) */}
+      <View style={styles.bottomFooter}>
         <TouchableOpacity
           style={styles.continueButton}
           onPress={onContinue}
           accessible={true}
-          accessibilityLabel={
-            isWeightMode
-              ? `Continue to Weight Intake (${cartItemCount} in cart)`
-              : `Continue to Garment Catalog (${cartItemCount} in cart)`
-          }
+          accessibilityRole="button"
+          accessibilityLabel={`Continue to Garment Catalog (${cartItemCount} in cart)`}
         >
           <Text style={styles.continueButtonText}>
-            {isWeightMode
-              ? `Continue to Weight Intake (${cartItemCount} in cart) →`
-              : `Continue to Garment Catalog (${cartItemCount} in cart) →`}
+            Continue to Garment Catalog ({cartItemCount} in cart) →
           </Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   scrollContent: {
-    padding: 12,
-    paddingBottom: 28,
+    padding: 16,
+    paddingBottom: 24,
   },
-  sectionHeader: {
-    marginTop: 8,
-    marginBottom: 6,
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  sectionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#EDF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 2,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#101F3D',
   },
   sectionSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 1,
+    fontSize: 13,
+    color: '#647894',
+    marginTop: 2,
+    lineHeight: 18,
   },
   modeRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: 12,
   },
   modeCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    padding: 10,
-    minHeight: 70,
+    borderRadius: 16,
+    padding: 14,
+    minHeight: 140,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(8, 102, 245, 0.05)',
+      },
+      default: {
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      },
+    }),
   },
   modeCardActive: {
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1.5,
+    borderColor: '#0866F5',
   },
-  modeCardContent: {
+  modeCardInactive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DCE5F0',
+  },
+  modeCardTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+    justifyContent: 'flex-start',
+    marginBottom: 8,
   },
-  radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#94a3b8',
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
-  radioCircleActive: {
-    borderColor: '#2563eb',
+  radioOuterActive: {
+    borderWidth: 2,
+    borderColor: '#0866F5',
+    backgroundColor: '#FFFFFF',
   },
-  radioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#2563eb',
+  radioOuterInactive: {
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
   },
-  modeTextContainer: {
-    flex: 1,
+  radioInnerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#0866F5',
+  },
+  modeIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EDF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
   modeTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
-  },
-  modeTitleActive: {
-    color: '#1d4ed8',
-  },
-  modeDesc: {
-    fontSize: 10.5,
-    color: '#64748b',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  workflowRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  workflowCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    minHeight: 72,
-  },
-  workflowCardActive: {
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
-  },
-  workflowIcon: {
-    fontSize: 20,
-    marginBottom: 2,
-  },
-  workflowTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  workflowTitleActive: {
-    color: '#1d4ed8',
-  },
-  workflowDesc: {
-    fontSize: 10.5,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    gap: 8,
-  },
-  loadingText: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  emptyContainer: {
-    padding: 16,
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  emptyText: {
-    color: '#94a3b8',
-    fontSize: 12,
-  },
-  serviceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  serviceCard: {
-    width: '48.5%',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 8,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    position: 'relative',
-    minHeight: 70,
-  },
-  serviceCardActive: {
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
-  },
-  serviceIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#101F3D',
     marginBottom: 4,
   },
-  serviceIconContainerActive: {
-    backgroundColor: '#dbeafe',
-  },
-  serviceIconEmoji: {
-    fontSize: 15,
-  },
-  serviceName: {
+  modeDesc: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#1e293b',
-    lineHeight: 15,
+    color: '#647894',
+    lineHeight: 16,
   },
-  serviceNameActive: {
-    color: '#1d4ed8',
+  servicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  serviceTurnaround: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
+  serviceCard: {
+    width: '48%',
+    borderRadius: 16,
+    padding: 14,
+    minHeight: 125,
+    position: 'relative',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(8, 102, 245, 0.05)',
+      },
+      default: {
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      },
+    }),
   },
-  serviceTurnaroundActive: {
-    color: '#2563eb',
-    fontWeight: '600',
+  serviceCardActive: {
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1.5,
+    borderColor: '#0866F5',
+  },
+  serviceCardInactive: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DCE5F0',
   },
   selectedBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  weightIntakeNotice: {
-    backgroundColor: '#eff6ff',
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
     borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#bfdbfe',
-    padding: 12,
-    marginTop: 2,
-    marginBottom: 14,
-  },
-  weightNoticeHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  weightNoticeIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#0866F5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  weightNoticeIcon: {
-    fontSize: 17,
-  },
-  weightNoticeTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1e40af',
-  },
-  weightNoticeDesc: {
-    fontSize: 11,
-    color: '#3b82f6',
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  weightBadgeRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#dbeafe',
-  },
-  weightBadge: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  weightBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#1d4ed8',
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 14,
-  },
-  categoryCard: {
-    width: '31.5%',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+  serviceIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EDF5FF',
     alignItems: 'center',
-    minHeight: 48,
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  categoryCardActive: {
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
+  serviceIconCircleActive: {
+    backgroundColor: '#DBEAFE',
   },
-  categoryIcon: {
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  categoryLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#334155',
-    textAlign: 'center',
-  },
-  categoryLabelActive: {
-    color: '#1d4ed8',
+  serviceTitle: {
+    fontSize: 15,
     fontWeight: '700',
+    marginBottom: 6,
   },
-  bottomBar: {
+  serviceTitleActive: {
+    color: '#0866F5',
+  },
+  serviceTitleInactive: {
+    color: '#101F3D',
+  },
+  turnaroundRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  turnaroundText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  turnaroundTextActive: {
+    color: '#0866F5',
+    fontWeight: '600',
+  },
+  turnaroundTextInactive: {
+    color: '#647894',
+  },
+  loadingContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#647894',
     marginTop: 8,
+  },
+  bottomFooter: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   continueButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: '#0866F5',
+    minHeight: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 46,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(8, 102, 245, 0.25)',
+      },
+      default: {
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+      },
+    }),
   },
   continueButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
   },
 });

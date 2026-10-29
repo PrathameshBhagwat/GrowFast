@@ -48,6 +48,8 @@ import { OrderItemsReviewStep } from './OrderItemsReviewStep';
 import { FinalReviewStep } from './FinalReviewStep';
 import { OrderCreatedStep } from './OrderCreatedStep';
 import { GrowFastLogo } from '../GrowFastLogo';
+import { WizardProgressBar } from './WizardProgressBar';
+import { WizardIcon } from './WizardIcon';
 
 export type WizardStep =
   | 'CUSTOMER' // Screen 3 (Dev C)
@@ -1067,57 +1069,43 @@ export function OrderWizardModal({
               accessible={true}
               accessibilityLabel="Go back or cancel"
             >
-              <Text style={styles.headerBackText}>
-                {currentStepIndex === 0 ? '✕ Cancel' : '‹ Back'}
-              </Text>
+              <View style={styles.headerBackRow}>
+                <WizardIcon name="chevron-back" size={20} color="#0866F5" fallbackText="‹" />
+                <Text style={styles.headerBackText}>
+                  {currentStepIndex === 0 ? 'Cancel' : 'Back'}
+                </Text>
+              </View>
             </TouchableOpacity>
           ) : (
-            <View style={{ width: 60 }} />
+            <View style={{ width: 80 }} />
           )}
 
           <Text style={styles.headerTitle}>
             {currentStepIndex === 5
               ? 'Order Confirmation'
-              : draft
-                ? 'Edit Order Draft'
-                : 'New Mobile Order'}
+              : currentStepIndex === 4
+                ? 'Review Order'
+                : draft
+                  ? 'Edit Order Draft'
+                  : 'New Mobile Order'}
           </Text>
 
           <View style={styles.headerRightSpacer}>
-            <GrowFastLogo size={26} />
+            <GrowFastLogo size={32} />
           </View>
         </View>
 
-        {/* Step Progress Segment Bar */}
+        {/* 5-Step Progress Indicator (Customer -> Services -> Catalog -> Cart -> Review) */}
         {currentStepIndex !== 5 && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBarRow}>
-              {STEPS.slice(0, 5).map((step, idx) => (
-                <View
-                  key={step.key}
-                  style={[
-                    styles.progressSegment,
-                    idx <= currentStepIndex
-                      ? styles.progressSegmentFilled
-                      : styles.progressSegmentEmpty,
-                  ]}
-                />
-              ))}
-            </View>
-            <View style={styles.stepLabelsRow}>
-              {STEPS.slice(0, 5).map((step, idx) => (
-                <Text
-                  key={step.key}
-                  style={[
-                    styles.stepLabelText,
-                    idx === currentStepIndex && styles.stepLabelTextActive,
-                  ]}
-                >
-                  {step.label}
-                </Text>
-              ))}
-            </View>
-          </View>
+          <WizardProgressBar
+            currentStepIndex={currentStepIndex}
+            steps={STEPS.slice(0, 5)}
+            onStepPress={(targetIdx) => {
+              if (targetIdx < currentStepIndex) {
+                setCurrentStepIndex(targetIdx);
+              }
+            }}
+          />
         )}
 
         {/* Step Body Component */}
@@ -1148,7 +1136,7 @@ export function OrderWizardModal({
                   accessible={true}
                   accessibilityLabel="Proceed to Services"
                 >
-                  <Text style={styles.customerNextBtnText}>Continue to Services ›</Text>
+                  <Text style={styles.customerNextBtnText}>Continue to Services →</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1274,6 +1262,7 @@ export function OrderWizardModal({
               onOrderSuccess={handleOrderCreatedSuccess}
               onPhotosUpdated={refreshPhotos}
               onNavigateToCart={() => setCurrentStepIndex(3)}
+              onNavigateToCustomer={() => setCurrentStepIndex(0)}
             />
           )}
 
@@ -1369,66 +1358,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#F1F5F9',
     backgroundColor: '#ffffff',
   },
   headerBackBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    minHeight: 40,
+    paddingHorizontal: 4,
+    minHeight: 44,
     justifyContent: 'center',
   },
+  headerBackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   headerBackText: {
-    color: '#2563eb',
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#0866F5',
+    fontSize: 16,
+    fontWeight: '600',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#101F3D',
+    textAlign: 'center',
   },
   headerRightSpacer: {
     width: 60,
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingRight: 4,
-  },
-  progressContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  progressBarRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  progressSegment: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
-  progressSegmentFilled: {
-    backgroundColor: '#2563eb',
-  },
-  progressSegmentEmpty: {
-    backgroundColor: '#e2e8f0',
-  },
-  stepLabelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  stepLabelText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  stepLabelTextActive: {
-    color: '#2563eb',
-    fontWeight: '700',
   },
   body: {
     flex: 1,
@@ -1441,18 +1399,18 @@ const styles = StyleSheet.create({
     borderTopColor: '#e2e8f0',
   },
   customerNextBtn: {
-    backgroundColor: '#2563eb',
-    minHeight: 48,
-    borderRadius: 8,
+    backgroundColor: '#0866F5',
+    minHeight: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   customerNextBtnDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: '#BFDBFE',
   },
   customerNextBtnText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
 });

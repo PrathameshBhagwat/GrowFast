@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { CustomerDTO, CreateCustomerRequest, MembershipTier } from '@growfast/shared-types';
 import { apiClient } from '../../api/client';
+import { WizardIcon } from './WizardIcon';
 
-interface CustomerStepProps {
+export interface CustomerStepProps {
   selectedCustomer: CustomerDTO | null;
   onSelectCustomer: (customer: CustomerDTO) => void;
   onClearCustomer: () => void;
@@ -89,7 +91,6 @@ export function CustomerStep({
     }
 
     if (!isConnected) {
-      // Offline fallback: set manual customer details
       onChangeManualDetails(newName.trim(), newPhone.trim());
       setShowCreateForm(false);
       Alert.alert(
@@ -121,52 +122,77 @@ export function CustomerStep({
     }
   };
 
-  const getMembershipBadgeColor = (tier?: MembershipTier) => {
-    switch (tier) {
-      case MembershipTier.PLATINUM:
-        return { bg: '#fef08a', text: '#854d0e', border: '#fde047' };
-      case MembershipTier.GOLD:
-        return { bg: '#fed7aa', text: '#9a3412', border: '#fdba74' };
-      case MembershipTier.SILVER:
-        return { bg: '#e2e8f0', text: '#334155', border: '#cbd5e1' };
-      default:
-        return { bg: '#f1f5f9', text: '#64748b', border: '#e2e8f0' };
-    }
+  const getMembershipBadgeLabel = (tier?: MembershipTier | string | null) => {
+    if (!tier || tier === 'NONE' || tier === 'STANDARD') return 'NONE';
+    return String(tier).toUpperCase();
   };
 
-  // If a customer is already selected, show selected customer card
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 1. SELECTED CUSTOMER CARD (Matches Screenshot 1)
+  // ─────────────────────────────────────────────────────────────────────────────
   if (selectedCustomer) {
-    const badgeColor = getMembershipBadgeColor(selectedCustomer.membership);
+    const badgeLabel = getMembershipBadgeLabel(selectedCustomer.membership);
     return (
-      <View style={styles.container}>
-        <Text style={styles.stepTitle}>Selected Customer</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        {/* Section Header: User Icon in soft blue box + Title */}
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionIconBox}>
+            <WizardIcon name="person-outline" size={20} color="#0866F5" fallbackText="👤" />
+          </View>
+          <Text style={styles.sectionTitle}>Selected Customer</Text>
+        </View>
 
+        {/* Selected Customer Card */}
         <View style={styles.selectedCustomerCard}>
-          <View style={styles.customerHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.selectedCustomerName}>{selectedCustomer.name}</Text>
-              <Text style={styles.selectedCustomerPhone}>📱 {selectedCustomer.phone}</Text>
-              {selectedCustomer.customerCode ? (
-                <Text style={styles.selectedCustomerCode}>ID: {selectedCustomer.customerCode}</Text>
-              ) : null}
+          {/* Top Row: Circular Avatar + Name + Membership Badge */}
+          <View style={styles.cardTopRow}>
+            <View style={styles.avatarCircle}>
+              <WizardIcon name="person-outline" size={24} color="#0866F5" fallbackText="👤" />
             </View>
-
-            <View
-              style={[
-                styles.tierBadge,
-                { backgroundColor: badgeColor.bg, borderColor: badgeColor.border },
-              ]}
-            >
-              <Text style={[styles.tierBadgeText, { color: badgeColor.text }]}>
-                {selectedCustomer.membership || 'STANDARD'}
+            <View style={styles.nameContainer}>
+              <Text style={styles.customerNameText} numberOfLines={1}>
+                {selectedCustomer.name}
               </Text>
+            </View>
+            <View style={styles.membershipPill}>
+              <Text style={styles.membershipPillText}>{badgeLabel}</Text>
             </View>
           </View>
 
-          {selectedCustomer.address ? (
-            <Text style={styles.customerAddressText}>📍 {selectedCustomer.address}</Text>
-          ) : null}
+          {/* Details Rows */}
+          <View style={styles.detailsGroup}>
+            {/* Phone Row */}
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconCircleBlue}>
+                <WizardIcon name="call" size={15} color="#0866F5" fallbackText="📞" />
+              </View>
+              <Text style={styles.phoneText}>{selectedCustomer.phone}</Text>
+            </View>
 
+            {/* ID Row */}
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconCircleBlue}>
+                <WizardIcon name="id-card-outline" size={16} color="#0866F5" fallbackText="🪪" />
+              </View>
+              <Text style={styles.idText}>
+                ID : {selectedCustomer.customerCode || selectedCustomer.id}
+              </Text>
+            </View>
+
+            {/* Address Row */}
+            {selectedCustomer.address ? (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIconCircleRed}>
+                  <WizardIcon name="location-sharp" size={16} color="#EF4444" fallbackText="📍" />
+                </View>
+                <Text style={styles.addressText} numberOfLines={2}>
+                  {selectedCustomer.address}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Discount Banner if customer has discount */}
           {selectedCustomer.discountPercent > 0 && (
             <View style={styles.discountBadge}>
               <Text style={styles.discountBadgeText}>
@@ -175,48 +201,89 @@ export function CustomerStep({
             </View>
           )}
 
+          {/* Card Divider */}
+          <View style={styles.cardDivider} />
+
+          {/* Change Customer Button (Screenshot 1) */}
           <TouchableOpacity
             style={styles.changeCustomerButton}
             onPress={onClearCustomer}
             accessible={true}
+            accessibilityRole="button"
             accessibilityLabel="Change selected customer"
           >
+            <WizardIcon name="sync-outline" size={18} color="#0866F5" fallbackText="🔄" />
             <Text style={styles.changeCustomerButtonText}>Change Customer</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
-  // If manual customer entered (e.g. offline)
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 2. MANUAL / OFFLINE CUSTOMER ENTERED
+  // ─────────────────────────────────────────────────────────────────────────────
   if (manualCustomerName) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.stepTitle}>Selected Customer</Text>
-        <View style={styles.selectedCustomerCard}>
-          <Text style={styles.selectedCustomerName}>{manualCustomerName}</Text>
-          <Text style={styles.selectedCustomerPhone}>📱 {manualCustomerPhone || 'No phone'}</Text>
-          <View style={[styles.tierBadge, { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }]}>
-            <Text style={[styles.tierBadgeText, { color: '#475569' }]}>MANUAL / OFFLINE</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionIconBox}>
+            <WizardIcon name="person-outline" size={20} color="#0866F5" fallbackText="👤" />
           </View>
+          <Text style={styles.sectionTitle}>Selected Customer</Text>
+        </View>
+
+        <View style={styles.selectedCustomerCard}>
+          <View style={styles.cardTopRow}>
+            <View style={styles.avatarCircle}>
+              <WizardIcon name="person-outline" size={24} color="#0866F5" fallbackText="👤" />
+            </View>
+            <View style={styles.nameContainer}>
+              <Text style={styles.customerNameText}>{manualCustomerName}</Text>
+            </View>
+            <View style={styles.membershipPill}>
+              <Text style={styles.membershipPillText}>OFFLINE</Text>
+            </View>
+          </View>
+
+          <View style={styles.detailsGroup}>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconCircleBlue}>
+                <WizardIcon name="call" size={15} color="#0866F5" fallbackText="📞" />
+              </View>
+              <Text style={styles.phoneText}>{manualCustomerPhone || 'No phone provided'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.cardDivider} />
+
           <TouchableOpacity
             style={styles.changeCustomerButton}
             onPress={onClearCustomer}
             accessible={true}
+            accessibilityRole="button"
             accessibilityLabel="Change customer details"
           >
-            <Text style={styles.changeCustomerButtonText}>Change Details</Text>
+            <WizardIcon name="sync-outline" size={18} color="#0866F5" fallbackText="🔄" />
+            <Text style={styles.changeCustomerButtonText}>Change Customer</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // 3. SEARCH & SELECTION INTERFACE (EMPTY STATE)
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
-      <Text style={styles.stepTitle}>Find or Add Customer</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.sectionHeaderRow}>
+        <View style={styles.sectionIconBox}>
+          <WizardIcon name="search-outline" size={20} color="#0866F5" fallbackText="🔍" />
+        </View>
+        <Text style={styles.sectionTitle}>Find or Add Customer</Text>
+      </View>
 
-      {/* Offline Notice if applicable */}
       {!isConnected && (
         <View style={styles.offlineNotice}>
           <Text style={styles.offlineNoticeTitle}>Device is Offline</Text>
@@ -227,24 +294,35 @@ export function CustomerStep({
         </View>
       )}
 
-      {/* Search Input (when online) */}
+      {/* Search Input Box */}
       {isConnected && (
         <View style={styles.searchSection}>
-          <Text style={styles.inputLabel}>Search by Name, WhatsApp, or Customer Code</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search phone or name..."
-            placeholderTextColor="#94a3b8"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-          />
+          <Text style={styles.inputLabel}>Search by Name, WhatsApp, or Customer ID</Text>
+          <View style={styles.searchInputContainer}>
+            <WizardIcon name="search-outline" size={18} color="#94A3B8" fallbackText="🔍" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search phone or name..."
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
+                <Text style={styles.clearSearchBtnText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {isSearching && (
             <View style={styles.searchingRow}>
-              <ActivityIndicator size="small" color="#2563eb" />
+              <ActivityIndicator size="small" color="#0866F5" />
               <Text style={styles.searchingText}>Searching customer registry...</Text>
             </View>
           )}
+
           {searchError ? <Text style={styles.errorText}>⚠️ {searchError}</Text> : null}
         </View>
       )}
@@ -253,44 +331,37 @@ export function CustomerStep({
       {searchResults.length > 0 && (
         <View style={styles.resultsContainer}>
           <Text style={styles.resultsHeader}>Search Results ({searchResults.length})</Text>
-          <FlatList
-            data={searchResults}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            renderItem={({ item }) => {
-              const badge = getMembershipBadgeColor(item.membership);
-              return (
-                <TouchableOpacity
-                  style={styles.customerResultCard}
-                  onPress={() => onSelectCustomer(item)}
-                  accessible={true}
-                  accessibilityLabel={`Select customer ${item.name}`}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.resultName}>{item.name}</Text>
-                    <Text style={styles.resultPhone}>📱 {item.phone}</Text>
-                    {item.customerCode ? (
-                      <Text style={styles.resultCode}>ID: {item.customerCode}</Text>
-                    ) : null}
-                  </View>
-                  <View
-                    style={[
-                      styles.tierBadgeSmall,
-                      { backgroundColor: badge.bg, borderColor: badge.border },
-                    ]}
-                  >
-                    <Text style={[styles.tierBadgeTextSmall, { color: badge.text }]}>
-                      {item.membership || 'STD'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-          />
+          {searchResults.map((item) => {
+            const badgeLabel = getMembershipBadgeLabel(item.membership);
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.customerResultCard}
+                onPress={() => onSelectCustomer(item)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={`Select customer ${item.name}`}
+              >
+                <View style={styles.avatarCircleSmall}>
+                  <WizardIcon name="person-outline" size={18} color="#0866F5" fallbackText="👤" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.resultName}>{item.name}</Text>
+                  <Text style={styles.resultPhone}>{item.phone}</Text>
+                  {item.customerCode ? (
+                    <Text style={styles.resultCode}>ID: {item.customerCode}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.membershipPill}>
+                  <Text style={styles.membershipPillText}>{badgeLabel}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
-      {/* Empty State when search has query but no results */}
+      {/* Empty Search Notice */}
       {isConnected &&
         searchQuery.trim().length >= 2 &&
         !isSearching &&
@@ -307,9 +378,11 @@ export function CustomerStep({
             style={styles.openCreateBtn}
             onPress={() => setShowCreateForm(true)}
             accessible={true}
+            accessibilityRole="button"
             accessibilityLabel="Add new customer"
           >
-            <Text style={styles.openCreateBtnText}>+ Create New Customer</Text>
+            <WizardIcon name="person-add-outline" size={18} color="#0866F5" fallbackText="＋" />
+            <Text style={styles.openCreateBtnText}>Create New Customer</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.createForm}>
@@ -328,7 +401,7 @@ export function CustomerStep({
               <TextInput
                 style={styles.textInput}
                 placeholder="e.g. Anand Sharma"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#94A3B8"
                 value={newName}
                 onChangeText={setNewName}
               />
@@ -339,7 +412,7 @@ export function CustomerStep({
               <TextInput
                 style={styles.textInput}
                 placeholder="e.g. 9876543210"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#94A3B8"
                 keyboardType="phone-pad"
                 value={newPhone}
                 onChangeText={setNewPhone}
@@ -351,7 +424,7 @@ export function CustomerStep({
               <TextInput
                 style={[styles.textInput, { height: 60 }]}
                 placeholder="e.g. Flat 302, Green Valley Apartments"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#94A3B8"
                 multiline
                 value={newAddress}
                 onChangeText={setNewAddress}
@@ -363,7 +436,7 @@ export function CustomerStep({
               <TextInput
                 style={styles.textInput}
                 placeholder="e.g. 560001"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#94A3B8"
                 keyboardType="numeric"
                 value={newPincode}
                 onChangeText={setNewPincode}
@@ -375,10 +448,11 @@ export function CustomerStep({
               onPress={handleCreateCustomer}
               disabled={isCreating}
               accessible={true}
+              accessibilityRole="button"
               accessibilityLabel="Save Customer and Continue"
             >
               {isCreating ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <Text style={styles.saveCustomerBtnText}>Save Customer & Select</Text>
               )}
@@ -386,128 +460,194 @@ export function CustomerStep({
           </View>
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  stepTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0f172a',
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
   },
+  sectionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#EDF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#101F3D',
+  },
   selectedCustomerCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 18,
     borderWidth: 1.5,
-    borderColor: '#3b82f6',
+    borderColor: '#3B82F6',
     ...Platform.select({
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 4px 12px rgba(8, 102, 245, 0.08)',
       },
       default: {
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
       },
     }),
   },
-  customerHeaderRow: {
+  cardTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  selectedCustomerName: {
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E0EFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarCircleSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E0EFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  customerNameText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: '#101F3D',
   },
-  selectedCustomerPhone: {
-    fontSize: 14,
-    color: '#475569',
-    marginTop: 4,
-  },
-  selectedCustomerCode: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
-    fontFamily: 'monospace',
-  },
-  customerAddressText: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 8,
-  },
-  tierBadge: {
+  membershipPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
+    borderColor: '#DCE5F0',
   },
-  tierBadgeText: {
+  membershipPillText: {
     fontSize: 11,
-    fontWeight: '800',
-  },
-  tierBadgeSmall: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  tierBadgeTextSmall: {
-    fontSize: 10,
     fontWeight: '700',
+    color: '#647894',
+    letterSpacing: 0.5,
+  },
+  detailsGroup: {
+    gap: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailIconCircleBlue: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EDF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  detailIconCircleRed: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  phoneText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#101F3D',
+  },
+  idText: {
+    fontSize: 14,
+    color: '#647894',
+    fontWeight: '500',
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#101F3D',
+    fontWeight: '500',
+    flex: 1,
   },
   discountBadge: {
-    backgroundColor: '#f0fdf4',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 8,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginTop: 12,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
   },
   discountBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#16a34a',
+    color: '#16A34A',
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#EDF2F7',
+    marginVertical: 16,
   },
   changeCustomerButton: {
-    marginTop: 14,
-    minHeight: 44,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
+    gap: 8,
   },
   changeCustomerButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#334155',
+    color: '#0866F5',
   },
   offlineNotice: {
-    backgroundColor: '#fff7ed',
+    backgroundColor: '#FFF7ED',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fed7aa',
+    borderColor: '#FED7AA',
     marginBottom: 16,
   },
   offlineNoticeTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#c2410c',
+    color: '#C2410C',
   },
   offlineNoticeText: {
     fontSize: 12,
-    color: '#9a3412',
+    color: '#9A3412',
     marginTop: 2,
   },
   searchSection: {
@@ -516,19 +656,33 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: '#647894',
     marginBottom: 6,
   },
-  searchInput: {
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderColor: '#DCE5F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    minHeight: 46,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 14,
-    color: '#0f172a',
-    backgroundColor: '#ffffff',
-    minHeight: 44,
+    color: '#101F3D',
+    marginLeft: 8,
+    paddingVertical: 8,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  clearSearchBtnText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '700',
   },
   searchingRow: {
     flexDirection: 'row',
@@ -538,11 +692,11 @@ const styles = StyleSheet.create({
   },
   searchingText: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#647894',
   },
   errorText: {
     fontSize: 12,
-    color: '#ef4444',
+    color: '#EF4444',
     marginTop: 4,
   },
   resultsContainer: {
@@ -551,72 +705,74 @@ const styles = StyleSheet.create({
   resultsHeader: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#334155',
+    color: '#647894',
     marginBottom: 8,
   },
   customerResultCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#DCE5F0',
     marginBottom: 8,
-    minHeight: 48,
   },
   resultName: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: '#101F3D',
   },
   resultPhone: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#647894',
     marginTop: 2,
   },
   resultCode: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#94A3B8',
     marginTop: 1,
     fontFamily: 'monospace',
   },
   emptyResults: {
     padding: 16,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCE5F0',
     alignItems: 'center',
     marginBottom: 16,
   },
   emptyResultsText: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#647894',
   },
   createCustomerContainer: {
     marginTop: 8,
   },
   openCreateBtn: {
-    minHeight: 44,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
+    minHeight: 48,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#cbd5e1',
+    borderColor: '#BFDBFE',
     borderStyle: 'dashed',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   openCreateBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2563eb',
+    color: '#0866F5',
   },
   createForm: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#DCE5F0',
   },
   createFormHeader: {
     flexDirection: 'row',
@@ -625,19 +781,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   createFormTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#101F3D',
   },
   cancelCreateBtn: {
-    minHeight: 44,
-    minWidth: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
   cancelCreateText: {
     fontSize: 13,
-    color: '#ef4444',
+    color: '#EF4444',
     fontWeight: '600',
   },
   inputGroup: {
@@ -645,28 +798,28 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
+    borderColor: '#DCE5F0',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
+    color: '#101F3D',
+    backgroundColor: '#F8FAFC',
     minHeight: 44,
   },
   saveCustomerBtn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#0866F5',
     minHeight: 48,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
   },
   saveCustomerBtnDisabled: {
-    backgroundColor: '#94a3b8',
+    backgroundColor: '#94A3B8',
   },
   saveCustomerBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },

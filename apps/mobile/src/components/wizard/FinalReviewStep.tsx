@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   CreateOrderItemRequest,
@@ -19,12 +20,11 @@ import {
   GarmentCatalogDTO,
   calculateOrderTotals,
   isPhotoRequiredForOrder,
-  getExpressMultiplier,
   getDayOfWeekInTimezone,
   adjustDueDateForThursday,
-  formatCatalogServiceName,
 } from '@growfast/shared-types';
 import { PendingPhoto } from '../../db/photos';
+import { WizardIcon } from './WizardIcon';
 
 export interface FinalReviewStepProps {
   clientDraftId: string;
@@ -55,6 +55,7 @@ export interface FinalReviewStepProps {
   onOrderSuccess: (order: { orderId: string; orderNumber: string }) => void;
   onPhotosUpdated?: () => void;
   onNavigateToCart?: () => void;
+  onNavigateToCustomer?: () => void;
 }
 
 export function FinalReviewStep({
@@ -80,6 +81,7 @@ export function FinalReviewStep({
   onOrderSuccess,
   onPhotosUpdated,
   onNavigateToCart,
+  onNavigateToCustomer,
 }: FinalReviewStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -116,7 +118,6 @@ export function FinalReviewStep({
 
   // Turnaround and Due-Date preview calculation
   const estimatedDueDate = useMemo(() => {
-    // 1. Find max estimated days among order items
     let maxDays = 2;
     for (const it of items) {
       const s = services.find((svc) => svc.id === it.serviceTypeId);
@@ -138,7 +139,6 @@ export function FinalReviewStep({
       calculatedDue.setDate(calculatedDue.getDate() + maxDays);
     }
 
-    // Adjust for Thursday store off
     const finalDate = adjustDueDateForThursday(calculatedDue);
     return finalDate.toLocaleDateString('en-IN', {
       weekday: 'short',
@@ -159,6 +159,7 @@ export function FinalReviewStep({
 
   const displayName = customer?.name || manualCustomerName || 'Walk-in Customer';
   const displayPhone = customer?.phone || manualCustomerPhone || 'No phone provided';
+  const displayAddress = customer?.address || null;
 
   const handleSaveLocalDraft = async () => {
     setIsSaving(true);
@@ -276,7 +277,7 @@ export function FinalReviewStep({
       {/* Offline Status Callout if applicable */}
       {!isConnected && (
         <View style={styles.offlineNotice}>
-          <Text style={styles.offlineNoticeTitle}>⚠️ Device is Offline</Text>
+          <Text style={styles.offlineNoticeTitle}>Device is Offline</Text>
           <Text style={styles.offlineNoticeText}>
             Submitting will queue this order in your local SQLite queue. It will synchronize
             automatically and receive an official server order number when you reconnect.
@@ -284,56 +285,85 @@ export function FinalReviewStep({
         </View>
       )}
 
-      {/* 1. Customer Information Card */}
+      {/* ── 1. CUSTOMER CARD (Screenshot 4) ── */}
       <View style={styles.card}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Customer Details</Text>
-          {customer?.membership && customer.membership !== 'NONE' && (
-            <View style={styles.membershipBadge}>
-              <Text style={styles.membershipBadgeText}>{customer.membership} MEMBER</Text>
+          <View style={styles.cardHeaderLeft}>
+            <View style={styles.iconCircleBlue}>
+              <WizardIcon name="person-outline" size={18} color="#0866F5" fallbackText="👤" />
             </View>
+            <Text style={styles.cardTitle}>Customer</Text>
+          </View>
+          {onNavigateToCustomer && (
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={onNavigateToCustomer}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Edit Customer"
+            >
+              <WizardIcon name="create-outline" size={16} color="#0866F5" fallbackText="✏️" />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
           )}
         </View>
 
         <Text style={styles.customerName}>{displayName}</Text>
-        <Text style={styles.customerPhone}>📞 {displayPhone}</Text>
-        {customer?.address ? (
-          <Text style={styles.customerAddress}>📍 {customer.address}</Text>
+
+        <View style={styles.customerDetailRow}>
+          <WizardIcon name="call" size={14} color="#647894" fallbackText="📞" />
+          <Text style={styles.customerDetailText}>{displayPhone}</Text>
+        </View>
+
+        {displayAddress ? (
+          <View style={styles.customerDetailRow}>
+            <WizardIcon name="location-sharp" size={14} color="#647894" fallbackText="📍" />
+            <Text style={styles.customerDetailText}>{displayAddress}</Text>
+          </View>
         ) : null}
       </View>
 
-      {/* 2. Fulfillment & Pickup Method */}
+      {/* ── 2. PICKUP & TURNAROUND CARD (Screenshot 4) ── */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Fulfillment Method</Text>
-        <View style={styles.radioGroupRow}>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderLeft}>
+            <View style={styles.iconCircleBlue}>
+              <WizardIcon name="cube-outline" size={18} color="#0866F5" fallbackText="📦" />
+            </View>
+            <View>
+              <Text style={styles.cardTitle}>Pickup & Turnaround</Text>
+              <Text style={styles.cardSubtitle}>Choose pickup method and delivery speed</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Fulfillment Method */}
+        <Text style={styles.subsectionLabel}>Fulfillment Method</Text>
+        <View style={styles.fulfillmentRow}>
           <TouchableOpacity
-            style={[
-              styles.radioChip,
-              pickupType === PickupType.STORE_PICKUP && styles.radioChipActive,
-            ]}
+            style={styles.fulfillmentCardActive}
             onPress={() => onPickupTypeChange(PickupType.STORE_PICKUP)}
             accessible={true}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: true }}
             accessibilityLabel="Store Counter Pickup"
           >
-            <Text
-              style={[
-                styles.radioChipText,
-                pickupType === PickupType.STORE_PICKUP && styles.radioChipTextActive,
-              ]}
-            >
-              🏪 Store Counter Pickup
-            </Text>
+            <View style={styles.fulfillmentLeft}>
+              <WizardIcon name="business-outline" size={18} color="#0866F5" fallbackText="🏪" />
+              <Text style={styles.fulfillmentText}>Store Counter Pickup</Text>
+            </View>
+            <View style={styles.radioOuterActive}>
+              <View style={styles.radioInnerDot} />
+            </View>
           </TouchableOpacity>
-
-          {/* Home Delivery temporarily hidden while feature is not offered */}
         </View>
-      </View>
 
-      {/* 3. Turnaround & Express Service */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Turnaround Speed & Surcharge</Text>
+        {/* Turnaround Speed & Surcharge */}
+        <Text style={[styles.subsectionLabel, { marginTop: 16 }]}>
+          Turnaround Speed & Surcharge
+        </Text>
 
-        {/* Regular */}
+        {/* Regular Turnaround */}
         <TouchableOpacity
           style={[
             styles.turnaroundOption,
@@ -341,13 +371,34 @@ export function FinalReviewStep({
           ]}
           onPress={() => onExpressOptionChange(ExpressDeliveryOption.REGULAR)}
           accessible={true}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: expressOption === ExpressDeliveryOption.REGULAR }}
           accessibilityLabel="Regular delivery speed"
         >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.turnaroundTitle}>Regular Turnaround</Text>
-            <Text style={styles.turnaroundSubtitle}>Standard turnaround (48-72 hours)</Text>
+          <View style={styles.turnaroundLeftCol}>
+            <View style={styles.turnaroundIconBox}>
+              <WizardIcon name="time-outline" size={18} color="#0866F5" fallbackText="⏱" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.turnaroundTitle}>Regular Turnaround</Text>
+              <Text style={styles.turnaroundSubtitle}>Standard turnaround (48-72 hours)</Text>
+            </View>
           </View>
-          <Text style={styles.turnaroundMultiplier}>Standard (0%)</Text>
+          <View style={styles.turnaroundRightCol}>
+            <Text style={styles.turnaroundMultiplierActive}>Standard (0%)</Text>
+            <View
+              style={[
+                styles.radioOuter,
+                expressOption === ExpressDeliveryOption.REGULAR
+                  ? styles.radioOuterActive
+                  : styles.radioOuterInactive,
+              ]}
+            >
+              {expressOption === ExpressDeliveryOption.REGULAR && (
+                <View style={styles.radioInnerDot} />
+              )}
+            </View>
+          </View>
         </TouchableOpacity>
 
         {/* Next-Day Evening */}
@@ -369,21 +420,51 @@ export function FinalReviewStep({
             onExpressOptionChange(ExpressDeliveryOption.NEXT_DAY_EVENING);
           }}
           accessible={true}
+          accessibilityRole="radio"
+          accessibilityState={{
+            selected: expressOption === ExpressDeliveryOption.NEXT_DAY_EVENING,
+          }}
           accessibilityLabel="Next-Day Evening Express"
         >
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.turnaroundTitle, isWednesday && { color: '#94a3b8' }]}>
-              ⚡ Next-Day Evening Express
-            </Text>
-            <Text style={styles.turnaroundSubtitle}>
-              {isWednesday
-                ? 'Unavailable on Wednesdays (Thursday store weekly off)'
-                : 'Delivered tomorrow evening (+50% surcharge)'}
-            </Text>
+          <View style={styles.turnaroundLeftCol}>
+            <View style={styles.turnaroundIconBox}>
+              <WizardIcon name="flash" size={18} color="#F59E0B" fallbackText="⚡" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.turnaroundTitle, isWednesday && { color: '#94A3B8' }]}>
+                Next-Day Evening Express
+              </Text>
+              <Text style={styles.turnaroundSubtitle}>
+                {isWednesday
+                  ? 'Unavailable on Wednesdays (Thursday store weekly off)'
+                  : 'Delivered tomorrow evening (+50%)'}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.turnaroundMultiplier, isWednesday && { color: '#94a3b8' }]}>
-            1.5× (+50%)
-          </Text>
+          <View style={styles.turnaroundRightCol}>
+            <Text
+              style={[
+                styles.turnaroundMultiplier,
+                expressOption === ExpressDeliveryOption.NEXT_DAY_EVENING &&
+                  styles.turnaroundMultiplierActive,
+                isWednesday && { color: '#94A3B8' },
+              ]}
+            >
+              1.5x (+50%)
+            </Text>
+            <View
+              style={[
+                styles.radioOuter,
+                expressOption === ExpressDeliveryOption.NEXT_DAY_EVENING
+                  ? styles.radioOuterActive
+                  : styles.radioOuterInactive,
+              ]}
+            >
+              {expressOption === ExpressDeliveryOption.NEXT_DAY_EVENING && (
+                <View style={styles.radioInnerDot} />
+              )}
+            </View>
+          </View>
         </TouchableOpacity>
 
         {/* Same-Day Urgent */}
@@ -404,119 +485,181 @@ export function FinalReviewStep({
             onExpressOptionChange(ExpressDeliveryOption.SAME_DAY);
           }}
           accessible={true}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: expressOption === ExpressDeliveryOption.SAME_DAY }}
           accessibilityLabel="Same-Day Urgent Express"
         >
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.turnaroundTitle, isThursday && { color: '#94a3b8' }]}>
-              🔥 Same-Day Urgent Express
-            </Text>
-            <Text style={styles.turnaroundSubtitle}>
-              {isThursday
-                ? 'Unavailable on Thursdays (Store weekly off)'
-                : 'Top-priority cycle delivered today (+100% surcharge)'}
-            </Text>
+          <View style={styles.turnaroundLeftCol}>
+            <View style={styles.turnaroundIconBox}>
+              <WizardIcon name="flame" size={18} color="#EF4444" fallbackText="🔥" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.turnaroundTitle, isThursday && { color: '#94A3B8' }]}>
+                Same-Day Urgent Express
+              </Text>
+              <Text style={styles.turnaroundSubtitle}>
+                {isThursday
+                  ? 'Unavailable on Thursdays (Store weekly off)'
+                  : 'Top-priority cycle delivered today (+100%)'}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.turnaroundMultiplier, isThursday && { color: '#94a3b8' }]}>
-            2.0× (+100%)
-          </Text>
+          <View style={styles.turnaroundRightCol}>
+            <Text
+              style={[
+                styles.turnaroundMultiplier,
+                expressOption === ExpressDeliveryOption.SAME_DAY &&
+                  styles.turnaroundMultiplierActive,
+                isThursday && { color: '#94A3B8' },
+              ]}
+            >
+              2.0x (+100%)
+            </Text>
+            <View
+              style={[
+                styles.radioOuter,
+                expressOption === ExpressDeliveryOption.SAME_DAY
+                  ? styles.radioOuterActive
+                  : styles.radioOuterInactive,
+              ]}
+            >
+              {expressOption === ExpressDeliveryOption.SAME_DAY && (
+                <View style={styles.radioInnerDot} />
+              )}
+            </View>
+          </View>
         </TouchableOpacity>
 
-        {/* Estimated Due Date Preview Banner */}
-        <View style={styles.dueDateBanner}>
-          <Text style={styles.dueDateIcon}>📅</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dueDateLabel}>ESTIMATED SYSTEM DUE DATE</Text>
+        {/* Estimated Due Date Banner (Screenshot 4) */}
+        <View style={styles.dueDateCard}>
+          <View style={styles.dueDateIconCircle}>
+            <WizardIcon name="calendar-outline" size={20} color="#0866F5" fallbackText="📅" />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.dueDateLabel}>Estimated due date</Text>
             <Text style={styles.dueDateValue}>{estimatedDueDate}</Text>
-            <Text style={styles.dueDateNote}>
-              Includes Thursday weekly-off adjustment. Final confirmation by server.
-            </Text>
+            <Text style={styles.dueDateNote}>Final confirmation by server.</Text>
           </View>
         </View>
       </View>
 
-      {/* 5. Order Notes Input */}
+      {/* ── 3. SPECIAL INSTRUCTIONS CARD (Screenshot 4) ── */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Special Instructions / Notes</Text>
-        <TextInput
-          style={styles.notesInput}
-          placeholder="e.g. Wash separately, customer requested light starch..."
-          placeholderTextColor="#94a3b8"
-          value={notes}
-          onChangeText={onNotesChange}
-          multiline
-          numberOfLines={2}
-          accessible={true}
-          accessibilityLabel="Order special instructions input"
-        />
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderLeft}>
+            <View style={styles.iconCircleBlue}>
+              <WizardIcon
+                name="document-text-outline"
+                size={18}
+                color="#0866F5"
+                fallbackText="📝"
+              />
+            </View>
+            <View>
+              <Text style={styles.cardTitle}>Special Instructions</Text>
+              <Text style={styles.cardSubtitle}>Add any garment care notes for this order</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.notesInputContainer}>
+          <WizardIcon name="create-outline" size={18} color="#94A3B8" fallbackText="✏️" />
+          <TextInput
+            style={styles.notesTextInput}
+            placeholder="Add garment care notes (optional)"
+            placeholderTextColor="#94A3B8"
+            value={notes}
+            onChangeText={onNotesChange}
+            multiline
+            numberOfLines={2}
+          />
+        </View>
       </View>
 
-      {/* 5. Authoritative Bill Breakdown */}
+      {/* ── 4. ORDER SUMMARY CARD (Screenshot 4) ── */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Provisional Financial Ledger</Text>
+        <View style={styles.cardHeaderRow}>
+          <View style={styles.cardHeaderLeft}>
+            <View style={styles.iconCircleBlue}>
+              <WizardIcon name="receipt-outline" size={18} color="#0866F5" fallbackText="🧾" />
+            </View>
+            <Text style={styles.cardTitle}>Order Summary</Text>
+          </View>
+          <Text style={styles.summaryItemCount}>{totalPieces} items</Text>
+        </View>
 
         <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Items Subtotal ({totalPieces} pcs):</Text>
+          <Text style={styles.priceLabel}>Items Subtotal ({totalPieces} pcs)</Text>
           <Text style={styles.priceValue}>₹{pricingTotals.subtotal.toFixed(2)}</Text>
         </View>
 
         {pricingTotals.discountAmount > 0 && (
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Customer Discount ({discountPercent}%):</Text>
+            <Text style={styles.priceLabel}>Customer Discount ({discountPercent}%)</Text>
             <Text style={styles.discountValue}>-₹{pricingTotals.discountAmount.toFixed(2)}</Text>
           </View>
         )}
 
         {isExpress && (
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Express Surcharge:</Text>
+            <Text style={styles.priceLabel}>Express Surcharge</Text>
             <Text style={styles.surchargeValue}>+₹{pricingTotals.expressSurcharge.toFixed(2)}</Text>
           </View>
         )}
 
         <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>GST (18% Applicable Tax):</Text>
+          <Text style={styles.priceLabel}>GST (18% Applicable Tax)</Text>
           <Text style={styles.priceValue}>₹{pricingTotals.taxAmount.toFixed(2)}</Text>
         </View>
 
-        <View style={[styles.priceRow, styles.totalRow]}>
-          <Text style={styles.totalLabel}>Provisional Grand Total:</Text>
+        <View style={styles.summaryDivider} />
+
+        <View style={[styles.priceRow, { alignItems: 'baseline', marginTop: 4 }]}>
+          <Text style={styles.totalLabel}>Estimated Total</Text>
           <Text style={styles.totalValue}>₹{pricingTotals.totalAmount.toFixed(2)}</Text>
         </View>
 
         <Text style={styles.provisionalDisclaimer}>
-          * Provisional calculation. Official total and taxes are confirmed upon server commit.
+          Final taxes and total confirmed when order is saved.
         </Text>
       </View>
 
-      {/* Action Buttons */}
+      {/* ── 5. FINAL ACTION BUTTONS (Screenshot 4) ── */}
       <View style={styles.actionsContainer}>
+        {/* Primary Action Button */}
         <TouchableOpacity
           style={styles.submitOrderBtn}
           onPress={handleConfirmSubmit}
           disabled={isSubmitting}
           accessible={true}
+          accessibilityRole="button"
           accessibilityLabel="Confirm and Create Order"
         >
           {isSubmitting ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.submitOrderBtnText}>
-              ✓ Confirm & Create Order (₹{pricingTotals.totalAmount.toFixed(2)})
+              ✓ Confirm & Create Order · ₹{pricingTotals.totalAmount.toFixed(2)}
             </Text>
           )}
         </TouchableOpacity>
 
+        {/* Secondary Action Button */}
         <TouchableOpacity
           style={styles.saveDraftBtn}
           onPress={handleSaveLocalDraft}
           disabled={isSaving || isSubmitting}
           accessible={true}
-          accessibilityLabel="Save as Local Draft"
+          accessibilityRole="button"
+          accessibilityLabel="Save as Offline Draft"
         >
           {isSaving ? (
-            <ActivityIndicator color="#475569" />
+            <ActivityIndicator color="#0866F5" />
           ) : (
-            <Text style={styles.saveDraftBtnText}>💾 Save as Offline Draft</Text>
+            <View style={styles.saveDraftBtnRow}>
+              <WizardIcon name="save-outline" size={18} color="#0866F5" fallbackText="💾" />
+              <Text style={styles.saveDraftBtnText}>Save as Offline Draft</Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -527,266 +670,363 @@ export function FinalReviewStep({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
   },
   offlineNotice: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: '#FFF7ED',
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#fde68a',
-    marginBottom: 16,
+    borderColor: '#FED7AA',
+    marginBottom: 14,
   },
   offlineNoticeTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#b45309',
+    color: '#C2410C',
     marginBottom: 4,
   },
   offlineNoticeText: {
     fontSize: 12,
-    color: '#92400e',
+    color: '#9A3412',
     lineHeight: 18,
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 16,
+    borderColor: '#DCE5F0',
+    marginBottom: 14,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(8, 102, 245, 0.04)',
+      },
+      default: {
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      },
+    }),
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconCircleBlue: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EDF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 8,
+    color: '#101F3D',
   },
-  membershipBadge: {
-    backgroundColor: '#fef3c7',
+  cardSubtitle: {
+    fontSize: 12,
+    color: '#647894',
+    marginTop: 2,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#fde68a',
+    paddingVertical: 4,
   },
-  membershipBadgeText: {
-    fontSize: 11,
+  editBtnText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#b45309',
+    color: '#0866F5',
   },
   customerName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  customerPhone: {
-    fontSize: 13,
-    color: '#64748b',
+    color: '#101F3D',
     marginBottom: 4,
   },
-  customerAddress: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  radioGroupRow: {
+  customerDetailRow: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    gap: 8,
     marginTop: 4,
   },
-  radioChip: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: '#f8fafc',
+  customerDetailText: {
+    fontSize: 13,
+    color: '#647894',
+    fontWeight: '500',
+  },
+  subsectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#101F3D',
+    marginBottom: 8,
+  },
+  fulfillmentRow: {
+    marginBottom: 4,
+  },
+  fulfillmentCardActive: {
+    backgroundColor: '#F0F7FF',
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: '#0866F5',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 46,
+    justifyContent: 'space-between',
+  },
+  fulfillmentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  fulfillmentText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#101F3D',
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  radioChipActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+  radioOuterActive: {
+    borderWidth: 2,
+    borderColor: '#0866F5',
+    backgroundColor: '#FFFFFF',
   },
-  radioChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    textAlign: 'center',
+  radioOuterInactive: {
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
   },
-  radioChipTextActive: {
-    color: '#1d4ed8',
-    fontWeight: '700',
+  radioInnerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#0866F5',
   },
   turnaroundOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCE5F0',
+    backgroundColor: '#FFFFFF',
     marginBottom: 8,
-    minHeight: 52,
   },
   turnaroundOptionActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    borderColor: '#0866F5',
+    borderWidth: 1.5,
+    backgroundColor: '#F0F7FF',
   },
   turnaroundOptionDisabled: {
-    backgroundColor: '#f1f5f9',
-    borderColor: '#e2e8f0',
-    opacity: 0.6,
+    opacity: 0.5,
+  },
+  turnaroundLeftCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  turnaroundIconBox: {
+    width: 28,
+    alignItems: 'center',
+    marginRight: 8,
   },
   turnaroundTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1e293b',
+    color: '#101F3D',
   },
   turnaroundSubtitle: {
     fontSize: 11,
-    color: '#64748b',
+    color: '#647894',
     marginTop: 2,
+  },
+  turnaroundRightCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   turnaroundMultiplier: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#647894',
+  },
+  turnaroundMultiplierActive: {
+    color: '#0866F5',
     fontWeight: '700',
-    color: '#2563eb',
   },
-  dueDateBanner: {
-    flexDirection: 'row',
-    backgroundColor: '#eff6ff',
-    borderRadius: 10,
-    padding: 12,
+  dueDateCard: {
+    backgroundColor: '#EDF5FF',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
-    marginTop: 8,
+    borderColor: '#BFDBFE',
+    padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    marginTop: 6,
   },
-  dueDateIcon: {
-    fontSize: 22,
+  dueDateIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dueDateLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#1e40af',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    color: '#647894',
+    fontWeight: '500',
   },
   dueDateValue: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#1e3a8a',
+    fontWeight: '700',
+    color: '#101F3D',
     marginTop: 2,
   },
   dueDateNote: {
-    fontSize: 10,
-    color: '#3b82f6',
+    fontSize: 11,
+    color: '#647894',
     marginTop: 2,
   },
-  notesInput: {
-    backgroundColor: '#f8fafc',
+  notesInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
-    padding: 10,
+    borderColor: '#DCE5F0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    marginTop: 6,
+  },
+  notesTextInput: {
+    flex: 1,
     fontSize: 13,
-    color: '#0f172a',
-    minHeight: 56,
-    textAlignVertical: 'top',
+    color: '#101F3D',
+    marginLeft: 8,
+    paddingVertical: 2,
+  },
+  summaryItemCount: {
+    fontSize: 13,
+    color: '#647894',
+    fontWeight: '500',
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
   priceLabel: {
-    fontSize: 13,
-    color: '#64748b',
+    fontSize: 13.5,
+    color: '#101F3D',
   },
   priceValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#101F3D',
   },
   discountValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#16a34a',
+    color: '#16A34A',
   },
   surchargeValue: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#ea580c',
+    color: '#EA580C',
   },
-  totalRow: {
-    borderTopWidth: 1.5,
-    borderTopColor: '#e2e8f0',
-    marginTop: 6,
-    paddingTop: 10,
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#EDF2F7',
+    marginVertical: 10,
   },
   totalLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#101F3D',
   },
   totalValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#2563eb',
+    color: '#0866F5',
   },
   provisionalDisclaimer: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 8,
-    fontStyle: 'italic',
+    fontSize: 11,
+    color: '#647894',
+    marginTop: 6,
   },
   actionsContainer: {
-    gap: 12,
-    marginTop: 4,
+    marginTop: 10,
+    gap: 10,
   },
   submitOrderBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: '#0866F5',
+    minHeight: 52,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(8, 102, 245, 0.25)',
+      },
+      default: {
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+      },
+    }),
   },
   submitOrderBtnText: {
-    color: '#ffffff',
-    fontSize: 15,
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
   },
   saveDraftBtn: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0866F5',
+    minHeight: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    minHeight: 46,
+  },
+  saveDraftBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   saveDraftBtnText: {
-    color: '#475569',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#0866F5',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
