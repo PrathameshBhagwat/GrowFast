@@ -1178,6 +1178,10 @@ export default function HomeScreen() {
           setActiveOrderId(orderId);
           setOrderDetailVisible(true);
         }}
+        onCustomerUpdated={(updated) => {
+          setProfileCustomer(updated);
+          setSelectedCustomer(updated);
+        }}
       />
 
       {/* Order Detail Modal integration */}

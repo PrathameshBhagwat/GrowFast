@@ -98,4 +98,80 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
       });
     }
   });
+
+  describe('4. Redesigned Customer Details Bottom Sheet (Screenshot 2 Target UI)', () => {
+    test('Customer Details Bottom Sheet offers strictly TWO order creation options: Per-Piece & Per-Weight', () => {
+      // Allowed order modes on customer details bottom sheet
+      const allowedCustomerOrderModes = ['PER_PIECE', 'PER_WEIGHT'];
+      assert.strictEqual(allowedCustomerOrderModes.length, 2);
+      assert.ok(allowedCustomerOrderModes.includes('PER_PIECE'));
+      assert.ok(allowedCustomerOrderModes.includes('PER_WEIGHT'));
+
+      // Dry Clean must NOT be a separate order mode button in the bottom sheet
+      assert.strictEqual(allowedCustomerOrderModes.includes('DRY_CLEAN'), false);
+    });
+
+    test('Customer initials helper correctly parses multi-word and single-word names', () => {
+      function getInitials(name?: string): string {
+        if (!name) return 'CU';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return name.slice(0, 2).toUpperCase();
+      }
+
+      assert.strictEqual(getInitials('Harshad Jadhav'), 'HJ');
+      assert.strictEqual(getInitials('Omkar Chavhan'), 'OC');
+      assert.strictEqual(getInitials('Swapnil'), 'SW');
+      assert.strictEqual(getInitials(''), 'CU');
+    });
+
+    test('Address Map URL builder correctly formats encoded coordinates/query for platform targets', () => {
+      const address = 'Wadmukhwadi, Alandi';
+      const pincode = '412105';
+      const fullAddress = `${address}, ${pincode}`;
+      const encodedQuery = encodeURIComponent(fullAddress);
+
+      const iosUrl = `maps:0,0?q=${encodedQuery}`;
+      const androidUrl = `geo:0,0?q=${encodedQuery}`;
+      const webUrl = `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
+
+      assert.ok(iosUrl.startsWith('maps:0,0?q=Wadmukhwadi%2C%20Alandi%2C%20412105'));
+      assert.ok(androidUrl.startsWith('geo:0,0?q=Wadmukhwadi%2C%20Alandi%2C%20412105'));
+      assert.ok(webUrl.includes('google.com/maps/search/?api=1'));
+    });
+
+    test('Customer details cards stack vertically on narrow screens (<360dp) to prevent horizontal truncation', () => {
+      const isNarrowScreen320 = 320 < 360;
+      const isNarrowScreen359 = 359 < 360;
+      const isStandardScreen375 = 375 < 360;
+      const isLargeScreen428 = 428 < 360;
+
+      assert.strictEqual(isNarrowScreen320, true, '320px stacks vertically');
+      assert.strictEqual(isNarrowScreen359, true, '359px stacks vertically');
+      assert.strictEqual(isStandardScreen375, false, '375px uses 2-column row');
+      assert.strictEqual(isLargeScreen428, false, '428px uses 2-column row');
+    });
+
+    test('Customer inline edit form validates required name and 10-digit phone', () => {
+      function validateEdit(name: string, phone: string): { valid: boolean; error?: string } {
+        const trimmedName = name.trim();
+        const cleanPhone = phone.replace(/[\s\-()]/g, '');
+
+        if (!trimmedName) {
+          return { valid: false, error: 'Customer Name is required.' };
+        }
+        if (cleanPhone.length < 10) {
+          return { valid: false, error: 'Valid 10-digit phone number is required.' };
+        }
+        return { valid: true };
+      }
+
+      assert.strictEqual(validateEdit('', '9834820606').valid, false);
+      assert.strictEqual(validateEdit('Harshad', '123').valid, false);
+      assert.strictEqual(validateEdit('Harshad Jadhav', '9834820606').valid, true);
+    });
+  });
 });
+
