@@ -113,8 +113,8 @@ export function CustomerProfileModal({
       ? `#${customer.id.replace(/^cust-/, 'CUST-')}`
       : null;
 
-  const hasMembership = customer.membership && customer.membership !== MembershipTier.NONE;
-  const hasDiscount = customer.discountPercent && customer.discountPercent > 0;
+  const hasMembership = Boolean(customer.membership && customer.membership !== MembershipTier.NONE);
+  const hasDiscount = Boolean(customer.discountPercent && customer.discountPercent > 0);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -220,22 +220,22 @@ export function CustomerProfileModal({
             </View>
 
             {/* Badges: Membership & Discount */}
-            {(hasMembership || hasDiscount) && (
+            {hasMembership || hasDiscount ? (
               <View style={styles.badgesRow}>
-                {hasMembership && (
+                {hasMembership ? (
                   <View style={styles.membershipBadgePill}>
                     <Icon name="ribbon-outline" size={14} color="#B45309" />
                     <Text style={styles.membershipBadgeText}>{customer.membership} MEMBER</Text>
                   </View>
-                )}
-                {hasDiscount && (
+                ) : null}
+                {hasDiscount ? (
                   <View style={styles.discountBadgePill}>
                     <Icon name="pricetag-outline" size={14} color="#047857" />
                     <Text style={styles.discountBadgeText}>{customer.discountPercent}% OFF</Text>
                   </View>
-                )}
+                ) : null}
               </View>
-            )}
+            ) : null}
 
             {/* Address Card */}
             {customer.address ? (

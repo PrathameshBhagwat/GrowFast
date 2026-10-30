@@ -1022,7 +1022,7 @@ export function OrderDetailModal({
           />
 
           {/* Photo Lightbox Modal */}
-          {selectedPhotoUrl && (
+          {selectedPhotoUrl ? (
             <Modal visible={true} transparent={true} animationType="fade">
               <View style={styles.lightboxBackdrop}>
                 <View style={styles.lightboxHeader}>
@@ -1053,7 +1053,7 @@ export function OrderDetailModal({
                 </View>
 
                 <View style={styles.lightboxFooter}>
-                  {lightboxPhotos.length > 1 && (
+                  {lightboxPhotos.length > 1 ? (
                     <View style={styles.lightboxNavRow}>
                       <TouchableOpacity
                         style={[
@@ -1082,7 +1082,7 @@ export function OrderDetailModal({
                         <Text style={styles.lightboxNavBtnText}>Next ›</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
+                  ) : null}
 
                   <TouchableOpacity
                     style={styles.lightboxTabSwitchBtn}
@@ -1097,7 +1097,7 @@ export function OrderDetailModal({
                 </View>
               </View>
             </Modal>
-          )}
+          ) : null}
         </View>
       </SafeAreaView>
     </Modal>

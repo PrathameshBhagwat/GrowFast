@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
   Modal,
-  SafeAreaView,
+  Alert,
   useWindowDimensions,
 } from 'react-native';
 import { useRouter, Redirect } from 'expo-router';
@@ -34,90 +34,93 @@ interface EmployeeDirectoryItem {
   role: string;
 }
 
-// Reusable 4x4 dot matrix decoration matching the reference image corners
-function DotMatrix({ rows = 4, cols = 4 }: { rows?: number; cols?: number }) {
-  return (
-    <View style={styles.dotGridContainer} pointerEvents="none" accessible={false}>
-      {Array.from({ length: rows }).map((_, r) => (
-        <View key={`row-${r}`} style={styles.dotGridRow}>
-          {Array.from({ length: cols }).map((_, c) => (
-            <View key={`dot-${r}-${c}`} style={styles.dotItem} />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// Bottom Laundry Machine & Towel Illustration matching reference image
-function LaundryIllustration() {
-  return (
-    <View style={styles.illustrationWrap} pointerEvents="none" accessible={false}>
-      {/* Left Leaf Accent */}
-      <View style={[styles.leafBase, styles.leafLeft1]} />
-      <View style={[styles.leafBase, styles.leafLeft2]} />
-
-      {/* Washing Machine Body */}
-      <View style={styles.washerBody}>
-        {/* Machine Top Panel */}
-        <View style={styles.washerTopPanel}>
-          <View style={styles.washerDispenserSlot} />
-          <View style={styles.washerControlDots}>
-            <View style={styles.washerTinyDot} />
-            <View style={styles.washerTinyDot} />
-            <View style={styles.washerTinyDot} />
-          </View>
-          <View style={styles.washerKnobRing}>
-            <View style={styles.washerKnobCenter} />
-          </View>
-        </View>
-
-        {/* Circular Front-Load Door */}
-        <View style={styles.washerDoorOuter}>
-          <View style={styles.washerDoorMid}>
-            <View style={styles.washerDoorGlass}>
-              <View style={styles.waterBubbleBig} />
-              <View style={styles.waterBubbleSmall} />
-              <View style={styles.waterWaveLine} />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Stack of Clean Folded Towels */}
-      <View style={styles.towelStack}>
-        <View style={[styles.towelFold, styles.towelTop]} />
-        <View style={[styles.towelFold, styles.towelMid]} />
-        <View style={[styles.towelFold, styles.towelBottom]} />
-      </View>
-
-      {/* Right Leaf Accent */}
-      <View style={[styles.leafBase, styles.leafRight1]} />
-      <View style={[styles.leafBase, styles.leafRight2]} />
-    </View>
-  );
-}
-
+// Fallback staff directory for immediate interactivity on mount
 const FALLBACK_STAFF_DIRECTORY: EmployeeDirectoryItem[] = [
   { id: 'emp-counter-001', name: 'Swapnil Shinde', role: 'COUNTER' },
   { id: 'emp-owner-001', name: 'Prathamesh Bhagwat', role: 'OWNER' },
 ];
 
+/**
+ * Top Laundry Illustration matching Screenshot 4 & Screenshot 5 (left phone):
+ * - Ceiling pendant lamp
+ * - Curved organic light blue backdrop
+ * - White front-load washing machine with bubbly blue drum
+ * - Potted plant sitting on top of the machine
+ * - Stack of clean folded towels
+ */
+function TopLaundryIllustration() {
+  return (
+    <View style={styles.topIllustrationWrap} pointerEvents="none" accessible={false}>
+      {/* Ceiling Pendant Lamp */}
+      <View style={styles.ceilingLampContainer}>
+        <View style={styles.lampCord} />
+        <View style={styles.lampShade} />
+        <View style={styles.lampGlow} />
+      </View>
+
+      {/* Curved Background Backdrop */}
+      <View style={styles.curvedBackdropShape} />
+
+      {/* Plant Pot on Top of Washing Machine */}
+      <View style={styles.plantContainer}>
+        <View style={styles.leafOne} />
+        <View style={styles.leafTwo} />
+        <View style={styles.leafThree} />
+        <View style={styles.plantPot} />
+      </View>
+
+      {/* Stack of Folded Towels next to machine */}
+      <View style={styles.towelsStack}>
+        <View style={[styles.towelLayer, styles.towelTop]} />
+        <View style={[styles.towelLayer, styles.towelMid]} />
+        <View style={[styles.towelLayer, styles.towelBottom]} />
+        <View style={[styles.towelLayer, styles.towelBase]} />
+      </View>
+
+      {/* Front-Load Washing Machine Body */}
+      <View style={styles.washerMachine}>
+        {/* Machine Top Panel */}
+        <View style={styles.washerControlBar}>
+          <View style={styles.washerDispenserSlot} />
+          <View style={styles.washerDotsRow}>
+            <View style={styles.washerTinyDot} />
+            <View style={styles.washerTinyDot} />
+            <View style={styles.washerTinyDot} />
+          </View>
+          <View style={styles.washerDialKnob} />
+        </View>
+
+        {/* Circular Front-Load Drum Door with Bubbles */}
+        <View style={styles.washerDoorOuterRing}>
+          <View style={styles.washerDoorInnerRing}>
+            <View style={styles.washerDoorGlass}>
+              <View style={styles.bubbleLarge} />
+              <View style={styles.bubbleMedium} />
+              <View style={styles.bubbleSmall} />
+              <View style={styles.waterWaveCurve} />
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize with fallback directory so the screen is immediately interactive on mount
   const [directory, setDirectory] = useState<EmployeeDirectoryItem[]>(FALLBACK_STAFF_DIRECTORY);
   const [selectedEmpId, setSelectedEmpId] = useState<string>('emp-counter-001');
   const [pin, setPin] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
   const [isFetchingDirectory, setIsFetchingDirectory] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [showDevChips, setShowDevChips] = useState(false);
 
   // Progressive brute-force lockout states
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -142,7 +145,6 @@ export default function LoginScreen() {
   }, [lockoutUntil]);
 
   const handlePinChange = (val: string) => {
-    // Strictly numeric, maximum 6 digits
     const digitsOnly = val.replace(/\D/g, '').slice(0, 6);
     setPin(digitsOnly);
     if (errorMsg && !lockoutUntil) {
@@ -153,7 +155,6 @@ export default function LoginScreen() {
   const loadDirectory = useCallback(async () => {
     setIsFetchingDirectory(true);
     try {
-      // Request strictly OWNER and COUNTER accounts from backend
       const list = await apiClient.auth.getDirectory(['OWNER', 'COUNTER']);
       if (Array.isArray(list) && list.length > 0) {
         const mobileRoles = ['OWNER', 'COUNTER'];
@@ -168,13 +169,13 @@ export default function LoginScreen() {
       console.warn('Could not load employee directory:', err?.message);
       if (directory.length === 0) {
         setErrorMsg(
-          `Unable to connect to backend server at ${apiClient.getBaseUrl()}. Please ensure the NestJS backend is running and your device is connected to the same Wi-Fi network.`,
+          `Unable to connect to backend server at ${apiClient.getBaseUrl()}. Please ensure the NestJS backend is running and your device is on the same Wi-Fi network.`,
         );
       }
     } finally {
       setIsFetchingDirectory(false);
     }
-  }, []);
+  }, [directory.length]);
 
   useEffect(() => {
     loadDirectory();
@@ -187,7 +188,6 @@ export default function LoginScreen() {
     }
   }, [isAuthLoading, isAuthenticated, router]);
 
-  // If already authenticated and done loading, redirect without violating hook rules
   if (!isAuthLoading && isAuthenticated) {
     return <Redirect href="/(tabs)" />;
   }
@@ -196,7 +196,7 @@ export default function LoginScreen() {
     if (lockoutUntil) return;
 
     if (!selectedEmpId.trim()) {
-      setErrorMsg('Please select your staff account');
+      setErrorMsg('Please select your staff role');
       return;
     }
     if (pin.length < 4) {
@@ -230,7 +230,6 @@ export default function LoginScreen() {
         err.message?.includes('Connection timed out');
 
       if (isNetworkError) {
-        // Network errors must not count against failed PIN lockout attempts
         setErrorMsg(
           `Cannot connect to backend server at ${apiClient.getBaseUrl()}. Verify the backend is running and your device is on the same network.`,
         );
@@ -258,80 +257,78 @@ export default function LoginScreen() {
     }
   };
 
-  const selectedEmployee = directory.find((d) => d.id === selectedEmpId);
-  const isCompactScreen = windowHeight < 720;
+  const handleForgotPin = () => {
+    Alert.alert(
+      'Forgot PIN?',
+      'Please contact your Store Owner or Manager (Prathamesh Bhagwat) to reset your staff access PIN in the Staff Management console.',
+      [{ text: 'OK', style: 'default' }],
+    );
+  };
 
-  if (!isAuthLoading && isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
-  }
+  const selectedEmployee = directory.find((d) => d.id === selectedEmpId);
+  const isNarrowScreen = windowWidth < 360;
 
   return (
-    <View
-      style={[
-        styles.safeArea,
-        {
-          paddingTop: Math.max(insets.top, 16),
-          paddingBottom: Math.max(insets.bottom, 12),
-        },
-      ]}
-    >
+    <View style={styles.safeArea}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardContainer}
       >
-        {/* Decorative Top-Right & Bottom-Right Dot Matrix */}
-        <View style={styles.topRightDots}>
-          <DotMatrix rows={4} cols={4} />
-        </View>
-        <View style={styles.bottomRightDots}>
-          <DotMatrix rows={4} cols={4} />
-        </View>
-
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            isCompactScreen && styles.scrollContentCompact,
+            { paddingTop: Math.max(insets.top + 8, 20) },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
         >
-          {/* Top Bar: Secure Staff Access Badge (Right-aligned, moon toggle removed) */}
-          <View style={styles.topBarRow}>
-            <View style={styles.secureBadgePill}>
-              <Icon
-                name="shield-checkmark-outline"
-                size={14}
-                color="#2563eb"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.secureBadgeText}>Secure staff access</Text>
+          {/* ── TOP HERO SECTION (Matches Screenshot 4) ── */}
+          <View style={styles.topHeroSection}>
+            {/* Left: Brand Header */}
+            <View style={styles.brandColumn}>
+              {/* GrowFast Logo with up-arrow */}
+              <View style={styles.brandLogoWrap}>
+                <GrowFastLogo size={isNarrowScreen ? 48 : 56} />
+              </View>
+
+              {/* Wordmark: GrowFast */}
+              <View style={styles.wordmarkRow}>
+                <Text style={styles.brandTitleText}>
+                  Grow<Text style={styles.brandTitleAccent}>Fast</Text>
+                </Text>
+              </View>
+
+              {/* Blue Underline Accent under Grow */}
+              <View style={styles.brandUnderlineAccent} />
+
+              {/* Two-Line Tagline */}
+              <Text style={styles.taglineText}>
+                Simpler Operations.{'\n'}Cleaner Tomorrow.
+              </Text>
             </View>
+
+            {/* Right: Laundry Illustration (Washer, Plant, Towels, Lamp) */}
+            <TopLaundryIllustration />
           </View>
 
-          {/* Wordmark Header: GrowFast & Tagline */}
-          <View style={styles.brandHeader}>
-            <GrowFastLogo
-              size={isCompactScreen ? 68 : 88}
-              containerStyle={styles.brandLogoContainer}
-            />
-            <View style={styles.wordmarkRow}>
-              <Text style={styles.brandGrow}>Grow</Text>
-              <Text style={styles.brandFast}>Fast</Text>
-            </View>
-            <Text style={styles.brandTagline}>Simpler Operations. Cleaner Tomorrow.</Text>
-            <View style={styles.taglineAccentPill} />
-          </View>
+          {/* ── BOTTOM CARD (White Elevated Bottom-Sheet Card) ── */}
+          <View
+            style={[
+              styles.cardContainer,
+              { paddingBottom: Math.max(insets.bottom + 16, 28) },
+            ]}
+          >
+            {/* Small uppercase blue subtitle */}
+            <Text style={styles.welcomeSubheader}>WELCOME BACK</Text>
 
-          {/* Main White Login Card */}
-          <View style={styles.card}>
-            {/* Center Top Laundry / Official Logo Badge */}
-            <View style={styles.shirtIconContainer}>
-              <GrowFastLogo size={40} />
-            </View>
+            {/* Heading */}
+            <Text style={styles.cardHeading}>Sign in to GrowFast</Text>
 
-            {/* Welcome Back & Subtitle */}
-            <Text style={styles.cardHeading}>Welcome back</Text>
-            <Text style={styles.cardSubtitle}>Sign in to continue to GrowFast</Text>
+            {/* Subtext */}
+            <Text style={styles.cardSubtext}>
+              Access your laundry operations securely and manage your business with ease.
+            </Text>
 
             {/* Error Message / Lockout Box */}
             {lockoutUntil ? (
@@ -373,49 +370,50 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            {/* Field 1: Role of You */}
+            {/* Field 1: Role of You (Role / Staff Dropdown) */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Role of You</Text>
               <TouchableOpacity
-                style={[styles.dropdownTrigger, !!lockoutUntil && { opacity: 0.6 }]}
+                style={[styles.dropdownBox, !!lockoutUntil && { opacity: 0.6 }]}
                 onPress={() => setPickerVisible(true)}
                 disabled={!!lockoutUntil}
                 activeOpacity={0.7}
                 accessible={true}
-                accessibilityLabel="Select Staff Account"
+                accessibilityRole="button"
+                accessibilityLabel="Select Staff Role"
               >
-                <View style={styles.fieldIconLeft}>
-                  <Icon name="person-outline" size={20} color="#2563eb" />
-                </View>
-                <View style={styles.fieldTextWrapper}>
-                  <Text
-                    style={
-                      selectedEmployee ? styles.dropdownSelectedText : styles.dropdownPlaceholder
-                    }
-                    numberOfLines={1}
-                  >
-                    {selectedEmployee
-                      ? `${selectedEmployee.name} (${selectedEmployee.role})`
-                      : isFetchingDirectory
-                        ? 'Loading staff accounts...'
-                        : 'Select who you are'}
-                  </Text>
-                </View>
-                <Icon name="chevron-down" size={20} color="#2563eb" style={{ marginLeft: 8 }} />
+                <Icon name="person-outline" size={20} color="#0866F5" style={{ marginRight: 10 }} />
+                <Text
+                  style={[
+                    styles.dropdownValueText,
+                    !selectedEmployee && styles.dropdownPlaceholderText,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectedEmployee
+                    ? `${selectedEmployee.name} (${selectedEmployee.role})`
+                    : isFetchingDirectory
+                      ? 'Loading staff accounts...'
+                      : 'Select your role'}
+                </Text>
+                <Icon name="chevron-down" size={18} color="#0866F5" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
             </View>
 
-            {/* Field 2: PIN */}
+            {/* Field 2: PIN Input with Show/Hide Toggle */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>PIN</Text>
-              <View style={[styles.pinInputContainer, !!lockoutUntil && { opacity: 0.6 }]}>
-                <View style={styles.fieldIconLeft}>
-                  <Icon name="lock-closed-outline" size={20} color="#2563eb" />
-                </View>
+              <View style={[styles.pinInputBox, !!lockoutUntil && { opacity: 0.6 }]}>
+                <Icon
+                  name="lock-closed-outline"
+                  size={20}
+                  color="#0866F5"
+                  style={{ marginRight: 10 }}
+                />
                 <TextInput
                   style={styles.pinTextInput}
                   placeholder="Enter your PIN"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="#94A3B8"
                   keyboardType="number-pad"
                   secureTextEntry={!showPin}
                   value={pin}
@@ -425,77 +423,48 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   accessible={true}
-                  accessibilityLabel="Staff PIN Input"
+                  accessibilityLabel="Enter your PIN"
                 />
                 <TouchableOpacity
                   style={styles.eyeToggleBtn}
-                  onPress={() => setShowPin(!showPin)}
+                  onPress={() => setShowPin((prev) => !prev)}
                   disabled={!!lockoutUntil}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   accessible={true}
+                  accessibilityRole="button"
                   accessibilityLabel={showPin ? 'Hide PIN' : 'Show PIN'}
                 >
                   <Icon
                     name={showPin ? 'eye-outline' : 'eye-off-outline'}
                     size={20}
-                    color="#64748b"
+                    color="#64748B"
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Quick Fill Test Accounts */}
-            <View style={styles.quickFillContainer}>
-              <Text style={styles.quickFillLabel}>⚡ Quick Fill for Testing:</Text>
-              <View style={styles.quickFillRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.quickChip,
-                    selectedEmpId === 'emp-counter-001' && styles.quickChipActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedEmpId('emp-counter-001');
-                    setPin('333333');
-                    setErrorMsg(null);
-                  }}
-                  activeOpacity={0.7}
-                  accessible={true}
-                  accessibilityLabel="Quick Select Counter Staff"
-                >
-                  <Text style={styles.quickChipTitle}>👔 Counter (Swapnil)</Text>
-                  <Text style={styles.quickChipSubtitle}>PIN: 333333</Text>
-                </TouchableOpacity>
+            {/* Forgot PIN? Link (Right-aligned, matching Screenshot 4) */}
+            <TouchableOpacity
+              style={styles.forgotPinTouch}
+              onPress={handleForgotPin}
+              activeOpacity={0.7}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Forgot PIN"
+            >
+              <Text style={styles.forgotPinText}>Forgot PIN?</Text>
+            </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.quickChip,
-                    selectedEmpId === 'emp-owner-001' && styles.quickChipActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedEmpId('emp-owner-001');
-                    setPin('111111');
-                    setErrorMsg(null);
-                  }}
-                  activeOpacity={0.7}
-                  accessible={true}
-                  accessibilityLabel="Quick Select Owner Staff"
-                >
-                  <Text style={styles.quickChipTitle}>👑 Owner (Prathamesh)</Text>
-                  <Text style={styles.quickChipSubtitle}>PIN: 111111</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Sign In Button */}
+            {/* Sign In Primary Action Button */}
             <TouchableOpacity
               style={[
-                styles.signInButton,
+                styles.signInBtn,
                 (isLoading ||
                   !selectedEmpId ||
                   pin.length < 4 ||
                   pin.length > 6 ||
                   !!lockoutUntil) &&
-                  styles.signInButtonDisabled,
+                  styles.signInBtnDisabled,
               ]}
               onPress={handleLogin}
               disabled={
@@ -503,36 +472,82 @@ export default function LoginScreen() {
               }
               activeOpacity={0.8}
               accessible={true}
-              accessibilityLabel="Sign In Button"
+              accessibilityRole="button"
+              accessibilityLabel="Sign In"
             >
               {isLoading ? (
-                <ActivityIndicator color="#ffffff" size="small" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <View style={styles.signInButtonInner}>
-                  <Text style={styles.signInButtonText}>Sign In</Text>
-                  <Icon name="arrow-forward" size={20} color="#ffffff" style={{ marginLeft: 8 }} />
+                <View style={styles.signInBtnInner}>
+                  <Text style={styles.signInBtnText}>Sign In</Text>
+                  <Icon name="arrow-forward" size={19} color="#FFFFFF" style={{ marginLeft: 8 }} />
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Card Footer: Divider + SECURE STAFF PORTAL */}
-            <View style={styles.cardFooterDividerRow}>
-              <View style={styles.footerLine} />
-              <View style={styles.footerBadge}>
-                <Icon
-                  name="shield-checkmark-outline"
-                  size={12}
-                  color="#64748b"
-                  style={{ marginRight: 5 }}
-                />
-                <Text style={styles.footerPortalText}>SECURE STAFF PORTAL</Text>
+            {/* Card Footer Divider with Shield Icon */}
+            <View style={styles.securityDividerRow}>
+              <View style={styles.dividerLine} />
+              <View style={styles.shieldIconSquircle}>
+                <Icon name="shield-checkmark-outline" size={14} color="#0866F5" />
               </View>
-              <View style={styles.footerLine} />
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Security Footer Caption */}
+            <Text style={styles.securityFooterText}>
+              Secure access to your GrowFast account
+            </Text>
+
+            {/* Developer Testing Quick-Fill Drawer Toggle */}
+            <View style={styles.devDrawerContainer}>
+              <TouchableOpacity
+                onPress={() => setShowDevChips((prev) => !prev)}
+                style={styles.devDrawerToggle}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.devDrawerToggleText}>
+                  {showDevChips ? 'Hide Quick Test Fill ▲' : '⚡ Quick Test Fill ▼'}
+                </Text>
+              </TouchableOpacity>
+
+              {showDevChips ? (
+                <View style={styles.quickFillRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickChip,
+                      selectedEmpId === 'emp-counter-001' && styles.quickChipActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedEmpId('emp-counter-001');
+                      setPin('333333');
+                      setErrorMsg(null);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.quickChipTitle}>👔 Counter (Swapnil)</Text>
+                    <Text style={styles.quickChipSubtitle}>PIN: 333333</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.quickChip,
+                      selectedEmpId === 'emp-owner-001' && styles.quickChipActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedEmpId('emp-owner-001');
+                      setPin('111111');
+                      setErrorMsg(null);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.quickChipTitle}>👑 Owner (Prathamesh)</Text>
+                    <Text style={styles.quickChipSubtitle}>PIN: 111111</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           </View>
-
-          {/* Bottom Illustration (Front-Load Washing Machine, Folded Towels & Foliage) */}
-          <LaundryIllustration />
         </ScrollView>
 
         {/* Staff Directory Modal */}
@@ -549,16 +564,17 @@ export default function LoginScreen() {
           >
             <View style={styles.pickerModalCard}>
               <View style={styles.pickerModalHeader}>
-                <Text style={styles.pickerModalTitle}>Select Staff Account</Text>
+                <Text style={styles.pickerModalTitle}>Select Your Role</Text>
                 <TouchableOpacity
                   onPress={() => setPickerVisible(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Close Staff Selector"
                 >
-                  <Icon name="close" size={22} color="#64748b" />
+                  <Icon name="close" size={22} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ maxHeight: 340 }}>
+              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
                 {directory.length > 0 ? (
                   directory.map((emp) => {
                     const isSelected = selectedEmpId === emp.id;
@@ -601,7 +617,7 @@ export default function LoginScreen() {
                   })
                 ) : (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: '#64748b' }}>No staff accounts loaded.</Text>
+                    <Text style={{ color: '#64748B' }}>No staff accounts loaded.</Text>
                   </View>
                 )}
               </ScrollView>
@@ -616,187 +632,337 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f0f7ff',
+    backgroundColor: '#F0F8FF',
   },
   keyboardContainer: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 20,
     justifyContent: 'space-between',
   },
-  scrollContentCompact: {
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
 
-  // Dot matrix decorations
-  topRightDots: {
-    position: 'absolute',
-    top: 40,
-    right: 18,
-    zIndex: 0,
-  },
-  bottomRightDots: {
-    position: 'absolute',
-    bottom: 120,
-    right: 20,
-    zIndex: 0,
-  },
-  dotGridContainer: {
-    flexDirection: 'column',
-    gap: 7,
-  },
-  dotGridRow: {
+  // ── TOP HERO SECTION ──
+  topHeroSection: {
     flexDirection: 'row',
-    gap: 7,
-  },
-  dotItem: {
-    width: 4.5,
-    height: 4.5,
-    borderRadius: 2.25,
-    backgroundColor: '#93c5fd',
-    opacity: 0.6,
-  },
-
-  // Top Bar Row
-  topBarRow: {
-    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    marginBottom: 16,
-    zIndex: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  themeCircleBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#64748b',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 2,
+  brandColumn: {
+    flex: 1,
+    zIndex: 3,
   },
-  secureBadgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    shadowColor: '#93c5fd',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  secureBadgeText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#2563eb',
-  },
-
-  // Brand Header
-  brandHeader: {
-    alignItems: 'center',
-    marginBottom: 16,
-    zIndex: 1,
-  },
-  brandLogoContainer: {
+  brandLogoWrap: {
     marginBottom: 8,
   },
   wordmarkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  brandGrow: {
-    fontSize: 38,
-    fontWeight: '900',
-    color: '#0f172a',
+  brandTitleText: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#0F172A',
     letterSpacing: -0.5,
   },
-  brandFast: {
-    fontSize: 38,
-    fontWeight: '900',
-    color: '#2563eb',
-    letterSpacing: -0.5,
+  brandTitleAccent: {
+    color: '#0866F5',
   },
-  brandTagline: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    color: '#64748b',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  taglineAccentPill: {
-    width: 34,
-    height: 3,
-    backgroundColor: '#2563eb',
+  brandUnderlineAccent: {
+    height: 3.5,
+    width: 44,
+    backgroundColor: '#0866F5',
     borderRadius: 2,
-    marginTop: 8,
+    marginTop: 3,
+    marginBottom: 10,
+  },
+  taglineText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+    lineHeight: 20,
   },
 
-  // Main Card
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 28,
-    paddingHorizontal: 22,
-    paddingTop: 26,
-    paddingBottom: 22,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    elevation: 4,
+  // ── LAUNDRY ILLUSTRATION GRAPHICS ──
+  topIllustrationWrap: {
+    width: 175,
+    height: 175,
+    position: 'relative',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  ceilingLampContainer: {
+    position: 'absolute',
+    top: -20,
+    right: 20,
+    alignItems: 'center',
     zIndex: 1,
+  },
+  lampCord: {
+    width: 1.5,
+    height: 30,
+    backgroundColor: '#94A3B8',
+  },
+  lampShade: {
+    width: 24,
+    height: 12,
+    backgroundColor: '#BAE6FD',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  lampGlow: {
+    width: 10,
+    height: 5,
+    backgroundColor: '#FEF08A',
+    opacity: 0.6,
+    borderRadius: 3,
+    marginTop: 1,
+  },
+  curvedBackdropShape: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#E0F2FE',
+    right: -10,
+    bottom: -10,
+    zIndex: 0,
+  },
+
+  // Plant Pot on Top of Washer
+  plantContainer: {
+    position: 'absolute',
+    top: 26,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 4,
+  },
+  leafOne: {
+    position: 'absolute',
+    top: -14,
+    left: -8,
+    width: 12,
+    height: 18,
+    backgroundColor: '#38BDF8',
+    borderTopLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    transform: [{ rotate: '-30deg' }],
+  },
+  leafTwo: {
+    position: 'absolute',
+    top: -18,
+    width: 11,
+    height: 20,
+    backgroundColor: '#0284C7',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  leafThree: {
+    position: 'absolute',
+    top: -14,
+    right: -8,
+    width: 12,
+    height: 18,
+    backgroundColor: '#0369A1',
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 12,
+    transform: [{ rotate: '30deg' }],
+  },
+  plantPot: {
+    width: 20,
+    height: 16,
+    backgroundColor: '#0F172A',
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+
+  // Stack of folded towels next to machine
+  towelsStack: {
+    position: 'absolute',
+    bottom: 0,
+    right: 98,
+    zIndex: 3,
+  },
+  towelLayer: {
+    height: 10,
+    borderRadius: 5,
+    marginBottom: 2,
+  },
+  towelTop: {
+    width: 32,
+    backgroundColor: '#0284C7',
+  },
+  towelMid: {
+    width: 36,
+    backgroundColor: '#BAE6FD',
+  },
+  towelBottom: {
+    width: 40,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  towelBase: {
+    width: 44,
+    backgroundColor: '#0284C7',
+  },
+
+  // Front-Load Washing Machine Body
+  washerMachine: {
+    width: 96,
+    height: 106,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    paddingTop: 8,
+    zIndex: 2,
     ...Platform.select({
       web: {
-        boxShadow: '0px 10px 20px rgba(30, 58, 138, 0.08)',
+        boxShadow: '0 4px 14px rgba(8, 102, 245, 0.12)',
       },
       default: {
-        shadowColor: '#1e3a8a',
-        shadowOpacity: 0.08,
-        shadowOffset: { width: 0, height: 10 },
-        shadowRadius: 20,
+        shadowColor: '#0866F5',
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 3,
       },
     }),
   },
-  shirtIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: '#f0f7ff',
-    alignSelf: 'center',
+  washerControlBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '84%',
+    marginBottom: 8,
+  },
+  washerDispenserSlot: {
+    width: 16,
+    height: 6,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+  },
+  washerDotsRow: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  washerTinyDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#0866F5',
+  },
+  washerDialKnob: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#0866F5',
+  },
+  washerDoorOuterRing: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    shadowColor: '#2563eb',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 14,
+  },
+  washerDoorInnerRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#BAE6FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  washerDoorGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0284C7',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bubbleLarge: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.85,
+    top: 6,
+    right: 8,
+  },
+  bubbleMedium: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.75,
+    top: 14,
+    left: 8,
+  },
+  bubbleSmall: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.9,
+    top: 22,
+    right: 14,
+  },
+  waterWaveCurve: {
+    position: 'absolute',
+    bottom: -4,
+    left: -4,
+    right: -4,
+    height: 20,
+    backgroundColor: '#0369A1',
+    borderRadius: 12,
+    opacity: 0.7,
+  },
+
+  // ── BOTTOM ELEVATED WHITE CARD ──
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 8,
+  },
+  welcomeSubheader: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0866F5',
+    letterSpacing: 1.2,
   },
   cardHeading: {
-    fontSize: 27,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'center',
-    letterSpacing: -0.5,
+    color: '#0F172A',
+    marginTop: 4,
+    letterSpacing: -0.3,
   },
-  cardSubtitle: {
-    fontSize: 13.5,
-    color: '#64748b',
-    textAlign: 'center',
+  cardSubtext: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
     marginTop: 4,
     marginBottom: 20,
   },
@@ -807,31 +973,28 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     backgroundColor: '#fef2f2',
     borderWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: '#fecaca',
+    borderRadius: 12,
     padding: 12,
-    borderRadius: 14,
     marginBottom: 16,
   },
   errorText: {
-    color: '#b91c1c',
     fontSize: 13,
+    color: '#991b1b',
     lineHeight: 18,
-    fontWeight: '500',
   },
   retryBtn: {
-    marginTop: 6,
+    marginTop: 8,
     alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     backgroundColor: '#fee2e2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fca5a5',
   },
   retryBtnText: {
-    color: '#991b1b',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#991b1b',
   },
 
   // Form Fields
@@ -839,358 +1002,159 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fieldLabel: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#0F172A',
     marginBottom: 8,
   },
-  dropdownTrigger: {
+  dropdownBox: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 14,
   },
-  fieldIconLeft: {
-    width: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fieldTextWrapper: {
+  dropdownValueText: {
     flex: 1,
-    paddingHorizontal: 10,
-  },
-  dropdownSelectedText: {
-    fontSize: 15,
-    color: '#0f172a',
+    fontSize: 14,
     fontWeight: '600',
+    color: '#0F172A',
   },
-  dropdownPlaceholder: {
-    fontSize: 15,
-    color: '#94a3b8',
+  dropdownPlaceholderText: {
+    color: '#94A3B8',
+    fontWeight: '400',
   },
-
-  // PIN Input
-  pinInputContainer: {
+  pinInputBox: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 14,
   },
   pinTextInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#0f172a',
-    paddingHorizontal: 10,
-    letterSpacing: 2,
-    fontWeight: '600',
+    height: '100%',
+    fontSize: 15,
+    color: '#0F172A',
+    paddingVertical: 0,
   },
   eyeToggleBtn: {
-    padding: 6,
+    padding: 4,
   },
-  // Quick Fill Chips
-  quickFillContainer: {
-    marginTop: 4,
-    marginBottom: 16,
+
+  // Forgot PIN Link
+  forgotPinTouch: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+    marginBottom: 20,
+    paddingVertical: 4,
   },
-  quickFillLabel: {
-    fontSize: 12,
+  forgotPinText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 6,
-  },
-  quickFillRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  quickChip: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-  },
-  quickChipActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
-  },
-  quickChipTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  quickChipSubtitle: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
+    color: '#0866F5',
   },
 
-  // Sign In Button
-  signInButton: {
-    height: 52,
-    backgroundColor: '#2563eb',
-    borderRadius: 16,
+  // Primary Sign In Button
+  signInBtn: {
+    height: 50,
+    backgroundColor: '#0866F5',
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
-
-    elevation: 4,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 4px 8px rgba(37, 99, 235, 0.3)',
-      },
-      default: {
-        shadowColor: '#2563eb',
-        shadowOpacity: 0.3,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-      },
-    }),
+    shadowColor: '#0866F5',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
   },
-  signInButtonDisabled: {
-    backgroundColor: '#93c5fd',
+  signInBtnDisabled: {
+    backgroundColor: '#93C5FD',
+    shadowOpacity: 0,
     elevation: 0,
-    ...Platform.select({
-      web: {
-        boxShadow: 'none',
-      },
-      default: {
-        shadowOpacity: 0,
-      },
-    }),
   },
-  signInButtonInner: {
+  signInBtnInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  signInButtonText: {
-    color: '#ffffff',
-    fontSize: 17,
+  signInBtnText: {
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    color: '#FFFFFF',
   },
 
-  // Card Footer Divider
-  cardFooterDividerRow: {
+  // Security Footer
+  securityDividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 22,
-  },
-  footerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e2e8f0',
-  },
-  footerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  footerPortalText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-    letterSpacing: 0.8,
-  },
-
-  // Bottom Illustration
-  illustrationWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 6,
-    height: 96,
-  },
-  washerBody: {
-    width: 82,
-    height: 88,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    alignItems: 'center',
-    paddingTop: 8,
-    elevation: 2,
-    zIndex: 2,
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 2px 6px rgba(59, 130, 246, 0.15)',
-      },
-      default: {
-        shadowColor: '#94a3b8',
-        shadowOpacity: 0.2,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-      },
-    }),
-  },
-  washerTopPanel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '84%',
     marginBottom: 8,
   },
-  washerDispenserSlot: {
-    width: 16,
-    height: 7,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#94a3b8',
-    backgroundColor: '#f1f5f9',
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
   },
-  washerControlDots: {
+  shieldIconSquircle: {
+    paddingHorizontal: 12,
+  },
+  securityFooterText: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+
+  // Developer Quick Test Fill Drawer
+  devDrawerContainer: {
+    marginTop: 18,
+    alignItems: 'center',
+  },
+  devDrawerToggle: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  devDrawerToggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  quickFillRow: {
     flexDirection: 'row',
-    gap: 2,
+    gap: 8,
+    marginTop: 8,
+    width: '100%',
   },
-  washerTinyDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#3b82f6',
-  },
-  washerKnobRing: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  washerKnobCenter: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2563eb',
-  },
-  washerDoorOuter: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#94a3b8',
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  washerDoorMid: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#dbeafe',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  washerDoorGlass: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#38bdf8',
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waterBubbleBig: {
-    position: 'absolute',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#ffffff',
-    opacity: 0.8,
-    top: 6,
-    left: 8,
-  },
-  waterBubbleSmall: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ffffff',
-    opacity: 0.7,
-    bottom: 8,
-    right: 8,
-  },
-  waterWaveLine: {
-    position: 'absolute',
-    bottom: 0,
-    width: 40,
-    height: 14,
-    backgroundColor: '#0284c7',
-    opacity: 0.6,
-    borderRadius: 8,
-  },
-
-  // Stack of Towels
-  towelStack: {
-    marginLeft: 8,
-    marginBottom: 4,
-    zIndex: 2,
-  },
-  towelFold: {
-    height: 12,
-    borderRadius: 6,
+  quickChip: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    marginBottom: 2,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
   },
-  towelTop: {
-    width: 42,
-    backgroundColor: '#ffffff',
-    borderColor: '#cbd5e1',
+  quickChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0866F5',
   },
-  towelMid: {
-    width: 46,
-    backgroundColor: '#e0f2fe',
-    borderColor: '#93c5fd',
+  quickChipTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  towelBottom: {
-    width: 50,
-    backgroundColor: '#ffffff',
-    borderColor: '#cbd5e1',
-  },
-
-  // Soft Cyan Leaves
-  leafBase: {
-    position: 'absolute',
-    width: 32,
-    height: 16,
-    backgroundColor: '#bae6fd',
-    opacity: 0.75,
-    borderRadius: 16,
-  },
-  leafLeft1: {
-    left: '12%',
-    bottom: 12,
-    transform: [{ rotate: '-35deg' }],
-  },
-  leafLeft2: {
-    left: '18%',
-    bottom: 24,
-    transform: [{ rotate: '-55deg' }],
-  },
-  leafRight1: {
-    right: '12%',
-    bottom: 12,
-    transform: [{ rotate: '35deg' }],
-  },
-  leafRight2: {
-    right: '18%',
-    bottom: 24,
-    transform: [{ rotate: '55deg' }],
+  quickChipSubtitle: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
   },
 
   // Staff Picker Modal
@@ -1201,10 +1165,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   pickerModalCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 20,
-    shadowColor: '#0f172a',
+    shadowColor: '#0F172A',
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 16,
@@ -1217,12 +1181,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#F1F5F9',
   },
   pickerModalTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#0F172A',
   },
   staffRow: {
     flexDirection: 'row',
@@ -1232,18 +1196,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
   },
   staffRowSelected: {
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
+    borderColor: '#0866F5',
+    backgroundColor: '#EFF6FF',
   },
   staffAvatarCircle: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#dbeafe',
+    backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1251,16 +1215,16 @@ const styles = StyleSheet.create({
   staffAvatarInitials: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1d4ed8',
+    color: '#0866F5',
   },
   staffRowName: {
     fontSize: 14.5,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#0F172A',
   },
   staffRowId: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#64748B',
     marginTop: 1,
   },
   rolePill: {
@@ -1269,19 +1233,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   roleOwner: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#FEF3C7',
   },
   roleCounter: {
-    backgroundColor: '#e0e7ff',
+    backgroundColor: '#E0E7FF',
   },
   rolePillText: {
     fontSize: 11,
     fontWeight: '700',
   },
   roleTextOwner: {
-    color: '#b45309',
+    color: '#B45309',
   },
   roleTextCounter: {
-    color: '#4338ca',
+    color: '#4338CA',
   },
 });

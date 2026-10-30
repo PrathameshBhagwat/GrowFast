@@ -498,11 +498,11 @@ export function CatalogGridStep({
             onChangeText={setSearchQuery}
             autoCapitalize="none"
           />
-          {searchQuery.length > 0 && (
+          {searchQuery.length > 0 ? (
             <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
               <Text style={styles.clearSearchBtnText}>✕</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
 
         <TouchableOpacity
@@ -583,7 +583,7 @@ export function CatalogGridStep({
               </TouchableOpacity>
             </View>
 
-            {weightError && <Text style={styles.weightErrorText}>{weightError}</Text>}
+            {weightError ? <Text style={styles.weightErrorText}>{weightError}</Text> : null}
 
             {/* Presets */}
             <View style={styles.presetsRow}>

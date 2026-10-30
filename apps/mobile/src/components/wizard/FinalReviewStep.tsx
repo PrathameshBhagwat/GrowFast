@@ -275,7 +275,7 @@ export function FinalReviewStep({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Offline Status Callout if applicable */}
-      {!isConnected && (
+      {!isConnected ? (
         <View style={styles.offlineNotice}>
           <Text style={styles.offlineNoticeTitle}>Device is Offline</Text>
           <Text style={styles.offlineNoticeText}>
@@ -283,7 +283,7 @@ export function FinalReviewStep({
             automatically and receive an official server order number when you reconnect.
           </Text>
         </View>
-      )}
+      ) : null}
 
       {/* ── 1. CUSTOMER CARD (Screenshot 4) ── */}
       <View style={styles.card}>
@@ -294,7 +294,7 @@ export function FinalReviewStep({
             </View>
             <Text style={styles.cardTitle}>Customer</Text>
           </View>
-          {onNavigateToCustomer && (
+          {onNavigateToCustomer ? (
             <TouchableOpacity
               style={styles.editBtn}
               onPress={onNavigateToCustomer}
@@ -305,7 +305,7 @@ export function FinalReviewStep({
               <WizardIcon name="create-outline" size={16} color="#0866F5" fallbackText="✏️" />
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
 
         <Text style={styles.customerName}>{displayName}</Text>
@@ -593,19 +593,19 @@ export function FinalReviewStep({
           <Text style={styles.priceValue}>₹{pricingTotals.subtotal.toFixed(2)}</Text>
         </View>
 
-        {pricingTotals.discountAmount > 0 && (
+        {pricingTotals.discountAmount > 0 ? (
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Customer Discount ({discountPercent}%)</Text>
             <Text style={styles.discountValue}>-₹{pricingTotals.discountAmount.toFixed(2)}</Text>
           </View>
-        )}
+        ) : null}
 
-        {isExpress && (
+        {isExpress ? (
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Express Surcharge</Text>
             <Text style={styles.surchargeValue}>+₹{pricingTotals.expressSurcharge.toFixed(2)}</Text>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>GST (18% Applicable Tax)</Text>

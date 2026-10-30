@@ -241,9 +241,9 @@ export function ReviewConfirmStep({
         <Text style={styles.cardHeader}>Customer</Text>
         <Text style={styles.cardMainText}>{displayName}</Text>
         <Text style={styles.cardSubText}>📱 {displayPhone}</Text>
-        {customer?.membership && customer.membership !== 'NONE' && (
+        {customer?.membership && customer.membership !== 'NONE' ? (
           <Text style={styles.memberTag}>⭐ {customer.membership} Member</Text>
-        )}
+        ) : null}
       </View>
 
       {/* Order Options Card */}
@@ -302,12 +302,12 @@ export function ReviewConfirmStep({
       <View style={styles.card}>
         <Text style={styles.cardHeader}>Intake Photos</Text>
         <Text style={styles.cardMainText}>{photos.length} photo(s) attached to draft</Text>
-        {photoRequired && photos.length === 0 && (
+        {photoRequired && photos.length === 0 ? (
           <Text style={styles.missingPhotoAlert}>
             ⚠️ Mandatory walk-in photo is currently missing. Please attach a photo before
             submitting.
           </Text>
-        )}
+        ) : null}
       </View>
 
       {/* Pricing Breakdown Card */}
@@ -319,7 +319,7 @@ export function ReviewConfirmStep({
           <Text style={styles.breakdownValue}>₹{pricingTotals.subtotal.toFixed(2)}</Text>
         </View>
 
-        {isExpress && (
+        {isExpress ? (
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>
               Express Turnaround Surcharge (
@@ -327,23 +327,23 @@ export function ReviewConfirmStep({
             </Text>
             <Text style={styles.breakdownValue}>+₹{pricingTotals.expressSurcharge.toFixed(2)}</Text>
           </View>
-        )}
+        ) : null}
 
-        {pricingTotals.discountAmount > 0 && (
+        {pricingTotals.discountAmount > 0 ? (
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Member Discount ({discountPercent}%):</Text>
             <Text style={[styles.breakdownValue, { color: '#16a34a' }]}>
               -₹{pricingTotals.discountAmount.toFixed(2)}
             </Text>
           </View>
-        )}
+        ) : null}
 
-        {pricingTotals.taxAmount > 0 && (
+        {pricingTotals.taxAmount > 0 ? (
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>GST (18%):</Text>
             <Text style={styles.breakdownValue}>+₹{pricingTotals.taxAmount.toFixed(2)}</Text>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Estimated Total Amount:</Text>

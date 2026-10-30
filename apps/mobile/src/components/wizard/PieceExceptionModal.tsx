@@ -179,11 +179,11 @@ export function PieceExceptionModal({
                 </Text>
               </View>
 
-              {error && (
+              {error ? (
                 <View style={styles.errorBanner}>
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
-              )}
+              ) : null}
 
               {/* 1. Quantity / Number of Pieces */}
               <View style={styles.fieldSection}>
@@ -249,11 +249,11 @@ export function PieceExceptionModal({
                   <Text style={styles.fieldLabel}>
                     Price Per Piece (₹) <Text style={styles.reqStar}>*</Text>
                   </Text>
-                  {!canModifyPrice && (
+                  {!canModifyPrice ? (
                     <View style={styles.readOnlyBadge}>
                       <Text style={styles.readOnlyBadgeText}>Configured Rate (View Only)</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
 
                 <TextInput
@@ -270,7 +270,7 @@ export function PieceExceptionModal({
                   accessibilityLabel="Price per piece input"
                 />
 
-                {canModifyPrice && (
+                {canModifyPrice ? (
                   <View style={styles.presetsRow}>
                     {PRICE_PRESETS.map((preset) => {
                       const isSelected = price === preset;
@@ -291,7 +291,7 @@ export function PieceExceptionModal({
                       );
                     })}
                   </View>
-                )}
+                ) : null}
               </View>
 
               {/* 3. Calculated Total Box */}

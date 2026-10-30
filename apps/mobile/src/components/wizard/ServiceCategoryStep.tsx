@@ -67,6 +67,57 @@ export {
   isWeightBasedPricing,
 };
 
+function ServiceCardIcon({ name }: { name: string }) {
+  const lower = name.toLowerCase();
+  const iconColor = '#0866F5';
+
+  if (lower.includes('iron') || lower.includes('press')) {
+    // Electric clothes iron appliance matching Screenshot 5 right phone
+    return <WizardIcon name="iron" family="mci" size={26} color={iconColor} fallbackText="♨️" />;
+  }
+
+  if (lower.includes('white')) {
+    // Clean tee with water droplet matching Screenshot 5 right phone
+    return (
+      <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+        <WizardIcon name="tshirt-crew-outline" family="mci" size={22} color={iconColor} fallbackText="👕" />
+        <View style={{ position: 'absolute', bottom: -1, right: -3 }}>
+          <WizardIcon name="water" family="mci" size={13} color={iconColor} fallbackText="💧" />
+        </View>
+      </View>
+    );
+  }
+
+  if (lower.includes('fold')) {
+    // Stack of folded laundry matching Screenshot 5 right phone
+    return <WizardIcon name="layers-triple-outline" family="mci" size={26} color={iconColor} fallbackText="📦" />;
+  }
+
+  if (lower.includes('premium')) {
+    // Award ribbon / medal matching Screenshot 5 right phone
+    return <WizardIcon name="medal-outline" family="mci" size={26} color={iconColor} fallbackText="🎖️" />;
+  }
+
+  if (lower.includes('woolen')) {
+    // Woolen knit sweater / garment
+    return <WizardIcon name="tshirt-crew-outline" family="mci" size={26} color={iconColor} fallbackText="🧶" />;
+  }
+
+  if (lower.includes('dry clean')) {
+    return <WizardIcon name="washing-machine" family="mci" size={26} color={iconColor} fallbackText="🧺" />;
+  }
+
+  if (lower.includes('shoe')) {
+    return <WizardIcon name="shoe-sneaker" family="mci" size={26} color={iconColor} fallbackText="👟" />;
+  }
+
+  if (lower.includes('starch')) {
+    return <WizardIcon name="tshirt-crew-outline" family="mci" size={26} color={iconColor} fallbackText="👔" />;
+  }
+
+  return <WizardIcon name="sparkles-outline" family="ionicons" size={24} color={iconColor} fallbackText="✨" />;
+}
+
 export function ServiceCategoryStep({
   workflow,
   onWorkflowChange,
@@ -190,7 +241,7 @@ export function ServiceCategoryStep({
                   !isWeightMode ? styles.radioOuterActive : styles.radioOuterInactive,
                 ]}
               >
-                {!isWeightMode && <View style={styles.radioInnerDot} />}
+                {!isWeightMode ? <View style={styles.radioInnerDot} /> : null}
               </View>
             </View>
 
@@ -226,7 +277,7 @@ export function ServiceCategoryStep({
                   isWeightMode ? styles.radioOuterActive : styles.radioOuterInactive,
                 ]}
               >
-                {isWeightMode && <View style={styles.radioInnerDot} />}
+                {isWeightMode ? <View style={styles.radioInnerDot} /> : null}
               </View>
             </View>
 
@@ -279,18 +330,20 @@ export function ServiceCategoryStep({
                   accessibilityLabel={`Service: ${displayName}, estimated turnaround ${turnaround}`}
                   activeOpacity={0.8}
                 >
-                  {/* Top Right Checkmark Badge when Selected */}
-                  {isSelected && (
+                  {/* Top Right Selection Indicator matching Screenshot 5 */}
+                  {isSelected ? (
                     <View style={styles.selectedBadge}>
                       <WizardIcon name="checkmark" size={13} color="#FFFFFF" fallbackText="✓" />
                     </View>
+                  ) : (
+                    <View style={styles.unselectedRadioCircle} />
                   )}
 
                   {/* Service Icon Circle */}
                   <View
                     style={[styles.serviceIconCircle, isSelected && styles.serviceIconCircleActive]}
                   >
-                    <WizardIcon name={iconName} size={24} color="#0866F5" fallbackText="✨" />
+                    <ServiceCardIcon name={svc.name} />
                   </View>
 
                   {/* Service Name */}
@@ -508,6 +561,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#0866F5',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  unselectedRadioCircle: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
   },
   serviceIconCircle: {
     width: 44,

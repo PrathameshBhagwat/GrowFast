@@ -193,13 +193,13 @@ export function CustomerStep({
           </View>
 
           {/* Discount Banner if customer has discount */}
-          {selectedCustomer.discountPercent > 0 && (
+          {selectedCustomer.discountPercent > 0 ? (
             <View style={styles.discountBadge}>
               <Text style={styles.discountBadgeText}>
                 🎉 {selectedCustomer.discountPercent}% Member Discount Applied
               </Text>
             </View>
-          )}
+          ) : null}
 
           {/* Card Divider */}
           <View style={styles.cardDivider} />
@@ -284,7 +284,7 @@ export function CustomerStep({
         <Text style={styles.sectionTitle}>Find or Add Customer</Text>
       </View>
 
-      {!isConnected && (
+      {!isConnected ? (
         <View style={styles.offlineNotice}>
           <Text style={styles.offlineNoticeTitle}>Device is Offline</Text>
           <Text style={styles.offlineNoticeText}>
@@ -292,10 +292,10 @@ export function CustomerStep({
             local draft.
           </Text>
         </View>
-      )}
+      ) : null}
 
       {/* Search Input Box */}
-      {isConnected && (
+      {isConnected ? (
         <View style={styles.searchSection}>
           <Text style={styles.inputLabel}>Search by Name, WhatsApp, or Customer ID</Text>
           <View style={styles.searchInputContainer}>
@@ -309,26 +309,26 @@ export function CustomerStep({
               autoCapitalize="none"
               autoCorrect={false}
             />
-            {searchQuery.length > 0 && (
+            {searchQuery.length > 0 ? (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
                 <Text style={styles.clearSearchBtnText}>✕</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
 
-          {isSearching && (
+          {isSearching ? (
             <View style={styles.searchingRow}>
               <ActivityIndicator size="small" color="#0866F5" />
               <Text style={styles.searchingText}>Searching customer registry...</Text>
             </View>
-          )}
+          ) : null}
 
           {searchError ? <Text style={styles.errorText}>⚠️ {searchError}</Text> : null}
         </View>
-      )}
+      ) : null}
 
       {/* Search Results List */}
-      {searchResults.length > 0 && (
+      {searchResults.length > 0 ? (
         <View style={styles.resultsContainer}>
           <Text style={styles.resultsHeader}>Search Results ({searchResults.length})</Text>
           {searchResults.map((item) => {
@@ -359,17 +359,17 @@ export function CustomerStep({
             );
           })}
         </View>
-      )}
+      ) : null}
 
       {/* Empty Search Notice */}
       {isConnected &&
-        searchQuery.trim().length >= 2 &&
-        !isSearching &&
-        searchResults.length === 0 && (
-          <View style={styles.emptyResults}>
-            <Text style={styles.emptyResultsText}>No customers found matching "{searchQuery}"</Text>
-          </View>
-        )}
+      searchQuery.trim().length >= 2 &&
+      !isSearching &&
+      searchResults.length === 0 ? (
+        <View style={styles.emptyResults}>
+          <Text style={styles.emptyResultsText}>No customers found matching "{searchQuery}"</Text>
+        </View>
+      ) : null}
 
       {/* Create New Customer Toggle / Form */}
       <View style={styles.createCustomerContainer}>

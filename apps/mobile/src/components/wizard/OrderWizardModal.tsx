@@ -1267,7 +1267,7 @@ export function OrderWizardModal({
           )}
 
           {/* STEP 5: Order Created & Confirmed (Screen 9 - Dev B) */}
-          {currentStepIndex === 5 && confirmedOrder && (
+          {currentStepIndex === 5 && confirmedOrder ? (
             <OrderCreatedStep
               orderId={confirmedOrder.orderId}
               orderNumber={confirmedOrder.orderNumber}
@@ -1294,11 +1294,11 @@ export function OrderWizardModal({
                 onOrderSavedOrSubmitted();
               }}
             />
-          )}
+          ) : null}
         </View>
 
         {/* Modal: Item Details, Defect Notes & Photos (Screen 6 - Dev B) */}
-        {configuringGarment && (
+        {configuringGarment ? (
           <ItemDetailsModal
             visible={itemConfigModalVisible}
             clientDraftId={clientDraftId}
@@ -1322,7 +1322,7 @@ export function OrderWizardModal({
             }}
             onPhotosUpdated={refreshPhotos}
           />
-        )}
+        ) : null}
 
         {/* Modal: Piece Weight Exception Modal */}
         <PieceExceptionModal

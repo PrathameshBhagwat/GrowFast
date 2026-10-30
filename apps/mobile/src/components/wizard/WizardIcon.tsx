@@ -1,8 +1,15 @@
 import React from 'react';
 import { Text, StyleProp, TextStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const IconComponent = Ionicons as unknown as React.ComponentType<{
+const IoniconComponent = Ionicons as unknown as React.ComponentType<{
+  name: string;
+  size?: number;
+  color?: string;
+  style?: any;
+}>;
+
+const MciComponent = MaterialCommunityIcons as unknown as React.ComponentType<{
   name: string;
   size?: number;
   color?: string;
@@ -15,6 +22,7 @@ export interface WizardIconProps {
   color?: string;
   style?: StyleProp<TextStyle>;
   fallbackText?: string;
+  family?: 'ionicons' | 'mci' | 'material-community';
 }
 
 export const WizardIcon: React.FC<WizardIconProps> = ({
@@ -23,10 +31,17 @@ export const WizardIcon: React.FC<WizardIconProps> = ({
   color = '#0866F5',
   style,
   fallbackText,
+  family = 'ionicons',
 }) => {
   try {
-    if (IconComponent) {
-      return <IconComponent name={name} size={size} color={color} style={style} />;
+    if (family === 'mci' || family === 'material-community') {
+      if (MciComponent) {
+        return <MciComponent name={name} size={size} color={color} style={style} />;
+      }
+    } else {
+      if (IoniconComponent) {
+        return <IoniconComponent name={name} size={size} color={color} style={style} />;
+      }
     }
   } catch {
     // Fallback if vector icons native font is not loaded

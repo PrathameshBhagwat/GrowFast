@@ -452,7 +452,7 @@ export default function HomeScreen() {
         {/* ==========================================
             B. COUNTER OPERATIONAL SCREEN NOTICE
             ========================================== */}
-        {!isNoticeDismissed && (
+        {!isNoticeDismissed ? (
           <View style={styles.noticeCard}>
             <TouchableOpacity
               style={styles.noticeDismissBtn}
@@ -502,7 +502,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* ==========================================
             C. MAIN SEARCH CARD: CUSTOMER / INVOICE
@@ -895,12 +895,14 @@ export default function HomeScreen() {
               color="#FFFFFF"
             />
             <Text style={styles.viewDueOrdersFullBtnText}>
-              {isDueOrdersExpanded ? "Hide Today's Due Orders" : "View Today's Due Orders"}
+              {isDueOrdersExpanded
+                ? "Hide Today's Due Orders"
+                : `View Today's Due Orders ${dueTotalCount != null ? dueTotalCount : (dueOrders.length > 0 ? dueOrders.length : '')}`.trim()}
             </Text>
           </TouchableOpacity>
 
           {/* Expanded Due Orders List */}
-          {isDueOrdersExpanded && (
+          {isDueOrdersExpanded ? (
             <View style={styles.expandedDueOrdersContainer}>
               {loadingDueOrders && !isRefreshing ? (
                 <View style={styles.loadingDueBox}>
@@ -1003,7 +1005,7 @@ export default function HomeScreen() {
                 </View>
               )}
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* ==========================================
@@ -1122,7 +1124,7 @@ export default function HomeScreen() {
                   >
                     {opt.label}
                   </Text>
-                  {isSelected && <Icon name="checkmark" size={18} color="#1765F5" />}
+                  {isSelected ? <Icon name="checkmark" size={18} color="#1765F5" /> : null}
                 </TouchableOpacity>
               );
             })}

@@ -505,7 +505,7 @@ export function ItemDetailsModal({
           )}
 
           {/* Rate Override (Manager/Owner Only) */}
-          {canModifyPrice && (
+          {canModifyPrice ? (
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Unit Rate Override (₹)</Text>
               <TextInput
@@ -517,7 +517,7 @@ export function ItemDetailsModal({
                 accessibilityLabel="Unit rate override"
               />
             </View>
-          )}
+          ) : null}
 
           {/* Pre-Existing Defect Notes & Quick Tags */}
           <View style={styles.inputGroup}>
@@ -588,15 +588,15 @@ export function ItemDetailsModal({
               </TouchableOpacity>
             </View>
 
-            {isCapturingPhoto && (
+            {isCapturingPhoto ? (
               <View style={styles.photoLoadingRow}>
                 <ActivityIndicator size="small" color="#2563eb" />
                 <Text style={styles.photoLoadingText}>Saving photo to device...</Text>
               </View>
-            )}
+            ) : null}
 
             {/* Thumbnail previews */}
-            {itemPhotos.length > 0 && (
+            {itemPhotos.length > 0 ? (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -616,7 +616,7 @@ export function ItemDetailsModal({
                   </View>
                 ))}
               </ScrollView>
-            )}
+            ) : null}
           </View>
 
           {/* Estimated Line Total Card */}

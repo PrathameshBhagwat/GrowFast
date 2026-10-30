@@ -299,12 +299,12 @@ export function OrderItemsReviewStep({
             <Text style={styles.summaryBarValue}>{totalPieces}</Text>
             <Text style={styles.summaryBarLabel}>Pieces</Text>
           </View>
-          {totalWeight > 0 && (
+          {totalWeight > 0 ? (
             <View style={styles.summaryBarItem}>
               <Text style={styles.summaryBarValue}>{totalWeight.toFixed(2)} kg</Text>
               <Text style={styles.summaryBarLabel}>Weight</Text>
             </View>
-          )}
+          ) : null}
           <View style={styles.summaryBarItem}>
             <Text style={styles.summaryBarValue}>{photos.length}</Text>
             <Text style={styles.summaryBarLabel}>Photos</Text>
@@ -457,18 +457,18 @@ export function OrderItemsReviewStep({
                                 source={{ uri: photo.localFileUri }}
                                 style={styles.thumbnailImg}
                               />
-                              {photo.syncStatus === 'UPLOADED' && (
+                              {photo.syncStatus === 'UPLOADED' ? (
                                 <View style={styles.syncStatusPill}>
                                   <Text style={styles.syncStatusPillText}>✓</Text>
                                 </View>
-                              )}
-                              {photo.syncStatus === 'FAILED' && (
+                              ) : null}
+                              {photo.syncStatus === 'FAILED' ? (
                                 <View
                                   style={[styles.syncStatusPill, { backgroundColor: '#ef4444' }]}
                                 >
                                   <Text style={styles.syncStatusPillText}>!</Text>
                                 </View>
-                              )}
+                              ) : null}
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.thumbnailRemoveBtn}
@@ -577,18 +577,18 @@ export function OrderItemsReviewStep({
                                   source={{ uri: photo.localFileUri }}
                                   style={styles.thumbnailImg}
                                 />
-                                {photo.syncStatus === 'UPLOADED' && (
+                                {photo.syncStatus === 'UPLOADED' ? (
                                   <View style={styles.syncStatusPill}>
                                     <Text style={styles.syncStatusPillText}>✓</Text>
                                   </View>
-                                )}
-                                {photo.syncStatus === 'FAILED' && (
+                                ) : null}
+                                {photo.syncStatus === 'FAILED' ? (
                                   <View
                                     style={[styles.syncStatusPill, { backgroundColor: '#ef4444' }]}
                                   >
                                     <Text style={styles.syncStatusPillText}>!</Text>
                                   </View>
-                                )}
+                                ) : null}
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={styles.thumbnailRemoveBtn}
@@ -688,11 +688,11 @@ export function OrderItemsReviewStep({
                       size={20}
                       color={garmentPhotos.length > 0 ? '#1d4ed8' : '#2563eb'}
                     />
-                    {garmentPhotos.length > 0 && (
+                    {garmentPhotos.length > 0 ? (
                       <View style={styles.photoCountBadge}>
                         <Text style={styles.photoCountBadgeText}>{garmentPhotos.length}</Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
                 </TouchableOpacity>
 
