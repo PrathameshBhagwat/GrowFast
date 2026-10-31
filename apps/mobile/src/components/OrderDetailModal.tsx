@@ -405,21 +405,40 @@ export function OrderDetailModal({
   const getStatusBadgeStyle = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.DELIVERED:
-        return { label: 'Delivered', bg: '#dcfce7', text: '#15803d' };
+        return { label: 'Delivered', bg: '#dcfce7', text: '#15803d', dot: '#15803d' };
       case OrderStatus.READY:
-        return { label: 'Ready', bg: '#e0f2fe', text: '#0284c7' };
+        return { label: 'Ready', bg: '#eff6ff', text: '#1765f5', dot: '#1765f5' };
       case OrderStatus.OUT_FOR_DELIVERY:
-        return { label: 'Out for Delivery', bg: '#ede9fe', text: '#6d28d9' };
+        return { label: 'Out for Delivery', bg: '#ede9fe', text: '#6d28d9', dot: '#6d28d9' };
       case OrderStatus.CANCELLED:
-        return { label: 'Cancelled', bg: '#fee2e2', text: '#b91c1c' };
+        return { label: 'Cancelled', bg: '#fee2e2', text: '#b91c1c', dot: '#b91c1c' };
       case OrderStatus.PROCESSING:
       case OrderStatus.RECEIVED:
       default:
-        return { label: 'In Process', bg: '#e0f2fe', text: '#0369a1' };
+        return { label: 'In Process', bg: '#eff6ff', text: '#0284c7', dot: '#0284c7' };
     }
   };
 
   const statusBadge = getStatusBadgeStyle(derivedStatus);
+
+  const getRelativeDueText = (dueDateStr?: string) => {
+    if (!dueDateStr) return '';
+    try {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const due = new Date(dueDateStr);
+      due.setHours(0, 0, 0, 0);
+      const diffTime = due.getTime() - now.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return '(Today)';
+      if (diffDays === 1) return '(Tomorrow)';
+      if (diffDays > 1) return `(${diffDays} days left)`;
+      if (diffDays === -1) return '(1 day overdue)';
+      return `(${Math.abs(diffDays)} days overdue)`;
+    } catch {
+      return '';
+    }
+  };
 
   const formatDateTime = (dateStr: string) => {
     try {
@@ -479,6 +498,16 @@ export function OrderDetailModal({
       ? `#${order.orderNumber}`
       : `#GF-${order?.orderNumber || '1024'}`;
 
+  const totalGarments = order?.items
+    ? order.items.reduce((s, it) => s + (it.physicalGarments?.length || 0), 0)
+    : 0;
+  const readyGarments = order?.items
+    ? order.items.reduce(
+        (s, it) => s + (it.physicalGarments?.filter((g) => Boolean(g.isReady)).length || 0),
+        0,
+      )
+    : 0;
+
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <SafeAreaView style={styles.safeArea}>
@@ -488,8 +517,10 @@ export function OrderDetailModal({
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.headerBackBtn}
             >
               <Text style={styles.backArrow}>‹</Text>
+              <Text style={styles.backBtnText}>Back</Text>
             </TouchableOpacity>
 
             <Text style={styles.headerTitle}>Order Details</Text>
@@ -526,25 +557,66 @@ export function OrderDetailModal({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Order Information Header Card matching Screen 11 */}
+                {/* Order Information Header Card matching Screen 11 / Screenshot 9 */}
                 <View style={styles.orderHeaderCard}>
+                  {/* Order Number & Status Row */}
                   <View style={styles.orderTopRow}>
-                    <Text style={styles.orderNumBig}>{orderNumDisplay}</Text>
+                    <View style={styles.orderIconAndNumberGroup}>
+                      <View style={styles.orderDocSquircle}>
+                        <Text style={{ fontSize: 20 }}>🧾</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.orderNumLabel}>Order Number</Text>
+                        <Text style={styles.orderNumBig}>{orderNumDisplay}</Text>
+                      </View>
+                    </View>
                     <View style={[styles.statusChip, { backgroundColor: statusBadge.bg }]}>
+                      <View style={[styles.statusDot, { backgroundColor: statusBadge.dot }]} />
                       <Text style={[styles.statusChipText, { color: statusBadge.text }]}>
                         {statusBadge.label}
                       </Text>
                     </View>
                   </View>
 
-                  <Text style={styles.customerName}>{order.customerName}</Text>
-                  <Text style={styles.customerPhone}>
-                    +91 {order.customerPhone.replace(/^\+?91/, '')}
-                  </Text>
+                  {/* Customer Information Row */}
+                  <TouchableOpacity
+                    style={styles.customerRowCard}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      // Customer info preview
+                    }}
+                  >
+                    <View style={styles.customerAvatarCircle}>
+                      <Text style={styles.customerAvatarText}>
+                        {order.customerName
+                          ? order.customerName
+                              .trim()
+                              .split(/\s+/)
+                              .slice(0, 2)
+                              .map((p) => p[0]?.toUpperCase())
+                              .join('')
+                          : 'CU'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, paddingHorizontal: 10 }}>
+                      <Text style={styles.customerName}>{order.customerName}</Text>
+                      <Text style={styles.customerPhone}>
+                        📞 +91 {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
+                      </Text>
+                      <Text style={styles.customerCode}>
+                        🪪 ID: {order.customerCode || `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000078'}`}
+                      </Text>
+                    </View>
+                    <Text style={styles.customerChevron}>›</Text>
+                  </TouchableOpacity>
 
+                  {/* Dates Grid */}
                   <View style={styles.datesGrid}>
                     <View style={styles.dateCol}>
-                      <Text style={styles.dateLabel}>Created</Text>
+                      <View style={styles.dateLabelRow}>
+                        <Text style={{ fontSize: 13, marginRight: 4 }}>📅</Text>
+                        <Text style={styles.dateLabel}>Created On</Text>
+                      </View>
                       <Text style={styles.dateVal}>{formatDateTime(order.orderDate)}</Text>
                       <Text style={styles.creatorVal} testID="mobile-order-created-by">
                         {order.createdByName
@@ -553,16 +625,19 @@ export function OrderDetailModal({
                       </Text>
                     </View>
                     <View style={styles.dateCol}>
-                      <Text style={styles.dateLabel}>Due Date</Text>
+                      <View style={styles.dateLabelRow}>
+                        <Text style={{ fontSize: 13, marginRight: 4 }}>📅</Text>
+                        <Text style={styles.dateLabel}>Due Date</Text>
+                      </View>
                       <Text style={styles.dateVal}>{formatDateOnly(order.effectiveDueDate)}</Text>
-                      {order.deliveredByName ? (
-                        <Text style={styles.creatorVal}>delivered by {order.deliveredByName}</Text>
-                      ) : null}
+                      <Text style={styles.dueRemainingVal}>
+                        {getRelativeDueText(order.effectiveDueDate)}
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* Segmented Tabs matching Screen 11 */}
+                {/* Segmented Tabs matching Screen 11 / Screenshot 9 */}
                 <View style={styles.tabBar}>
                   <TouchableOpacity
                     style={[styles.tabItem, activeTab === 'ITEMS' && styles.tabItemActive]}
@@ -574,7 +649,7 @@ export function OrderDetailModal({
                         activeTab === 'ITEMS' && styles.tabItemTextActive,
                       ]}
                     >
-                      Items
+                      👕 Items ({order.items.length})
                     </Text>
                   </TouchableOpacity>
 
@@ -588,7 +663,7 @@ export function OrderDetailModal({
                         activeTab === 'PHOTOS' && styles.tabItemTextActive,
                       ]}
                     >
-                      Photos ({orderPhotos.length})
+                      🖼 Photos ({orderPhotos.length})
                     </Text>
                   </TouchableOpacity>
 
@@ -602,7 +677,7 @@ export function OrderDetailModal({
                         activeTab === 'HISTORY' && styles.tabItemTextActive,
                       ]}
                     >
-                      History
+                      ⏱ History
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -626,74 +701,78 @@ export function OrderDetailModal({
                             <View style={{ flex: 1, paddingHorizontal: 12 }}>
                               <Text style={styles.itemGarmentName}>{item.garmentName}</Text>
                               <Text style={styles.itemServiceName}>
-                                {(item as any).serviceName || item.serviceType} •{' '}
+                                {((item as any).serviceName || item.serviceType || 'DRY_CLEAN').toUpperCase()} •{' '}
                                 {isWeight
                                   ? `${item.weight} kg (${item.quantity} pcs in bag)`
                                   : `${item.quantity} pc${item.quantity > 1 ? 's' : ''}`}
                               </Text>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                               <Text style={styles.itemPrice}>₹ {item.lineTotal.toFixed(0)}</Text>
+                              <Text style={styles.itemChevronIcon}>^</Text>
                             </View>
                           </View>
 
                           {/* Compact Photo Preview Strip */}
                           <View style={styles.itemPhotoStripContainer}>
                             {itemPhotos.length > 0 ? (
-                              <View style={styles.itemThumbnailsRow}>
-                                {visibleThumbnails.map((photo, phIdx) => {
-                                  const fullUrl = resolvePhotoUrl(photo.url);
-                                  return (
+                              <View>
+                                <View style={styles.itemThumbnailsRow}>
+                                  {visibleThumbnails.map((photo, phIdx) => {
+                                    const fullUrl = resolvePhotoUrl(photo.url);
+                                    return (
+                                      <TouchableOpacity
+                                        key={photo.id || phIdx}
+                                        style={styles.compactThumbBtn}
+                                        onPress={() =>
+                                          openLightbox(
+                                            itemPhotos.map((p) => p.url),
+                                            phIdx,
+                                          )
+                                        }
+                                        accessible={true}
+                                        accessibilityLabel={`View photo ${phIdx + 1} for ${item.garmentName}`}
+                                        activeOpacity={0.8}
+                                      >
+                                        <Image
+                                          source={{ uri: fullUrl }}
+                                          style={styles.compactThumbImage}
+                                          resizeMode="cover"
+                                        />
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+
+                                  {extraPhotosCount > 0 ? (
                                     <TouchableOpacity
-                                      key={photo.id || phIdx}
-                                      style={styles.compactThumbBtn}
+                                      style={styles.compactExtraBadgeBtn}
                                       onPress={() =>
                                         openLightbox(
                                           itemPhotos.map((p) => p.url),
-                                          phIdx,
+                                          maxThumbnails,
                                         )
                                       }
                                       accessible={true}
-                                      accessibilityLabel={`View photo ${phIdx + 1} for ${item.garmentName}`}
+                                      accessibilityLabel={`View ${extraPhotosCount} more photos`}
                                       activeOpacity={0.8}
                                     >
-                                      <Image
-                                        source={{ uri: fullUrl }}
-                                        style={styles.compactThumbImage}
-                                        resizeMode="cover"
-                                      />
+                                      <Text style={styles.compactExtraBadgeText}>
+                                        +{extraPhotosCount}
+                                      </Text>
                                     </TouchableOpacity>
-                                  );
-                                })}
+                                  ) : null}
 
-                                {extraPhotosCount > 0 && (
                                   <TouchableOpacity
-                                    style={styles.compactExtraBadgeBtn}
-                                    onPress={() =>
-                                      openLightbox(
-                                        itemPhotos.map((p) => p.url),
-                                        maxThumbnails,
-                                      )
-                                    }
+                                    style={styles.compactAddMorePhotoBtn}
+                                    onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                     accessible={true}
-                                    accessibilityLabel={`View ${extraPhotosCount} more photos`}
-                                    activeOpacity={0.8}
+                                    accessibilityLabel={`Add photo for ${item.garmentName}`}
+                                    activeOpacity={0.7}
                                   >
-                                    <Text style={styles.compactExtraBadgeText}>
-                                      +{extraPhotosCount}
-                                    </Text>
+                                    <Text style={styles.compactAddCameraIcon}>📷</Text>
+                                    <Text style={styles.compactAddMorePhotoText}>Add</Text>
                                   </TouchableOpacity>
-                                )}
-
-                                <TouchableOpacity
-                                  style={styles.compactAddMorePhotoBtn}
-                                  onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
-                                  accessible={true}
-                                  accessibilityLabel={`Add photo for ${item.garmentName}`}
-                                  activeOpacity={0.7}
-                                >
-                                  <Text style={styles.compactAddMorePhotoText}>📷 +</Text>
-                                </TouchableOpacity>
+                                </View>
 
                                 <TouchableOpacity
                                   style={styles.compactViewAllLink}
@@ -702,8 +781,7 @@ export function OrderDetailModal({
                                   accessibilityLabel="View all order photos in Photos tab"
                                 >
                                   <Text style={styles.compactViewAllText}>
-                                    {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} •
-                                    View All ›
+                                    {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} • View All →
                                   </Text>
                                 </TouchableOpacity>
                               </View>
@@ -731,7 +809,17 @@ export function OrderDetailModal({
                       (i) => i.physicalGarments && i.physicalGarments.length > 0,
                     ) ? (
                       <View style={styles.garmentChecklistCard}>
-                        <Text style={styles.checklistTitle}>Garment Readiness Checklist</Text>
+                        <View style={styles.checklistHeaderRow}>
+                          <View style={styles.checklistTitleGroup}>
+                            <Text style={styles.checklistCheckIcon}>☑</Text>
+                            <Text style={styles.checklistTitle}>Garment Readiness Checklist</Text>
+                          </View>
+                          <View style={styles.checklistBadgePill}>
+                            <Text style={styles.checklistBadgeText}>
+                              {readyGarments} / {totalGarments} Ready
+                            </Text>
+                          </View>
+                        </View>
                         {order.items.map((item) =>
                           item.physicalGarments?.map((g) => {
                             const pgPhotos = getGarmentPhotos(g.id);
@@ -748,14 +836,16 @@ export function OrderDetailModal({
                                     g.isReady && styles.checkboxCircleActive,
                                   ]}
                                 >
-                                  {g.isReady && <Text style={styles.checkmarkIcon}>✓</Text>}
+                                  {Boolean(g.isReady) ? (
+                                    <Text style={styles.checkmarkIcon}>✓</Text>
+                                  ) : null}
                                 </View>
                                 <Text style={styles.garmentCheckText}>
                                   {item.garmentName} #{g.unitNumber}{' '}
                                   {g.tagId ? `(Tag: ${g.tagId})` : ''}
                                 </Text>
 
-                                {pgPhotos.length > 0 && (
+                                {pgPhotos.length > 0 ? (
                                   <TouchableOpacity
                                     style={styles.garmentPiecePhotoBtn}
                                     onPress={(e) => {
@@ -774,24 +864,31 @@ export function OrderDetailModal({
                                       style={styles.garmentPieceThumbImage}
                                       resizeMode="cover"
                                     />
-                                    {pgPhotos.length > 1 && (
+                                    {pgPhotos.length > 1 ? (
                                       <View style={styles.garmentPieceBadge}>
                                         <Text style={styles.garmentPieceBadgeText}>
                                           +{pgPhotos.length - 1}
                                         </Text>
                                       </View>
-                                    )}
+                                    ) : null}
                                   </TouchableOpacity>
-                                )}
+                                ) : null}
 
-                                <Text
+                                <View
                                   style={[
-                                    styles.garmentStatusLabel,
-                                    g.isReady ? styles.statusReady : styles.statusWaiting,
+                                    styles.garmentStatusPill,
+                                    g.isReady ? styles.statusPillReady : styles.statusPillWaiting,
                                   ]}
                                 >
-                                  {g.isReady ? 'Ready' : 'In Processing'}
-                                </Text>
+                                  <Text
+                                    style={[
+                                      styles.garmentStatusLabel,
+                                      g.isReady ? styles.statusReady : styles.statusWaiting,
+                                    ]}
+                                  >
+                                    {g.isReady ? 'Ready' : 'In Processing'}
+                                  </Text>
+                                </View>
                               </TouchableOpacity>
                             );
                           }),
@@ -799,8 +896,13 @@ export function OrderDetailModal({
                       </View>
                     ) : null}
 
-                    {/* Financial Summary */}
+                    {/* Financial Summary / Payment Summary */}
                     <View style={styles.financialSummaryCard}>
+                      <View style={styles.paymentSummaryHeaderRow}>
+                        <Text style={{ fontSize: 18, marginRight: 6 }}>👛</Text>
+                        <Text style={styles.paymentSummaryTitle}>Payment Summary</Text>
+                      </View>
+
                       <View style={styles.summaryRow}>
                         <Text style={styles.summaryLabel}>Total Amount</Text>
                         <Text style={styles.summaryVal}>₹ {effectiveTotal.toFixed(2)}</Text>
@@ -811,12 +913,7 @@ export function OrderDetailModal({
                           ₹ {effectivePaid.toFixed(2)}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.summaryRow,
-                          { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8 },
-                        ]}
-                      >
+                      <View style={styles.balanceDueHighlightBox}>
                         <Text style={styles.summaryDueLabel}>Balance Due</Text>
                         <Text style={styles.summaryDueVal}>₹ {effectiveDue.toFixed(2)}</Text>
                       </View>
@@ -1124,11 +1221,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
+  headerBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   backArrow: {
-    fontSize: 32,
-    color: '#0f172a',
-    fontWeight: '300',
-    marginTop: -4,
+    fontSize: 24,
+    color: '#1765f5',
+    fontWeight: '700',
+    marginTop: -2,
+  },
+  backBtnText: {
+    fontSize: 15,
+    color: '#1765f5',
+    fontWeight: '700',
   },
   headerTitle: {
     fontSize: 18,
@@ -1159,19 +1266,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  orderIconAndNumberGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  orderDocSquircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  orderNumLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
+  },
   orderNumBig: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#0f172a',
   },
   statusChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    gap: 5,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   statusChipText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  customerRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    marginTop: 12,
+  },
+  customerAvatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#dbeafe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customerAvatarText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1d4ed8',
   },
   customerName: {
     fontSize: 15,
@@ -1180,24 +1335,44 @@ const styles = StyleSheet.create({
   },
   customerPhone: {
     fontSize: 13,
+    color: '#475569',
+    marginTop: 2,
+  },
+  customerCode: {
+    fontSize: 12,
     color: '#64748b',
     marginTop: 2,
-    marginBottom: 16,
+  },
+  customerChevron: {
+    fontSize: 20,
+    color: '#94a3b8',
+    fontWeight: 'bold',
   },
   datesGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 10,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     paddingTop: 12,
+    marginTop: 4,
   },
   dateCol: {
     flex: 1,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  dateLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   dateLabel: {
     fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: '500',
+    color: '#64748b',
+    fontWeight: '600',
   },
   dateVal: {
     fontSize: 13,
@@ -1210,6 +1385,81 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '500',
     marginTop: 2,
+  },
+  dueRemainingVal: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  itemChevronIcon: {
+    fontSize: 16,
+    color: '#64748b',
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  compactAddCameraIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  checklistHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  checklistTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  checklistCheckIcon: {
+    fontSize: 16,
+    color: '#1765f5',
+  },
+  checklistBadgePill: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  checklistBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  garmentStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusPillReady: {
+    backgroundColor: '#dcfce7',
+  },
+  statusPillWaiting: {
+    backgroundColor: '#fef3c7',
+  },
+  paymentSummaryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  paymentSummaryTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  balanceDueHighlightBox: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
   },
   tabBar: {
     flexDirection: 'row',

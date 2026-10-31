@@ -14,6 +14,7 @@ import {
   Pressable,
   Platform,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -98,6 +99,8 @@ const SEARCH_FIELD_OPTIONS: SearchFieldOption[] = [
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const isCompact = screenWidth < 360;
   const { isConnected } = useNetworkStatus();
   const { user: session, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
 
@@ -522,29 +525,41 @@ export default function HomeScreen() {
           </View>
 
           {/* Two Primary Action Buttons */}
-          <View style={styles.primaryActionsRow}>
+          <View style={[styles.primaryActionsRow, isCompact && styles.primaryActionsRowCompact]}>
             {/* Find / Edit Order Button */}
             <TouchableOpacity
-              style={styles.secondaryActionBtn}
+              style={[styles.secondaryActionBtn, isCompact && styles.actionBtnCompact]}
               onPress={() => router.push('/(tabs)/orders' as any)}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Find or Edit Order"
             >
-              <Icon name="search-outline" size={18} color="#1765F5" />
-              <Text style={styles.secondaryActionBtnText}>Find / Edit Order</Text>
+              <Icon name="search-outline" size={isCompact ? 16 : 18} color="#1765F5" />
+              <Text
+                style={[styles.secondaryActionBtnText, isCompact && styles.actionBtnTextCompact]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                Find / Edit Order
+              </Text>
             </TouchableOpacity>
 
             {/* Add New Customer Button */}
             <TouchableOpacity
-              style={styles.primaryActionBtn}
+              style={[styles.primaryActionBtn, isCompact && styles.actionBtnCompact]}
               onPress={() => router.push('/(tabs)/customers' as any)}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Add New Customer"
             >
-              <Icon name="add" size={19} color="#FFFFFF" />
-              <Text style={styles.primaryActionBtnText}>Add New Customer</Text>
+              <Icon name="add" size={isCompact ? 17 : 19} color="#FFFFFF" />
+              <Text
+                style={[styles.primaryActionBtnText, isCompact && styles.actionBtnTextCompact]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                Add New Customer
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -1418,6 +1433,9 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 14,
   },
+  primaryActionsRowCompact: {
+    gap: 6,
+  },
   secondaryActionBtn: {
     flex: 1,
     height: 44,
@@ -1454,6 +1472,12 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  actionBtnCompact: {
+    paddingHorizontal: 4,
+  },
+  actionBtnTextCompact: {
+    fontSize: 12,
   },
 
   // Inner Search Container

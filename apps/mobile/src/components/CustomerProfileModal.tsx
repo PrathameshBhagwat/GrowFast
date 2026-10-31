@@ -355,24 +355,34 @@ export function CustomerProfileModal({
                   <View style={styles.docIconBox}>
                     <IonIcon name="document-text-outline" size={18} color="#0866F5" />
                   </View>
-                  <View>
+                  <View style={styles.orderHistoryTextContainer}>
                     <Text style={styles.orderHistoryHeading}>Order History</Text>
-                    <Text style={styles.orderHistorySubheading}>
+                    <Text
+                      style={styles.orderHistorySubheading}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       View and track this customer's past orders
                     </Text>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  style={styles.refreshBtn}
+                  style={[styles.refreshBtn, loadingOrders && { opacity: 0.6 }]}
                   onPress={() =>
                     loadOrderHistory(activeCustomer.id, orderSearchQuery, orderStatusFilter)
                   }
+                  disabled={loadingOrders}
                   activeOpacity={0.7}
                   accessibilityRole="button"
                   accessibilityLabel="Refresh Order History"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <IonIcon name="refresh-outline" size={14} color="#0866F5" />
+                  {loadingOrders ? (
+                    <ActivityIndicator size="small" color="#0866F5" style={{ width: 14, height: 14 }} />
+                  ) : (
+                    <IonIcon name="refresh-outline" size={14} color="#0866F5" />
+                  )}
                   <Text style={styles.refreshBtnText}>Refresh</Text>
                 </TouchableOpacity>
               </View>
@@ -909,11 +919,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
+    gap: 8,
   },
   orderHistoryTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    flexShrink: 1,
+    marginRight: 6,
+  },
+  orderHistoryTextContainer: {
+    flex: 1,
+    flexShrink: 1,
   },
   docIconBox: {
     width: 36,
@@ -923,6 +940,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
+    flexShrink: 0,
   },
   orderHistoryHeading: {
     fontSize: 16,
@@ -935,15 +953,17 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   refreshBtn: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#DBEAFE',
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
     gap: 4,
+    minHeight: 32,
   },
   refreshBtnText: {
     fontSize: 12,

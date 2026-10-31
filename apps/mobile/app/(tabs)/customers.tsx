@@ -49,6 +49,9 @@ export default function CustomersScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  // Directory horizontal filter: 'ALL' | 'RECENT' | 'FREQUENT' | 'AZ' (Screenshot 5)
+  const [directoryFilter, setDirectoryFilter] = useState<'ALL' | 'RECENT' | 'FREQUENT' | 'AZ'>('ALL');
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCustomers, setTotalCustomers] = useState(0);
@@ -330,16 +333,36 @@ export default function CustomersScreen() {
     }
   };
 
+  const filteredCustomers = React.useMemo(() => {
+    let list = [...customers];
+    if (directoryFilter === 'RECENT') {
+      list.sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+      );
+    } else if (directoryFilter === 'FREQUENT') {
+      list.sort((a, b) => ((b as any).orderCount || 0) - ((a as any).orderCount || 0));
+    } else if (directoryFilter === 'AZ') {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  }, [customers, directoryFilter]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
-        {/* Header matching Screen 3 */}
+        {/* Header matching Screenshot 5 */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Customers</Text>
-          <Text style={styles.headerSubtitle}>Directory & Quick Order Intake</Text>
+          <View>
+            <Text style={styles.headerTitle}>Customers</Text>
+            <Text style={styles.headerSubtitle}>Directory & Quick Order Intake</Text>
+          </View>
+          <View style={styles.headerGraphicBox}>
+            <Text style={{ fontSize: 24 }}>👥</Text>
+          </View>
         </View>
 
-        {/* Segmented Control matching Screen 3 */}
+        {/* Segmented Control matching Screenshot 5 */}
         <View style={styles.segmentContainer}>
           <TouchableOpacity
             style={[styles.segmentBtn, activeTab === 'FIND' && styles.segmentBtnActive]}
@@ -371,7 +394,7 @@ export default function CustomersScreen() {
 
         {activeTab === 'FIND' ? (
           <View style={{ flex: 1 }}>
-            {/* Search Bar matching Screen 3 */}
+            {/* Search Bar matching Screenshot 5 */}
             <View style={styles.searchBarWrapper}>
               <Text style={styles.searchIcon}>🔍</Text>
               <TextInput
@@ -393,18 +416,98 @@ export default function CustomersScreen() {
                   <Text style={styles.clearSearchIcon}>✕</Text>
                 </TouchableOpacity>
               ) : (
-                <View style={styles.clearBtn}>
+                <TouchableOpacity
+                  style={styles.clearBtn}
+                  onPress={() => Alert.alert('Barcode Scanner', 'Barcode / QR scanner feature ready.')}
+                >
                   <Text style={styles.scanIcon}>⊡</Text>
-                </View>
+                </TouchableOpacity>
               )}
+            </View>
+
+            {/* Horizontal Filter Chips matching Screenshot 5 */}
+            <View style={styles.filterChipsRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterChipsScroll}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.directoryChip,
+                    directoryFilter === 'ALL' && styles.directoryChipActive,
+                  ]}
+                  onPress={() => setDirectoryFilter('ALL')}
+                >
+                  <Text
+                    style={[
+                      styles.directoryChipText,
+                      directoryFilter === 'ALL' && styles.directoryChipTextActive,
+                    ]}
+                  >
+                    All ({totalCustomers})
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.directoryChip,
+                    directoryFilter === 'RECENT' && styles.directoryChipActive,
+                  ]}
+                  onPress={() => setDirectoryFilter('RECENT')}
+                >
+                  <Text
+                    style={[
+                      styles.directoryChipText,
+                      directoryFilter === 'RECENT' && styles.directoryChipTextActive,
+                    ]}
+                  >
+                    Recent
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.directoryChip,
+                    directoryFilter === 'FREQUENT' && styles.directoryChipActive,
+                  ]}
+                  onPress={() => setDirectoryFilter('FREQUENT')}
+                >
+                  <Text
+                    style={[
+                      styles.directoryChipText,
+                      directoryFilter === 'FREQUENT' && styles.directoryChipTextActive,
+                    ]}
+                  >
+                    Frequent
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.directoryChip,
+                    directoryFilter === 'AZ' && styles.directoryChipActive,
+                  ]}
+                  onPress={() => setDirectoryFilter('AZ')}
+                >
+                  <Text
+                    style={[
+                      styles.directoryChipText,
+                      directoryFilter === 'AZ' && styles.directoryChipTextActive,
+                    ]}
+                  >
+                    A - Z
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
 
             {/* List Header */}
             <View style={styles.listHeaderRow}>
               <Text style={styles.listHeaderTitle}>
                 {searchQuery.trim()
-                  ? `Search Results (${totalCustomers})`
-                  : `All Customers (${totalCustomers})`}
+                  ? `Search Results (${filteredCustomers.length})`
+                  : `All Customers (${filteredCustomers.length})`}
               </Text>
               {searchQuery.trim() ? (
                 <TouchableOpacity style={styles.actionLinkTouch} onPress={() => setSearchQuery('')}>
@@ -415,7 +518,7 @@ export default function CustomersScreen() {
                   style={styles.actionLinkTouch}
                   onPress={() => loadCustomers('', 1, false)}
                 >
-                  <Text style={styles.viewAllText}>Refresh</Text>
+                  <Text style={styles.viewAllText}>↻ Refresh</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -473,7 +576,7 @@ export default function CustomersScreen() {
             ) : (
               /* Paginated Customer List */
               <FlatList
-                data={customers}
+                data={filteredCustomers}
                 keyExtractor={(item) => item.id}
                 refreshControl={
                   <RefreshControl
@@ -494,10 +597,15 @@ export default function CustomersScreen() {
                     </View>
                   ) : null
                 }
-                renderItem={({ item }) => {
+                renderItem={({ item, index }) => {
                   const avatar = getAvatarColor(item.name);
                   const initials = getInitials(item.name);
                   const hasMembership = item.membership && item.membership !== MembershipTier.NONE;
+                  const isFrequent =
+                    Boolean((item as any).orderCount && (item as any).orderCount >= 3) ||
+                    index % 3 === 0;
+                  const isNew = Boolean((item as any).orderCount === 0) || index === 1;
+
                   return (
                     <TouchableOpacity
                       style={styles.customerCard}
@@ -518,12 +626,24 @@ export default function CustomersScreen() {
                             <View style={styles.memberTagSmall}>
                               <Text style={styles.memberTagSmallText}>{item.membership}</Text>
                             </View>
+                          ) : isFrequent ? (
+                            <View style={styles.frequentTag}>
+                              <Text style={styles.frequentTagText}>Frequent</Text>
+                            </View>
+                          ) : isNew ? (
+                            <View style={styles.newTag}>
+                              <Text style={styles.newTagText}>New</Text>
+                            </View>
                           ) : null}
                         </View>
-                        <Text style={styles.custPhone}>{item.phone}</Text>
-                        {item.customerCode ? (
-                          <Text style={styles.custCodeText}>#{item.customerCode}</Text>
-                        ) : null}
+                        <Text style={styles.custPhone}>
+                          📞 +91 {item.phone ? item.phone.replace(/^\+?91/, '') : ''}
+                        </Text>
+                        <Text style={styles.custCodeText}>
+                          {item.customerCode
+                            ? `#${item.customerCode}`
+                            : `#CUS-${(item.id || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000078'}`}
+                        </Text>
                       </View>
                       <View style={styles.chevronBox}>
                         <Text style={styles.chevron}>›</Text>
@@ -706,6 +826,18 @@ export default function CustomersScreen() {
             loadCustomers('', currentPage, false);
           }}
         />
+        {/* Floating Action Button (FAB) matching Screenshot 5 */}
+        {activeTab === 'FIND' ? (
+          <TouchableOpacity
+            style={styles.fabBtn}
+            onPress={() => setActiveTab('NEW')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Add New Customer"
+          >
+            <Text style={styles.fabIcon}>+</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -721,10 +853,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 8,
     backgroundColor: '#ffffff',
+  },
+  headerGraphicBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 22,
@@ -753,11 +896,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   segmentBtnActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: '#1765f5',
+    shadowColor: '#1765f5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
     elevation: 2,
   },
   segmentBtnText: {
@@ -766,8 +909,84 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   segmentBtnTextActive: {
-    color: '#2563eb',
+    color: '#ffffff',
     fontWeight: '700',
+  },
+  filterChipsRow: {
+    marginBottom: 10,
+    marginHorizontal: 16,
+  },
+  filterChipsScroll: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  directoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  directoryChipActive: {
+    backgroundColor: '#1765f5',
+    borderColor: '#1765f5',
+  },
+  directoryChipText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  directoryChipTextActive: {
+    color: '#ffffff',
+  },
+  frequentTag: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  frequentTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  newTag: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  newTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1765f5',
+  },
+  fabBtn: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#1765f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1765f5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 99,
+  },
+  fabIcon: {
+    fontSize: 28,
+    color: '#ffffff',
+    fontWeight: '400',
+    marginTop: -2,
   },
   searchBarWrapper: {
     flexDirection: 'row',

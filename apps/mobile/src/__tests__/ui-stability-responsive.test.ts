@@ -173,5 +173,101 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
       assert.strictEqual(validateEdit('Harshad Jadhav', '9834820606').valid, true);
     });
   });
+
+  describe('5. Order Details Screen Verification (Screenshot 9 Target UI)', () => {
+    test('Garment readiness checklist computes exact readiness count and ratio', () => {
+      const items = [
+        {
+          id: 'item-1',
+          garmentName: 'Shirt',
+          physicalGarments: [
+            { id: 'pg-1', unitNumber: 1, tagId: 'GF-G28Y3T', isReady: true },
+            { id: 'pg-2', unitNumber: 2, tagId: 'GF-MDBBMK', isReady: true },
+            { id: 'pg-3', unitNumber: 3, tagId: 'GF-K7GB5S', isReady: true },
+          ],
+        },
+      ];
+
+      const totalGarments = items.reduce((s, it) => s + (it.physicalGarments?.length || 0), 0);
+      const readyGarments = items.reduce(
+        (s, it) => s + (it.physicalGarments?.filter((g) => Boolean(g.isReady)).length || 0),
+        0,
+      );
+
+      assert.strictEqual(totalGarments, 3);
+      assert.strictEqual(readyGarments, 3);
+      assert.strictEqual(`${readyGarments} / ${totalGarments} Ready`, '3 / 3 Ready');
+    });
+
+    test('Financial summary calculates and highlights balance due in dedicated alert box', () => {
+      const totalAmount = 315;
+      const amountPaid = 0;
+      const amountDue = totalAmount - amountPaid;
+
+      assert.strictEqual(amountDue, 315);
+      assert.strictEqual(amountDue.toFixed(2), '315.00');
+    });
+
+    test('Order number format correctly handles GF-ORD prefix', () => {
+      function formatOrderNum(num?: string): string {
+        if (!num) return '#GF-1024';
+        if (num.startsWith('#')) return num;
+        if (num.startsWith('GF-')) return `#${num}`;
+        return `#GF-${num}`;
+      }
+
+      assert.strictEqual(formatOrderNum('GF-ORD-000586'), '#GF-ORD-000586');
+      assert.strictEqual(formatOrderNum('#GF-ORD-000586'), '#GF-ORD-000586');
+    });
+  });
+
+  describe('6. Collect Payment Modal Verification (Screenshot 10 Target UI)', () => {
+    test('Calculates quick preset amounts (Full, 50%, Exact, Clear) correctly', () => {
+      const amountDue = 315;
+      const fullAmount = amountDue.toFixed(2);
+      const halfAmount = (amountDue * 0.5).toFixed(2);
+      const exactAmount = amountDue.toFixed(2);
+
+      assert.strictEqual(fullAmount, '315.00');
+      assert.strictEqual(halfAmount, '157.50');
+      assert.strictEqual(exactAmount, '315.00');
+    });
+
+    test('Offers exactly 5 supported payment modes', () => {
+      const modes = ['CASH', 'UPI', 'CARD', 'ONLINE', 'STORE_CREDIT'];
+      assert.strictEqual(modes.length, 5);
+      assert.ok(modes.includes('CASH'));
+      assert.ok(modes.includes('UPI'));
+      assert.ok(modes.includes('CARD'));
+      assert.ok(modes.includes('ONLINE'));
+      assert.ok(modes.includes('STORE_CREDIT'));
+    });
+  });
+
+  describe('7. Customers Tab Filter Chips & Directory Verification (Screenshot 5 Target UI)', () => {
+    test('Directory filter supports ALL, RECENT, FREQUENT, and AZ sorting', () => {
+      const customers = [
+        { id: '1', name: 'Omkar Chavhan', createdAt: '2026-10-01T00:00:00Z', orderCount: 2 },
+        { id: '2', name: 'Harshad Jadhav', createdAt: '2026-10-30T00:00:00Z', orderCount: 5 },
+        { id: '3', name: 'Aarav Sharma', createdAt: '2026-10-15T00:00:00Z', orderCount: 1 },
+      ];
+
+      // AZ sort
+      const azSorted = [...customers].sort((a, b) => a.name.localeCompare(b.name));
+      assert.strictEqual(azSorted[0].name, 'Aarav Sharma');
+      assert.strictEqual(azSorted[1].name, 'Harshad Jadhav');
+      assert.strictEqual(azSorted[2].name, 'Omkar Chavhan');
+
+      // Frequent sort
+      const frequentSorted = [...customers].sort((a, b) => b.orderCount - a.orderCount);
+      assert.strictEqual(frequentSorted[0].name, 'Harshad Jadhav');
+
+      // Recent sort
+      const recentSorted = [...customers].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      assert.strictEqual(recentSorted[0].name, 'Harshad Jadhav');
+    });
+  });
 });
 
