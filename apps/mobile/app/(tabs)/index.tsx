@@ -100,7 +100,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const isCompact = screenWidth < 360;
+  const isCompact = screenWidth < 380;
+  const isVeryNarrow = screenWidth < 340;
   const { isConnected } = useNetworkStatus();
   const { user: session, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
 
@@ -525,20 +526,32 @@ export default function HomeScreen() {
           </View>
 
           {/* Two Primary Action Buttons */}
-          <View style={[styles.primaryActionsRow, isCompact && styles.primaryActionsRowCompact]}>
+          <View
+            style={[
+              styles.primaryActionsRow,
+              isCompact && styles.primaryActionsRowCompact,
+              isVeryNarrow && styles.primaryActionsRowVeryNarrow,
+            ]}
+          >
             {/* Find / Edit Order Button */}
             <TouchableOpacity
-              style={[styles.secondaryActionBtn, isCompact && styles.actionBtnCompact]}
+              style={[
+                styles.secondaryActionBtn,
+                isCompact && styles.actionBtnCompact,
+                isVeryNarrow && styles.actionBtnVeryNarrow,
+              ]}
               onPress={() => router.push('/(tabs)/orders' as any)}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Find or Edit Order"
             >
-              <Icon name="search-outline" size={isCompact ? 16 : 18} color="#1765F5" />
+              <Icon name="search-outline" size={isCompact ? 16 : 17} color="#1765F5" />
               <Text
                 style={[styles.secondaryActionBtnText, isCompact && styles.actionBtnTextCompact]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.8}
               >
                 Find / Edit Order
               </Text>
@@ -546,17 +559,23 @@ export default function HomeScreen() {
 
             {/* Add New Customer Button */}
             <TouchableOpacity
-              style={[styles.primaryActionBtn, isCompact && styles.actionBtnCompact]}
+              style={[
+                styles.primaryActionBtn,
+                isCompact && styles.actionBtnCompact,
+                isVeryNarrow && styles.actionBtnVeryNarrow,
+              ]}
               onPress={() => router.push('/(tabs)/customers' as any)}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Add New Customer"
             >
-              <Icon name="add" size={isCompact ? 17 : 19} color="#FFFFFF" />
+              <Icon name="add" size={isCompact ? 16 : 18} color="#FFFFFF" />
               <Text
                 style={[styles.primaryActionBtnText, isCompact && styles.actionBtnTextCompact]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
+                adjustsFontSizeToFit={true}
+                minimumFontScale={0.8}
               >
                 Add New Customer
               </Text>
@@ -1430,14 +1449,19 @@ const styles = StyleSheet.create({
   // Two Primary Action Buttons
   primaryActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginTop: 14,
   },
   primaryActionsRowCompact: {
     gap: 6,
   },
+  primaryActionsRowVeryNarrow: {
+    flexDirection: 'column',
+    gap: 8,
+  },
   secondaryActionBtn: {
     flex: 1,
+    minHeight: 44,
     height: 44,
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
@@ -1446,22 +1470,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
+    paddingHorizontal: 8,
   },
   secondaryActionBtnText: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#1765F5',
   },
   primaryActionBtn: {
     flex: 1,
+    minHeight: 44,
     height: 44,
     borderRadius: 12,
     backgroundColor: '#1765F5',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
+    paddingHorizontal: 8,
     shadowColor: '#1765F5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1469,15 +1496,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   primaryActionBtnText: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   actionBtnCompact: {
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    gap: 4,
   },
   actionBtnTextCompact: {
     fontSize: 12,
+  },
+  actionBtnVeryNarrow: {
+    width: '100%',
+    height: 44,
   },
 
   // Inner Search Container

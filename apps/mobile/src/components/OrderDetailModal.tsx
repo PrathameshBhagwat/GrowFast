@@ -277,7 +277,7 @@ export function OrderDetailModal({
     return result;
   };
 
-  const getGarmentPhotos = (garmentId: string): any[] => {
+  const getGarmentPhotos = (garmentId: string, item?: any, g?: any): any[] => {
     const seen = new Set<string>();
     const result: any[] = [];
 
@@ -290,10 +290,16 @@ export function OrderDetailModal({
       }
     };
 
-    if (order && Array.isArray(order.items)) {
-      for (const item of order.items) {
-        if (Array.isArray(item.physicalGarments)) {
-          const pg = item.physicalGarments.find((g: any) => g.id === garmentId);
+    // 1. Direct piece-specific photos from physical garment object
+    if (g && Array.isArray(g.photos)) {
+      g.photos.forEach(addPhoto);
+    }
+
+    // 2. Search through order.items for the garment if g was not provided or has no photos
+    if (result.length === 0 && order && Array.isArray(order.items)) {
+      for (const it of order.items) {
+        if (Array.isArray(it.physicalGarments)) {
+          const pg = it.physicalGarments.find((candidate: any) => candidate.id === garmentId);
           if (pg && Array.isArray(pg.photos)) {
             pg.photos.forEach(addPhoto);
           }
@@ -301,11 +307,77 @@ export function OrderDetailModal({
       }
     }
 
+    // 3. Search orderPhotos for photos directly tagged with physicalGarmentId
     orderPhotos.forEach((p) => {
       if (p.physicalGarmentId === garmentId) {
         addPhoto(p);
       }
     });
+
+    // 4. Resolve the target parent item and unitNumber
+    const targetItem =
+      item ||
+      (order?.items
+        ? order.items.find((it: any) =>
+            Array.isArray(it.physicalGarments) &&
+            it.physicalGarments.some((cand: any) => cand.id === garmentId),
+          )
+        : null);
+
+    const resolvedG =
+      g ||
+      (targetItem && Array.isArray(targetItem.physicalGarments)
+        ? targetItem.physicalGarments.find((cand: any) => cand.id === garmentId)
+        : null);
+
+    const unitNum = resolvedG?.unitNumber;
+
+    if (targetItem) {
+      if (unitNum != null) {
+        // Photos explicitly tagged with unitNumber or pieceNumber
+        orderPhotos.forEach((p) => {
+          if (
+            p.orderItemId === targetItem.id &&
+            (p.unitNumber === unitNum ||
+              p.pieceNumber === unitNum ||
+              (p as any).pieceIndex === unitNum - 1)
+          ) {
+            addPhoto(p);
+          }
+        });
+
+        if (Array.isArray(targetItem.photos)) {
+          targetItem.photos.forEach((p: any) => {
+            if (
+              p.unitNumber === unitNum ||
+              p.pieceNumber === unitNum ||
+              p.pieceIndex === unitNum - 1
+            ) {
+              addPhoto(p);
+            }
+          });
+        }
+      }
+
+      // 5. Fallback to item-level intake photos if this piece has no piece-specific photos
+      if (result.length === 0) {
+        const itemPhotos = getItemPhotos(targetItem);
+        if (itemPhotos.length > 0) {
+          if (unitNum != null && itemPhotos[unitNum - 1]) {
+            // If item has a photo corresponding to this piece index, use it
+            addPhoto(itemPhotos[unitNum - 1]);
+          } else {
+            // Otherwise, fallback to the item's primary intake photo (e.g. 1 photo taken for the entire bundle)
+            addPhoto(itemPhotos[0]);
+          }
+        }
+      }
+    }
+
+    // 6. Single-item order fallback: order-level photo
+    if (result.length === 0 && orderPhotos.length > 0 && order?.items?.length === 1) {
+      addPhoto(orderPhotos[0]);
+    }
 
     return result;
   };
@@ -599,11 +671,13 @@ export function OrderDetailModal({
                       </Text>
                     </View>
                     <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                      <Text style={styles.customerName}>{order.customerName}</Text>
-                      <Text style={styles.customerPhone}>
+                      <Text style={styles.customerName} numberOfLines={1} ellipsizeMode="tail">
+                        {order.customerName}
+                      </Text>
+                      <Text style={styles.customerPhone} numberOfLines={1} ellipsizeMode="tail">
                         📞 +91 {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
                       </Text>
-                      <Text style={styles.customerCode}>
+                      <Text style={styles.customerCode} numberOfLines={1} ellipsizeMode="tail">
                         🪪 ID: {order.customerCode || `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000078'}`}
                       </Text>
                     </View>
@@ -822,13 +896,14 @@ export function OrderDetailModal({
                         </View>
                         {order.items.map((item) =>
                           item.physicalGarments?.map((g) => {
-                            const pgPhotos = getGarmentPhotos(g.id);
+                            const pgPhotos = getGarmentPhotos(g.id, item, g);
                             return (
                               <TouchableOpacity
                                 key={g.id}
                                 style={styles.garmentCheckRow}
                                 onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
                                 disabled={operatingGarmentId === g.id}
+                                activeOpacity={0.7}
                               >
                                 <View
                                   style={[
@@ -840,7 +915,11 @@ export function OrderDetailModal({
                                     <Text style={styles.checkmarkIcon}>✓</Text>
                                   ) : null}
                                 </View>
-                                <Text style={styles.garmentCheckText}>
+                                <Text
+                                  style={styles.garmentCheckText}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
                                   {item.garmentName} #{g.unitNumber}{' '}
                                   {g.tagId ? `(Tag: ${g.tagId})` : ''}
                                 </Text>
@@ -858,6 +937,7 @@ export function OrderDetailModal({
                                     accessible={true}
                                     accessibilityLabel={`View ${pgPhotos.length} photo(s) for ${item.garmentName} #${g.unitNumber}`}
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    activeOpacity={0.8}
                                   >
                                     <Image
                                       source={{ uri: resolvePhotoUrl(pgPhotos[0].url) }}
@@ -872,7 +952,24 @@ export function OrderDetailModal({
                                       </View>
                                     ) : null}
                                   </TouchableOpacity>
-                                ) : null}
+                                ) : (
+                                  <TouchableOpacity
+                                    style={styles.garmentPiecePlaceholderBtn}
+                                    onPress={(e) => {
+                                      e.stopPropagation?.();
+                                      handleAddPhotoAction({
+                                        orderItemId: item.id,
+                                        physicalGarmentId: g.id,
+                                      });
+                                    }}
+                                    accessible={true}
+                                    accessibilityLabel={`Add photo for ${item.garmentName} #${g.unitNumber}`}
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Text style={styles.garmentPiecePlaceholderIcon}>📷</Text>
+                                  </TouchableOpacity>
+                                )}
 
                                 <View
                                   style={[
@@ -1595,9 +1692,9 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   garmentPiecePhotoBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 6,
+    width: 42,
+    height: 42,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     overflow: 'hidden',
@@ -1610,6 +1707,22 @@ const styles = StyleSheet.create({
   garmentPieceThumbImage: {
     width: '100%',
     height: '100%',
+  },
+  garmentPiecePlaceholderBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+    backgroundColor: '#f8fafc',
+    marginRight: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  garmentPiecePlaceholderIcon: {
+    fontSize: 15,
+    opacity: 0.6,
   },
   garmentPieceBadge: {
     position: 'absolute',

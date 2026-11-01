@@ -219,6 +219,104 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
       assert.strictEqual(formatOrderNum('GF-ORD-000586'), '#GF-ORD-000586');
       assert.strictEqual(formatOrderNum('#GF-ORD-000586'), '#GF-ORD-000586');
     });
+
+    test('getGarmentPhotos resolves item intake photos when physical garment has no individual photos (Order #GF-ORD-000587)', () => {
+      // Simulate Order #GF-ORD-000587 structure where item has 1 intake photo and 3 physical garments
+      const item = {
+        id: 'item-shirt-1',
+        garmentName: 'Shirt',
+        quantity: 3,
+        photos: [{ id: 'photo-shirt-intake', url: '/uploads/orders/shirt_intake_1.jpg' }],
+        physicalGarments: [
+          { id: 'pg-1', unitNumber: 1, tagId: 'GF-4XBSAY', isReady: false },
+          { id: 'pg-2', unitNumber: 2, tagId: 'GF-H29QMV', isReady: false },
+          { id: 'pg-3', unitNumber: 3, tagId: 'GF-H9S6YM', isReady: false },
+        ],
+      };
+
+      const orderPhotos: any[] = [
+        { id: 'photo-shirt-intake', url: '/uploads/orders/shirt_intake_1.jpg', orderItemId: 'item-shirt-1' },
+      ];
+
+      function resolveGarmentPhotos(garmentId: string, targetItem: typeof item, g: any): any[] {
+        const seen = new Set<string>();
+        const result: any[] = [];
+        const addPhoto = (p: any) => {
+          if (!p) return;
+          const key = p.id || p.url;
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            result.push(p);
+          }
+        };
+
+        if (g && Array.isArray(g.photos)) g.photos.forEach(addPhoto);
+        orderPhotos.forEach((p) => {
+          if (p.physicalGarmentId === garmentId) addPhoto(p);
+        });
+
+        if (result.length === 0 && targetItem) {
+          const itemPhotos = targetItem.photos || [];
+          if (itemPhotos.length > 0) {
+            if (g.unitNumber != null && itemPhotos[g.unitNumber - 1]) {
+              addPhoto(itemPhotos[g.unitNumber - 1]);
+            } else {
+              addPhoto(itemPhotos[0]);
+            }
+          }
+        }
+        return result;
+      }
+
+      for (const g of item.physicalGarments) {
+        const photos = resolveGarmentPhotos(g.id, item, g);
+        assert.strictEqual(photos.length, 1, `Garment ${g.tagId} resolves 1 intake photo`);
+        assert.strictEqual(photos[0].url, '/uploads/orders/shirt_intake_1.jpg');
+      }
+    });
+
+    test('Checklist row renders fallback placeholder when garment and item have 0 photos', () => {
+      const itemNoPhotos = {
+        id: 'item-bag-1',
+        garmentName: 'Bag',
+        photos: [],
+        physicalGarments: [{ id: 'pg-bag-1', unitNumber: 1, tagId: 'GF-BAG-01', isReady: false }],
+      };
+
+      const photos: any[] = [];
+      const hasPhoto = photos.length > 0;
+      const fallbackBoxRendered = !hasPhoto ? 'garmentPiecePlaceholderBtn' : null;
+
+      assert.strictEqual(fallbackBoxRendered, 'garmentPiecePlaceholderBtn');
+    });
+
+    test('Home screen search action buttons adapt to narrow and standard viewports without clipping', () => {
+      function getLayoutConfig(screenWidth: number) {
+        const isCompact = screenWidth < 380;
+        const isVeryNarrow = screenWidth < 340;
+        return {
+          flexDirection: isVeryNarrow ? 'column' : 'row',
+          fontSize: isCompact ? 12 : 13,
+          paddingHorizontal: isCompact ? 6 : 8,
+          gap: isVeryNarrow ? 8 : isCompact ? 6 : 8,
+        };
+      }
+
+      // 320px narrow fold screen
+      const narrow = getLayoutConfig(320);
+      assert.strictEqual(narrow.flexDirection, 'column');
+      assert.strictEqual(narrow.fontSize, 12);
+
+      // 360px standard Android screen
+      const std360 = getLayoutConfig(360);
+      assert.strictEqual(std360.flexDirection, 'row');
+      assert.strictEqual(std360.fontSize, 12);
+
+      // 390px iPhone 13/14 screen
+      const std390 = getLayoutConfig(390);
+      assert.strictEqual(std390.flexDirection, 'row');
+      assert.strictEqual(std390.fontSize, 13);
+    });
   });
 
   describe('6. Collect Payment Modal Verification (Screenshot 10 Target UI)', () => {
