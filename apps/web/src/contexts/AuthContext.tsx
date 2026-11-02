@@ -20,6 +20,22 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const TOKEN_KEY = 'growfast_token';
 const EMPLOYEE_KEY = 'growfast_employee';
 
+// Module-level in-flight promise cache to deduplicate concurrent verification requests (e.g. React StrictMode)
+let activeAuthVerifyPromise: Promise<unknown> | null = null;
+let activeAuthVerifyToken: string | null = null;
+
+function verifyStoredToken(token: string): Promise<unknown> {
+  if (activeAuthVerifyPromise && activeAuthVerifyToken === token) {
+    return activeAuthVerifyPromise;
+  }
+  activeAuthVerifyToken = token;
+  activeAuthVerifyPromise = apiFetch('/auth/me', { token, retries: 0 }).finally(() => {
+    activeAuthVerifyPromise = null;
+    activeAuthVerifyToken = null;
+  });
+  return activeAuthVerifyPromise;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     isAuthenticated: false,
@@ -31,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Restore session from localStorage on mount and verify token validity
   useEffect(() => {
+    let isMounted = true;
     const token = localStorage.getItem(TOKEN_KEY);
     const employeeStr = localStorage.getItem(EMPLOYEE_KEY);
 
@@ -38,15 +55,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const employee = JSON.parse(employeeStr) as EmployeeSummary;
 
-        // Verify token with backend
-        apiFetch('/auth/me', { token, retries: 1 })
+        // Verify token with backend (deduplicated across StrictMode mounts)
+        verifyStoredToken(token)
           .then(() => {
-            setState({
-              isAuthenticated: true,
-              token,
-              employee,
-              isLoading: false,
-            });
+            if (isMounted) {
+              setState({
+                isAuthenticated: true,
+                token,
+                employee,
+                isLoading: false,
+              });
+            }
           })
           .catch((err) => {
             if (
@@ -56,32 +75,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Token actually invalid or expired — clear storage
               localStorage.removeItem(TOKEN_KEY);
               localStorage.removeItem(EMPLOYEE_KEY);
-              setState({
-                isAuthenticated: false,
-                token: null,
-                employee: null,
-                isLoading: false,
-              });
+              if (isMounted) {
+                setState({
+                  isAuthenticated: false,
+                  token: null,
+                  employee: null,
+                  isLoading: false,
+                });
+              }
             } else {
               // Server returned 500, or backend is offline/unreachable.
               // Do NOT aggressively destroy the session here, otherwise a hard
               // refresh while backend is booting will log them out!
-              setState({
-                isAuthenticated: true, // Optimistically keep them logged in
-                token,
-                employee,
-                isLoading: false,
-              });
+              if (isMounted) {
+                setState({
+                  isAuthenticated: true, // Optimistically keep them logged in
+                  token,
+                  employee,
+                  isLoading: false,
+                });
+              }
             }
           });
       } catch {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(EMPLOYEE_KEY);
-        setState((prev) => ({ ...prev, isLoading: false }));
+        if (isMounted) {
+          setState((prev) => ({ ...prev, isLoading: false }));
+        }
       }
     } else {
-      setState((prev) => ({ ...prev, isLoading: false }));
+      if (isMounted) {
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = useCallback(async (employeeId: string, pin: string) => {

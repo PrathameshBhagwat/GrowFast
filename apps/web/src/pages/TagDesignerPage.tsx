@@ -259,6 +259,17 @@ export const TagDesignerPage: React.FC = () => {
 
   const hasDuplicateShortcuts = duplicateShortcutCodes.size > 0;
 
+  // Compute active preview sample unconditionally at top level (preserves Rules of Hooks)
+  const activeSample = useMemo(() => {
+    const preset = SAMPLE_PRESETS[sampleIndex] || SAMPLE_PRESETS[0];
+    const base = preset.data;
+    return {
+      ...base,
+      shopName: design.shopName || 'GrowFast',
+      serviceShortcut: resolveServiceShortcut(base.serviceType, design.serviceShortcuts),
+    };
+  }, [sampleIndex, design.shopName, design.serviceShortcuts]);
+
   // Field configuration handlers
   const handleFieldToggle = (index: number) => {
     setDesign((prev) => {
@@ -478,15 +489,6 @@ export const TagDesignerPage: React.FC = () => {
   if (isLoading) {
     return <LoadingState message="Loading Design Tags..." fullPage />;
   }
-
-  const activeSample = useMemo(() => {
-    const base = SAMPLE_PRESETS[sampleIndex].data;
-    return {
-      ...base,
-      shopName: design.shopName || 'GrowFast',
-      serviceShortcut: resolveServiceShortcut(base.serviceType, design.serviceShortcuts),
-    };
-  }, [sampleIndex, design.shopName, design.serviceShortcuts]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] p-3 sm:p-6 lg:p-8">

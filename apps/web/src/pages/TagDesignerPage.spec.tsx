@@ -316,4 +316,70 @@ describe('TagDesignerPage (Design Tags Specification)', { timeout: 15000 }, () =
     ).toBeInTheDocument();
     expect(screen.queryByText('General Tag Settings')).not.toBeInTheDocument();
   });
+
+  it('renders LoadingState initially then smoothly transitions to loaded view without hook order violations', async () => {
+    let resolveDesign: (val: any) => void;
+    const delayedPromise = new Promise((resolve) => {
+      resolveDesign = resolve;
+    });
+    (TagDesignApi.getDesign as any).mockImplementation(() => delayedPromise);
+
+    render(
+      <MemoryRouter>
+        <TagDesignerPage />
+      </MemoryRouter>,
+    );
+
+    // Initial loading state must be visible
+    expect(screen.getByText(/Loading Design Tags\.\.\./i)).toBeInTheDocument();
+
+    // Resolve design and transition out of loading
+    resolveDesign!(mockDesign);
+
+    await waitFor(() => {
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
+    });
+    expect(screen.getByText('General Tag Settings')).toBeInTheDocument();
+  });
+
+  it('handles API loading failure with error message banner without crashing or violating hook order', async () => {
+    (TagDesignApi.getDesign as any).mockRejectedValue(new Error('Network failure'));
+
+    render(
+      <MemoryRouter>
+        <TagDesignerPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Network failure/i)).toBeInTheDocument();
+    expect(screen.getByText('General Tag Settings')).toBeInTheDocument();
+  });
+
+  it('cycles sample presets cleanly without changing hook counts or orders', async () => {
+    render(
+      <MemoryRouter>
+        <TagDesignerPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Design Tags')).toBeInTheDocument();
+    });
+
+    const sampleSelect = screen.getByLabelText(/Sample Data Scenario:/i);
+    fireEvent.change(sampleSelect, { target: { value: '1' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Silk Saree/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(sampleSelect, { target: { value: '2' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Silk Saree/i)).toBeInTheDocument();
+    });
+  });
 });

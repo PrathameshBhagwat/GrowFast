@@ -61,7 +61,7 @@ export const TagDesignApi = {
    * Authenticated font download for Code 39 barcode thermal printing.
    */
   async downloadFont(): Promise<void> {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('growfast_token') || localStorage.getItem('token');
     const API_URL = import.meta.env.VITE_API_URL || '/api';
     const response = await fetch(`${API_URL}/store/tag-design/download-font`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
