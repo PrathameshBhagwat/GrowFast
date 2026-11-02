@@ -24,11 +24,16 @@ const mockPrismaService = () => ({
   notification: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn().mockResolvedValue(null),
     findMany: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
   order: {
     findUnique: jest.fn(),
+  },
+  store: {
+    findUnique: jest.fn().mockResolvedValue({ name: 'GrowFast', address: 'Main St', phone: '+919999999999' }),
   },
 });
 
@@ -257,6 +262,61 @@ describe('NotificationService', () => {
       );
     });
 
+    it('should skip dispatch if notification status is already SENT', async () => {
+      prisma.notification.findUnique.mockResolvedValue({
+        id: 'notif-already-sent',
+        storeId: STORE_A,
+        status: 'SENT',
+      });
+
+      const result = await service.processNotification('notif-already-sent');
+      expect(result).toBe(true);
+      expect(prisma.notification.update).not.toHaveBeenCalled();
+    });
+
+    it('should abort dispatch if atomic status claim returns count 0 (claimed by worker)', async () => {
+      prisma.notification.findUnique
+        .mockResolvedValueOnce({
+          id: 'notif-racing',
+          storeId: STORE_A,
+          status: 'CREATED',
+        })
+        .mockResolvedValueOnce({
+          id: 'notif-racing',
+          storeId: STORE_A,
+          status: 'QUEUED', // Claimed by worker
+        });
+      prisma.notification.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      const result = await service.processNotification('notif-racing');
+      expect(result).toBe(false);
+      expect(prisma.notification.update).not.toHaveBeenCalled();
+    });
+
+    it('should block concurrent in-flight executions for the same notificationId', async () => {
+      const mockNotification = {
+        id: 'notif-inflight-lock',
+        storeId: STORE_A,
+        status: 'QUEUED',
+        channel: NotificationChannel.IN_APP,
+        recipient: RECIPIENT,
+      };
+
+      prisma.notification.findUnique.mockImplementation(async () => {
+        await new Promise((r) => setTimeout(r, 25));
+        return mockNotification;
+      });
+      prisma.notification.update.mockResolvedValue({});
+
+      const [p1, p2] = await Promise.all([
+        service.processNotification('notif-inflight-lock'),
+        service.processNotification('notif-inflight-lock'),
+      ]);
+
+      // At least one should be rejected/skipped by lock
+      expect([p1, p2]).toContain(false);
+    });
+
     // ─── Notification Failure Must Not Corrupt Business Transactions ──
 
     it('should return null on database error without throwing', async () => {
@@ -275,10 +335,11 @@ describe('NotificationService', () => {
       // No exception thrown — calling transaction is safe
     });
 
-    // ─── Duplicate Event Handling ─────────────────────────────────
+    // ─── Deduplication & Idempotency ──────────────────────────────
 
-    it('should allow multiple events of the same type (no false idempotency claim)', async () => {
+    it('should deduplicate repeated calls for the same order, event, and recipient', async () => {
       const baseNotification = {
+        id: 'notif-idemp-1',
         storeId: STORE_A,
         orderId: ORDER_ID,
         customerId: null,
@@ -295,13 +356,9 @@ describe('NotificationService', () => {
       };
 
       prisma.order.findUnique.mockResolvedValue({ storeId: STORE_A });
-      prisma.notification.create
-        .mockResolvedValueOnce({ ...baseNotification, id: 'notif-dup-1' })
-        .mockResolvedValueOnce({ ...baseNotification, id: 'notif-dup-2' });
-      prisma.notification.update.mockResolvedValue({});
-      prisma.notification.findUnique
-        .mockResolvedValueOnce({ ...baseNotification, id: 'notif-dup-1', status: 'FAILED' })
-        .mockResolvedValueOnce({ ...baseNotification, id: 'notif-dup-2', status: 'FAILED' });
+      // First call finds no existing record, calls create
+      prisma.notification.findFirst.mockResolvedValueOnce(null);
+      prisma.notification.create.mockResolvedValueOnce(baseNotification);
 
       const result1 = await service.createNotificationEvent(
         STORE_A,
@@ -310,6 +367,9 @@ describe('NotificationService', () => {
         RECIPIENT,
         ORDER_ID,
       );
+
+      // Second call finds the existing notification
+      prisma.notification.findFirst.mockResolvedValueOnce(baseNotification);
 
       const result2 = await service.createNotificationEvent(
         STORE_A,
@@ -321,8 +381,154 @@ describe('NotificationService', () => {
 
       expect(result1).toBeDefined();
       expect(result2).toBeDefined();
-      expect(result1!.id).not.toBe(result2!.id);
+      expect(result1!.id).toBe(result2!.id);
+      expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('should deduplicate concurrent in-flight calls to createNotificationEvent', async () => {
+      const baseNotification = {
+        id: 'notif-concurrent-1',
+        storeId: STORE_A,
+        orderId: ORDER_ID,
+        customerId: null,
+        eventType: NotificationEventType.ORDER_CREATED,
+        channel: NotificationChannel.SMS,
+        status: 'CREATED',
+        recipient: RECIPIENT,
+        payload: null,
+        sentAt: null,
+        failedAt: null,
+        failureReason: null,
+        retryCount: 0,
+        createdAt: new Date(),
+      };
+
+      prisma.order.findUnique.mockResolvedValue({ storeId: STORE_A });
+      prisma.notification.findFirst.mockResolvedValue(null);
+      prisma.notification.create.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return baseNotification;
+      });
+
+      const [r1, r2] = await Promise.all([
+        service.createNotificationEvent(
+          STORE_A,
+          NotificationEventType.ORDER_CREATED,
+          NotificationChannel.SMS,
+          RECIPIENT,
+          ORDER_ID,
+        ),
+        service.createNotificationEvent(
+          STORE_A,
+          NotificationEventType.ORDER_CREATED,
+          NotificationChannel.SMS,
+          RECIPIENT,
+          ORDER_ID,
+        ),
+      ]);
+
+      expect(r1).toBeDefined();
+      expect(r2).toBeDefined();
+      expect(r1!.id).toBe(r2!.id);
+      expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('should allow legitimate different event types for the same order', async () => {
+      const notifCreated = {
+        id: 'notif-created-1',
+        storeId: STORE_A,
+        orderId: ORDER_ID,
+        customerId: null,
+        eventType: NotificationEventType.ORDER_CREATED,
+        channel: NotificationChannel.SMS,
+        status: 'CREATED',
+        recipient: RECIPIENT,
+        payload: null,
+        sentAt: null,
+        failedAt: null,
+        failureReason: null,
+        retryCount: 0,
+        createdAt: new Date(),
+      };
+
+      const notifReady = {
+        id: 'notif-ready-1',
+        storeId: STORE_A,
+        orderId: ORDER_ID,
+        customerId: null,
+        eventType: NotificationEventType.ORDER_READY,
+        channel: NotificationChannel.SMS,
+        status: 'CREATED',
+        recipient: RECIPIENT,
+        payload: null,
+        sentAt: null,
+        failedAt: null,
+        failureReason: null,
+        retryCount: 0,
+        createdAt: new Date(),
+      };
+
+      prisma.order.findUnique.mockResolvedValue({ storeId: STORE_A });
+      prisma.notification.findFirst.mockResolvedValue(null);
+      prisma.notification.create
+        .mockResolvedValueOnce(notifCreated)
+        .mockResolvedValueOnce(notifReady);
+
+      const resCreated = await service.createNotificationEvent(
+        STORE_A,
+        NotificationEventType.ORDER_CREATED,
+        NotificationChannel.SMS,
+        RECIPIENT,
+        ORDER_ID,
+      );
+
+      const resReady = await service.createNotificationEvent(
+        STORE_A,
+        NotificationEventType.ORDER_READY,
+        NotificationChannel.SMS,
+        RECIPIENT,
+        ORDER_ID,
+      );
+
+      expect(resCreated!.id).toBe('notif-created-1');
+      expect(resReady!.id).toBe('notif-ready-1');
       expect(prisma.notification.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('should allow retry if previous notification status was FAILED', async () => {
+      const retryNotification = {
+        id: 'notif-retried-1',
+        storeId: STORE_A,
+        orderId: ORDER_ID,
+        customerId: null,
+        eventType: NotificationEventType.ORDER_CREATED,
+        channel: NotificationChannel.SMS,
+        status: 'CREATED',
+        recipient: RECIPIENT,
+        payload: null,
+        sentAt: null,
+        failedAt: null,
+        failureReason: null,
+        retryCount: 0,
+        createdAt: new Date(),
+      };
+
+      prisma.order.findUnique.mockResolvedValue({ storeId: STORE_A });
+      // When findFirst queries for CREATED, QUEUED, SENT, none match because existing is FAILED
+      prisma.notification.findFirst.mockResolvedValueOnce(null);
+      prisma.notification.create.mockResolvedValueOnce(retryNotification);
+
+      const result = await service.createNotificationEvent(
+        STORE_A,
+        NotificationEventType.ORDER_CREATED,
+        NotificationChannel.SMS,
+        RECIPIENT,
+        ORDER_ID,
+      );
+
+      expect(result).toBeDefined();
+      expect(result!.id).toBe('notif-retried-1');
+      expect(prisma.notification.create).toHaveBeenCalledTimes(1);
     });
 
     // ─── All Event Types ─────────────────────────────────────────

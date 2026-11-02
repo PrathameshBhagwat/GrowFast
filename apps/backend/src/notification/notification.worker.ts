@@ -59,13 +59,22 @@ export class NotificationWorkerService implements OnApplicationBootstrap, OnAppl
 
     try {
       // 1. Find eligible notifications (CREATED or FAILED with retryCount < MAX_RETRIES)
+      // Enforce a grace period for CREATED notifications (15s) in production/development
+      // to avoid racing with the initial in-flight asynchronous dispatch.
+      const gracePeriodMs = process.env.NODE_ENV === 'test' ? 0 : 15000;
+      const olderThan = new Date(Date.now() - gracePeriodMs);
+
       const eligibleNotifications = await this.prisma.notification.findMany({
         where: {
           OR: [
-            { status: NotificationStatus.CREATED },
+            {
+              status: NotificationStatus.CREATED,
+              ...(gracePeriodMs > 0 ? { createdAt: { lte: olderThan } } : {}),
+            },
             {
               status: NotificationStatus.FAILED,
               retryCount: { lt: this.MAX_RETRIES },
+              ...(gracePeriodMs > 0 ? { failedAt: { lte: olderThan } } : {}),
             },
           ],
         },

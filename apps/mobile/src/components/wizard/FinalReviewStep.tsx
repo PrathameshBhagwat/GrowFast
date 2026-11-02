@@ -174,6 +174,7 @@ export function FinalReviewStep({
   };
 
   const handleConfirmSubmit = async () => {
+    if (isSubmitting) return;
     if (items.length === 0) {
       Alert.alert('Validation Error', 'Cannot submit an order with zero items.');
       return;

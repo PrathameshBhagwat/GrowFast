@@ -23,6 +23,7 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
   private sock: any = null;
   private isConnected = false;
   private readonly authFolder = './baileys_auth';
+  private readonly sentCache = new Map<string, { timestamp: number; externalId?: string }>();
 
   constructor() {
     this.logger.log('Initializing Baileys WhatsApp Provider (DEVELOPMENT MODE)');
@@ -93,6 +94,21 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
       };
     }
 
+    if (payload.id) {
+      const cached = this.sentCache.get(payload.id);
+      const fifteenMinutes = 15 * 60 * 1000;
+      if (cached && Date.now() - cached.timestamp < fifteenMinutes) {
+        this.logger.warn(
+          `[BaileysWhatsAppProvider] Duplicate dispatch suppressed for notification ${payload.id}. Already sent with externalId: ${cached.externalId}`,
+        );
+        return {
+          success: true,
+          providerName: this.name,
+          externalId: cached.externalId,
+        };
+      }
+    }
+
     if (!payload.recipient) {
       return {
         success: false,
@@ -153,10 +169,21 @@ export class BaileysWhatsAppProvider implements NotificationProvider {
         msg = await this.sock.sendMessage(jid, { text: messageBody });
       }
 
+      const externalId = msg?.key?.id;
+      if (payload.id) {
+        this.sentCache.set(payload.id, { timestamp: Date.now(), externalId });
+        if (this.sentCache.size > 2000) {
+          const cutoff = Date.now() - 15 * 60 * 1000;
+          for (const [k, v] of this.sentCache.entries()) {
+            if (v.timestamp < cutoff) this.sentCache.delete(k);
+          }
+        }
+      }
+
       return {
         success: true,
         providerName: this.name,
-        externalId: msg?.key?.id,
+        externalId,
       };
     } catch (error: any) {
       this.logger.error(`Failed to send WhatsApp message to ${jid}`, error.stack);

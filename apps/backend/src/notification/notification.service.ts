@@ -43,6 +43,10 @@ export class NotificationService {
   private readonly logProvider: NotificationProvider;
   private readonly whatsappProvider: NotificationProvider;
 
+  // In-memory locks to eliminate duplicate event creation and concurrent dispatches
+  private readonly activeEventCreationLocks = new Map<string, Promise<NotificationDTO | null>>();
+  private readonly activeDispatchLocks = new Set<string>();
+
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private billPdfService?: BillPdfService,
@@ -62,6 +66,16 @@ export class NotificationService {
     }
   }
 
+  /**
+   * Mask recipient phone number for PII protection in structured logs.
+   */
+  private maskPhone(phone?: string | null): string {
+    if (!phone) return 'N/A';
+    const clean = phone.replace(/\D/g, '');
+    if (clean.length <= 4) return '***';
+    return `${clean.slice(0, 2)}****${clean.slice(-4)}`;
+  }
+
   private getProvider(channel: NotificationChannel): NotificationProvider {
     if (channel === NotificationChannel.WHATSAPP || channel === NotificationChannel.SMS) {
       return this.whatsappProvider;
@@ -70,16 +84,53 @@ export class NotificationService {
   }
 
   /**
-   * Create and record a notification event.
+   * Create and record a notification event with end-to-end idempotency protection.
    *
    * This method is designed to be SAFE to call from business transactions:
    * - It catches all errors internally
    * - It never throws to the caller
    * - It returns null on failure instead of crashing the calling transaction
+   * - It deduplicates duplicate requests for the same (storeId, orderId, eventType, recipient)
    *
    * @param storeId - Derived from authenticated context, NEVER from client input
    */
   async createNotificationEvent(
+    storeId: string,
+    eventType: NotificationEventType,
+    channel: NotificationChannel,
+    recipient: string,
+    orderId?: string,
+    customerId?: string,
+    payload?: Record<string, unknown>,
+  ): Promise<NotificationDTO | null> {
+    const lockKey = `${storeId}:${orderId || 'no-order'}:${eventType}:${channel}:${recipient}`;
+    const inFlight = this.activeEventCreationLocks.get(lockKey);
+    if (inFlight) {
+      this.logger.debug(
+        `[NotificationService] In-flight event creation detected for ${lockKey}. Awaiting existing promise.`,
+      );
+      return await inFlight;
+    }
+
+    const creationPromise = this.executeCreateNotificationEvent(
+      storeId,
+      eventType,
+      channel,
+      recipient,
+      orderId,
+      customerId,
+      payload,
+    );
+
+    this.activeEventCreationLocks.set(lockKey, creationPromise);
+    try {
+      return await creationPromise;
+    } finally {
+      this.activeEventCreationLocks.delete(lockKey);
+    }
+  }
+
+  private async executeCreateNotificationEvent(
     storeId: string,
     eventType: NotificationEventType,
     channel: NotificationChannel,
@@ -99,6 +150,31 @@ export class NotificationService {
           this.logger.warn(`Notification rejected: order ${orderId} not found or wrong store`);
           return null;
         }
+
+        // 1.5 Idempotency check:
+        // A single order must have at most one active or successfully sent notification
+        // for a given eventType and recipient (e.g. ORDER_CREATED sent only once).
+        if (this.prisma.notification?.findFirst) {
+          const existing = await this.prisma.notification.findFirst({
+            where: {
+              storeId,
+              orderId,
+              eventType,
+              channel,
+              recipient,
+              status: {
+                in: [NotificationStatus.CREATED, NotificationStatus.QUEUED, NotificationStatus.SENT],
+              },
+            },
+          });
+
+          if (existing) {
+            this.logger.log(
+              `[NotificationService] Idempotent deduplication: notification already exists (${existing.status}) for order ${orderId}, event ${eventType}, id: ${existing.id}`,
+            );
+            return this.toDTO(existing);
+          }
+        }
       }
 
       // 2. Create the notification record
@@ -109,26 +185,32 @@ export class NotificationService {
           customerId: customerId || null,
           eventType,
           channel,
-          status: 'CREATED',
+          status: NotificationStatus.CREATED,
           recipient,
           payload: payload ? (payload as Prisma.InputJsonValue) : undefined,
           retryCount: 0,
         },
       });
 
-      // 3. Asynchronously trigger dispatch without blocking the caller
-      if (typeof setImmediate !== 'undefined') {
-        setImmediate(() => {
-          this.processNotification(notification.id).catch((err) => {
-            this.logger.error(`Async dispatch error for ${notification.id}: ${err.message}`);
+      this.logger.log(
+        `[NotificationService] Created notification event: id=${notification.id}, order=${orderId || 'none'}, event=${eventType}, recipient=${this.maskPhone(recipient)}`,
+      );
+
+      // 3. Asynchronously trigger dispatch without blocking the caller (deferred in test environment)
+      if (process.env.NODE_ENV !== 'test') {
+        if (typeof setImmediate !== 'undefined') {
+          setImmediate(() => {
+            this.processNotification(notification.id).catch((err) => {
+              this.logger.error(`Async dispatch error for ${notification.id}: ${err.message}`);
+            });
           });
-        });
-      } else {
-        Promise.resolve().then(() => {
-          this.processNotification(notification.id).catch((err) => {
-            this.logger.error(`Async dispatch error for ${notification.id}: ${err.message}`);
+        } else {
+          Promise.resolve().then(() => {
+            this.processNotification(notification.id).catch((err) => {
+              this.logger.error(`Async dispatch error for ${notification.id}: ${err.message}`);
+            });
           });
-        });
+        }
       }
 
       // Return the created state
@@ -144,18 +226,40 @@ export class NotificationService {
    * Process a single notification (called by the background worker or immediate dispatch).
    */
   async processNotification(notificationId: string): Promise<boolean> {
-    const notification = await this.prisma.notification.findUnique({
-      where: { id: notificationId },
-    });
-
-    if (!notification) return false;
-
-    // Idempotency: If already successfully sent, do not duplicate
-    if (notification.status === 'SENT') {
-      return true;
+    if (this.activeDispatchLocks.has(notificationId)) {
+      this.logger.debug(
+        `[NotificationService] Notification ${notificationId} is already in-flight. Skipping duplicate concurrent execution.`,
+      );
+      return false;
     }
+    this.activeDispatchLocks.add(notificationId);
 
     try {
+      const notification = await this.prisma.notification.findUnique({
+        where: { id: notificationId },
+      });
+
+      if (!notification) return false;
+
+      // Idempotency: If already successfully sent, do not duplicate
+      if (notification.status === NotificationStatus.SENT) {
+        return true;
+      }
+
+      // Concurrency claim: Transition CREATED to QUEUED atomically
+      if (notification.status === NotificationStatus.CREATED && this.prisma.notification?.updateMany) {
+        const claimResult = await this.prisma.notification.updateMany({
+          where: { id: notificationId, status: NotificationStatus.CREATED },
+          data: { status: NotificationStatus.QUEUED },
+        });
+
+        if (claimResult.count === 0) {
+          const fresh = await this.prisma.notification.findUnique({ where: { id: notificationId } });
+          if (fresh?.status === NotificationStatus.SENT) return true;
+          return false;
+        }
+      }
+
       const store = this.prisma.store
         ? await this.prisma.store.findUnique({
             where: { id: notification.storeId },
@@ -229,6 +333,10 @@ export class NotificationService {
         }
       }
 
+      this.logger.log(
+        `[NotificationService] Dispatching notification: id=${notification.id}, order=${notification.orderId || 'none'}, event=${notification.eventType}, recipient=${this.maskPhone(notification.recipient)}, attempt=${notification.retryCount + 1}`,
+      );
+
       const provider = this.getProvider(notification.channel as NotificationChannel);
       const result = await provider.dispatch({
         id: notification.id,
@@ -241,40 +349,62 @@ export class NotificationService {
       });
 
       if (result.success) {
+        const enrichedPayload = {
+          ...payload,
+          ...(result.externalId ? { externalId: result.externalId } : {}),
+          providerName: result.providerName,
+          dispatchedAt: new Date().toISOString(),
+        };
+
         await this.prisma.notification.update({
           where: { id: notification.id },
           data: {
-            status: 'SENT',
+            status: NotificationStatus.SENT,
             sentAt: new Date(),
+            payload: enrichedPayload,
           },
         });
+
+        this.logger.log(
+          `[NotificationService] Notification dispatched successfully: id=${notification.id}, externalId=${result.externalId || 'N/A'}, recipient=${this.maskPhone(notification.recipient)}`,
+        );
         return true;
       } else {
         await this.prisma.notification.update({
           where: { id: notification.id },
           data: {
-            status: 'FAILED',
+            status: NotificationStatus.FAILED,
             failedAt: new Date(),
             failureReason: result.failureReason || 'Provider returned failure',
             retryCount: { increment: 1 },
           },
         });
+
+        this.logger.warn(
+          `[NotificationService] Notification dispatch failed: id=${notification.id}, reason=${result.failureReason}`,
+        );
         return false;
       }
     } catch (dispatchErr: any) {
       this.logger.error(
-        `Notification dispatch failed for ${notification.id}: ${dispatchErr.message}`,
+        `Notification dispatch failed for ${notificationId}: ${dispatchErr.message}`,
       );
-      await this.prisma.notification.update({
-        where: { id: notification.id },
-        data: {
-          status: 'FAILED',
-          failedAt: new Date(),
-          failureReason: dispatchErr.message || 'Dispatch exception',
-          retryCount: { increment: 1 },
-        },
-      });
+      try {
+        await this.prisma.notification.update({
+          where: { id: notificationId },
+          data: {
+            status: NotificationStatus.FAILED,
+            failedAt: new Date(),
+            failureReason: dispatchErr.message || 'Dispatch exception',
+            retryCount: { increment: 1 },
+          },
+        });
+      } catch {
+        // Ignore secondary update error
+      }
       return false;
+    } finally {
+      this.activeDispatchLocks.delete(notificationId);
     }
   }
 

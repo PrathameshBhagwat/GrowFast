@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Modal,
   View,
@@ -307,6 +307,7 @@ export function OrderWizardModal({
     useState<CreateOrderItemRequest | null>(null);
 
   // Confirmed Order State (Screen 9)
+  const isSubmittingOrderRef = useRef(false);
   const [confirmedOrder, setConfirmedOrder] = useState<{
     orderId: string;
     orderNumber: string;
@@ -959,36 +960,44 @@ export function OrderWizardModal({
 
   // Submit order to server
   const handleSubmitOrder = async () => {
-    await persistDraftToStorage('QUEUED');
-    await queueDraftForSync(clientDraftId);
+    if (isSubmittingOrderRef.current) {
+      return { success: false, error: 'Order submission already in progress' };
+    }
+    isSubmittingOrderRef.current = true;
+    try {
+      await persistDraftToStorage('QUEUED');
+      await queueDraftForSync(clientDraftId);
 
-    if (isConnected) {
-      const syncResult = await syncEngine.syncDraft(clientDraftId);
-      if (syncResult.success) {
+      if (isConnected) {
+        const syncResult = await syncEngine.syncDraft(clientDraftId);
+        if (syncResult.success) {
+          onOrderSavedOrSubmitted();
+          return {
+            success: true,
+            orderId: syncResult.orderId,
+            orderNumber: syncResult.orderNumber,
+          };
+        } else if (syncResult.isConflict) {
+          return {
+            success: false,
+            isConflict: true,
+            error: syncResult.error,
+          };
+        } else {
+          return {
+            success: false,
+            error: syncResult.error || 'Server rejected order submission.',
+          };
+        }
+      } else {
         onOrderSavedOrSubmitted();
         return {
-          success: true,
-          orderId: syncResult.orderId,
-          orderNumber: syncResult.orderNumber,
-        };
-      } else if (syncResult.isConflict) {
-        return {
           success: false,
-          isConflict: true,
-          error: syncResult.error,
-        };
-      } else {
-        return {
-          success: false,
-          error: syncResult.error || 'Server rejected order submission.',
+          error: 'Order queued offline in local storage.',
         };
       }
-    } else {
-      onOrderSavedOrSubmitted();
-      return {
-        success: false,
-        error: 'Order queued offline in local storage.',
-      };
+    } finally {
+      isSubmittingOrderRef.current = false;
     }
   };
 

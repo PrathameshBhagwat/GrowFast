@@ -14,6 +14,7 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
   private readonly phoneNumberId: string;
   private readonly apiVersion: string;
   private readonly requestTimeoutMs: number;
+  private readonly sentCache = new Map<string, { timestamp: number; externalId?: string }>();
 
   constructor() {
     this.accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
@@ -25,6 +26,21 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
   }
 
   async dispatch(payload: NotificationDispatchPayload): Promise<NotificationDispatchResult> {
+    if (payload.id) {
+      const cached = this.sentCache.get(payload.id);
+      const fifteenMinutes = 15 * 60 * 1000;
+      if (cached && Date.now() - cached.timestamp < fifteenMinutes) {
+        this.logger.warn(
+          `[WhatsAppNotificationProvider] Duplicate dispatch suppressed for notification ${payload.id}. Already sent with externalId: ${cached.externalId}`,
+        );
+        return {
+          success: true,
+          providerName: this.name,
+          externalId: cached.externalId,
+        };
+      }
+    }
+
     if (!this.accessToken || !this.phoneNumberId) {
       return {
         success: false,
@@ -119,10 +135,21 @@ export class WhatsAppNotificationProvider implements NotificationProvider {
         };
       }
 
+      const externalId = data.messages?.[0]?.id;
+      if (payload.id) {
+        this.sentCache.set(payload.id, { timestamp: Date.now(), externalId });
+        if (this.sentCache.size > 2000) {
+          const cutoff = Date.now() - 15 * 60 * 1000;
+          for (const [k, v] of this.sentCache.entries()) {
+            if (v.timestamp < cutoff) this.sentCache.delete(k);
+          }
+        }
+      }
+
       return {
         success: true,
         providerName: this.name,
-        externalId: data.messages?.[0]?.id,
+        externalId,
       };
     } catch (error: any) {
       const reason =
