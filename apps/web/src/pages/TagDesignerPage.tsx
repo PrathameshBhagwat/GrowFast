@@ -10,6 +10,8 @@ import { friendlyErrorMessage } from '../services/api';
 import {
   REFERENCE_TAG_DESIGN,
   DEFAULT_TAG_DESIGN,
+  DEFAULT_SERVICE_SHORTCUTS,
+  resolveServiceShortcut,
   SUPPORTED_TAG_FONTS,
   SUPPORTED_TAG_PRINTERS,
   SUPPORTED_TAG_DIMENSIONS,
@@ -41,7 +43,20 @@ import {
   User,
   ShieldAlert,
   Info,
+  Tag as TagIcon,
 } from 'lucide-react';
+
+const CONFIGURABLE_SERVICES: { id: string; name: string; defaultShortcut: string }[] = [
+  { id: 'DRY_CLEAN', name: 'Dry Cleaning', defaultShortcut: 'DC' },
+  { id: 'STEAM_PRESS', name: 'Steam Iron', defaultShortcut: 'SI' },
+  { id: 'SHOE_CLEAN', name: 'Shoe Cleaning', defaultShortcut: 'SC' },
+  { id: 'WEIGHT_BASED', name: 'Starching', defaultShortcut: 'ST' },
+  { id: 'WASH_IRON', name: 'Wash and Steam Iron', defaultShortcut: 'WSI' },
+  { id: 'WASH', name: 'Standard Wash', defaultShortcut: 'W' },
+  { id: 'PREMIUM_LAUNDRY', name: 'Premium Laundry', defaultShortcut: 'PL' },
+  { id: 'WOOLEN_LAUNDRY', name: 'Woolen Laundry', defaultShortcut: 'WL' },
+  { id: 'LAUNDRY_WHITE', name: 'Laundry for White', defaultShortcut: 'LW' },
+];
 
 const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
   {
@@ -202,6 +217,47 @@ export const TagDesignerPage: React.FC = () => {
     const clamped = Math.max(0, Math.min(14, isNaN(days) ? 1 : days));
     setDesign((prev) => ({ ...prev, workshopPreponeDays: clamped }));
   };
+
+  const handleShopNameChange = (shopName: string) => {
+    setDesign((prev) => ({
+      ...prev,
+      shopName: shopName.slice(0, 50),
+    }));
+  };
+
+  const handleServiceShortcutChange = (serviceKey: string, code: string) => {
+    const cleanCode = code.toUpperCase().replace(/[^A-Z0-9\-\/\+]/g, '').slice(0, 6);
+    setDesign((prev) => {
+      const shortcuts = { ...(prev.serviceShortcuts || DEFAULT_SERVICE_SHORTCUTS) };
+      shortcuts[serviceKey] = cleanCode;
+      return {
+        ...prev,
+        serviceShortcuts: shortcuts,
+      };
+    });
+  };
+
+  const duplicateShortcutCodes = useMemo(() => {
+    const counts = new Map<string, number>();
+    const activeShortcuts = design.serviceShortcuts || DEFAULT_SERVICE_SHORTCUTS;
+    for (const srv of CONFIGURABLE_SERVICES) {
+      const code = (
+        activeShortcuts[srv.id] ||
+        activeShortcuts[srv.name] ||
+        srv.defaultShortcut
+      ).trim().toUpperCase();
+      if (code) {
+        counts.set(code, (counts.get(code) || 0) + 1);
+      }
+    }
+    const dups = new Set<string>();
+    for (const [code, count] of counts.entries()) {
+      if (count > 1) dups.add(code);
+    }
+    return dups;
+  }, [design.serviceShortcuts]);
+
+  const hasDuplicateShortcuts = duplicateShortcutCodes.size > 0;
 
   // Field configuration handlers
   const handleFieldToggle = (index: number) => {
@@ -423,7 +479,14 @@ export const TagDesignerPage: React.FC = () => {
     return <LoadingState message="Loading Design Tags..." fullPage />;
   }
 
-  const activeSample = SAMPLE_PRESETS[sampleIndex].data;
+  const activeSample = useMemo(() => {
+    const base = SAMPLE_PRESETS[sampleIndex].data;
+    return {
+      ...base,
+      shopName: design.shopName || 'GrowFast',
+      serviceShortcut: resolveServiceShortcut(base.serviceType, design.serviceShortcuts),
+    };
+  }, [sampleIndex, design.shopName, design.serviceShortcuts]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] p-3 sm:p-6 lg:p-8">
@@ -678,6 +741,104 @@ export const TagDesignerPage: React.FC = () => {
                   </div>
                 </label>
               </div>
+
+              {/* Shop Name Configuration */}
+              <div className="sm:col-span-2 md:col-span-3 pt-3 border-t border-[var(--border)]">
+                <label
+                  htmlFor="tag-shop-name-input"
+                  className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5"
+                >
+                  Shop Name (Displayed on Line 1)
+                </label>
+                <input
+                  type="text"
+                  id="tag-shop-name-input"
+                  maxLength={50}
+                  value={design.shopName ?? 'GrowFast'}
+                  onChange={(e) => handleShopNameChange(e.target.value)}
+                  placeholder="e.g. GrowFast"
+                  className="w-full min-h-[44px] px-3.5 py-2 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 font-sans"
+                />
+                <span className="text-[11px] text-[var(--text-secondary)] mt-1 block">
+                  Configured shop name displayed at the top of every garment tag (no branch or address appended). Maximum 50 characters.
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Service Shortcuts Configuration Card */}
+          <Card className="p-4 sm:p-5 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-[var(--shadow-neu-card)]">
+            <div className="pb-3 mb-4 border-b border-[var(--border)] flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <TagIcon size={18} className="text-blue-600 dark:text-blue-400" />
+                  Service Shortcuts Configuration
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Owner-configured service shortcut codes displayed on Line 4 of each garment tag (1–6 characters).
+                </p>
+              </div>
+            </div>
+
+            {hasDuplicateShortcuts && (
+              <div
+                id="duplicate-shortcuts-warning"
+                className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 rounded-xl text-xs flex items-center gap-2"
+              >
+                <AlertCircle size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>
+                  Warning: Multiple services share the same shortcut code. Unique shortcuts are recommended for accurate workshop processing.
+                </span>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[var(--text-secondary)]">
+                    <th className="py-2 px-3 font-bold">Active Service</th>
+                    <th className="py-2 px-3 font-bold">Shortcut Code (1–6 Chars)</th>
+                    <th className="py-2 px-3 font-bold text-center">Tag Line 4 Preview</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {CONFIGURABLE_SERVICES.map((srv) => {
+                    const currentCode =
+                      design.serviceShortcuts?.[srv.id] ||
+                      design.serviceShortcuts?.[srv.name] ||
+                      DEFAULT_SERVICE_SHORTCUTS[srv.id] ||
+                      DEFAULT_SERVICE_SHORTCUTS[srv.name] ||
+                      srv.defaultShortcut;
+                    const isDup = duplicateShortcutCodes.has(currentCode.toUpperCase());
+                    return (
+                      <tr key={srv.id} className="hover:bg-[var(--bg-surface-hover)]">
+                        <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">
+                          <div className="font-semibold">{srv.name}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)] font-mono">{srv.id}</div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <input
+                            type="text"
+                            id={`shortcut-input-${srv.id}`}
+                            value={currentCode}
+                            maxLength={6}
+                            onChange={(e) => handleServiceShortcutChange(srv.id, e.target.value)}
+                            aria-label={`Shortcut for ${srv.name}`}
+                            className={`w-28 min-h-[40px] px-2.5 py-1 text-xs font-mono font-bold uppercase rounded-lg border bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 ${
+                              isDup ? 'border-amber-400 focus:ring-amber-500' : 'border-[var(--border)]'
+                            }`}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-block px-2.5 py-1 font-bold font-mono text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            {currentCode || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </Card>
 

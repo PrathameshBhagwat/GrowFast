@@ -3,6 +3,9 @@ import {
   DEFAULT_TAG_DESIGN,
   type TagDesignConfig,
   type TagFieldConfig,
+  formatShopName,
+  resolveServiceShortcut,
+  formatGarmentSequence,
 } from '@growfast/shared-types';
 
 export interface PhysicalTagData {
@@ -13,9 +16,11 @@ export interface PhysicalTagData {
   customerName: string;
   serviceType: string;
   garmentName: string;
+  shopName?: string;
+  serviceShortcut?: string;
   storeName?: string;
   storeLocation?: string;
-  orderDate: string | Date;
+  orderDate?: string | Date;
   isCancelled?: boolean;
   // Reference Image Fields
   customerAddress?: string;
@@ -43,19 +48,12 @@ export interface PhysicalTagProps {
  * Maps service category or category name to canonical compact service abbreviation
  * e.g. DRY_CLEAN -> DC, STEAM_PRESS / STEAM_IRON -> SI, WASH_IRON -> WSI
  */
-export function getServiceCode(serviceType: string): string {
+export function getServiceCode(
+  serviceType: string,
+  customShortcuts?: Record<string, string>,
+): string {
   if (!serviceType) return 'GEN';
-  const norm = serviceType.toUpperCase().replace(/\s+/g, '_').replace(/&/g, 'AND');
-  if (norm.includes('DRY_CLEAN')) return 'DC';
-  if (norm.includes('WASH') && (norm.includes('IRON') || norm.includes('STEAM'))) return 'WSI';
-  if (norm.includes('WASH') && norm.includes('FOLD')) return 'W+F';
-  if (norm.includes('STEAM') || norm.includes('IRON') || norm.includes('PRESS')) return 'SI';
-  if (norm.includes('SHOE')) return 'SC';
-  if (norm.includes('LEATHER')) return 'LC';
-  if (norm.includes('STAIN')) return 'SR';
-  if (norm.includes('PREMIUM')) return 'PC';
-  if (norm.includes('WASH') || norm.includes('LAUNDRY')) return 'W';
-  return norm.replace(/[^A-Z0-9]/g, '').slice(0, 3) || 'GEN';
+  return resolveServiceShortcut(serviceType, customShortcuts);
 }
 
 /**
@@ -472,13 +470,97 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
           </div>
         );
 
+      // ─── Canonical 5-Line Garment Tag Fields ─────────────────────────
+      case 'shopName': {
+        const resolvedShopName = formatShopName(
+          data.shopName || activeDesign.shopName,
+          data.storeName,
+        );
+        return (
+          <div
+            key="shopName"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+            data-testid="tag-shop-name"
+          >
+            <span
+              className="truncate block tracking-wide font-black"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial Black'),
+                fontWeight: fieldCfg.isBold !== false ? 'bold' : 'normal',
+                fontSize: `${fieldCfg.fontSize || 10}px`,
+              }}
+              title={resolvedShopName}
+            >
+              {resolvedShopName}
+            </span>
+          </div>
+        );
+      }
+
+      case 'serviceShortcut': {
+        const shortcut =
+          data.serviceShortcut ||
+          resolveServiceShortcut(serviceType, activeDesign.serviceShortcuts);
+        return (
+          <div
+            key="serviceShortcut"
+            className={`my-0.5 overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+            data-testid="tag-service-shortcut"
+          >
+            <span
+              className="block truncate font-bold tracking-wide"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial Black'),
+                fontSize: `${fieldCfg.fontSize || 12}px`,
+              }}
+              title={shortcut}
+            >
+              {shortcut}
+            </span>
+          </div>
+        );
+      }
+
+      case 'garmentSequence': {
+        const seq = formatGarmentSequence(garmentName, unitNumber, totalPieces);
+        return (
+          <div
+            key="garmentSequence"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+            data-testid="tag-garment-sequence"
+          >
+            <span
+              className="truncate block tracking-tight font-bold"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Calibri'),
+                fontSize: `${fieldCfg.fontSize || 11}px`,
+              }}
+              title={seq}
+            >
+              {seq}
+            </span>
+          </div>
+        );
+      }
+
       // ─── Legacy Phase T4 Aliases ──────────────────────────────────
-      case 'storeHeader':
+      case 'storeHeader': {
+        const headerText =
+          data.shopName || (!data.storeLocation && activeDesign.shopName)
+            ? formatShopName(data.shopName || activeDesign.shopName, data.storeName)
+            : storeHeader;
         return (
           <div
             key="storeHeader"
             className={`overflow-hidden leading-none ${alignClass}`}
             style={{ textAlign }}
+            data-testid="tag-store-header"
           >
             <span
               className="tracking-tight truncate block"
@@ -486,12 +568,13 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
                 ...baseStyle,
                 fontSize: `${fieldCfg.fontSize}px`,
               }}
-              title={storeHeader}
+              title={headerText}
             >
-              {storeHeader}
+              {headerText}
             </span>
           </div>
         );
+      }
 
       case 'tagId':
         return (

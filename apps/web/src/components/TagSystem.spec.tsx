@@ -838,4 +838,220 @@ describe('Phase T2: Tag UI & 40×40 mm Tag Preview & Printing Tests', () => {
       expect(screen.queryByText('Aishwarya Gangam')).not.toBeInTheDocument();
     });
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // Canonical 5-Line Garment Tag Layout & Configuration Tests
+  // ─────────────────────────────────────────────────────────────
+  describe('Canonical 5-Line Garment Tag Layout & Owner Configuration', () => {
+    const canonical5LineDesign: TagDesignConfig = {
+      version: 1,
+      name: 'Standard 5-Line Tag',
+      shopName: 'GrowFast',
+      serviceShortcuts: {
+        DRY_CLEAN: 'DC',
+        STEAM_PRESS: 'SI',
+      },
+      fields: [
+        { field: 'shopName', label: 'Shop Name', enabled: true, fontSize: 10, alignment: 'center' },
+        { field: 'orderNumber', label: 'Order Number', enabled: true, fontSize: 14, alignment: 'center', isBold: true },
+        { field: 'customerName', label: 'Customer Name', enabled: true, fontSize: 10, alignment: 'center' },
+        { field: 'serviceShortcut', label: 'Service Shortcut', enabled: true, fontSize: 12, alignment: 'center', isBold: true },
+        { field: 'garmentSequence', label: 'Garment Sequence', enabled: true, fontSize: 11, alignment: 'center' },
+      ],
+      containerPaddingMm: { top: 2.0, right: 2.5, bottom: 2.0, left: 2.5 },
+      borderStyle: 'dashed',
+    };
+
+    it('renders exact 5-line layout in specified top-to-bottom order', () => {
+      const tagData: PhysicalTagData = {
+        orderNumber: 'GF-ORD-000586',
+        customerName: 'Harshad Jadhav',
+        serviceType: 'DRY_CLEAN',
+        garmentName: 'Shirt',
+        unitNumber: 1,
+        totalPieces: 5,
+        shopName: 'GrowFast',
+        storeName: 'GrowFast Pune Flagship Branch',
+        storeLocation: 'Alandi',
+        orderDate: '2026-10-30T10:00:00.000Z',
+      };
+
+      const { container } = render(<PhysicalTag data={tagData} design={canonical5LineDesign} />);
+
+      // Line 1: Shop Name
+      const shopEl = container.querySelector('[data-testid="tag-shop-name"]');
+      expect(shopEl).toBeInTheDocument();
+      expect(within(shopEl as HTMLElement).getByText('GrowFast')).toBeInTheDocument();
+      expect(shopEl?.textContent).not.toContain('Pune');
+      expect(shopEl?.textContent).not.toContain('Alandi');
+
+      // Line 2: Order Number
+      const orderEl = container.querySelector('[title="GF-ORD-000586"]');
+      expect(orderEl).toBeInTheDocument();
+      expect(orderEl?.textContent).toBe('GF-ORD-000586');
+
+      // Line 3: Customer Name
+      const custEl = container.querySelector('[title="Harshad Jadhav"]');
+      expect(custEl).toBeInTheDocument();
+      expect(custEl?.textContent).toBe('Harshad Jadhav');
+
+      // Line 4: Service Shortcut (only DC, not full name, not piece count)
+      const shortcutEl = container.querySelector('[data-testid="tag-service-shortcut"]');
+      expect(shortcutEl).toBeInTheDocument();
+      expect(within(shortcutEl as HTMLElement).getByText('DC')).toBeInTheDocument();
+
+      // Line 5: Garment Type and Piece Sequence (Shirt 1/5)
+      const seqEl = container.querySelector('[data-testid="tag-garment-sequence"]');
+      expect(seqEl).toBeInTheDocument();
+      expect(within(seqEl as HTMLElement).getByText('Shirt 1/5')).toBeInTheDocument();
+    });
+
+    it('renders owner-configured shop name (e.g. SuperClean) on Line 1 without branch details', () => {
+      const customShopDesign: TagDesignConfig = {
+        ...canonical5LineDesign,
+        shopName: 'SuperClean',
+      };
+
+      const tagData: PhysicalTagData = {
+        orderNumber: 'GF-ORD-000586',
+        customerName: 'Harshad Jadhav',
+        serviceType: 'DRY_CLEAN',
+        garmentName: 'Shirt',
+        unitNumber: 1,
+        totalPieces: 1,
+        storeName: 'SuperClean Pune Hub Branch',
+        orderDate: '2026-10-30T10:00:00.000Z',
+      };
+
+      render(<PhysicalTag data={tagData} design={customShopDesign} />);
+
+      expect(screen.getByText('SuperClean')).toBeInTheDocument();
+      expect(screen.queryByText(/Pune Hub/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Branch/)).not.toBeInTheDocument();
+    });
+
+    it('renders owner-configured custom service shortcut (e.g. DRY) on Line 4', () => {
+      const customShortcutDesign: TagDesignConfig = {
+        ...canonical5LineDesign,
+        serviceShortcuts: {
+          DRY_CLEAN: 'DRY',
+        },
+      };
+
+      const tagData: PhysicalTagData = {
+        orderNumber: 'GF-ORD-000586',
+        customerName: 'Harshad Jadhav',
+        serviceType: 'DRY_CLEAN',
+        garmentName: 'Shirt',
+        unitNumber: 2,
+        totalPieces: 5,
+        orderDate: '2026-10-30T10:00:00.000Z',
+      };
+
+      render(<PhysicalTag data={tagData} design={customShortcutDesign} />);
+
+      expect(screen.getByText('DRY')).toBeInTheDocument();
+      expect(screen.getByText('Shirt 2/5')).toBeInTheDocument();
+    });
+
+    it('handles long customer names gracefully with ellipsis without breaking tag layout', () => {
+      const tagData: PhysicalTagData = {
+        orderNumber: 'GF-ORD-000586',
+        customerName: 'Dr. Rajeshwari Swaminathan-Venkatesh Junior',
+        serviceType: 'STEAM_PRESS',
+        garmentName: 'Silk Saree',
+        unitNumber: 1,
+        totalPieces: 1,
+        orderDate: '2026-10-30T10:00:00.000Z',
+      };
+
+      const { container } = render(<PhysicalTag data={tagData} design={canonical5LineDesign} />);
+
+      const custSpan = container.querySelector('[title="Dr. Rajeshwari Swaminathan-Venkatesh Junior"]');
+      expect(custSpan).toBeInTheDocument();
+      expect(custSpan?.className).toContain('truncate');
+    });
+
+    it('OrderTagsSection maintains independent sequence numbering for mixed garments (5 shirts & 3 pants)', () => {
+      const mixedOrder: OrderDetailDTO = {
+        ...baseOrder,
+        id: 'ord-mixed-test',
+        orderNumber: 'GF-ORD-000586',
+        customerName: 'Harshad Jadhav',
+        items: [
+          {
+            id: 'item-shirts',
+            garmentName: 'Shirt',
+            garmentCategory: GarmentCategory.MEN,
+            serviceType: ServiceCategory.DRY_CLEAN,
+            quantity: 5,
+            unitPrice: 100,
+            lineTotal: 500,
+            colorTags: [],
+            defectNotes: null,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            itemDueDate: null,
+            photos: [],
+            physicalGarments: [1, 2, 3, 4, 5].map((u) => ({
+              id: `pg-shirt-${u}`,
+              orderItemId: 'item-shirts',
+              unitNumber: u,
+              tagId: `GF-SHIRT-00${u}`,
+              isReady: false,
+              isCancelled: false,
+              isDelivered: false,
+              deliveredAt: null,
+              createdAt: '2026-10-30T10:00:00.000Z',
+              updatedAt: '2026-10-30T10:00:00.000Z',
+              photos: [],
+            })),
+          },
+          {
+            id: 'item-pants',
+            garmentName: 'Pants',
+            garmentCategory: GarmentCategory.MEN,
+            serviceType: ServiceCategory.STEAM_PRESS,
+            quantity: 3,
+            unitPrice: 80,
+            lineTotal: 240,
+            colorTags: [],
+            defectNotes: null,
+            itemStatus: ItemStatus.RECEIVED,
+            deliveredQuantity: 0,
+            itemDueDate: null,
+            photos: [],
+            physicalGarments: [1, 2, 3].map((u) => ({
+              id: `pg-pant-${u}`,
+              orderItemId: 'item-pants',
+              unitNumber: u,
+              tagId: `GF-PANT-00${u}`,
+              isReady: false,
+              isCancelled: false,
+              isDelivered: false,
+              deliveredAt: null,
+              createdAt: '2026-10-30T10:00:00.000Z',
+              updatedAt: '2026-10-30T10:00:00.000Z',
+              photos: [],
+            })),
+          },
+        ],
+      };
+
+      const onViewPhotos = vi.fn();
+      render(<OrderTagsSection order={mixedOrder} onViewPhotos={onViewPhotos} design={canonical5LineDesign} />);
+
+      // Shirt pieces: 1/5 through 5/5
+      expect(screen.getByText('Piece 1/5')).toBeInTheDocument();
+      expect(screen.getByText('Piece 5/5')).toBeInTheDocument();
+
+      // Pant pieces: 1/3 through 3/3
+      expect(screen.getByText('Piece 1/3')).toBeInTheDocument();
+      expect(screen.getByText('Piece 3/3')).toBeInTheDocument();
+
+      // Ensure tag IDs render for both
+      expect(screen.getByText('GF-SHIRT-001')).toBeInTheDocument();
+      expect(screen.getByText('GF-PANT-001')).toBeInTheDocument();
+    });
+  });
 });

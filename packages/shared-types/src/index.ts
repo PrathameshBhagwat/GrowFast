@@ -154,6 +154,12 @@ export type {
 export {
   DEFAULT_TAG_DESIGN,
   REFERENCE_TAG_DESIGN,
+  CANONICAL_5LINE_TAG_FIELDS,
+  CANONICAL_5LINE_TAG_DESIGN,
+  DEFAULT_SERVICE_SHORTCUTS,
+  resolveServiceShortcut,
+  formatGarmentSequence,
+  formatShopName,
   sanitizeTagDesign,
   SUPPORTED_TAG_FONTS,
   SUPPORTED_TAG_PRINTERS,

@@ -1,6 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card, Button } from '@growfast/ui';
-import { OrderDetailDTO, OrderPhotoDTO, type TagDesignConfig } from '@growfast/shared-types';
+import {
+  OrderDetailDTO,
+  OrderPhotoDTO,
+  type TagDesignConfig,
+  resolveServiceShortcut,
+} from '@growfast/shared-types';
 import { PhysicalTagData } from './PhysicalTag';
 import { TagPreviewModal } from './TagPreviewModal';
 import { TagPrintLayout } from './TagPrintLayout';
@@ -80,7 +85,10 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
         continue;
       }
 
-      for (const pg of item.physicalGarments) {
+      // Sort physical garments within this specific item by unitNumber ascending
+      const sortedGars = [...item.physicalGarments].sort((a, b) => a.unitNumber - b.unitNumber);
+
+      for (const pg of sortedGars) {
         const pieceTagId = pg.tagId || `GF-${pg.id.slice(-6).toUpperCase()}`;
         const tagData: PhysicalTagData = {
           orderNumber: order.orderNumber,
@@ -90,6 +98,8 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
           customerName: order.customerName,
           serviceType: item.serviceType,
           garmentName: item.garmentName,
+          shopName: activeDesign?.shopName || 'GrowFast',
+          serviceShortcut: resolveServiceShortcut(item.serviceType, activeDesign?.serviceShortcuts),
           storeName: order.storeName,
           storeLocation: order.storeAddress ? order.storeAddress.split(',')[0].trim() : undefined,
           orderDate: order.orderDate,
@@ -113,9 +123,9 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
       }
     }
 
-    // Sort deterministically: unitNumber ascending
-    return list.sort((a, b) => a.unitNumber - b.unitNumber);
-  }, [order]);
+    // Keep items in order, with garments grouped by item and piece positions contiguous
+    return list;
+  }, [order, activeDesign]);
 
   // Non-cancelled garments eligible for bulk printing
   const activeEntries = useMemo(() => tagEntries.filter((e) => !e.isCancelled), [tagEntries]);

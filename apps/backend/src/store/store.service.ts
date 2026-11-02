@@ -146,6 +146,42 @@ export class StoreService {
       throw new NotFoundException(`Store with ID ${storeId} not found`);
     }
 
+    if (dto.layout) {
+      if (dto.layout.shopName !== undefined) {
+        if (typeof dto.layout.shopName !== 'string' || dto.layout.shopName.trim().length === 0) {
+          throw new BadRequestException('Shop name cannot be empty');
+        }
+        if (dto.layout.shopName.trim().length > 50) {
+          throw new BadRequestException('Shop name cannot exceed 50 characters');
+        }
+      }
+
+      if (dto.layout.serviceShortcuts !== undefined) {
+        if (
+          typeof dto.layout.serviceShortcuts !== 'object' ||
+          dto.layout.serviceShortcuts === null
+        ) {
+          throw new BadRequestException('serviceShortcuts must be an object');
+        }
+        for (const [service, shortcut] of Object.entries(dto.layout.serviceShortcuts)) {
+          if (typeof shortcut !== 'string' || shortcut.trim().length === 0) {
+            throw new BadRequestException(`Shortcut for service "${service}" cannot be empty`);
+          }
+          const clean = shortcut.trim().toUpperCase();
+          if (clean.length < 1 || clean.length > 6) {
+            throw new BadRequestException(
+              `Shortcut "${clean}" for service "${service}" must be between 1 and 6 characters`,
+            );
+          }
+          if (!/^[A-Z0-9\-\/\+]+$/i.test(clean)) {
+            throw new BadRequestException(
+              `Shortcut "${clean}" contains invalid characters. Use alphanumeric, hyphen, plus, or slash.`,
+            );
+          }
+        }
+      }
+    }
+
     const sanitizedLayout = sanitizeTagDesign(dto.layout);
 
     const latest = await this.prisma.tagTemplate.findFirst({

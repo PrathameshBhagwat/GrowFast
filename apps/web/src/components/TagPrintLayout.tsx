@@ -44,8 +44,19 @@ export const TagPrintLayout: React.FC<TagPrintLayoutProps> = ({
     );
   }
 
-  // Sort deterministically: unitNumber ascending (1, 2, 3...)
-  const sortedTags = [...tags].sort((a, b) => a.unitNumber - b.unitNumber);
+  // Check if unitNumbers are distinct across the batch
+  const hasDuplicateUnitNumbers = tags.some((t, i) =>
+    tags.findIndex((other) => other.unitNumber === t.unitNumber) !== i,
+  );
+
+  // Sort deterministically: if duplicate unitNumbers exist (multiple garment types),
+  // group by garmentName, then unitNumber ascending; otherwise sort by unitNumber ascending
+  const sortedTags = [...tags].sort((a, b) => {
+    if (hasDuplicateUnitNumbers && a.garmentName !== b.garmentName) {
+      return (a.garmentName || '').localeCompare(b.garmentName || '');
+    }
+    return a.unitNumber - b.unitNumber;
+  });
 
   return (
     <div id={id} className="printable-tags-container" data-testid="printable-tags-container">

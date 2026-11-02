@@ -8,6 +8,10 @@
  */
 
 export type TagFieldKey =
+  // ─── 5-Line Canonical Garment Tag Fields ────────────────────────────
+  | 'shopName' // Line 1: Shop Name
+  | 'serviceShortcut' // Line 4: Service Shortcut (e.g. DC, SI, SC, ST)
+  | 'garmentSequence' // Line 5: Garment Type and Piece Sequence (e.g. Shirt 1/5, Pant 1/3)
   // ─── Reference Image Canonical Fields ──────────────────────────────
   | 'barcode' // BarCode (Code 39 barcode)
   | 'qrcode' // QRCode
@@ -66,6 +70,8 @@ export interface TagDesignConfig {
   storeId?: string;
   version: number;
   name: string;
+  shopName?: string; // Configured Shop Name, default 'GrowFast'
+  serviceShortcuts?: Record<string, string>; // Owner-configured service shortcuts map
   width?: string; // e.g. '1.5 in'
   height?: string; // e.g. '1.5 in'
   printer?: string; // e.g. 'TSC TE244'
@@ -126,11 +132,231 @@ export const SUPPORTED_TAG_PRINTERS = [
 export const SUPPORTED_TAG_DIMENSIONS = ['1.5 in', '2.0 in', '40 mm', '50 mm'] as const;
 
 /**
+ * Standard canonical service shortcuts.
+ * Owner can configure and customize any shortcut through the admin interface.
+ */
+export const DEFAULT_SERVICE_SHORTCUTS: Record<string, string> = {
+  DRY_CLEAN: 'DC',
+  STEAM_PRESS: 'SI',
+  SHOE_CLEAN: 'SC',
+  WEIGHT_BASED: 'ST',
+  WASH_IRON: 'WSI',
+  WASH: 'W',
+  LEATHER_CLEAN: 'RC',
+  STAIN_REMOVAL: 'FS',
+  // Human readable service names
+  'Dry Clean': 'DC',
+  'Dry Cleaning': 'DC',
+  'Steam Iron': 'SI',
+  'Steam Press': 'SI',
+  'Shoe Cleaning': 'SC',
+  'Starching': 'ST',
+  'Starching Dc': 'ST',
+  'Wash and Steam Iron': 'WSI',
+  'Wash & Steam Iron': 'WSI',
+  'Wash and Fold': 'W+F',
+  'Wash & Fold': 'W+F',
+  'Standard Wash': 'W',
+  'Premium Laundry': 'PL',
+  'Woolen Laundry': 'WL',
+  'Laundry for White': 'LW',
+  'Reprocess Cleaning': 'RC',
+  'Free Shoe': 'FS',
+};
+
+/**
+ * Canonical 5-Line Garment Tag Fields:
+ * Line 1: Shop Name
+ * Line 2: Order Number
+ * Line 3: Customer Name
+ * Line 4: Service Shortcut (e.g. DC, SI, SC, ST)
+ * Line 5: Garment Type and Piece Sequence (e.g. Shirt 1/5, Pant 1/3)
+ */
+export const CANONICAL_5LINE_TAG_FIELDS: TagFieldConfig[] = [
+  {
+    field: 'shopName',
+    label: 'Shop Name',
+    enabled: true,
+    fontSize: 10,
+    alignment: 'center',
+    isBold: true,
+    isUppercase: true,
+  },
+  {
+    field: 'orderNumber',
+    label: 'Order Number',
+    enabled: true,
+    fontSize: 14,
+    alignment: 'center',
+    isBold: true,
+    isMono: true,
+    isUppercase: true,
+  },
+  {
+    field: 'customerName',
+    label: 'Customer Name',
+    enabled: true,
+    fontSize: 10,
+    alignment: 'center',
+    isBold: true,
+  },
+  {
+    field: 'serviceShortcut',
+    label: 'Service Shortcut',
+    enabled: true,
+    fontSize: 12,
+    alignment: 'center',
+    isBold: true,
+  },
+  {
+    field: 'garmentSequence',
+    label: 'Garment Type & Piece Sequence',
+    enabled: true,
+    fontSize: 11,
+    alignment: 'center',
+    isBold: true,
+  },
+];
+
+export const CANONICAL_5LINE_TAG_DESIGN: TagDesignConfig = {
+  version: 1,
+  name: 'Canonical 5-Line Garment Tag',
+  shopName: 'GrowFast',
+  serviceShortcuts: { ...DEFAULT_SERVICE_SHORTCUTS },
+  width: '1.5 in',
+  height: '1.5 in',
+  printer: 'TSC TE244',
+  wetStrengthPaper: true,
+  align: 'center',
+  fields: CANONICAL_5LINE_TAG_FIELDS,
+  containerPaddingMm: { top: 2.0, right: 2.5, bottom: 2.0, left: 2.5 },
+  borderStyle: 'dashed',
+  borderColor: '#d1d5db',
+  lineHeight: 1.15,
+};
+
+/**
+ * Resolves a short, readable service code for garment tags with fallback logic.
+ */
+export function resolveServiceShortcut(
+  serviceIdentifier?: string | null,
+  customShortcuts?: Record<string, string> | null,
+): string {
+  if (!serviceIdentifier || typeof serviceIdentifier !== 'string') {
+    return 'GEN';
+  }
+
+  const raw = serviceIdentifier.trim();
+  if (!raw) return 'GEN';
+
+  // 1. Check custom shortcuts if provided
+  if (customShortcuts && typeof customShortcuts === 'object') {
+    if (customShortcuts[raw]) {
+      return customShortcuts[raw].trim().toUpperCase();
+    }
+    const upperRaw = raw.toUpperCase().replace(/\s+/g, '_');
+    for (const [key, val] of Object.entries(customShortcuts)) {
+      if (
+        key === raw ||
+        key.toUpperCase() === raw.toUpperCase() ||
+        key.toUpperCase().replace(/\s+/g, '_') === upperRaw
+      ) {
+        if (val && typeof val === 'string' && val.trim()) {
+          return val.trim().toUpperCase();
+        }
+      }
+    }
+  }
+
+  // 2. Check built-in standard shortcuts
+  if (DEFAULT_SERVICE_SHORTCUTS[raw]) {
+    return DEFAULT_SERVICE_SHORTCUTS[raw];
+  }
+  const normKey = raw.toUpperCase().replace(/\s+/g, '_');
+  if (DEFAULT_SERVICE_SHORTCUTS[normKey]) {
+    return DEFAULT_SERVICE_SHORTCUTS[normKey];
+  }
+
+  // 3. Fallback based on name contents
+  if (
+    normKey.includes('WASH') &&
+    (normKey.includes('IRON') || normKey.includes('STEAM') || normKey.includes('PRESS'))
+  ) {
+    return 'WSI';
+  }
+  if (normKey.includes('WASH') && normKey.includes('FOLD')) return 'W+F';
+  if (normKey.includes('DRY_CLEAN')) return 'DC';
+  if (normKey.includes('STARCH')) return 'ST';
+  if (normKey.includes('STEAM') || normKey.includes('IRON') || normKey.includes('PRESS')) return 'SI';
+  if (normKey.includes('SHOE')) return 'SC';
+  if (normKey.includes('PREMIUM')) return 'PL';
+  if (normKey.includes('WOOL')) return 'WL';
+  if (normKey.includes('WHITE')) return 'LW';
+  if (normKey.includes('LEATHER') || normKey.includes('REPROCESS')) return 'RC';
+  if (normKey.includes('STAIN') || normKey.includes('FREE_SHOE')) return 'FS';
+  if (normKey.includes('WASH') || normKey.includes('LAUNDRY')) return 'W';
+
+  // 4. Generate abbreviation from initials or first characters
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    const initials = words.map((w) => w[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (initials.length >= 2) return initials.slice(0, 4);
+  }
+
+  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return clean.slice(0, 3) || 'GEN';
+}
+
+/**
+ * Formats garment type and piece position: e.g. "Shirt 1/5", "Pant 1/3"
+ */
+export function formatGarmentSequence(
+  garmentName?: string | null,
+  unitNumber?: number | null,
+  totalPieces?: number | null,
+): string {
+  let name = (garmentName || 'Garment').trim();
+  if (name.toLowerCase() === 'pants') {
+    name = 'Pant';
+  } else if (name.toLowerCase() === 'shirts') {
+    name = 'Shirt';
+  }
+  const unit = typeof unitNumber === 'number' && unitNumber > 0 ? unitNumber : 1;
+  const total = typeof totalPieces === 'number' && totalPieces > 0 ? totalPieces : 1;
+  return `${name} ${unit}/${total}`;
+}
+
+/**
+ * Formats shop name displayed at the top of the tag: e.g. "GrowFast"
+ * Does not add branch name, location, address, or phone number.
+ */
+export function formatShopName(
+  configuredShopName?: string | null,
+  storeName?: string | null,
+): string {
+  if (configuredShopName && typeof configuredShopName === 'string' && configuredShopName.trim()) {
+    return configuredShopName.trim();
+  }
+  if (storeName && typeof storeName === 'string' && storeName.trim()) {
+    const parts = storeName.split('/');
+    const cleaned = (parts[0] || '').trim();
+    if (cleaned.toLowerCase().includes('branch') && !cleaned.toLowerCase().includes('growfast')) {
+      return 'GrowFast';
+    }
+    const stripped = cleaned.replace(/\s+Branch$/i, '').trim();
+    return stripped || 'GrowFast';
+  }
+  return 'GrowFast';
+}
+
+/**
  * Approved canonical reference default tag design from user UI specification.
  */
 export const REFERENCE_TAG_DESIGN: TagDesignConfig = {
   version: 1,
   name: 'Standard 1.5×1.5 in Tag (TSC TE244)',
+  shopName: 'GrowFast',
+  serviceShortcuts: { ...DEFAULT_SERVICE_SHORTCUTS },
   width: '1.5 in',
   height: '1.5 in',
   printer: 'TSC TE244',
@@ -263,6 +489,8 @@ export const REFERENCE_TAG_DESIGN: TagDesignConfig = {
 export const DEFAULT_TAG_DESIGN: TagDesignConfig = {
   version: 1,
   name: 'Standard 40×40 mm Washable Cloth Tag',
+  shopName: 'GrowFast',
+  serviceShortcuts: { ...DEFAULT_SERVICE_SHORTCUTS },
   width: '1.5 in',
   height: '1.5 in',
   printer: 'TSC TE244',
@@ -353,6 +581,12 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
     return { ...DEFAULT_TAG_DESIGN };
   }
 
+  const canonical5Keys: TagFieldKey[] = [
+    'shopName',
+    'serviceShortcut',
+    'garmentSequence',
+  ];
+
   const referenceKeys: TagFieldKey[] = [
     'barcode',
     'qrcode',
@@ -377,7 +611,7 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
     'tagId',
   ];
 
-  const validKeys: TagFieldKey[] = [...referenceKeys, ...legacyKeys];
+  const validKeys: TagFieldKey[] = [...canonical5Keys, ...referenceKeys, ...legacyKeys];
 
   // Map known fields with safe clamped values
   const fields: TagFieldConfig[] = input.fields
@@ -406,14 +640,21 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
           (f.field === 'storeHeader' ||
             f.field === 'garmentName' ||
             f.field === 'orderNumber' ||
-            f.field === 'bookingNo'),
+            f.field === 'bookingNo' ||
+            f.field === 'shopName'),
         label:
           f.label ||
           (f.field === 'orderNumber'
             ? 'Order Number (Primary Anchor)'
             : f.field === 'bookingNo'
               ? 'Booking No.'
-              : f.field),
+              : f.field === 'shopName'
+                ? 'Shop Name'
+                : f.field === 'serviceShortcut'
+                  ? 'Service Shortcut'
+                  : f.field === 'garmentSequence'
+                    ? 'Garment Type & Piece Sequence'
+                    : f.field),
       };
     });
 
@@ -459,9 +700,35 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
   const rawDays = typeof input.workshopPreponeDays === 'number' ? input.workshopPreponeDays : 1;
   const workshopPreponeDays = Math.min(Math.max(Math.round(rawDays), 0), 14);
 
+  // Sanitize shopName (Owner configuration)
+  const shopName =
+    typeof input.shopName === 'string' && input.shopName.trim()
+      ? input.shopName.trim().slice(0, 50)
+      : input.shopName === undefined
+        ? (defaultSource.shopName || 'GrowFast')
+        : 'GrowFast';
+
+  // Sanitize serviceShortcuts (Owner configuration)
+  const serviceShortcuts: Record<string, string> = {
+    ...DEFAULT_SERVICE_SHORTCUTS,
+  };
+  if (input.serviceShortcuts && typeof input.serviceShortcuts === 'object') {
+    for (const [key, val] of Object.entries(input.serviceShortcuts)) {
+      if (typeof key === 'string' && typeof val === 'string') {
+        const cleanKey = key.trim();
+        const cleanVal = val.trim().toUpperCase().slice(0, 6);
+        if (cleanKey && cleanVal) {
+          serviceShortcuts[cleanKey] = cleanVal;
+        }
+      }
+    }
+  }
+
   return {
     version: Number(input.version) || 1,
     name: input.name?.trim() || defaultSource.name,
+    shopName,
+    serviceShortcuts,
     width,
     height,
     printer,
