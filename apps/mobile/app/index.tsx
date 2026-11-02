@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Redirect } from 'expo-router';
+import { Redirect, useRootNavigationState } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { GrowFastLogo } from '../src/components/GrowFastLogo';
 
 export default function IndexScreen() {
   const { isAuthenticated, isLoading } = useAuth();
+  const rootNavigationState = useRootNavigationState();
 
-  if (isLoading) {
+  if (isLoading || !rootNavigationState?.key) {
     return (
       <View style={styles.container}>
         <GrowFastLogo size={100} containerStyle={styles.logoContainer} />
