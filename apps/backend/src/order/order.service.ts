@@ -784,11 +784,15 @@ export class OrderService {
   }
 
   async findOrderByDraftId(draftId: string, storeId: string) {
+    if (!draftId || !draftId.trim() || draftId === 'undefined') {
+      throw new NotFoundException(`Order with draft ID "${draftId}" not found`);
+    }
+
     const order = await this.prisma.order.findUnique({
       where: {
         storeId_clientDraftId: {
           storeId,
-          clientDraftId: draftId,
+          clientDraftId: draftId.trim(),
         },
       },
       include: {

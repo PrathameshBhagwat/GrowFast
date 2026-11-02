@@ -94,24 +94,37 @@ export class SyncEngine {
         return { success: false, error: 'Authentication required' };
       }
 
-      // 4. Pre-check idempotency recovery: check if backend already committed this draft
+      // 4. Pre-check idempotency recovery: check if backend already committed this draft.
+      // A pre-check query for an existing draft ID is only meaningful if:
+      // - The client is recovering from an interrupted sync.
+      // - The draft was previously attempted and failed with a network error.
+      // - The client is checking whether an ambiguous timeout already succeeded on the server.
+      // For a freshly created local draft that has never touched the network, a lookup by draft ID will always return 404.
       let serverOrder: any = null;
-      try {
-        const existing = await apiClient.orders.getByDraftId(clientDraftId);
-        if (existing && existing.id) {
-          serverOrder = existing;
-        }
-      } catch (checkErr: any) {
-        // If 404 or not found, proceed to normal creation
-        if (checkErr instanceof ApiError && checkErr.statusCode === 404) {
-          // Expected: order does not exist on server yet
-        } else if (checkErr instanceof ApiError && checkErr.statusCode === 401) {
-          await updateDraftSyncStatus(clientDraftId, 'FAILED_RETRYABLE', {
-            error: 'Session expired. Please log in again.',
-            incrementRetry: true,
-          });
-          this.onAuthExpired?.();
-          return { success: false, error: 'Session expired' };
+      const isRetryOrRecovery =
+        draft.retryCount > 0 ||
+        Boolean(draft.lastSyncAttemptAt) ||
+        draft.syncStatus === 'FAILED_RETRYABLE' ||
+        draft.syncStatus === 'SYNCING';
+
+      if (isRetryOrRecovery) {
+        try {
+          const existing = await apiClient.orders.getByDraftId(clientDraftId);
+          if (existing && existing.id) {
+            serverOrder = existing;
+          }
+        } catch (checkErr: any) {
+          // If 404 or not found, proceed to normal creation
+          if (checkErr instanceof ApiError && checkErr.statusCode === 404) {
+            // Expected: order does not exist on server yet
+          } else if (checkErr instanceof ApiError && checkErr.statusCode === 401) {
+            await updateDraftSyncStatus(clientDraftId, 'FAILED_RETRYABLE', {
+              error: 'Session expired. Please log in again.',
+              incrementRetry: true,
+            });
+            this.onAuthExpired?.();
+            return { success: false, error: 'Session expired' };
+          }
         }
       }
 

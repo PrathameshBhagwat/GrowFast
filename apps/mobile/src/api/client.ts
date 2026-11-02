@@ -323,7 +323,16 @@ export function normalizeApiUrl(baseUrl: string, endpoint: string): string {
   return `${base}${path}`;
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export interface RequestOptions extends RequestInit {
+  /**
+   * HTTP status codes that are considered expected / non-erroneous for probes or existence checks.
+   * If the response status is in this list, `console.warn` logging will not trigger, though `ApiError`
+   * is still thrown so callers can cleanly catch and branch.
+   */
+  expectedStatuses?: number[];
+}
+
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const token = await getAuthToken();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const normalizedPath = cleanEndpoint.startsWith('/api/') ? cleanEndpoint : `/api${cleanEndpoint}`;
@@ -413,7 +422,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
           await triggerUnauthorized();
         }
         const statusDetail = `HTTP ${response.status} (${response.statusText || 'Error'}) from ${cleanEndpoint}`;
-        console.warn(`[apiClient] HTTP error without JSON body: ${statusDetail}`);
+        const isExpected =
+          options.expectedStatuses && options.expectedStatuses.includes(response.status);
+        if (!isExpected) {
+          console.warn(`[apiClient] HTTP error without JSON body: ${statusDetail}`);
+        }
         throw new ApiError(statusDetail, response.status, null);
       }
       console.warn(
@@ -433,9 +446,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         `Request failed with HTTP ${response.status}`;
       const formattedError = Array.isArray(errorMessage) ? errorMessage.join(', ') : errorMessage;
 
-      console.warn(
-        `[apiClient] HTTP ${response.status} on [${options.method || 'GET'} ${cleanEndpoint}]: ${formattedError}`,
-      );
+      const isExpected =
+        options.expectedStatuses && options.expectedStatuses.includes(response.status);
+      if (!isExpected) {
+        console.warn(
+          `[apiClient] HTTP ${response.status} on [${options.method || 'GET'} ${cleanEndpoint}]: ${formattedError}`,
+        );
+      }
 
       throw new ApiError(formattedError, response.status, responseData);
     }
@@ -530,7 +547,10 @@ export const apiClient = {
     },
 
     getById: async (id: string): Promise<CustomerDTO> => {
-      return await request<CustomerDTO>(`/api/customers/${id}`);
+      if (!id || !id.trim() || id === 'undefined') {
+        throw new ApiError('Customer ID is required', 400);
+      }
+      return await request<CustomerDTO>(`/api/customers/${encodeURIComponent(id.trim())}`);
     },
 
     update: async (id: string, payload: UpdateCustomerRequest): Promise<CustomerDTO> => {
@@ -569,12 +589,30 @@ export const apiClient = {
       });
     },
 
-    getByDraftId: async (draftId: string): Promise<OrderDetailDTO> => {
-      return await request<OrderDetailDTO>(`/api/orders/by-draft/${draftId}`);
+    getByDraftId: async (draftId: string): Promise<OrderDetailDTO | null> => {
+      if (!draftId || !draftId.trim() || draftId === 'undefined') {
+        return null;
+      }
+      try {
+        return await request<OrderDetailDTO>(
+          `/api/orders/by-draft/${encodeURIComponent(draftId.trim())}`,
+          {
+            expectedStatuses: [404],
+          },
+        );
+      } catch (err: any) {
+        if (err instanceof ApiError && err.statusCode === 404) {
+          return null;
+        }
+        throw err;
+      }
     },
 
     getById: async (orderId: string): Promise<OrderDetailDTO> => {
-      return await request<OrderDetailDTO>(`/api/orders/${orderId}`);
+      if (!orderId || !orderId.trim() || orderId === 'undefined') {
+        throw new ApiError('Order ID is required', 400);
+      }
+      return await request<OrderDetailDTO>(`/api/orders/${encodeURIComponent(orderId.trim())}`);
     },
 
     list: async (params?: {
@@ -680,11 +718,17 @@ export const apiClient = {
     },
 
     getOrderPayments: async (orderId: string): Promise<PaymentDTO[]> => {
-      return await request<PaymentDTO[]>(`/api/orders/${orderId}/payments`);
+      if (!orderId || !orderId.trim() || orderId === 'undefined') {
+        throw new ApiError('Order ID is required', 400);
+      }
+      return await request<PaymentDTO[]>(`/api/orders/${encodeURIComponent(orderId.trim())}/payments`);
     },
 
     getSummary: async (orderId: string): Promise<PaymentSummaryDTO> => {
-      return await request<PaymentSummaryDTO>(`/api/orders/${orderId}/payments/summary`);
+      if (!orderId || !orderId.trim() || orderId === 'undefined') {
+        throw new ApiError('Order ID is required', 400);
+      }
+      return await request<PaymentSummaryDTO>(`/api/orders/${encodeURIComponent(orderId.trim())}/payments/summary`);
     },
   },
 
@@ -763,7 +807,10 @@ export const apiClient = {
     },
 
     getByOrder: async (orderId: string): Promise<OrderPhotoDTO[]> => {
-      return await request<OrderPhotoDTO[]>(`/api/orders/${orderId}/photos`);
+      if (!orderId || !orderId.trim() || orderId === 'undefined') {
+        throw new ApiError('Order ID is required', 400);
+      }
+      return await request<OrderPhotoDTO[]>(`/api/orders/${encodeURIComponent(orderId.trim())}/photos`);
     },
   },
 
@@ -774,7 +821,10 @@ export const apiClient = {
     },
 
     getById: async (id: string): Promise<DeliveryRecordDTO> => {
-      return await request<DeliveryRecordDTO>(`/api/deliveries/${id}`);
+      if (!id || !id.trim() || id === 'undefined') {
+        throw new ApiError('Delivery ID is required', 400);
+      }
+      return await request<DeliveryRecordDTO>(`/api/deliveries/${encodeURIComponent(id.trim())}`);
     },
 
     updateStatus: async (
@@ -853,7 +903,12 @@ export const apiClient = {
     },
 
     getById: async (id: string): Promise<{ success: boolean; data: NotificationDTO }> => {
-      return await request<{ success: boolean; data: NotificationDTO }>(`/api/notifications/${id}`);
+      if (!id || !id.trim() || id === 'undefined') {
+        throw new ApiError('Notification ID is required', 400);
+      }
+      return await request<{ success: boolean; data: NotificationDTO }>(
+        `/api/notifications/${encodeURIComponent(id.trim())}`,
+      );
     },
   },
 };
