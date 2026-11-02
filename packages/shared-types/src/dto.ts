@@ -54,6 +54,15 @@ export interface EmployeeDTO {
   storeId: string;
   storeName: string;
   isActive: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  photoUrl?: string | null;
+  passportPhotoUrl?: string | null;
+  aadhaarFrontUrl?: string | null;
+  aadhaarBackUrl?: string | null;
+  currentAddress?: string | null;
+  permanentAddress?: string | null;
+  sameAsCurrentAddress?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +74,13 @@ export interface CreateEmployeeRequest {
   pin: string;
   role: Role;
   storeId?: string;
+  photoUrl?: string | null;
+  passportPhotoUrl?: string | null;
+  aadhaarFrontUrl?: string | null;
+  aadhaarBackUrl?: string | null;
+  currentAddress?: string | null;
+  permanentAddress?: string | null;
+  sameAsCurrentAddress?: boolean;
 }
 
 export interface UpdateEmployeeRequest {
@@ -75,6 +91,13 @@ export interface UpdateEmployeeRequest {
   isActive?: boolean;
   pin?: string;
   storeId?: string;
+  photoUrl?: string | null;
+  passportPhotoUrl?: string | null;
+  aadhaarFrontUrl?: string | null;
+  aadhaarBackUrl?: string | null;
+  currentAddress?: string | null;
+  permanentAddress?: string | null;
+  sameAsCurrentAddress?: boolean;
 }
 
 // ─── Customer DTOs ──────────────────────────────────────────────────

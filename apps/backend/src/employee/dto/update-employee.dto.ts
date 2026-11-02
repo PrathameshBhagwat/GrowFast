@@ -30,4 +30,32 @@ export class UpdateEmployeeDto {
   @IsOptional()
   @IsString()
   storeId?: string;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  passportPhotoUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  aadhaarFrontUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  aadhaarBackUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  currentAddress?: string | null;
+
+  @IsOptional()
+  @IsString()
+  permanentAddress?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  sameAsCurrentAddress?: boolean;
 }

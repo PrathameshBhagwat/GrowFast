@@ -111,4 +111,25 @@ describe('EmployeeController', () => {
       expect(service.update).toHaveBeenCalledWith('emp-001', dto, mockReqUser.user);
     });
   });
+
+  describe('remove', () => {
+    it('should call service.remove and return confirmation response', async () => {
+      service.remove = jest.fn().mockResolvedValue({
+        success: true,
+        message: 'Staff member permanently deleted.',
+        permanentDeleteType: 'HARD',
+      });
+
+      const result = await controller.remove('emp-002', mockReqUser);
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Staff member permanently deleted.',
+        data: {
+          permanentDeleteType: 'HARD',
+        },
+      });
+      expect(service.remove).toHaveBeenCalledWith('emp-002', mockReqUser.user);
+    });
+  });
 });

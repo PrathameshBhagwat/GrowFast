@@ -60,7 +60,8 @@ export function getServiceCode(
  * Formats order date to compact physical tag date format:
  * e.g. "02 Sep 26 Wed" or "08 Oct 26 Thu"
  */
-export function formatTagDate(dateInput: string | Date): string {
+export function formatTagDate(dateInput?: string | Date): string {
+  if (!dateInput) return '';
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return '';
   const day = String(d.getDate()).padStart(2, '0');

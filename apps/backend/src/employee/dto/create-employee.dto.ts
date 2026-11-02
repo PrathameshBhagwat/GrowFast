@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { Role } from '@growfast/shared-types';
 
 export class CreateEmployeeDto {
@@ -26,4 +26,32 @@ export class CreateEmployeeDto {
   @IsOptional()
   @IsString()
   storeId?: string;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  passportPhotoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  aadhaarFrontUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  aadhaarBackUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  currentAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  permanentAddress?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  sameAsCurrentAddress?: boolean;
 }

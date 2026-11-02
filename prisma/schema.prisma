@@ -42,11 +42,20 @@ model Employee {
   phone     String?
   email     String?  @unique
   pinHash   String   @map("pin_hash")
-  role      Role
-  storeId   String   @map("store_id")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role                 Role
+  storeId              String                @map("store_id")
+  isActive             Boolean               @default(true)
+  photoUrl             String?               @map("photo_url")
+  passportPhotoUrl     String?               @map("passport_photo_url")
+  aadhaarFrontUrl      String?               @map("aadhaar_front_url")
+  aadhaarBackUrl       String?               @map("aadhaar_back_url")
+  currentAddress       String?               @map("current_address")
+  permanentAddress     String?               @map("permanent_address")
+  sameAsCurrentAddress Boolean               @default(false) @map("same_as_current_address")
+  isDeleted            Boolean               @default(false) @map("is_deleted")
+  deletedAt            DateTime?             @map("deleted_at")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   store            Store                 @relation(fields: [storeId], references: [id])
   createdOrders    Order[]               @relation("OrderCreatedBy")
@@ -58,6 +67,7 @@ model Employee {
   @@index([storeId])
   @@index([role])
   @@index([isActive])
+  @@index([isDeleted])
   @@map("employees")
 }
 

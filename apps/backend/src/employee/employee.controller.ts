@@ -8,9 +8,12 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Request,
 } from '@nestjs/common';
-import { EmployeeService } from './employee.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { EmployeeService, STAFF_DOCUMENT_MAX_SIZE } from './employee.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -43,8 +46,51 @@ export class EmployeeController {
   }
 
   /**
+   * POST /api/employees/upload-document
+   * Upload an optional staff photograph, passport-size photo, or Aadhaar card image.
+   * Allowed roles: OWNER, MANAGER
+   */
+  @Post('upload-document')
+  @Roles('OWNER', 'MANAGER')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: STAFF_DOCUMENT_MAX_SIZE },
+    }),
+  )
+  async uploadDocument(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('storeId') storeId: string,
+    @Request() req: any,
+  ) {
+    const result = await this.employeeService.uploadDocument(file, storeId, req.user);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  /**
+   * GET /api/employees/:id/documents/:docType
+   * Retrieve secure, authenticated access URL for a staff document.
+   * Allowed roles: OWNER, MANAGER
+   */
+  @Get(':id/documents/:docType')
+  @Roles('OWNER', 'MANAGER')
+  async getDocumentUrl(
+    @Param('id') id: string,
+    @Param('docType') docType: string,
+    @Request() req: any,
+  ) {
+    const accessUrl = await this.employeeService.getDocumentAccessUrl(id, docType, req.user);
+    return {
+      success: true,
+      data: { accessUrl },
+    };
+  }
+
+  /**
    * GET /api/employees/:id
-   * Get employee by ID with store isolation.
+   * Get employee by ID with store isolation and complete profile.
    * Allowed roles: OWNER, MANAGER
    */
   @Get(':id')
@@ -59,7 +105,7 @@ export class EmployeeController {
 
   /**
    * POST /api/employees
-   * Create a new employee account.
+   * Create a new employee account with optional profile details.
    * Allowed roles: OWNER, MANAGER
    */
   @Post()
@@ -74,7 +120,7 @@ export class EmployeeController {
 
   /**
    * PATCH /api/employees/:id
-   * Update existing employee account (details, role, status, or PIN).
+   * Update existing employee account (details, role, status, PIN, or optional profile).
    * Allowed roles: OWNER, MANAGER
    */
   @Patch(':id')
@@ -89,16 +135,19 @@ export class EmployeeController {
 
   /**
    * DELETE /api/employees/:id
-   * Delete an employee account.
+   * Permanently delete an employee account with historical and financial preservation.
    * Allowed roles: OWNER, MANAGER
    */
   @Delete(':id')
   @Roles('OWNER', 'MANAGER')
   async remove(@Param('id') id: string, @Request() req: any) {
-    await this.employeeService.remove(id, req.user);
+    const result = await this.employeeService.remove(id, req.user);
     return {
       success: true,
-      message: 'Employee deleted successfully',
+      message: result.message,
+      data: {
+        permanentDeleteType: result.permanentDeleteType,
+      },
     };
   }
 }
