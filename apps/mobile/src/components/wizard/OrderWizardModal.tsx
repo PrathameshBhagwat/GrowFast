@@ -36,6 +36,7 @@ import { OrderDraft, saveDraft, queueDraftForSync, generateUUID } from '../../db
 import { getPhotosForDraft, PendingPhoto, deletePhoto } from '../../db/photos';
 import { syncEngine } from '../../services/sync-engine';
 import { apiClient } from '../../api/client';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Modular Screen Components
 import { CustomerStep } from './CustomerStep';
@@ -244,6 +245,7 @@ export function OrderWizardModal({
   onOrderSavedOrSubmitted,
   onViewOrderDetail,
 }: OrderWizardModalProps) {
+  const { colors, isDark } = useTheme();
   const { isConnected } = useNetworkStatus();
   const canModifyPrice = userRole === Role.OWNER || userRole === Role.MANAGER;
 
@@ -1059,9 +1061,9 @@ export function OrderWizardModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <View style={[styles.safeContainer, { paddingTop: topInset, paddingBottom: insets.bottom }]}>
+      <View style={[styles.safeContainer, { paddingTop: topInset, paddingBottom: insets.bottom, backgroundColor: colors.surface }]}>
         {/* Header Bar */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           {currentStepIndex !== 5 ? (
             <TouchableOpacity
               style={styles.headerBackBtn}
@@ -1070,8 +1072,8 @@ export function OrderWizardModal({
               accessibilityLabel="Go back or cancel"
             >
               <View style={styles.headerBackRow}>
-                <WizardIcon name="chevron-back" size={20} color="#0866F5" fallbackText="‹" />
-                <Text style={styles.headerBackText}>
+                <WizardIcon name="chevron-back" size={20} color={colors.primary} fallbackText="‹" />
+                <Text style={[styles.headerBackText, { color: colors.primary }]}>
                   {currentStepIndex === 0 ? 'Cancel' : 'Back'}
                 </Text>
               </View>
@@ -1080,7 +1082,7 @@ export function OrderWizardModal({
             <View style={{ width: 80 }} />
           )}
 
-          <Text style={styles.headerTitle}>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
             {currentStepIndex === 5
               ? 'Order Confirmation'
               : currentStepIndex === 4
@@ -1109,7 +1111,7 @@ export function OrderWizardModal({
         )}
 
         {/* Step Body Component */}
-        <View style={styles.body}>
+        <View style={[styles.body, { backgroundColor: colors.background }]}>
           {/* STEP 0: Customer (Screen 3 - Dev C) */}
           {currentStepIndex === 0 && (
             <View style={{ flex: 1 }}>
@@ -1125,10 +1127,11 @@ export function OrderWizardModal({
                 }}
                 isConnected={isConnected}
               />
-              <View style={styles.customerFooter}>
+              <View style={[styles.customerFooter, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
                 <TouchableOpacity
                   style={[
                     styles.customerNextBtn,
+                    { backgroundColor: colors.primary },
                     !selectedCustomer && !manualCustomerPhone && styles.customerNextBtnDisabled,
                   ]}
                   onPress={handleNext}

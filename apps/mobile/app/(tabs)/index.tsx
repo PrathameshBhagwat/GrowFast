@@ -29,6 +29,7 @@ import {
 } from '@growfast/shared-types';
 
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { apiClient } from '../../src/api/client';
 import { ConnectionBanner } from '../../src/components/ConnectionBanner';
@@ -104,6 +105,7 @@ export default function HomeScreen() {
   const isVeryNarrow = screenWidth < 340;
   const { isConnected } = useNetworkStatus();
   const { user: session, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
+  const { isDark, colors, toggleTheme } = useTheme();
 
   // 1. Operational Screen Notice State
   const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
@@ -377,7 +379,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ConnectionBanner />
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={[
           styles.scrollContent,
           {
@@ -392,7 +394,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            colors={['#1765F5']}
+            colors={[colors.primary]}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -409,10 +411,13 @@ export default function HomeScreen() {
                 <GrowFastLogo size={34} />
               </View>
               <View style={styles.brandTextGroup}>
-                <Text style={styles.brandTitleText}>
+                <Text style={[styles.brandTitleText, { color: colors.textPrimary }]}>
                   GrowFast <Text style={styles.brandAccentText}>Laundry</Text>
                 </Text>
-                <Text style={styles.branchSubtitleText} numberOfLines={1}>
+                <Text
+                  style={[styles.branchSubtitleText, { color: colors.textSecondary }]}
+                  numberOfLines={1}
+                >
                   {storeBranch}
                 </Text>
               </View>
@@ -421,34 +426,45 @@ export default function HomeScreen() {
             {/* Right: Theme Toggle + Sign-Out */}
             <View style={styles.headerActionGroup}>
               <TouchableOpacity
-                style={styles.circleActionButton}
-                onPress={() =>
-                  Alert.alert(
-                    'Theme Settings',
-                    'Light mode is active. System default theme is currently enforced.',
-                  )
-                }
+                style={[
+                  styles.circleActionButton,
+                  {
+                    backgroundColor: isDark ? colors.surfaceSecondary : '#FFFFFF',
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={toggleTheme}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel="Theme Toggle"
+                accessibilityLabel={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               >
-                <Icon name="moon-outline" size={19} color="#334155" />
+                <Icon
+                  name={isDark ? 'sunny' : 'moon-outline'}
+                  size={19}
+                  color={isDark ? '#FBBF24' : colors.textPrimary}
+                />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.circleActionButton}
+                style={[
+                  styles.circleActionButton,
+                  {
+                    backgroundColor: isDark ? colors.surfaceSecondary : '#FFFFFF',
+                    borderColor: colors.border,
+                  },
+                ]}
                 onPress={handleSignOut}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Sign Out"
               >
-                <Icon name="log-out-outline" size={20} color="#334155" />
+                <Icon name="log-out-outline" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* User & Role Display */}
-          <Text style={styles.userRoleLineText}>
+          <Text style={[styles.userRoleLineText, { color: colors.textMuted }]}>
             {staffName} • {staffRole}
           </Text>
         </View>
@@ -457,7 +473,12 @@ export default function HomeScreen() {
             B. COUNTER OPERATIONAL SCREEN NOTICE
             ========================================== */}
         {!isNoticeDismissed ? (
-          <View style={styles.noticeCard}>
+          <View
+            style={[
+              styles.noticeCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <TouchableOpacity
               style={styles.noticeDismissBtn}
               onPress={() => setIsNoticeDismissed(true)}
@@ -465,7 +486,7 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Dismiss Notice"
             >
-              <Icon name="close" size={18} color="#94A3B8" />
+              <Icon name="close" size={18} color={colors.textMuted} />
             </TouchableOpacity>
 
             <View style={styles.noticeContentRow}>
@@ -476,8 +497,10 @@ export default function HomeScreen() {
 
               {/* Text Group */}
               <View style={styles.noticeTextColumn}>
-                <Text style={styles.noticeTitle}>Counter Operational Screen</Text>
-                <Text style={styles.noticeSubText}>
+                <Text style={[styles.noticeTitle, { color: colors.textPrimary }]}>
+                  Counter Operational Screen
+                </Text>
+                <Text style={[styles.noticeSubText, { color: colors.textSecondary }]}>
                   {loadingDueOrders && dueTotalCount === null
                     ? 'Checking orders requiring attention today...'
                     : dueOrdersError
@@ -511,15 +534,22 @@ export default function HomeScreen() {
         {/* ==========================================
             C. MAIN SEARCH CARD: CUSTOMER / INVOICE
             ========================================== */}
-        <View style={styles.mainSearchCard}>
+        <View
+          style={[
+            styles.mainSearchCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           {/* Card Header */}
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardHeaderSquircle}>
               <Icon name="person-outline" size={22} color="#FFFFFF" />
             </View>
             <View style={styles.cardHeaderTextColumn}>
-              <Text style={styles.cardHeaderTitle}>Search Customer / Invoice</Text>
-              <Text style={styles.cardHeaderSubtitle}>
+              <Text style={[styles.cardHeaderTitle, { color: colors.textPrimary }]}>
+                Search Customer / Invoice
+              </Text>
+              <Text style={[styles.cardHeaderSubtitle, { color: colors.textSecondary }]}>
                 Lookup customer by name, mobile, ID, address, or search invoice #
               </Text>
             </View>
@@ -537,6 +567,10 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={[
                 styles.secondaryActionBtn,
+                {
+                  backgroundColor: isDark ? colors.surfaceSecondary : '#FFFFFF',
+                  borderColor: isDark ? colors.border : '#BFDBFE',
+                },
                 isCompact && styles.actionBtnCompact,
                 isVeryNarrow && styles.actionBtnVeryNarrow,
               ]}
@@ -545,9 +579,17 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Find or Edit Order"
             >
-              <Icon name="search-outline" size={isCompact ? 16 : 17} color="#1765F5" />
+              <Icon
+                name="search-outline"
+                size={isCompact ? 16 : 17}
+                color={isDark ? '#60A5FA' : '#1765F5'}
+              />
               <Text
-                style={[styles.secondaryActionBtnText, isCompact && styles.actionBtnTextCompact]}
+                style={[
+                  styles.secondaryActionBtnText,
+                  { color: isDark ? '#60A5FA' : '#1765F5' },
+                  isCompact && styles.actionBtnTextCompact,
+                ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
                 adjustsFontSizeToFit={true}
@@ -583,31 +625,55 @@ export default function HomeScreen() {
           </View>
 
           {/* Inner Search Box with Field Selector */}
-          <View style={styles.innerSearchBoxContainer}>
+          <View
+            style={[
+              styles.innerSearchBoxContainer,
+              {
+                backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
+                borderColor: colors.border,
+              },
+            ]}
+          >
             {/* Field Selector Dropdown Pill */}
             <TouchableOpacity
-              style={styles.fieldSelectorPill}
+              style={[
+                styles.fieldSelectorPill,
+                {
+                  backgroundColor: isDark ? colors.surface : '#FFFFFF',
+                  borderColor: colors.border,
+                },
+              ]}
               onPress={() => setFieldPickerVisible(true)}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel={`Filter Search Field: ${currentFieldOption.label}`}
             >
-              <Text style={styles.fieldSelectorPillText}>{currentFieldOption.label}</Text>
-              <Icon name="chevron-down" size={14} color="#64748B" />
+              <Text style={[styles.fieldSelectorPillText, { color: colors.textPrimary }]}>
+                {currentFieldOption.label}
+              </Text>
+              <Icon name="chevron-down" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
 
             {/* Search Input Row */}
-            <View style={styles.searchInputRow}>
+            <View
+              style={[
+                styles.searchInputRow,
+                {
+                  backgroundColor: isDark ? colors.surface : '#FFFFFF',
+                  borderColor: colors.border,
+                },
+              ]}
+            >
               <Icon
                 name="search-outline"
                 size={19}
-                color="#94A3B8"
+                color={colors.textMuted}
                 style={styles.searchIconStyle}
               />
               <TextInput
-                style={styles.searchTextInput}
+                style={[styles.searchTextInput, { color: colors.textPrimary }]}
                 placeholder={currentFieldOption.placeholder}
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
@@ -636,7 +702,15 @@ export default function HomeScreen() {
 
           {/* Selected Customer Active Banner */}
           {selectedCustomer ? (
-            <View style={styles.selectedCustomerBanner}>
+            <View
+              style={[
+                styles.selectedCustomerBanner,
+                {
+                  backgroundColor: isDark ? colors.surfaceSecondary : '#EFF6FF',
+                  borderColor: isDark ? colors.border : '#BFDBFE',
+                },
+              ]}
+            >
               <View style={styles.selectedCustomerInfoRow}>
                 <View style={styles.selectedAvatarCircle}>
                   <Text style={styles.selectedAvatarText}>
@@ -647,7 +721,10 @@ export default function HomeScreen() {
                   <View
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
                   >
-                    <Text style={styles.selectedCustomerName} numberOfLines={1}>
+                    <Text
+                      style={[styles.selectedCustomerName, { color: colors.textPrimary }]}
+                      numberOfLines={1}
+                    >
                       {selectedCustomer.name}
                     </Text>
                     {selectedCustomer.membership && selectedCustomer.membership !== 'NONE' ? (
@@ -656,14 +733,21 @@ export default function HomeScreen() {
                       </View>
                     ) : null}
                   </View>
-                  <Text style={styles.selectedCustomerPhone}>{selectedCustomer.phone}</Text>
+                  <Text
+                    style={[styles.selectedCustomerPhone, { color: colors.textSecondary }]}
+                  >
+                    {selectedCustomer.phone}
+                  </Text>
                   {selectedCustomer.customerCode ? (
                     <Text style={styles.selectedCustomerCode}>
                       #{selectedCustomer.customerCode}
                     </Text>
                   ) : null}
                   {selectedCustomer.address ? (
-                    <Text style={styles.selectedCustomerAddress} numberOfLines={1}>
+                    <Text
+                      style={[styles.selectedCustomerAddress, { color: colors.textMuted }]}
+                      numberOfLines={1}
+                    >
                       {selectedCustomer.address}
                     </Text>
                   ) : null}
@@ -749,13 +833,19 @@ export default function HomeScreen() {
           {/* Dropdown Customer Results */}
           {!selectedCustomer && customerResults.length > 0 ? (
             <View style={styles.resultsContainer}>
-              <Text style={styles.resultsSectionHeader}>
+              <Text style={[styles.resultsSectionHeader, { color: colors.textSecondary }]}>
                 Customer Matches ({customerResults.length})
               </Text>
               {customerResults.map((cust) => (
                 <TouchableOpacity
                   key={cust.id}
-                  style={styles.resultCustomerCard}
+                  style={[
+                    styles.resultCustomerCard,
+                    {
+                      backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
+                      borderColor: colors.border,
+                    },
+                  ]}
                   onPress={() => handleSelectCustomer(cust)}
                   activeOpacity={0.7}
                   accessibilityRole="button"
@@ -766,7 +856,10 @@ export default function HomeScreen() {
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.resultCustomerName} numberOfLines={1}>
+                      <Text
+                        style={[styles.resultCustomerName, { color: colors.textPrimary }]}
+                        numberOfLines={1}
+                      >
                         {cust.name}
                       </Text>
                       {cust.membership && cust.membership !== 'NONE' ? (
@@ -775,9 +868,16 @@ export default function HomeScreen() {
                         </View>
                       ) : null}
                     </View>
-                    <Text style={styles.resultCustomerPhone}>{cust.phone}</Text>
+                    <Text
+                      style={[styles.resultCustomerPhone, { color: colors.textSecondary }]}
+                    >
+                      {cust.phone}
+                    </Text>
                     {cust.address ? (
-                      <Text style={styles.resultCustomerAddress} numberOfLines={1}>
+                      <Text
+                        style={[styles.resultCustomerAddress, { color: colors.textMuted }]}
+                        numberOfLines={1}
+                      >
                         {cust.address}
                       </Text>
                     ) : null}
@@ -793,7 +893,7 @@ export default function HomeScreen() {
           {/* Dropdown Order / Invoice Results */}
           {!selectedCustomer && orderResults.length > 0 ? (
             <View style={styles.resultsContainer}>
-              <Text style={styles.resultsSectionHeader}>
+              <Text style={[styles.resultsSectionHeader, { color: colors.textSecondary }]}>
                 Invoice / Order Matches ({orderResults.length})
               </Text>
               {orderResults.map((order) => {
@@ -811,7 +911,13 @@ export default function HomeScreen() {
                 return (
                   <TouchableOpacity
                     key={order.id}
-                    style={styles.resultOrderCard}
+                    style={[
+                      styles.resultOrderCard,
+                      {
+                        backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
+                        borderColor: colors.border,
+                      },
+                    ]}
                     onPress={() => {
                       setActiveOrderId(order.id);
                       setOrderDetailVisible(true);
@@ -824,11 +930,20 @@ export default function HomeScreen() {
                       <Icon name="shirt-outline" size={18} color="#1765F5" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={styles.resultOrderNumber}>{orderNumDisplay}</Text>
-                      <Text style={styles.resultOrderCustomer} numberOfLines={1}>
+                      <Text
+                        style={[styles.resultOrderNumber, { color: colors.textPrimary }]}
+                      >
+                        {orderNumDisplay}
+                      </Text>
+                      <Text
+                        style={[styles.resultOrderCustomer, { color: colors.textSecondary }]}
+                        numberOfLines={1}
+                      >
                         {order.customerName || (order as any).customer?.name || 'Customer'}
                       </Text>
-                      <Text style={styles.resultOrderMeta}>
+                      <Text
+                        style={[styles.resultOrderMeta, { color: colors.textMuted }]}
+                      >
                         Due: {formatDate(order.effectiveDueDate || order.orderDate)} • ₹
                         {order.totalAmount.toFixed(0)}
                       </Text>
@@ -888,7 +1003,12 @@ export default function HomeScreen() {
         {/* ==========================================
             D. TODAY'S DUE ORDERS CARD
             ========================================== */}
-        <View style={styles.dueOrdersCard}>
+        <View
+          style={[
+            styles.dueOrdersCard,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           {/* Header Row */}
           <View style={styles.cardHeaderRow}>
             <View style={styles.cardHeaderSquircle}>
@@ -896,7 +1016,9 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardHeaderTextColumn}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.cardHeaderTitle}>Today's Due Orders</Text>
+                <Text style={[styles.cardHeaderTitle, { color: colors.textPrimary }]}>
+                  Today's Due Orders
+                </Text>
                 <View style={styles.dueCountBadgePill}>
                   {loadingDueOrders && dueTotalCount === null ? (
                     <ActivityIndicator
@@ -911,7 +1033,9 @@ export default function HomeScreen() {
                   )}
                 </View>
               </View>
-              <Text style={styles.cardHeaderSubtitle}>Orders requiring attention today</Text>
+              <Text style={[styles.cardHeaderSubtitle, { color: colors.textSecondary }]}>
+                Orders requiring attention today
+              </Text>
             </View>
           </View>
 
@@ -983,7 +1107,13 @@ export default function HomeScreen() {
                     return (
                       <TouchableOpacity
                         key={order.id}
-                        style={styles.dueOrderItemCard}
+                        style={[
+                          styles.dueOrderItemCard,
+                          {
+                            backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
+                            borderColor: colors.border,
+                          },
+                        ]}
                         onPress={() => {
                           setActiveOrderId(order.id);
                           setOrderDetailVisible(true);
@@ -993,14 +1123,19 @@ export default function HomeScreen() {
                         accessibilityLabel={`Order ${orderNumDisplay}`}
                       >
                         <View style={styles.garmentSquircleSmall}>
-                          <Icon name="shirt-outline" size={19} color="#1765F5" />
+                          <Icon name="shirt-outline" size={19} color={colors.primary} />
                         </View>
                         <View style={styles.dueOrderCenterColumn}>
-                          <Text style={styles.dueOrderNumberText}>{orderNumDisplay}</Text>
-                          <Text style={styles.dueOrderCustomerText} numberOfLines={1}>
+                          <Text style={[styles.dueOrderNumberText, { color: colors.textPrimary }]}>
+                            {orderNumDisplay}
+                          </Text>
+                          <Text
+                            style={[styles.dueOrderCustomerText, { color: colors.textSecondary }]}
+                            numberOfLines={1}
+                          >
                             {order.customerName || (order as any).customer?.name || 'Customer'}
                           </Text>
-                          <Text style={styles.dueOrderSubText}>
+                          <Text style={[styles.dueOrderSubText, { color: colors.textMuted }]}>
                             Due: {formatDate(order.effectiveDueDate || order.orderDate)} • ₹
                             {order.totalAmount.toFixed(0)}
                           </Text>
@@ -1021,7 +1156,7 @@ export default function HomeScreen() {
                               {order.status.replace(/_/g, ' ')}
                             </Text>
                           </View>
-                          <Icon name="chevron-forward" size={17} color="#94A3B8" />
+                          <Icon name="chevron-forward" size={17} color={colors.textMuted} />
                         </View>
                       </TouchableOpacity>
                     );
@@ -1034,7 +1169,9 @@ export default function HomeScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Open Full Orders List"
                   >
-                    <Text style={styles.viewAllOrdersLinkText}>View All in Orders Screen →</Text>
+                    <Text style={[styles.viewAllOrdersLinkText, { color: colors.primary }]}>
+                      View All in Orders Screen →
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1121,15 +1258,22 @@ export default function HomeScreen() {
         onRequestClose={() => setFieldPickerVisible(false)}
       >
         <Pressable style={styles.modalOverlayBackdrop} onPress={() => setFieldPickerVisible(false)}>
-          <View style={styles.fieldPickerModalCard}>
+          <View
+            style={[
+              styles.fieldPickerModalCard,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <View style={styles.fieldPickerHeaderRow}>
-              <Text style={styles.fieldPickerTitle}>Search Field</Text>
+              <Text style={[styles.fieldPickerTitle, { color: colors.textPrimary }]}>
+                Search Field
+              </Text>
               <TouchableOpacity
                 onPress={() => setFieldPickerVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityLabel="Close Field Picker"
               >
-                <Icon name="close" size={20} color="#64748B" />
+                <Icon name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -1140,6 +1284,14 @@ export default function HomeScreen() {
                   key={opt.key}
                   style={[
                     styles.fieldPickerOptionRow,
+                    {
+                      backgroundColor: isSelected
+                        ? colors.primaryBg
+                        : isDark
+                          ? colors.surfaceSecondary
+                          : '#F8FAFC',
+                      borderColor: colors.border,
+                    },
                     isSelected && styles.fieldPickerOptionRowSelected,
                   ]}
                   onPress={() => {
@@ -1153,12 +1305,13 @@ export default function HomeScreen() {
                   <Text
                     style={[
                       styles.fieldPickerOptionText,
+                      { color: isSelected ? colors.primary : colors.textPrimary },
                       isSelected && styles.fieldPickerOptionTextSelected,
                     ]}
                   >
                     {opt.label}
                   </Text>
-                  {isSelected ? <Icon name="checkmark" size={18} color="#1765F5" /> : null}
+                  {isSelected ? <Icon name="checkmark" size={18} color={colors.primary} /> : null}
                 </TouchableOpacity>
               );
             })}

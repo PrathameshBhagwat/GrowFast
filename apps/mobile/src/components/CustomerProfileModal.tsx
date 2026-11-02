@@ -23,6 +23,7 @@ import {
   UpdateCustomerRequest,
 } from '@growfast/shared-types';
 import { apiClient } from '../api/client';
+import { useTheme } from '../contexts/ThemeContext';
 
 const IonIcon = Ionicons as unknown as React.ComponentType<{
   name: string;
@@ -92,6 +93,7 @@ export function CustomerProfileModal({
   onViewOrder,
   onCustomerUpdated,
 }: CustomerProfileModalProps) {
+  const { colors, isDark } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const isNarrowScreen = windowWidth < 360;
 
@@ -254,74 +256,74 @@ export function CustomerProfileModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.sheetCard}>
+        <View style={[styles.sheetCard, { backgroundColor: colors.surface }]}>
           {/* Top Drag Handle (Screenshot 2) */}
-          <View style={styles.dragHandle} />
+          <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
           {/* ── B. CUSTOMER PROFILE HEADER (Screenshot 2) ── */}
-          <View style={styles.headerRow}>
+          <View style={[styles.headerRow, { borderBottomColor: colors.border }]}>
             {/* Left: Avatar with soft blue decorative backdrop */}
             <View style={styles.avatarWrapper}>
-              <View style={styles.avatarBackdrop} />
-              <View style={styles.avatarCircle}>
+              <View style={[styles.avatarBackdrop, { backgroundColor: colors.primaryBg }]} />
+              <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
                 <Text style={styles.avatarText}>{getInitials(activeCustomer.name)}</Text>
               </View>
             </View>
 
             {/* Middle: Name, Phone, ID */}
             <View style={styles.headerInfoCol}>
-              <Text style={styles.customerName} numberOfLines={1}>
+              <Text style={[styles.customerName, { color: colors.textPrimary }]} numberOfLines={1}>
                 {activeCustomer.name}
               </Text>
 
               {/* Phone with receiver icon */}
               <View style={styles.headerMetaRow}>
-                <IonIcon name="call" size={13} color="#64748B" style={styles.metaIcon} />
-                <Text style={styles.headerMetaText}>{activeCustomer.phone}</Text>
+                <IonIcon name="call" size={13} color={colors.textSecondary} style={styles.metaIcon} />
+                <Text style={[styles.headerMetaText, { color: colors.textSecondary }]}>{activeCustomer.phone}</Text>
               </View>
 
               {/* ID with badge/card icon */}
               <View style={styles.headerMetaRow}>
-                <IonIcon name="id-card-outline" size={13} color="#64748B" style={styles.metaIcon} />
-                <Text style={styles.headerMetaText}>ID: {displayCode}</Text>
+                <IonIcon name="id-card-outline" size={13} color={colors.textSecondary} style={styles.metaIcon} />
+                <Text style={[styles.headerMetaText, { color: colors.textSecondary }]}>ID: {displayCode}</Text>
               </View>
             </View>
 
             {/* Right: Close button & Edit button */}
             <View style={styles.headerActionsCol}>
               <TouchableOpacity
-                style={styles.closeBtnCircle}
+                style={[styles.closeBtnCircle, { backgroundColor: colors.surfaceSecondary }]}
                 onPress={onClose}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityRole="button"
                 accessibilityLabel="Close customer details"
               >
-                <IonIcon name="close" size={18} color="#64748B" />
+                <IonIcon name="close" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.editBtnPill}
+                style={[styles.editBtnPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 onPress={handleOpenEdit}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Edit Customer Details"
               >
-                <IonIcon name="pencil" size={13} color="#0866F5" style={{ marginRight: 4 }} />
-                <Text style={styles.editBtnText}>Edit</Text>
+                <IonIcon name="pencil" size={13} color={colors.primary} style={{ marginRight: 4 }} />
+                <Text style={[styles.editBtnText, { color: colors.primary }]}>Edit</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
             {/* ── C. CUSTOMER ADDRESS SECTION (Screenshot 2) ── */}
-            <View style={styles.addressCard}>
-              <View style={styles.addressIconCircle}>
-                <IonIcon name="location-sharp" size={18} color="#0866F5" />
+            <View style={[styles.addressCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+              <View style={[styles.addressIconCircle, { backgroundColor: colors.primaryLight }]}>
+                <IonIcon name="location-sharp" size={18} color={colors.primary} />
               </View>
 
               <View style={styles.addressTextCol}>
-                <Text style={styles.addressLabel}>Address</Text>
-                <Text style={styles.addressVal} numberOfLines={2}>
+                <Text style={[styles.addressLabel, { color: colors.textSecondary }]}>Address</Text>
+                <Text style={[styles.addressVal, { color: colors.textPrimary }]} numberOfLines={2}>
                   {activeCustomer.address
                     ? `${activeCustomer.address}${activeCustomer.pincode ? `, ${activeCustomer.pincode}` : ''}`
                     : 'No address recorded for this customer.'}
@@ -330,7 +332,7 @@ export function CustomerProfileModal({
 
               {activeCustomer.address ? (
                 <TouchableOpacity
-                  style={styles.viewMapBtn}
+                  style={[styles.viewMapBtn, { backgroundColor: colors.primaryLight }]}
                   onPress={handleViewOnMap}
                   activeOpacity={0.7}
                   accessibilityRole="button"
@@ -339,10 +341,10 @@ export function CustomerProfileModal({
                   <IonIcon
                     name="location-outline"
                     size={14}
-                    color="#0866F5"
+                    color={colors.primary}
                     style={{ marginRight: 3 }}
                   />
-                  <Text style={styles.viewMapText}>View on Map</Text>
+                  <Text style={[styles.viewMapText, { color: colors.primary }]}>View on Map</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -352,13 +354,13 @@ export function CustomerProfileModal({
               {/* Header: Document icon + Title & Subtitle + Refresh button */}
               <View style={styles.orderHistoryHeaderRow}>
                 <View style={styles.orderHistoryTitleGroup}>
-                  <View style={styles.docIconBox}>
-                    <IonIcon name="document-text-outline" size={18} color="#0866F5" />
+                  <View style={[styles.docIconBox, { backgroundColor: colors.primaryBg }]}>
+                    <IonIcon name="document-text-outline" size={18} color={colors.primary} />
                   </View>
                   <View style={styles.orderHistoryTextContainer}>
-                    <Text style={styles.orderHistoryHeading}>Order History</Text>
+                    <Text style={[styles.orderHistoryHeading, { color: colors.textPrimary }]}>Order History</Text>
                     <Text
-                      style={styles.orderHistorySubheading}
+                      style={[styles.orderHistorySubheading, { color: colors.textSecondary }]}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
@@ -368,7 +370,7 @@ export function CustomerProfileModal({
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.refreshBtn, loadingOrders && { opacity: 0.6 }]}
+                  style={[styles.refreshBtn, { backgroundColor: colors.primaryBg, borderColor: colors.primaryLight }, loadingOrders && { opacity: 0.6 }]}
                   onPress={() =>
                     loadOrderHistory(activeCustomer.id, orderSearchQuery, orderStatusFilter)
                   }
@@ -379,26 +381,26 @@ export function CustomerProfileModal({
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   {loadingOrders ? (
-                    <ActivityIndicator size="small" color="#0866F5" style={{ width: 14, height: 14 }} />
+                    <ActivityIndicator size="small" color={colors.primary} style={{ width: 14, height: 14 }} />
                   ) : (
-                    <IonIcon name="refresh-outline" size={14} color="#0866F5" />
+                    <IonIcon name="refresh-outline" size={14} color={colors.primary} />
                   )}
-                  <Text style={styles.refreshBtnText}>Refresh</Text>
+                  <Text style={[styles.refreshBtnText, { color: colors.primary }]}>Refresh</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Search Bar */}
-              <View style={styles.searchBarContainer}>
+              <View style={[styles.searchBarContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
                 <IonIcon
                   name="search-outline"
                   size={17}
-                  color="#64748B"
+                  color={colors.textSecondary}
                   style={{ marginRight: 8 }}
                 />
                 <TextInput
-                  style={styles.searchInput}
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
                   placeholder="Search order # (e.g. 1024)..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                   value={orderSearchQuery}
                   onChangeText={setOrderSearchQuery}
                   autoCapitalize="none"
@@ -410,7 +412,7 @@ export function CustomerProfileModal({
                     onPress={() => setOrderSearchQuery('')}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <IonIcon name="close-circle" size={16} color="#94A3B8" />
+                    <IonIcon name="close-circle" size={16} color={colors.textMuted} />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -427,13 +429,18 @@ export function CustomerProfileModal({
                     return (
                       <TouchableOpacity
                         key={f.key}
-                        style={[styles.filterChip, isSelected && styles.filterChipActive]}
+                        style={[
+                          styles.filterChip,
+                          { backgroundColor: colors.surfaceSecondary },
+                          isSelected && [styles.filterChipActive, { backgroundColor: colors.primary }],
+                        ]}
                         onPress={() => setOrderStatusFilter(f.key)}
                         activeOpacity={0.7}
                       >
                         <Text
                           style={[
                             styles.filterChipText,
+                            { color: colors.textSecondary },
                             isSelected && styles.filterChipTextActive,
                           ]}
                         >
@@ -448,8 +455,8 @@ export function CustomerProfileModal({
               {/* Order History Content States */}
               {loadingOrders ? (
                 <View style={styles.loadingBox}>
-                  <ActivityIndicator size="small" color="#0866F5" />
-                  <Text style={styles.loadingText}>Fetching order history...</Text>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Fetching order history...</Text>
                 </View>
               ) : orderError ? (
                 <View style={styles.errorBox}>
@@ -466,19 +473,19 @@ export function CustomerProfileModal({
                 </View>
               ) : orders.length === 0 ? (
                 /* Empty State Card matching Screenshot 2 */
-                <View style={styles.emptyStateCard}>
+                <View style={[styles.emptyStateCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                   {/* Package box graphic with rays */}
                   <View style={styles.packageGraphicWrap}>
-                    <View style={styles.packageCloudBackdrop} />
-                    <View style={styles.packageSunburstRay1} />
-                    <View style={styles.packageSunburstRay2} />
+                    <View style={[styles.packageCloudBackdrop, { backgroundColor: colors.primaryBg }]} />
+                    <View style={[styles.packageSunburstRay1, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.packageSunburstRay2, { backgroundColor: colors.primary }]} />
                     <View style={styles.packageBox}>
-                      <MciIcon name="package-variant-closed" size={36} color="#0866F5" />
+                      <MciIcon name="package-variant-closed" size={36} color={colors.primary} />
                     </View>
                   </View>
 
-                  <Text style={styles.emptyStateHeading}>No past orders</Text>
-                  <Text style={styles.emptyStateSubtext}>
+                  <Text style={[styles.emptyStateHeading, { color: colors.textPrimary }]}>No past orders</Text>
+                  <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
                     No past orders recorded for this customer.
                   </Text>
                 </View>
@@ -501,7 +508,7 @@ export function CustomerProfileModal({
                     return (
                       <TouchableOpacity
                         key={ord.id}
-                        style={styles.orderItemCard}
+                        style={[styles.orderItemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                         onPress={() => {
                           onClose();
                           onViewOrder?.(ord.id);
@@ -510,12 +517,12 @@ export function CustomerProfileModal({
                         accessibilityRole="button"
                         accessibilityLabel={`View Order ${orderNumDisplay}`}
                       >
-                        <View style={styles.orderSquircle}>
-                          <IonIcon name="shirt-outline" size={16} color="#0866F5" />
+                        <View style={[styles.orderSquircle, { backgroundColor: colors.primaryBg }]}>
+                          <IonIcon name="shirt-outline" size={16} color={colors.primary} />
                         </View>
                         <View style={{ flex: 1, marginLeft: 10 }}>
-                          <Text style={styles.orderNumText}>{orderNumDisplay}</Text>
-                          <Text style={styles.orderDateText}>
+                          <Text style={[styles.orderNumText, { color: colors.textPrimary }]}>{orderNumDisplay}</Text>
+                          <Text style={[styles.orderDateText, { color: colors.textSecondary }]}>
                             {formatDate(ord.orderDate || ord.effectiveDueDate)}
                           </Text>
                         </View>
@@ -533,12 +540,12 @@ export function CustomerProfileModal({
                               {displayStatus.replace(/_/g, ' ')}
                             </Text>
                           </View>
-                          <Text style={styles.orderTotalText}>₹{ord.totalAmount.toFixed(0)}</Text>
+                          <Text style={[styles.orderTotalText, { color: colors.textPrimary }]}>₹{ord.totalAmount.toFixed(0)}</Text>
                         </View>
                         <IonIcon
                           name="chevron-forward"
                           size={16}
-                          color="#94A3B8"
+                          color={colors.textMuted}
                           style={{ marginLeft: 6 }}
                         />
                       </TouchableOpacity>
@@ -549,17 +556,17 @@ export function CustomerProfileModal({
             </View>
 
             {/* ── E. CREATE ORDER SECTION (Screenshot 2: EXACTLY TWO OPTIONS) ── */}
-            <View style={styles.createOrderContainer}>
+            <View style={[styles.createOrderContainer, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
               {/* Header row: Cart icon + Title + Subtitle */}
               <View style={styles.createOrderHeaderRow}>
-                <View style={styles.cartIconSquircle}>
-                  <IonIcon name="cart-outline" size={18} color="#0866F5" />
+                <View style={[styles.cartIconSquircle, { backgroundColor: colors.primaryLight }]}>
+                  <IonIcon name="cart-outline" size={18} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.createOrderHeading} numberOfLines={1}>
+                  <Text style={[styles.createOrderHeading, { color: colors.textPrimary }]} numberOfLines={1}>
                     Create Order for {activeCustomer.name}
                   </Text>
-                  <Text style={styles.createOrderSubheading}>
+                  <Text style={[styles.createOrderSubheading, { color: colors.textSecondary }]}>
                     Choose how you want to add items to this order
                   </Text>
                 </View>
@@ -576,6 +583,7 @@ export function CustomerProfileModal({
                 <TouchableOpacity
                   style={[
                     styles.orderCardPerPiece,
+                    { backgroundColor: colors.primary },
                     isNarrowScreen && styles.orderCardFullWidth,
                   ]}
                   onPress={() => {
@@ -602,6 +610,7 @@ export function CustomerProfileModal({
                 <TouchableOpacity
                   style={[
                     styles.orderCardPerWeight,
+                    { backgroundColor: colors.surface, borderColor: colors.primary },
                     isNarrowScreen && styles.orderCardFullWidth,
                   ]}
                   onPress={() => {
@@ -613,15 +622,15 @@ export function CustomerProfileModal({
                   accessibilityLabel={`Create Per-Weight Order for ${activeCustomer.name}`}
                 >
                   <View style={styles.orderCardLeftIcon}>
-                    <MciIcon name="scale-balance" size={24} color="#0866F5" />
+                    <MciIcon name="scale-balance" size={24} color={colors.primary} />
                   </View>
                   <View style={styles.orderCardContent}>
-                    <Text style={styles.orderCardTitlePerWeight}>Per-Weight</Text>
-                    <Text style={styles.orderCardDescPerWeight} numberOfLines={1}>
+                    <Text style={[styles.orderCardTitlePerWeight, { color: colors.textPrimary }]}>Per-Weight</Text>
+                    <Text style={[styles.orderCardDescPerWeight, { color: colors.textSecondary }]} numberOfLines={1}>
                       Batch laundry in kg
                     </Text>
                   </View>
-                  <IonIcon name="arrow-forward" size={18} color="#0866F5" />
+                  <IonIcon name="arrow-forward" size={18} color={colors.primary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -639,14 +648,14 @@ export function CustomerProfileModal({
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.editModalOverlay}
           >
-            <View style={styles.editModalCard}>
-              <View style={styles.editModalHeader}>
-                <Text style={styles.editModalTitle}>Edit Customer Details</Text>
+            <View style={[styles.editModalCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.editModalHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.editModalTitle, { color: colors.textPrimary }]}>Edit Customer Details</Text>
                 <TouchableOpacity
                   onPress={() => setEditModalVisible(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <IonIcon name="close" size={20} color="#64748B" />
+                  <IonIcon name="close" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -657,62 +666,62 @@ export function CustomerProfileModal({
               ) : null}
 
               <View style={styles.editInputGroup}>
-                <Text style={styles.editInputLabel}>Customer Name *</Text>
+                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Customer Name *</Text>
                 <TextInput
-                  style={styles.editTextInput}
+                  style={[styles.editTextInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }]}
                   value={editName}
                   onChangeText={setEditName}
                   placeholder="Full Name"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
 
               <View style={styles.editInputGroup}>
-                <Text style={styles.editInputLabel}>Phone / WhatsApp *</Text>
+                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Phone / WhatsApp *</Text>
                 <TextInput
-                  style={styles.editTextInput}
+                  style={[styles.editTextInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }]}
                   value={editPhone}
                   onChangeText={setEditPhone}
                   placeholder="10-digit number"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="phone-pad"
                 />
               </View>
 
               <View style={styles.editInputGroup}>
-                <Text style={styles.editInputLabel}>Address</Text>
+                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Address</Text>
                 <TextInput
-                  style={[styles.editTextInput, { height: 60 }]}
+                  style={[styles.editTextInput, { height: 60, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }]}
                   value={editAddress}
                   onChangeText={setEditAddress}
                   placeholder="Street / Area / Society"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                   multiline
                 />
               </View>
 
               <View style={styles.editInputGroup}>
-                <Text style={styles.editInputLabel}>Pincode</Text>
+                <Text style={[styles.editInputLabel, { color: colors.textPrimary }]}>Pincode</Text>
                 <TextInput
-                  style={styles.editTextInput}
+                  style={[styles.editTextInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }]}
                   value={editPincode}
                   onChangeText={setEditPincode}
                   placeholder="e.g. 412105"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="numeric"
                 />
               </View>
 
               <View style={styles.editActionsRow}>
                 <TouchableOpacity
-                  style={styles.editCancelBtn}
+                  style={[styles.editCancelBtn, { backgroundColor: colors.surfaceSecondary }]}
                   onPress={() => setEditModalVisible(false)}
                 >
-                  <Text style={styles.editCancelBtnText}>Cancel</Text>
+                  <Text style={[styles.editCancelBtnText, { color: colors.textSecondary }]}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.editSaveBtn, isSavingEdit && { opacity: 0.7 }]}
+                  style={[styles.editSaveBtn, { backgroundColor: colors.primary }, isSavingEdit && { opacity: 0.7 }]}
                   onPress={handleSaveCustomer}
                   disabled={isSavingEdit}
                 >

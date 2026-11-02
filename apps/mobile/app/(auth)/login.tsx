@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../../src/api/client';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import { GrowFastLogo } from '../../src/components/GrowFastLogo';
 
 // Safe component wrapper for vector icons across React 18/19 type definitions
@@ -110,6 +111,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -269,7 +271,7 @@ export default function LoginScreen() {
   const isNarrowScreen = windowWidth < 360;
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { backgroundColor: isDark ? colors.background : '#F0F8FF' }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardContainer}
@@ -294,7 +296,7 @@ export default function LoginScreen() {
 
               {/* Wordmark: GrowFast */}
               <View style={styles.wordmarkRow}>
-                <Text style={styles.brandTitleText}>
+                <Text style={[styles.brandTitleText, { color: colors.textPrimary }]}>
                   Grow<Text style={styles.brandTitleAccent}>Fast</Text>
                 </Text>
               </View>
@@ -303,7 +305,7 @@ export default function LoginScreen() {
               <View style={styles.brandUnderlineAccent} />
 
               {/* Two-Line Tagline */}
-              <Text style={styles.taglineText}>
+              <Text style={[styles.taglineText, { color: colors.textSecondary }]}>
                 Simpler Operations.{'\n'}Cleaner Tomorrow.
               </Text>
             </View>
@@ -316,17 +318,17 @@ export default function LoginScreen() {
           <View
             style={[
               styles.cardContainer,
-              { paddingBottom: Math.max(insets.bottom + 16, 28) },
+              { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom + 16, 28) },
             ]}
           >
             {/* Small uppercase blue subtitle */}
-            <Text style={styles.welcomeSubheader}>WELCOME BACK</Text>
+            <Text style={[styles.welcomeSubheader, { color: colors.primary }]}>WELCOME BACK</Text>
 
             {/* Heading */}
-            <Text style={styles.cardHeading}>Sign in to GrowFast</Text>
+            <Text style={[styles.cardHeading, { color: colors.textPrimary }]}>Sign in to GrowFast</Text>
 
             {/* Subtext */}
-            <Text style={styles.cardSubtext}>
+            <Text style={[styles.cardSubtext, { color: colors.textSecondary }]}>
               Access your laundry operations securely and manage your business with ease.
             </Text>
 
@@ -372,9 +374,13 @@ export default function LoginScreen() {
 
             {/* Field 1: Role of You (Role / Staff Dropdown) */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Role of You</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Role of You</Text>
               <TouchableOpacity
-                style={[styles.dropdownBox, !!lockoutUntil && { opacity: 0.6 }]}
+                style={[
+                  styles.dropdownBox,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                  !!lockoutUntil && { opacity: 0.6 },
+                ]}
                 onPress={() => setPickerVisible(true)}
                 disabled={!!lockoutUntil}
                 activeOpacity={0.7}
@@ -382,10 +388,11 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Select Staff Role"
               >
-                <Icon name="person-outline" size={20} color="#0866F5" style={{ marginRight: 10 }} />
+                <Icon name="person-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
                 <Text
                   style={[
                     styles.dropdownValueText,
+                    { color: colors.textPrimary },
                     !selectedEmployee && styles.dropdownPlaceholderText,
                   ]}
                   numberOfLines={1}
@@ -396,24 +403,30 @@ export default function LoginScreen() {
                       ? 'Loading staff accounts...'
                       : 'Select your role'}
                 </Text>
-                <Icon name="chevron-down" size={18} color="#0866F5" style={{ marginLeft: 8 }} />
+                <Icon name="chevron-down" size={18} color={colors.primary} style={{ marginLeft: 8 }} />
               </TouchableOpacity>
             </View>
 
             {/* Field 2: PIN Input with Show/Hide Toggle */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>PIN</Text>
-              <View style={[styles.pinInputBox, !!lockoutUntil && { opacity: 0.6 }]}>
+              <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>PIN</Text>
+              <View
+                style={[
+                  styles.pinInputBox,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                  !!lockoutUntil && { opacity: 0.6 },
+                ]}
+              >
                 <Icon
                   name="lock-closed-outline"
                   size={20}
-                  color="#0866F5"
+                  color={colors.primary}
                   style={{ marginRight: 10 }}
                 />
                 <TextInput
-                  style={styles.pinTextInput}
+                  style={[styles.pinTextInput, { color: colors.textPrimary }]}
                   placeholder="Enter your PIN"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="number-pad"
                   secureTextEntry={!showPin}
                   value={pin}
@@ -437,7 +450,7 @@ export default function LoginScreen() {
                   <Icon
                     name={showPin ? 'eye-outline' : 'eye-off-outline'}
                     size={20}
-                    color="#64748B"
+                    color={colors.textSecondary}
                   />
                 </TouchableOpacity>
               </View>
@@ -452,13 +465,14 @@ export default function LoginScreen() {
               accessibilityRole="button"
               accessibilityLabel="Forgot PIN"
             >
-              <Text style={styles.forgotPinText}>Forgot PIN?</Text>
+              <Text style={[styles.forgotPinText, { color: colors.primary }]}>Forgot PIN?</Text>
             </TouchableOpacity>
 
             {/* Sign In Primary Action Button */}
             <TouchableOpacity
               style={[
                 styles.signInBtn,
+                { backgroundColor: colors.primary },
                 (isLoading ||
                   !selectedEmpId ||
                   pin.length < 4 ||
@@ -487,15 +501,15 @@ export default function LoginScreen() {
 
             {/* Card Footer Divider with Shield Icon */}
             <View style={styles.securityDividerRow}>
-              <View style={styles.dividerLine} />
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
               <View style={styles.shieldIconSquircle}>
-                <Icon name="shield-checkmark-outline" size={14} color="#0866F5" />
+                <Icon name="shield-checkmark-outline" size={14} color={colors.primary} />
               </View>
-              <View style={styles.dividerLine} />
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
             </View>
 
             {/* Security Footer Caption */}
-            <Text style={styles.securityFooterText}>
+            <Text style={[styles.securityFooterText, { color: colors.textSecondary }]}>
               Secure access to your GrowFast account
             </Text>
 
@@ -506,7 +520,7 @@ export default function LoginScreen() {
                 style={styles.devDrawerToggle}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.devDrawerToggleText}>
+                <Text style={[styles.devDrawerToggleText, { color: colors.textMuted }]}>
                   {showDevChips ? 'Hide Quick Test Fill ▲' : '⚡ Quick Test Fill ▼'}
                 </Text>
               </TouchableOpacity>
@@ -516,7 +530,8 @@ export default function LoginScreen() {
                   <TouchableOpacity
                     style={[
                       styles.quickChip,
-                      selectedEmpId === 'emp-counter-001' && styles.quickChipActive,
+                      { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                      selectedEmpId === 'emp-counter-001' && [styles.quickChipActive, { backgroundColor: colors.primaryBg, borderColor: colors.primary }],
                     ]}
                     onPress={() => {
                       setSelectedEmpId('emp-counter-001');
@@ -525,14 +540,15 @@ export default function LoginScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.quickChipTitle}>👔 Counter (Swapnil)</Text>
-                    <Text style={styles.quickChipSubtitle}>PIN: 333333</Text>
+                    <Text style={[styles.quickChipTitle, { color: colors.textPrimary }]}>👔 Counter (Swapnil)</Text>
+                    <Text style={[styles.quickChipSubtitle, { color: colors.textSecondary }]}>PIN: 333333</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[
                       styles.quickChip,
-                      selectedEmpId === 'emp-owner-001' && styles.quickChipActive,
+                      { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                      selectedEmpId === 'emp-owner-001' && [styles.quickChipActive, { backgroundColor: colors.primaryBg, borderColor: colors.primary }],
                     ]}
                     onPress={() => {
                       setSelectedEmpId('emp-owner-001');
@@ -541,8 +557,8 @@ export default function LoginScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.quickChipTitle}>👑 Owner (Prathamesh)</Text>
-                    <Text style={styles.quickChipSubtitle}>PIN: 111111</Text>
+                    <Text style={[styles.quickChipTitle, { color: colors.textPrimary }]}>👑 Owner (Prathamesh)</Text>
+                    <Text style={[styles.quickChipSubtitle, { color: colors.textSecondary }]}>PIN: 111111</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -562,15 +578,15 @@ export default function LoginScreen() {
             activeOpacity={1}
             onPress={() => setPickerVisible(false)}
           >
-            <View style={styles.pickerModalCard}>
-              <View style={styles.pickerModalHeader}>
-                <Text style={styles.pickerModalTitle}>Select Your Role</Text>
+            <View style={[styles.pickerModalCard, { backgroundColor: colors.surface }]}>
+              <View style={[styles.pickerModalHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.pickerModalTitle, { color: colors.textPrimary }]}>Select Your Role</Text>
                 <TouchableOpacity
                   onPress={() => setPickerVisible(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityLabel="Close Staff Selector"
                 >
-                  <Icon name="close" size={22} color="#64748B" />
+                  <Icon name="close" size={22} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -581,21 +597,25 @@ export default function LoginScreen() {
                     return (
                       <TouchableOpacity
                         key={emp.id}
-                        style={[styles.staffRow, isSelected && styles.staffRowSelected]}
+                        style={[
+                          styles.staffRow,
+                          { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                          isSelected && [styles.staffRowSelected, { borderColor: colors.primary, backgroundColor: colors.primaryBg }],
+                        ]}
                         onPress={() => {
                           setSelectedEmpId(emp.id);
                           setPickerVisible(false);
                           setErrorMsg(null);
                         }}
                       >
-                        <View style={styles.staffAvatarCircle}>
-                          <Text style={styles.staffAvatarInitials}>
+                        <View style={[styles.staffAvatarCircle, { backgroundColor: colors.primaryLight }]}>
+                          <Text style={[styles.staffAvatarInitials, { color: colors.primary }]}>
                             {emp.name.slice(0, 1).toUpperCase()}
                           </Text>
                         </View>
                         <View style={{ flex: 1, paddingRight: 8 }}>
-                          <Text style={styles.staffRowName}>{emp.name}</Text>
-                          <Text style={styles.staffRowId}>{emp.id}</Text>
+                          <Text style={[styles.staffRowName, { color: colors.textPrimary }]}>{emp.name}</Text>
+                          <Text style={[styles.staffRowId, { color: colors.textSecondary }]}>{emp.id}</Text>
                         </View>
                         <View
                           style={[
@@ -617,7 +637,7 @@ export default function LoginScreen() {
                   })
                 ) : (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: '#64748B' }}>No staff accounts loaded.</Text>
+                    <Text style={{ color: colors.textSecondary }}>No staff accounts loaded.</Text>
                   </View>
                 )}
               </ScrollView>

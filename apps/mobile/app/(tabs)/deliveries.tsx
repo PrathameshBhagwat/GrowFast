@@ -23,6 +23,7 @@ import { apiClient } from '../../src/api/client';
 import { ConnectionBanner } from '../../src/components/ConnectionBanner';
 import { DeliveryDetailModal } from '../../src/components/DeliveryDetailModal';
 import { DeliveryCompletionModal } from '../../src/components/DeliveryCompletionModal';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 type FilterTab = 'ALL' | DeliveryStatus;
 
@@ -37,6 +38,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 
 export default function DeliveriesScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { isConnected } = useNetworkStatus();
   const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const session = authUser;
@@ -250,7 +252,7 @@ export default function DeliveriesScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => {
           setActiveDelivery(item);
           setDetailModalVisible(true);
@@ -262,43 +264,43 @@ export default function DeliveriesScreen() {
         {/* Card Header: Order Number, Badge, Chevron */}
         <View style={styles.cardHeaderRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={styles.deliveryIconBox}>
+            <View style={[styles.deliveryIconBox, { backgroundColor: colors.primaryBg }]}>
               <Text style={styles.deliveryEmoji}>🚚</Text>
             </View>
             <View>
-              <Text style={styles.orderNumberText}>{orderNumDisplay}</Text>
-              <Text style={styles.customerNameText}>{item.customerName}</Text>
+              <Text style={[styles.orderNumberText, { color: colors.textPrimary }]}>{orderNumDisplay}</Text>
+              <Text style={[styles.customerNameText, { color: colors.textSecondary }]}>{item.customerName}</Text>
             </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
               <Text style={[styles.statusBadgeText, { color: badge.text }]}>{badge.label}</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
           </View>
         </View>
 
         {/* Destination Address */}
-        <View style={styles.addressRow}>
+        <View style={[styles.addressRow, { backgroundColor: colors.surfaceSecondary }]}>
           <Text style={styles.addressPin}>📍</Text>
-          <Text style={styles.addressText} numberOfLines={2}>
+          <Text style={[styles.addressText, { color: colors.textPrimary }]} numberOfLines={2}>
             {item.address}
           </Text>
         </View>
 
         {/* Sub-info: Scheduled date & Driver */}
         <View style={styles.cardFooterInfo}>
-          <Text style={styles.scheduledText}>📅 {formatDate(item.scheduledAt)}</Text>
-          <Text style={styles.riderText}>
+          <Text style={[styles.scheduledText, { color: colors.textSecondary }]}>📅 {formatDate(item.scheduledAt)}</Text>
+          <Text style={[styles.riderText, { color: colors.textSecondary }]}>
             👤 {item.riderName ? item.riderName : 'No Rider Assigned'}
           </Text>
         </View>
 
         {/* Quick Action Buttons */}
-        <View style={styles.actionButtonsContainer}>
+        <View style={[styles.actionButtonsContainer, { borderTopColor: colors.border }]}>
           {item.status === DeliveryStatus.SCHEDULED && isOwnerOrManager ? (
             <TouchableOpacity
-              style={styles.cardActionBtn}
+              style={[styles.cardActionBtn, { backgroundColor: colors.surfaceSecondary }]}
               onPress={(e) => {
                 e.stopPropagation();
                 handleOpenAssignDriver(item);
@@ -306,13 +308,13 @@ export default function DeliveriesScreen() {
               accessibilityRole="button"
               accessibilityLabel="Assign Driver"
             >
-              <Text style={styles.cardActionBtnText}>👤 Assign Rider</Text>
+              <Text style={[styles.cardActionBtnText, { color: colors.textPrimary }]}>👤 Assign Rider</Text>
             </TouchableOpacity>
           ) : null}
 
           {item.status === DeliveryStatus.ASSIGNED && canOperate ? (
             <TouchableOpacity
-              style={[styles.cardActionBtn, { backgroundColor: '#2563eb' }]}
+              style={[styles.cardActionBtn, { backgroundColor: colors.primary }]}
               onPress={(e) => {
                 e.stopPropagation();
                 handleQuickStartDelivery(item);
@@ -328,7 +330,7 @@ export default function DeliveriesScreen() {
 
           {item.status === DeliveryStatus.IN_TRANSIT && canOperate ? (
             <TouchableOpacity
-              style={[styles.cardActionBtn, { backgroundColor: '#16a34a' }]}
+              style={[styles.cardActionBtn, { backgroundColor: colors.success }]}
               onPress={(e) => {
                 e.stopPropagation();
                 setActiveDelivery(item);
@@ -348,62 +350,62 @@ export default function DeliveriesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ConnectionBanner />
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12), backgroundColor: colors.background }]}>
         {/* Top Header */}
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <View style={styles.userProfileGroup}>
             <View style={styles.avatarCircle}>
               <Text style={styles.avatarText}>{staffName.charAt(0).toUpperCase()}</Text>
             </View>
             <View style={{ marginLeft: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.userName}>{staffName}</Text>
+                <Text style={[styles.userName, { color: colors.textPrimary }]}>{staffName}</Text>
                 <View style={styles.roleBadge}>
                   <Text style={styles.roleBadgeText}>{staffRole}</Text>
                 </View>
               </View>
-              <Text style={styles.userBranch}>{storeBranch}</Text>
+              <Text style={[styles.userBranch, { color: colors.textSecondary }]}>{storeBranch}</Text>
             </View>
           </View>
 
           <TouchableOpacity
-            style={styles.refreshButton}
+            style={[styles.refreshButton, { backgroundColor: colors.surfaceSecondary }]}
             onPress={handleRefresh}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel="Refresh Deliveries"
           >
-            <Text style={styles.refreshButtonText}>↻</Text>
+            <Text style={[styles.refreshButtonText, { color: colors.primary }]}>↻</Text>
           </TouchableOpacity>
         </View>
 
         {/* Operational Overview Counters */}
-        <View style={styles.counterBar}>
+        <View style={[styles.counterBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.counterBox}>
-            <Text style={styles.counterVal}>{counts.inTransit}</Text>
-            <Text style={styles.counterLabel}>In Transit</Text>
+            <Text style={[styles.counterVal, { color: colors.textPrimary }]}>{counts.inTransit}</Text>
+            <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>In Transit</Text>
           </View>
-          <View style={styles.counterDivider} />
+          <View style={[styles.counterDivider, { backgroundColor: colors.border }]} />
           <View style={styles.counterBox}>
-            <Text style={styles.counterVal}>{counts.assigned}</Text>
-            <Text style={styles.counterLabel}>Assigned</Text>
+            <Text style={[styles.counterVal, { color: colors.textPrimary }]}>{counts.assigned}</Text>
+            <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Assigned</Text>
           </View>
-          <View style={styles.counterDivider} />
+          <View style={[styles.counterDivider, { backgroundColor: colors.border }]} />
           <View style={styles.counterBox}>
-            <Text style={[styles.counterVal, { color: '#16a34a' }]}>{counts.completed}</Text>
-            <Text style={styles.counterLabel}>Completed</Text>
+            <Text style={[styles.counterVal, { color: colors.success }]}>{counts.completed}</Text>
+            <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Completed</Text>
           </View>
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
             placeholder="Search by order #, customer, address, rider..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"
@@ -422,13 +424,17 @@ export default function DeliveriesScreen() {
               return (
                 <TouchableOpacity
                   key={tab.key}
-                  style={[styles.filterChip, isActive && styles.filterChipActive]}
+                  style={[
+                    styles.filterChip,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    isActive && [styles.filterChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                  ]}
                   onPress={() => setActiveTab(tab.key)}
                   activeOpacity={0.7}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                 >
-                  <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                  <Text style={[styles.filterChipText, { color: colors.textSecondary }, isActive && styles.filterChipTextActive]}>
                     {tab.label}
                   </Text>
                 </TouchableOpacity>
@@ -440,8 +446,8 @@ export default function DeliveriesScreen() {
         {/* Main List */}
         {loading && !refreshing ? (
           <View style={styles.centerBox}>
-            <ActivityIndicator size="large" color="#2563eb" />
-            <Text style={styles.loadingText}>Fetching deliveries...</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Fetching deliveries...</Text>
           </View>
         ) : error ? (
           <View style={styles.centerBox}>
@@ -454,8 +460,8 @@ export default function DeliveriesScreen() {
         ) : filteredDeliveries.length === 0 ? (
           <View style={styles.centerBox}>
             <Text style={styles.emptyEmoji}>🚚</Text>
-            <Text style={styles.emptyTitle}>No Deliveries Found</Text>
-            <Text style={styles.emptySub}>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Deliveries Found</Text>
+            <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
               {searchQuery
                 ? `No delivery matching "${searchQuery}".`
                 : activeTab === 'ALL'
@@ -477,7 +483,7 @@ export default function DeliveriesScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                colors={['#2563eb']}
+                colors={[colors.primary]}
               />
             }
           />
@@ -521,30 +527,30 @@ export default function DeliveriesScreen() {
         onRequestClose={() => setAssignModalVisible(false)}
       >
         <View style={styles.assignOverlay}>
-          <View style={styles.assignCard}>
+          <View style={[styles.assignCard, { backgroundColor: colors.surface }]}>
             <View style={styles.assignHeaderRow}>
-              <Text style={styles.assignTitle}>Assign Delivery Rider</Text>
+              <Text style={[styles.assignTitle, { color: colors.textPrimary }]}>Assign Delivery Rider</Text>
               <TouchableOpacity
                 onPress={() => setAssignModalVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.assignClose}>✕</Text>
+                <Text style={[styles.assignClose, { color: colors.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.assignSub}>
+            <Text style={[styles.assignSub, { color: colors.textSecondary }]}>
               Select a delivery driver for Order #{deliveryToAssign?.orderNumber}:
             </Text>
 
             {loadingRiders ? (
               <View style={{ padding: 20, alignItems: 'center' }}>
-                <ActivityIndicator color="#2563eb" />
-                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }}>
                   Loading staff riders...
                 </Text>
               </View>
             ) : availableRiders.length === 0 ? (
               <View style={{ padding: 16, alignItems: 'center' }}>
-                <Text style={{ color: '#64748b', fontSize: 13 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
                   No active DELIVERY riders found.
                 </Text>
               </View>
@@ -555,17 +561,21 @@ export default function DeliveriesScreen() {
                   return (
                     <TouchableOpacity
                       key={rider.id}
-                      style={[styles.riderOptionRow, isSelected && styles.riderOptionRowSelected]}
+                      style={[
+                        styles.riderOptionRow,
+                        { borderColor: colors.border },
+                        isSelected && [styles.riderOptionRowSelected, { borderColor: colors.primary, backgroundColor: colors.primaryBg }],
+                      ]}
                       onPress={() => setSelectedRiderId(rider.id)}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.riderOptionName, isSelected && { color: '#1e40af' }]}>
+                        <Text style={[styles.riderOptionName, { color: colors.textPrimary }, isSelected && { color: colors.primary }]}>
                           {rider.name}
                         </Text>
-                        <Text style={styles.riderOptionSub}>Role: {rider.role}</Text>
+                        <Text style={[styles.riderOptionSub, { color: colors.textSecondary }]}>Role: {rider.role}</Text>
                       </View>
-                      <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                        {isSelected ? <View style={styles.radioDot} /> : null}
+                      <View style={[styles.radioCircle, { borderColor: colors.textMuted }, isSelected && { borderColor: colors.primary }]}>
+                        {isSelected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}
                       </View>
                     </TouchableOpacity>
                   );
@@ -578,10 +588,10 @@ export default function DeliveriesScreen() {
                 style={styles.assignCancelBtn}
                 onPress={() => setAssignModalVisible(false)}
               >
-                <Text style={styles.assignCancelText}>Cancel</Text>
+                <Text style={[styles.assignCancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.assignConfirmBtn, !selectedRiderId && { opacity: 0.5 }]}
+                style={[styles.assignConfirmBtn, { backgroundColor: colors.primary }, !selectedRiderId && { opacity: 0.5 }]}
                 onPress={handleConfirmAssignment}
                 disabled={isAssigning || !selectedRiderId}
               >

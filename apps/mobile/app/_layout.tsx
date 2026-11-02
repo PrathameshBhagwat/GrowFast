@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-rout
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { getDatabase } from '../src/db/sqlite';
@@ -73,6 +74,27 @@ export function ProtectedRoutes({
   return <>{children}</>;
 }
 
+function ThemedAppContainer() {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={colors.statusBarStyle} />
+      <ConnectionBanner />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   useEffect(() => {
     async function initApp() {
@@ -92,19 +114,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ProtectedRoutes>
-            <View style={styles.container}>
-              <StatusBar style="auto" />
-              <ConnectionBanner />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(auth)/login" />
-                <Stack.Screen name="(tabs)" />
-              </Stack>
-            </View>
-          </ProtectedRoutes>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ProtectedRoutes>
+              <ThemedAppContainer />
+            </ProtectedRoutes>
+          </AuthProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
   );

@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { useSyncManager } from '../../src/hooks/useSyncManager';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import {
   listDrafts,
@@ -156,6 +157,7 @@ export default function OrdersScreen() {
   const { isConnected } = useNetworkStatus();
   const { syncDraft, syncAll, isSyncingAll } = useSyncManager();
   const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isDark, colors } = useTheme();
   const session = authUser;
 
   const [drafts, setDrafts] = useState<OrderDraft[]>([]);
@@ -472,8 +474,13 @@ export default function OrdersScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, paddingTop: Math.max(insets.top, 12) },
+        ]}
+      >
         {/* Header matching Screen 10 */}
         <View style={styles.headerRow}>
           <TouchableOpacity
@@ -482,9 +489,9 @@ export default function OrdersScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Back to Home"
           >
-            <Icon name="chevron-back" size={24} color="#0f172a" />
+            <Icon name="chevron-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Search Orders</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Search Orders</Text>
           <TouchableOpacity
             style={styles.filterIconBtn}
             onPress={openFilterModal}
@@ -495,7 +502,7 @@ export default function OrdersScreen() {
               <Icon
                 name="options-outline"
                 size={22}
-                color={activeFilterCount > 0 ? '#2563eb' : '#64748b'}
+                color={activeFilterCount > 0 ? colors.primary : colors.textSecondary}
               />
               {activeFilterCount > 0 ? (
                 <View style={styles.filterBadge}>
@@ -507,12 +514,20 @@ export default function OrdersScreen() {
         </View>
 
         {/* Search Bar matching Screen 10 */}
-        <View style={styles.searchBarContainer}>
-          <Icon name="search-outline" size={18} color="#64748b" style={{ marginRight: 8 }} />
+        <View
+          style={[
+            styles.searchBarContainer,
+            {
+              backgroundColor: isDark ? colors.surfaceSecondary : '#FFFFFF',
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Icon name="search-outline" size={18} color={colors.textMuted} style={{ marginRight: 8 }} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
             placeholder="Search by order no, name, phone..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
@@ -523,27 +538,37 @@ export default function OrdersScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Clear Search"
             >
-              <Icon name="close-circle" size={18} color="#94a3b8" />
+              <Icon name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           ) : (
-            <Icon name="barcode-outline" size={20} color="#64748b" />
+            <Icon name="barcode-outline" size={20} color={colors.textSecondary} />
           )}
         </View>
 
         {/* Filter Pills matching Screen 10 */}
-        <View style={styles.filterTabsWrapper}>
+        <View
+          style={[
+            styles.filterTabsWrapper,
+            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          ]}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterPillsContainer}
           >
             <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'ALL' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
+                activeFilter === 'ALL' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+              ]}
               onPress={() => setActiveFilter('ALL')}
             >
               <Text
                 style={[
                   styles.filterPillText,
+                  { color: colors.textSecondary },
                   activeFilter === 'ALL' && styles.filterPillTextActive,
                 ]}
               >
@@ -552,12 +577,17 @@ export default function OrdersScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'IN_PROCESS' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
+                activeFilter === 'IN_PROCESS' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+              ]}
               onPress={() => setActiveFilter('IN_PROCESS')}
             >
               <Text
                 style={[
                   styles.filterPillText,
+                  { color: colors.textSecondary },
                   activeFilter === 'IN_PROCESS' && styles.filterPillTextActive,
                 ]}
               >
@@ -566,12 +596,17 @@ export default function OrdersScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'READY' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
+                activeFilter === 'READY' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+              ]}
               onPress={() => setActiveFilter('READY')}
             >
               <Text
                 style={[
                   styles.filterPillText,
+                  { color: colors.textSecondary },
                   activeFilter === 'READY' && styles.filterPillTextActive,
                 ]}
               >
@@ -580,12 +615,17 @@ export default function OrdersScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.filterPill, activeFilter === 'DELIVERED' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
+                activeFilter === 'DELIVERED' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+              ]}
               onPress={() => setActiveFilter('DELIVERED')}
             >
               <Text
                 style={[
                   styles.filterPillText,
+                  { color: colors.textSecondary },
                   activeFilter === 'DELIVERED' && styles.filterPillTextActive,
                 ]}
               >
@@ -597,7 +637,8 @@ export default function OrdersScreen() {
               <TouchableOpacity
                 style={[
                   styles.filterPill,
-                  activeFilter === 'DRAFTS' && styles.filterPillActive,
+                  { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
+                  activeFilter === 'DRAFTS' && [styles.filterPillActive, { backgroundColor: colors.primary }],
                   styles.draftPillBadge,
                 ]}
                 onPress={() => setActiveFilter('DRAFTS')}
@@ -686,8 +727,8 @@ export default function OrdersScreen() {
         ) : filteredOrders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyEmoji}>📋</Text>
-            <Text style={styles.emptyTitle}>No Orders Found</Text>
-            <Text style={styles.emptySub}>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Orders Found</Text>
+            <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
               {searchQuery
                 ? `No orders matching "${searchQuery}"`
                 : 'No orders in this status category.'}
@@ -703,7 +744,11 @@ export default function OrdersScreen() {
             windowSize={5}
             removeClippedSubviews={Platform.OS !== 'web'}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563eb']} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[colors.primary]}
+              />
             }
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -717,19 +762,31 @@ export default function OrdersScreen() {
 
               return (
                 <TouchableOpacity
-                  style={styles.orderCard}
+                  style={[
+                    styles.orderCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
                   onPress={() => handleOpenOrderDetail(item.id)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.garmentIconBox}>
-                    <Icon name="shirt-outline" size={20} color="#2563eb" />
+                  <View
+                    style={[
+                      styles.garmentIconBox,
+                      { backgroundColor: isDark ? colors.surfaceSecondary : '#eff6ff' },
+                    ]}
+                  >
+                    <Icon name="shirt-outline" size={20} color={colors.primary} />
                   </View>
                   <View style={styles.orderCenterDetails}>
-                    <Text style={styles.orderNumberText}>{orderNumDisplay}</Text>
-                    <Text style={styles.orderCustomerText}>
+                    <Text style={[styles.orderNumberText, { color: colors.textPrimary }]}>
+                      {orderNumDisplay}
+                    </Text>
+                    <Text style={[styles.orderCustomerText, { color: colors.textSecondary }]}>
                       {item.customerName || (item as any).customer?.name || 'Customer'}
                     </Text>
-                    <Text style={styles.orderSubDetails}>{formatDate(item.orderDate)}</Text>
+                    <Text style={[styles.orderSubDetails, { color: colors.textMuted }]}>
+                      {formatDate(item.orderDate)}
+                    </Text>
                   </View>
                   <View style={styles.orderRightGroup}>
                     <View style={[styles.statusChip, { backgroundColor: badge.bg }]}>
@@ -737,7 +794,9 @@ export default function OrdersScreen() {
                         {badge.label}
                       </Text>
                     </View>
-                    <Text style={styles.orderTotalText}>₹ {item.totalAmount.toFixed(0)}</Text>
+                    <Text style={[styles.orderTotalText, { color: colors.textPrimary }]}>
+                      ₹ {item.totalAmount.toFixed(0)}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               );

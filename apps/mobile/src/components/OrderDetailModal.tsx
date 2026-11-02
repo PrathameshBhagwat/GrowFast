@@ -29,6 +29,7 @@ import { apiClient } from '../api/client';
 import { PaymentHistoryView } from './PaymentHistoryView';
 import { PaymentCollectionModal } from './PaymentCollectionModal';
 import { MarkAsDeliveredModal } from './MarkAsDeliveredModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface OrderDetailModalProps {
   visible: boolean;
@@ -47,6 +48,7 @@ export function OrderDetailModal({
   onOrderUpdated,
   userRole,
 }: OrderDetailModalProps) {
+  const { colors, isDark } = useTheme();
   const [order, setOrder] = useState<OrderDetailDTO | null>(null);
   const [payments, setPayments] = useState<PaymentDTO[]>([]);
   const [summary, setSummary] = useState<PaymentSummaryDTO | null>(null);
@@ -582,20 +584,20 @@ export function OrderDetailModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
           {/* Header Bar matching Screen 11 */}
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.headerBackBtn}
             >
-              <Text style={styles.backArrow}>‹</Text>
-              <Text style={styles.backBtnText}>Back</Text>
+              <Text style={[styles.backArrow, { color: colors.primary }]}>‹</Text>
+              <Text style={[styles.backBtnText, { color: colors.primary }]}>Back</Text>
             </TouchableOpacity>
 
-            <Text style={styles.headerTitle}>Order Details</Text>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Order Details</Text>
 
             <TouchableOpacity
               onPress={() => {
@@ -607,19 +609,19 @@ export function OrderDetailModal({
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.dotsIcon}>⋮</Text>
+              <Text style={[styles.dotsIcon, { color: colors.textSecondary }]}>⋮</Text>
             </TouchableOpacity>
           </View>
 
           {loading ? (
             <View style={styles.centerBox}>
-              <ActivityIndicator size="large" color="#2563eb" />
-              <Text style={styles.centerText}>Loading order details...</Text>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.centerText, { color: colors.textSecondary }]}>Loading order details...</Text>
             </View>
           ) : error ? (
             <View style={styles.centerBox}>
               <Text style={styles.errorText}>⚠️ {error}</Text>
-              <TouchableOpacity style={styles.retryBtn} onPress={fetchOrderData}>
+              <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={fetchOrderData}>
                 <Text style={styles.retryBtnText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -630,16 +632,16 @@ export function OrderDetailModal({
                 showsVerticalScrollIndicator={false}
               >
                 {/* Order Information Header Card matching Screen 11 / Screenshot 9 */}
-                <View style={styles.orderHeaderCard}>
+                <View style={[styles.orderHeaderCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   {/* Order Number & Status Row */}
                   <View style={styles.orderTopRow}>
                     <View style={styles.orderIconAndNumberGroup}>
-                      <View style={styles.orderDocSquircle}>
+                      <View style={[styles.orderDocSquircle, { backgroundColor: colors.primaryBg }]}>
                         <Text style={{ fontSize: 20 }}>🧾</Text>
                       </View>
                       <View>
-                        <Text style={styles.orderNumLabel}>Order Number</Text>
-                        <Text style={styles.orderNumBig}>{orderNumDisplay}</Text>
+                        <Text style={[styles.orderNumLabel, { color: colors.textSecondary }]}>Order Number</Text>
+                        <Text style={[styles.orderNumBig, { color: colors.textPrimary }]}>{orderNumDisplay}</Text>
                       </View>
                     </View>
                     <View style={[styles.statusChip, { backgroundColor: statusBadge.bg }]}>
@@ -652,14 +654,14 @@ export function OrderDetailModal({
 
                   {/* Customer Information Row */}
                   <TouchableOpacity
-                    style={styles.customerRowCard}
+                    style={[styles.customerRowCard, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
                     activeOpacity={0.7}
                     onPress={() => {
                       // Customer info preview
                     }}
                   >
-                    <View style={styles.customerAvatarCircle}>
-                      <Text style={styles.customerAvatarText}>
+                    <View style={[styles.customerAvatarCircle, { backgroundColor: colors.primaryLight }]}>
+                      <Text style={[styles.customerAvatarText, { color: colors.primary }]}>
                         {order.customerName
                           ? order.customerName
                               .trim()
@@ -671,40 +673,40 @@ export function OrderDetailModal({
                       </Text>
                     </View>
                     <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                      <Text style={styles.customerName} numberOfLines={1} ellipsizeMode="tail">
+                      <Text style={[styles.customerName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
                         {order.customerName}
                       </Text>
-                      <Text style={styles.customerPhone} numberOfLines={1} ellipsizeMode="tail">
+                      <Text style={[styles.customerPhone, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
                         📞 +91 {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
                       </Text>
-                      <Text style={styles.customerCode} numberOfLines={1} ellipsizeMode="tail">
+                      <Text style={[styles.customerCode, { color: colors.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
                         🪪 ID: {order.customerCode || `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000078'}`}
                       </Text>
                     </View>
-                    <Text style={styles.customerChevron}>›</Text>
+                    <Text style={[styles.customerChevron, { color: colors.textMuted }]}>›</Text>
                   </TouchableOpacity>
 
                   {/* Dates Grid */}
-                  <View style={styles.datesGrid}>
-                    <View style={styles.dateCol}>
+                  <View style={[styles.datesGrid, { borderTopColor: colors.border }]}>
+                    <View style={[styles.dateCol, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                       <View style={styles.dateLabelRow}>
                         <Text style={{ fontSize: 13, marginRight: 4 }}>📅</Text>
-                        <Text style={styles.dateLabel}>Created On</Text>
+                        <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>Created On</Text>
                       </View>
-                      <Text style={styles.dateVal}>{formatDateTime(order.orderDate)}</Text>
-                      <Text style={styles.creatorVal} testID="mobile-order-created-by">
+                      <Text style={[styles.dateVal, { color: colors.textPrimary }]}>{formatDateTime(order.orderDate)}</Text>
+                      <Text style={[styles.creatorVal, { color: colors.textSecondary }]} testID="mobile-order-created-by">
                         {order.createdByName
                           ? `by ${order.createdByName}`
                           : 'Creator: Not recorded'}
                       </Text>
                     </View>
-                    <View style={styles.dateCol}>
+                    <View style={[styles.dateCol, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                       <View style={styles.dateLabelRow}>
                         <Text style={{ fontSize: 13, marginRight: 4 }}>📅</Text>
-                        <Text style={styles.dateLabel}>Due Date</Text>
+                        <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>Due Date</Text>
                       </View>
-                      <Text style={styles.dateVal}>{formatDateOnly(order.effectiveDueDate)}</Text>
-                      <Text style={styles.dueRemainingVal}>
+                      <Text style={[styles.dateVal, { color: colors.textPrimary }]}>{formatDateOnly(order.effectiveDueDate)}</Text>
+                      <Text style={[styles.dueRemainingVal, { color: colors.textSecondary }]}>
                         {getRelativeDueText(order.effectiveDueDate)}
                       </Text>
                     </View>
@@ -712,14 +714,15 @@ export function OrderDetailModal({
                 </View>
 
                 {/* Segmented Tabs matching Screen 11 / Screenshot 9 */}
-                <View style={styles.tabBar}>
+                <View style={[styles.tabBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <TouchableOpacity
-                    style={[styles.tabItem, activeTab === 'ITEMS' && styles.tabItemActive]}
+                    style={[styles.tabItem, activeTab === 'ITEMS' && [styles.tabItemActive, { backgroundColor: colors.primary }]]}
                     onPress={() => setActiveTab('ITEMS')}
                   >
                     <Text
                       style={[
                         styles.tabItemText,
+                        { color: colors.textSecondary },
                         activeTab === 'ITEMS' && styles.tabItemTextActive,
                       ]}
                     >
@@ -728,12 +731,13 @@ export function OrderDetailModal({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.tabItem, activeTab === 'PHOTOS' && styles.tabItemActive]}
+                    style={[styles.tabItem, activeTab === 'PHOTOS' && [styles.tabItemActive, { backgroundColor: colors.primary }]]}
                     onPress={() => setActiveTab('PHOTOS')}
                   >
                     <Text
                       style={[
                         styles.tabItemText,
+                        { color: colors.textSecondary },
                         activeTab === 'PHOTOS' && styles.tabItemTextActive,
                       ]}
                     >
@@ -742,12 +746,13 @@ export function OrderDetailModal({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.tabItem, activeTab === 'HISTORY' && styles.tabItemActive]}
+                    style={[styles.tabItem, activeTab === 'HISTORY' && [styles.tabItemActive, { backgroundColor: colors.primary }]]}
                     onPress={() => setActiveTab('HISTORY')}
                   >
                     <Text
                       style={[
                         styles.tabItemText,
+                        { color: colors.textSecondary },
                         activeTab === 'HISTORY' && styles.tabItemTextActive,
                       ]}
                     >
@@ -767,14 +772,14 @@ export function OrderDetailModal({
                       const extraPhotosCount = Math.max(0, itemPhotos.length - maxThumbnails);
 
                       return (
-                        <View key={item.id} style={styles.itemRowCard}>
+                        <View key={item.id} style={[styles.itemRowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                           <View style={styles.itemMainRow}>
-                            <View style={styles.garmentIconBox}>
+                            <View style={[styles.garmentIconBox, { backgroundColor: colors.primaryBg }]}>
                               <Text style={styles.garmentEmoji}>{isWeight ? '⚖️' : '👔'}</Text>
                             </View>
                             <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                              <Text style={styles.itemGarmentName}>{item.garmentName}</Text>
-                              <Text style={styles.itemServiceName}>
+                              <Text style={[styles.itemGarmentName, { color: colors.textPrimary }]}>{item.garmentName}</Text>
+                              <Text style={[styles.itemServiceName, { color: colors.textSecondary }]}>
                                 {((item as any).serviceName || item.serviceType || 'DRY_CLEAN').toUpperCase()} •{' '}
                                 {isWeight
                                   ? `${item.weight} kg (${item.quantity} pcs in bag)`
@@ -782,13 +787,13 @@ export function OrderDetailModal({
                               </Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Text style={styles.itemPrice}>₹ {item.lineTotal.toFixed(0)}</Text>
-                              <Text style={styles.itemChevronIcon}>^</Text>
+                              <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>₹ {item.lineTotal.toFixed(0)}</Text>
+                              <Text style={[styles.itemChevronIcon, { color: colors.textSecondary }]}>^</Text>
                             </View>
                           </View>
 
                           {/* Compact Photo Preview Strip */}
-                          <View style={styles.itemPhotoStripContainer}>
+                          <View style={[styles.itemPhotoStripContainer, { borderTopColor: colors.border }]}>
                             {itemPhotos.length > 0 ? (
                               <View>
                                 <View style={styles.itemThumbnailsRow}>
@@ -837,14 +842,14 @@ export function OrderDetailModal({
                                   ) : null}
 
                                   <TouchableOpacity
-                                    style={styles.compactAddMorePhotoBtn}
+                                    style={[styles.compactAddMorePhotoBtn, { backgroundColor: colors.primaryBg, borderColor: colors.primaryLight }]}
                                     onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                     accessible={true}
                                     accessibilityLabel={`Add photo for ${item.garmentName}`}
                                     activeOpacity={0.7}
                                   >
                                     <Text style={styles.compactAddCameraIcon}>📷</Text>
-                                    <Text style={styles.compactAddMorePhotoText}>Add</Text>
+                                    <Text style={[styles.compactAddMorePhotoText, { color: colors.primary }]}>Add</Text>
                                   </TouchableOpacity>
                                 </View>
 
@@ -854,7 +859,7 @@ export function OrderDetailModal({
                                   accessible={true}
                                   accessibilityLabel="View all order photos in Photos tab"
                                 >
-                                  <Text style={styles.compactViewAllText}>
+                                  <Text style={[styles.compactViewAllText, { color: colors.primary }]}>
                                     {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} • View All →
                                   </Text>
                                 </TouchableOpacity>
@@ -862,15 +867,15 @@ export function OrderDetailModal({
                             ) : (
                               <View style={styles.noPhotosRow}>
                                 <TouchableOpacity
-                                  style={styles.addPhotoInlineBtn}
+                                  style={[styles.addPhotoInlineBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
                                   onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                   accessible={true}
                                   accessibilityLabel={`Add photo for ${item.garmentName}`}
                                   activeOpacity={0.7}
                                 >
-                                  <Text style={styles.addPhotoInlineText}>📷 + Add Photo</Text>
+                                  <Text style={[styles.addPhotoInlineText, { color: colors.textPrimary }]}>📷 + Add Photo</Text>
                                 </TouchableOpacity>
-                                <Text style={styles.noPhotosLabel}>No photos attached</Text>
+                                <Text style={[styles.noPhotosLabel, { color: colors.textMuted }]}>No photos attached</Text>
                               </View>
                             )}
                           </View>
@@ -882,11 +887,11 @@ export function OrderDetailModal({
                     {order.items.some(
                       (i) => i.physicalGarments && i.physicalGarments.length > 0,
                     ) ? (
-                      <View style={styles.garmentChecklistCard}>
+                      <View style={[styles.garmentChecklistCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <View style={styles.checklistHeaderRow}>
                           <View style={styles.checklistTitleGroup}>
                             <Text style={styles.checklistCheckIcon}>☑</Text>
-                            <Text style={styles.checklistTitle}>Garment Readiness Checklist</Text>
+                            <Text style={[styles.checklistTitle, { color: colors.textPrimary }]}>Garment Readiness Checklist</Text>
                           </View>
                           <View style={styles.checklistBadgePill}>
                             <Text style={styles.checklistBadgeText}>
@@ -900,7 +905,7 @@ export function OrderDetailModal({
                             return (
                               <TouchableOpacity
                                 key={g.id}
-                                style={styles.garmentCheckRow}
+                                style={[styles.garmentCheckRow, { borderBottomColor: colors.border }]}
                                 onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
                                 disabled={operatingGarmentId === g.id}
                                 activeOpacity={0.7}
@@ -916,7 +921,7 @@ export function OrderDetailModal({
                                   ) : null}
                                 </View>
                                 <Text
-                                  style={styles.garmentCheckText}
+                                  style={[styles.garmentCheckText, { color: colors.textPrimary }]}
                                   numberOfLines={1}
                                   ellipsizeMode="tail"
                                 >
@@ -994,41 +999,41 @@ export function OrderDetailModal({
                     ) : null}
 
                     {/* Financial Summary / Payment Summary */}
-                    <View style={styles.financialSummaryCard}>
+                    <View style={[styles.financialSummaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <View style={styles.paymentSummaryHeaderRow}>
                         <Text style={{ fontSize: 18, marginRight: 6 }}>👛</Text>
-                        <Text style={styles.paymentSummaryTitle}>Payment Summary</Text>
+                        <Text style={[styles.paymentSummaryTitle, { color: colors.textPrimary }]}>Payment Summary</Text>
                       </View>
 
                       <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Total Amount</Text>
-                        <Text style={styles.summaryVal}>₹ {effectiveTotal.toFixed(2)}</Text>
+                        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total Amount</Text>
+                        <Text style={[styles.summaryVal, { color: colors.textPrimary }]}>₹ {effectiveTotal.toFixed(2)}</Text>
                       </View>
                       <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Amount Paid</Text>
-                        <Text style={[styles.summaryVal, { color: '#16a34a' }]}>
+                        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Amount Paid</Text>
+                        <Text style={[styles.summaryVal, { color: colors.success }]}>
                           ₹ {effectivePaid.toFixed(2)}
                         </Text>
                       </View>
-                      <View style={styles.balanceDueHighlightBox}>
-                        <Text style={styles.summaryDueLabel}>Balance Due</Text>
-                        <Text style={styles.summaryDueVal}>₹ {effectiveDue.toFixed(2)}</Text>
+                      <View style={[styles.balanceDueHighlightBox, { backgroundColor: colors.errorBg, borderColor: colors.error }]}>
+                        <Text style={[styles.summaryDueLabel, { color: colors.textPrimary }]}>Balance Due</Text>
+                        <Text style={[styles.summaryDueVal, { color: colors.error }]}>₹ {effectiveDue.toFixed(2)}</Text>
                       </View>
                     </View>
                   </View>
                 ) : activeTab === 'PHOTOS' ? (
                   /* Tab Content 2: Photos */
-                  <View style={styles.photosTabContainer}>
+                  <View style={[styles.photosTabContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={styles.photosTabHeaderRow}>
                       <View>
-                        <Text style={styles.photosTabTitle}>Order Garment Intake Photos</Text>
-                        <Text style={styles.photosTabSubtitle}>
+                        <Text style={[styles.photosTabTitle, { color: colors.textPrimary }]}>Order Garment Intake Photos</Text>
+                        <Text style={[styles.photosTabSubtitle, { color: colors.textSecondary }]}>
                           {orderPhotos.length} photo(s) recorded for this order
                         </Text>
                       </View>
                       <View style={styles.photosActionRow}>
                         <TouchableOpacity
-                          style={styles.actionBtnSmall}
+                          style={[styles.actionBtnSmall, { backgroundColor: colors.primary }]}
                           onPress={() => handleTakePhoto()}
                           disabled={isUploadingPhoto}
                           accessible={true}
@@ -1037,31 +1042,31 @@ export function OrderDetailModal({
                           <Text style={styles.actionBtnSmallText}>📷 Camera</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={[styles.actionBtnSmall, styles.actionBtnSmallSecondary]}
+                          style={[styles.actionBtnSmall, styles.actionBtnSmallSecondary, { backgroundColor: colors.surfaceSecondary }]}
                           onPress={() => handlePickGallery()}
                           disabled={isUploadingPhoto}
                           accessible={true}
                           accessibilityLabel="Select from Gallery"
                         >
-                          <Text style={styles.actionBtnSmallText}>🖼️ Gallery</Text>
+                          <Text style={[styles.actionBtnSmallText, { color: colors.textPrimary }]}>🖼️ Gallery</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
 
                     {isUploadingPhoto && (
-                      <View style={styles.uploadingBox}>
-                        <ActivityIndicator size="small" color="#2563eb" />
-                        <Text style={styles.uploadingText}>Uploading photo to server...</Text>
+                      <View style={[styles.uploadingBox, { backgroundColor: colors.primaryBg }]}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={[styles.uploadingText, { color: colors.primary }]}>Uploading photo to server...</Text>
                       </View>
                     )}
 
                     {orderPhotos.length === 0 ? (
-                      <View style={styles.emptyPhotosContainer}>
+                      <View style={[styles.emptyPhotosContainer, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                         <Text style={styles.emptyPhotosIcon}>📷</Text>
-                        <Text style={styles.emptyPhotosText}>
+                        <Text style={[styles.emptyPhotosText, { color: colors.textPrimary }]}>
                           No photos recorded for this order yet.
                         </Text>
-                        <Text style={styles.emptyPhotosSubtext}>
+                        <Text style={[styles.emptyPhotosSubtext, { color: colors.textSecondary }]}>
                           Tap 'Camera' or 'Gallery' above to attach garment intake photos.
                         </Text>
                       </View>
@@ -1072,7 +1077,7 @@ export function OrderDetailModal({
                           return (
                             <TouchableOpacity
                               key={photo.id || idx}
-                              style={styles.photoCard}
+                              style={[styles.photoCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
                               onPress={() =>
                                 openLightbox(
                                   orderPhotos.map((p) => p.url),
@@ -1109,13 +1114,13 @@ export function OrderDetailModal({
                     />
 
                     {/* Notification Dispatch History (Task 4) */}
-                    <View style={styles.notificationHistorySection}>
-                      <Text style={styles.notificationHistoryTitle}>Customer Notifications</Text>
+                    <View style={[styles.notificationHistorySection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Text style={[styles.notificationHistoryTitle, { color: colors.textPrimary }]}>Customer Notifications</Text>
                       {notifications.length > 0 ? (
                         notifications.map((notif) => (
-                          <View key={notif.id} style={styles.notificationCard}>
+                          <View key={notif.id} style={[styles.notificationCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
                             <View style={styles.notificationHeader}>
-                              <Text style={styles.notifEventText}>
+                              <Text style={[styles.notifEventText, { color: colors.textPrimary }]}>
                                 {notif.eventType.replace(/_/g, ' ')}
                               </Text>
                               <View
@@ -1127,10 +1132,10 @@ export function OrderDetailModal({
                                 <Text style={styles.notifStatusText}>{notif.status}</Text>
                               </View>
                             </View>
-                            <Text style={styles.notifRecipientText}>
+                            <Text style={[styles.notifRecipientText, { color: colors.textSecondary }]}>
                               📱 {notif.recipient} via {notif.channel}
                             </Text>
-                            <Text style={styles.notifDateText}>
+                            <Text style={[styles.notifDateText, { color: colors.textMuted }]}>
                               {new Date(notif.createdAt).toLocaleDateString('en-IN', {
                                 day: '2-digit',
                                 month: 'short',
@@ -1141,7 +1146,7 @@ export function OrderDetailModal({
                           </View>
                         ))
                       ) : (
-                        <Text style={styles.noNotificationsText}>
+                        <Text style={[styles.noNotificationsText, { color: colors.textMuted }]}>
                           No notifications recorded for this order yet.
                         </Text>
                       )}
@@ -1151,23 +1156,23 @@ export function OrderDetailModal({
               </ScrollView>
 
               {/* Bottom Action Bar matching Screen 11 */}
-              <View style={styles.bottomBar}>
+              <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
                 <TouchableOpacity
-                  style={styles.addPhotoBtn}
+                  style={[styles.addPhotoBtn, { backgroundColor: colors.surface, borderColor: colors.primary }]}
                   onPress={() => handleAddPhotoAction()}
                   activeOpacity={0.8}
                   disabled={isUploadingPhoto}
                   accessible={true}
                   accessibilityLabel="Add Photo to Order"
                 >
-                  <Text style={styles.addPhotoBtnText}>
+                  <Text style={[styles.addPhotoBtnText, { color: colors.primary }]}>
                     {isUploadingPhoto ? '⏳ Uploading...' : '📷 Add Photo'}
                   </Text>
                 </TouchableOpacity>
 
                 {effectiveDue > 0 ? (
                   <TouchableOpacity
-                    style={[styles.primaryActionBtn, { backgroundColor: '#2563eb' }]}
+                    style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
                     onPress={() => setPaymentModalVisible(true)}
                     activeOpacity={0.8}
                   >
@@ -1177,7 +1182,7 @@ export function OrderDetailModal({
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.primaryActionBtn, { backgroundColor: '#2563eb' }]}
+                    style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
                     onPress={() => setMarkDeliveredVisible(true)}
                     activeOpacity={0.8}
                   >

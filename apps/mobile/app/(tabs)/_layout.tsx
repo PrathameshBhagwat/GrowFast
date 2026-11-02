@@ -3,6 +3,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { Text, View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import { GrowFastLogo } from '../../src/components/GrowFastLogo';
 
 const Icon = Ionicons as unknown as React.ComponentType<{
@@ -14,12 +15,13 @@ const Icon = Ionicons as unknown as React.ComponentType<{
 
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { colors } = useTheme();
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <GrowFastLogo size={80} containerStyle={{ marginBottom: 16 }} />
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -31,11 +33,11 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#1765F5',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#e2e8f0',
+          backgroundColor: colors.tabBarBackground,
+          borderTopColor: colors.tabBarBorder,
           borderTopWidth: 1,
           height: 62,
           paddingBottom: 8,

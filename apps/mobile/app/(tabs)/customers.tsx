@@ -31,10 +31,12 @@ import { getUserSession, MobileUserSession } from '../../src/storage/secure-stor
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { CustomerProfileModal } from '../../src/components/CustomerProfileModal';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function CustomersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { isConnected } = useNetworkStatus();
   const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const session = authUser;
@@ -349,43 +351,43 @@ export default function CustomersScreen() {
   }, [customers, directoryFilter]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12) }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12), backgroundColor: colors.background }]}>
         {/* Header matching Screenshot 5 */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.surface }]}>
           <View>
-            <Text style={styles.headerTitle}>Customers</Text>
-            <Text style={styles.headerSubtitle}>Directory & Quick Order Intake</Text>
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Customers</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Directory & Quick Order Intake</Text>
           </View>
-          <View style={styles.headerGraphicBox}>
+          <View style={[styles.headerGraphicBox, { backgroundColor: colors.primaryBg }]}>
             <Text style={{ fontSize: 24 }}>👥</Text>
           </View>
         </View>
 
         {/* Segmented Control matching Screenshot 5 */}
-        <View style={styles.segmentContainer}>
+        <View style={[styles.segmentContainer, { backgroundColor: colors.surfaceSecondary }]}>
           <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'FIND' && styles.segmentBtnActive]}
+            style={[styles.segmentBtn, activeTab === 'FIND' && [styles.segmentBtnActive, { backgroundColor: colors.primary }]]}
             onPress={() => setActiveTab('FIND')}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === 'FIND' }}
           >
             <Text
-              style={[styles.segmentBtnText, activeTab === 'FIND' && styles.segmentBtnTextActive]}
+              style={[styles.segmentBtnText, { color: activeTab === 'FIND' ? '#ffffff' : colors.textSecondary }, activeTab === 'FIND' && styles.segmentBtnTextActive]}
             >
               Find Existing
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'NEW' && styles.segmentBtnActive]}
+            style={[styles.segmentBtn, activeTab === 'NEW' && [styles.segmentBtnActive, { backgroundColor: colors.primary }]]}
             onPress={() => setActiveTab('NEW')}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === 'NEW' }}
           >
             <Text
-              style={[styles.segmentBtnText, activeTab === 'NEW' && styles.segmentBtnTextActive]}
+              style={[styles.segmentBtnText, { color: activeTab === 'NEW' ? '#ffffff' : colors.textSecondary }, activeTab === 'NEW' && styles.segmentBtnTextActive]}
             >
               + New Customer
             </Text>
@@ -395,12 +397,12 @@ export default function CustomersScreen() {
         {activeTab === 'FIND' ? (
           <View style={{ flex: 1 }}>
             {/* Search Bar matching Screenshot 5 */}
-            <View style={styles.searchBarWrapper}>
+            <View style={[styles.searchBarWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={styles.searchIcon}>🔍</Text>
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: colors.textPrimary }]}
                 placeholder="Search by name, phone, or customer code..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
@@ -413,14 +415,14 @@ export default function CustomersScreen() {
                   onPress={() => setSearchQuery('')}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={styles.clearSearchIcon}>✕</Text>
+                  <Text style={[styles.clearSearchIcon, { color: colors.textMuted }]}>✕</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={styles.clearBtn}
                   onPress={() => Alert.alert('Barcode Scanner', 'Barcode / QR scanner feature ready.')}
                 >
-                  <Text style={styles.scanIcon}>⊡</Text>
+                  <Text style={[styles.scanIcon, { color: colors.textSecondary }]}>⊡</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -435,13 +437,15 @@ export default function CustomersScreen() {
                 <TouchableOpacity
                   style={[
                     styles.directoryChip,
-                    directoryFilter === 'ALL' && styles.directoryChipActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    directoryFilter === 'ALL' && [styles.directoryChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setDirectoryFilter('ALL')}
                 >
                   <Text
                     style={[
                       styles.directoryChipText,
+                      { color: colors.textSecondary },
                       directoryFilter === 'ALL' && styles.directoryChipTextActive,
                     ]}
                   >
@@ -452,13 +456,15 @@ export default function CustomersScreen() {
                 <TouchableOpacity
                   style={[
                     styles.directoryChip,
-                    directoryFilter === 'RECENT' && styles.directoryChipActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    directoryFilter === 'RECENT' && [styles.directoryChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setDirectoryFilter('RECENT')}
                 >
                   <Text
                     style={[
                       styles.directoryChipText,
+                      { color: colors.textSecondary },
                       directoryFilter === 'RECENT' && styles.directoryChipTextActive,
                     ]}
                   >
@@ -469,13 +475,15 @@ export default function CustomersScreen() {
                 <TouchableOpacity
                   style={[
                     styles.directoryChip,
-                    directoryFilter === 'FREQUENT' && styles.directoryChipActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    directoryFilter === 'FREQUENT' && [styles.directoryChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setDirectoryFilter('FREQUENT')}
                 >
                   <Text
                     style={[
                       styles.directoryChipText,
+                      { color: colors.textSecondary },
                       directoryFilter === 'FREQUENT' && styles.directoryChipTextActive,
                     ]}
                   >
@@ -486,13 +494,15 @@ export default function CustomersScreen() {
                 <TouchableOpacity
                   style={[
                     styles.directoryChip,
-                    directoryFilter === 'AZ' && styles.directoryChipActive,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    directoryFilter === 'AZ' && [styles.directoryChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
                   ]}
                   onPress={() => setDirectoryFilter('AZ')}
                 >
                   <Text
                     style={[
                       styles.directoryChipText,
+                      { color: colors.textSecondary },
                       directoryFilter === 'AZ' && styles.directoryChipTextActive,
                     ]}
                   >
@@ -504,21 +514,21 @@ export default function CustomersScreen() {
 
             {/* List Header */}
             <View style={styles.listHeaderRow}>
-              <Text style={styles.listHeaderTitle}>
+              <Text style={[styles.listHeaderTitle, { color: colors.textSecondary }]}>
                 {searchQuery.trim()
                   ? `Search Results (${filteredCustomers.length})`
                   : `All Customers (${filteredCustomers.length})`}
               </Text>
               {searchQuery.trim() ? (
                 <TouchableOpacity style={styles.actionLinkTouch} onPress={() => setSearchQuery('')}>
-                  <Text style={styles.viewAllText}>Clear Search</Text>
+                  <Text style={[styles.viewAllText, { color: colors.primary }]}>Clear Search</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   style={styles.actionLinkTouch}
                   onPress={() => loadCustomers('', 1, false)}
                 >
-                  <Text style={styles.viewAllText}>↻ Refresh</Text>
+                  <Text style={[styles.viewAllText, { color: colors.primary }]}>↻ Refresh</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -539,23 +549,23 @@ export default function CustomersScreen() {
             {/* Loading Indicator */}
             {isLoading && !isRefreshing ? (
               <View style={styles.loadingBox}>
-                <ActivityIndicator size="small" color="#2563eb" />
-                <Text style={styles.loadingText}>Searching customer directory...</Text>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Searching customer directory...</Text>
               </View>
             ) : customers.length === 0 && !searchError ? (
               /* Empty State */
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyEmoji}>👥</Text>
-                <Text style={styles.emptyTitle}>
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
                   {searchQuery.trim() ? 'No Customers Found' : 'No Customers Registered'}
                 </Text>
-                <Text style={styles.emptySub}>
+                <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
                   {searchQuery.trim()
                     ? `No matches found for "${searchQuery}". Tap below to register a new customer.`
                     : 'The directory is empty. Register your first customer to get started.'}
                 </Text>
                 <TouchableOpacity
-                  style={styles.emptyActionBtn}
+                  style={[styles.emptyActionBtn, { backgroundColor: colors.primaryBg, borderColor: colors.primaryLight }]}
                   onPress={() => {
                     const cleanPhoneInput = searchQuery.replace(/\D/g, '').trim();
                     const cleanNameInput = searchQuery.replace(/[0-9+]/g, '').trim();
@@ -568,7 +578,7 @@ export default function CustomersScreen() {
                   }}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.emptyActionBtnText}>
+                  <Text style={[styles.emptyActionBtnText, { color: colors.primary }]}>
                     + Add {searchQuery.trim() ? `"${searchQuery.trim()}"` : 'New Customer'}
                   </Text>
                 </TouchableOpacity>
@@ -582,7 +592,7 @@ export default function CustomersScreen() {
                   <RefreshControl
                     refreshing={isRefreshing}
                     onRefresh={onRefresh}
-                    colors={['#2563eb']}
+                    colors={[colors.primary]}
                   />
                 }
                 showsVerticalScrollIndicator={false}
@@ -592,8 +602,8 @@ export default function CustomersScreen() {
                 ListFooterComponent={
                   isLoadingMore ? (
                     <View style={styles.loadingMoreBox}>
-                      <ActivityIndicator size="small" color="#2563eb" />
-                      <Text style={styles.loadingMoreText}>Loading more customers...</Text>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={[styles.loadingMoreText, { color: colors.textSecondary }]}>Loading more customers...</Text>
                     </View>
                   ) : null
                 }
@@ -608,7 +618,7 @@ export default function CustomersScreen() {
 
                   return (
                     <TouchableOpacity
-                      style={styles.customerCard}
+                      style={[styles.customerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                       onPress={() => handleSelectCustomer(item)}
                       activeOpacity={0.7}
                       accessibilityRole="button"
@@ -619,7 +629,7 @@ export default function CustomersScreen() {
                       </View>
                       <View style={{ flex: 1, paddingHorizontal: 12 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.custName} numberOfLines={1}>
+                          <Text style={[styles.custName, { color: colors.textPrimary }]} numberOfLines={1}>
                             {item.name}
                           </Text>
                           {hasMembership ? (
@@ -636,17 +646,17 @@ export default function CustomersScreen() {
                             </View>
                           ) : null}
                         </View>
-                        <Text style={styles.custPhone}>
+                        <Text style={[styles.custPhone, { color: colors.textSecondary }]}>
                           📞 +91 {item.phone ? item.phone.replace(/^\+?91/, '') : ''}
                         </Text>
-                        <Text style={styles.custCodeText}>
+                        <Text style={[styles.custCodeText, { color: colors.textMuted }]}>
                           {item.customerCode
                             ? `#${item.customerCode}`
                             : `#CUS-${(item.id || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000078'}`}
                         </Text>
                       </View>
                       <View style={styles.chevronBox}>
-                        <Text style={styles.chevron}>›</Text>
+                        <Text style={[styles.chevron, { color: colors.textMuted }]}>›</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -665,9 +675,9 @@ export default function CustomersScreen() {
               contentContainerStyle={styles.formContainer}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.formCard}>
-                <Text style={styles.formTitle}>Add New Customer</Text>
-                <Text style={styles.formSubtitle}>Quickly register walk-in or phone customer</Text>
+              <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.formTitle, { color: colors.textPrimary }]}>Add New Customer</Text>
+                <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>Quickly register walk-in or phone customer</Text>
 
                 {createError ? (
                   <View style={styles.formErrorBox}>
@@ -676,11 +686,11 @@ export default function CustomersScreen() {
                 ) : null}
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Full Name *</Text>
+                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Full Name *</Text>
                   <TextInput
-                    style={[styles.formInput, fieldErrors.name && styles.inputError]}
+                    style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }, fieldErrors.name && styles.inputError]}
                     placeholder="e.g. Rahul Sharma"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textMuted}
                     value={newName}
                     onChangeText={(val) => {
                       setNewName(val);
@@ -695,11 +705,11 @@ export default function CustomersScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>WhatsApp Phone Number *</Text>
+                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>WhatsApp Phone Number *</Text>
                   <TextInput
-                    style={[styles.formInput, fieldErrors.phone && styles.inputError]}
+                    style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }, fieldErrors.phone && styles.inputError]}
                     placeholder="e.g. 9876543210 (10-15 digits)"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                     maxLength={16}
                     value={newPhone}
@@ -715,15 +725,15 @@ export default function CustomersScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Address *</Text>
+                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Address *</Text>
                   <TextInput
                     style={[
                       styles.formInput,
-                      { height: 72, textAlignVertical: 'top', paddingTop: 10 },
+                      { height: 72, textAlignVertical: 'top', paddingTop: 10, backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary },
                       fieldErrors.address && styles.inputError,
                     ]}
                     placeholder="House/Flat, Street, Area"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textMuted}
                     multiline
                     value={newAddress}
                     onChangeText={(val) => {
@@ -738,11 +748,11 @@ export default function CustomersScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Pincode *</Text>
+                  <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Pincode *</Text>
                   <TextInput
-                    style={[styles.formInput, fieldErrors.pincode && styles.inputError]}
+                    style={[styles.formInput, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.textPrimary }, fieldErrors.pincode && styles.inputError]}
                     placeholder="e.g. 411001"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="default"
                     maxLength={10}
                     value={newPincode}
@@ -758,7 +768,7 @@ export default function CustomersScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.submitCustomerBtn, isSubmitting && styles.btnDisabled]}
+                  style={[styles.submitCustomerBtn, { backgroundColor: colors.primary }, isSubmitting && styles.btnDisabled]}
                   onPress={handleCreateCustomer}
                   disabled={isSubmitting}
                   activeOpacity={0.8}
