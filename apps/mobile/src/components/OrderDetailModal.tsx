@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   OrderDetailDTO,
   PaymentDTO,
@@ -30,6 +31,40 @@ import { PaymentHistoryView } from './PaymentHistoryView';
 import { PaymentCollectionModal } from './PaymentCollectionModal';
 import { MarkAsDeliveredModal } from './MarkAsDeliveredModal';
 import { useTheme } from '../contexts/ThemeContext';
+
+const IonIcon: React.FC<{
+  name: string;
+  size?: number;
+  color?: string;
+  style?: any;
+}> = (props) => {
+  try {
+    if (Ionicons) {
+      const Component = Ionicons as any;
+      return <Component {...props} />;
+    }
+  } catch {
+    // fallback
+  }
+  return <View style={[{ width: props.size || 18, height: props.size || 18 }, props.style]} />;
+};
+
+const MciIcon: React.FC<{
+  name: string;
+  size?: number;
+  color?: string;
+  style?: any;
+}> = (props) => {
+  try {
+    if (MaterialCommunityIcons) {
+      const Component = MaterialCommunityIcons as any;
+      return <Component {...props} />;
+    }
+  } catch {
+    // fallback
+  }
+  return <View style={[{ width: props.size || 18, height: props.size || 18 }, props.style]} />;
+};
 
 interface OrderDetailModalProps {
   visible: boolean;
@@ -61,8 +96,11 @@ export function OrderDetailModal({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Active tab matching Screen 11
+  // Active tab matching target redesign: Items, Photos, History
   const [activeTab, setActiveTab] = useState<OrderTab>('ITEMS');
+
+  // Collapsible items state (default: all expanded)
+  const [collapsedItemIds, setCollapsedItemIds] = useState<Record<string, boolean>>({});
 
   // Sub-modals
   const [paymentModalVisible, setPaymentModalVisible] = useState<boolean>(false);
@@ -226,6 +264,13 @@ export function OrderDetailModal({
     setActiveTab('PHOTOS');
   };
 
+  const toggleItemExpanded = (itemId: string) => {
+    setCollapsedItemIds((prev) => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }));
+  };
+
   const getItemPhotos = (item: any): any[] => {
     const seen = new Set<string>();
     const result: any[] = [];
@@ -369,7 +414,7 @@ export function OrderDetailModal({
             // If item has a photo corresponding to this piece index, use it
             addPhoto(itemPhotos[unitNum - 1]);
           } else {
-            // Otherwise, fallback to the item's primary intake photo (e.g. 1 photo taken for the entire bundle)
+            // Otherwise, fallback to the item's primary intake photo
             addPhoto(itemPhotos[0]);
           }
         }
@@ -456,8 +501,8 @@ export function OrderDetailModal({
 
   const handleAddPhotoAction = (target?: { orderItemId?: string; physicalGarmentId?: string }) => {
     Alert.alert('Add Garment Photo', 'Choose how you want to add a photo to this order:', [
-      { text: '📷 Take Photo', onPress: () => handleTakePhoto(target) },
-      { text: '🖼️ Choose from Gallery', onPress: () => handlePickGallery(target) },
+      { text: 'Take Photo', onPress: () => handleTakePhoto(target) },
+      { text: 'Choose from Gallery', onPress: () => handlePickGallery(target) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -479,17 +524,17 @@ export function OrderDetailModal({
   const getStatusBadgeStyle = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.DELIVERED:
-        return { label: 'Delivered', bg: '#dcfce7', text: '#15803d', dot: '#15803d' };
+        return { label: 'Delivered', dot: '#15803d', pillText: '#15803d' };
       case OrderStatus.READY:
-        return { label: 'Ready', bg: '#eff6ff', text: '#1765f5', dot: '#1765f5' };
+        return { label: 'Ready', dot: '#15803d', pillText: '#15803d' };
       case OrderStatus.OUT_FOR_DELIVERY:
-        return { label: 'Out for Delivery', bg: '#ede9fe', text: '#6d28d9', dot: '#6d28d9' };
+        return { label: 'Out for Delivery', dot: '#6d28d9', pillText: '#6d28d9' };
       case OrderStatus.CANCELLED:
-        return { label: 'Cancelled', bg: '#fee2e2', text: '#b91c1c', dot: '#b91c1c' };
+        return { label: 'Cancelled', dot: '#dc2626', pillText: '#dc2626' };
       case OrderStatus.PROCESSING:
       case OrderStatus.RECEIVED:
       default:
-        return { label: 'In Process', bg: '#eff6ff', text: '#0284c7', dot: '#0284c7' };
+        return { label: 'In Process', dot: '#1e69f5', pillText: '#1e3a8a' };
     }
   };
 
@@ -572,6 +617,36 @@ export function OrderDetailModal({
       ? `#${order.orderNumber}`
       : `#GF-${order?.orderNumber || '1024'}`;
 
+  const handleCopyOrderNumber = () => {
+    Alert.alert('Order Number Copied', `${orderNumDisplay} copied to clipboard.`);
+  };
+
+  const getGarmentVectorIcon = (garmentName: string, isWeight?: boolean) => {
+    if (isWeight) {
+      return 'scale-bathroom';
+    }
+    const nameLower = (garmentName || '').toLowerCase();
+    if (nameLower.includes('bag') || nameLower.includes('backpack') || nameLower.includes('purse') || nameLower.includes('tote')) {
+      return 'bag-personal-outline';
+    }
+    if (nameLower.includes('shoe') || nameLower.includes('sneaker') || nameLower.includes('boot') || nameLower.includes('footwear')) {
+      return 'shoe-sneaker';
+    }
+    if (nameLower.includes('bed') || nameLower.includes('sheet') || nameLower.includes('blanket') || nameLower.includes('quilt') || nameLower.includes('curtain') || nameLower.includes('comforter') || nameLower.includes('linen')) {
+      return 'bed-outline';
+    }
+    if (nameLower.includes('suit') || nameLower.includes('blazer') || nameLower.includes('coat') || nameLower.includes('jacket') || nameLower.includes('tuxedo')) {
+      return 'tie';
+    }
+    if (nameLower.includes('pant') || nameLower.includes('trouser') || nameLower.includes('jean') || nameLower.includes('short')) {
+      return 'hanger';
+    }
+    if (nameLower.includes('saree') || nameLower.includes('sari') || nameLower.includes('dress') || nameLower.includes('kurta') || nameLower.includes('skirt') || nameLower.includes('gown')) {
+      return 'hanger';
+    }
+    return 'tshirt-crew-outline';
+  };
+
   const totalGarments = order?.items
     ? order.items.reduce((s, it) => s + (it.physicalGarments?.length || 0), 0)
     : 0;
@@ -586,15 +661,16 @@ export function OrderDetailModal({
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-          {/* Header Bar matching Screen 11 */}
+          {/* Header Bar matching Reference: Arrow Back, Order Details, Three Dots */}
           <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={styles.headerBackBtn}
+              style={styles.headerIconBtn}
+              accessible={true}
+              accessibilityLabel="Navigate Back"
             >
-              <Text style={[styles.backArrow, { color: colors.primary }]}>‹</Text>
-              <Text style={[styles.backBtnText, { color: colors.primary }]}>Back</Text>
+              <IonIcon name="arrow-back" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
 
             <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Order Details</Text>
@@ -608,8 +684,11 @@ export function OrderDetailModal({
                 ]);
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.headerIconBtn}
+              accessible={true}
+              accessibilityLabel="Order Options Menu"
             >
-              <Text style={[styles.dotsIcon, { color: colors.textSecondary }]}>⋮</Text>
+              <IonIcon name="ellipsis-vertical" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -620,7 +699,8 @@ export function OrderDetailModal({
             </View>
           ) : error ? (
             <View style={styles.centerBox}>
-              <Text style={styles.errorText}>⚠️ {error}</Text>
+              <IonIcon name="alert-circle" size={40} color={colors.error} />
+              <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={fetchOrderData}>
                 <Text style={styles.retryBtnText}>Retry</Text>
               </TouchableOpacity>
@@ -631,132 +711,209 @@ export function OrderDetailModal({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Order Information Header Card matching Screen 11 / Screenshot 9 */}
-                <View style={[styles.orderHeaderCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  {/* Order Number & Status Row */}
-                  <View style={styles.orderTopRow}>
-                    <View style={styles.orderIconAndNumberGroup}>
-                      <View style={[styles.orderDocSquircle, { backgroundColor: colors.primaryBg }]}>
-                        <Text style={{ fontSize: 20 }}>🧾</Text>
-                      </View>
-                      <View>
-                        <Text style={[styles.orderNumLabel, { color: colors.textSecondary }]}>Order Number</Text>
-                        <Text style={[styles.orderNumBig, { color: colors.textPrimary }]}>{orderNumDisplay}</Text>
+                {/* Unified Order Information Card matching Target Design */}
+                <View style={[styles.unifiedOrderCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {/* Top Royal Blue Banner */}
+                  <View style={styles.topBlueBanner}>
+                    <View style={styles.orderNumberGroup}>
+                      <Text style={styles.orderNumBannerLabel}>Order Number</Text>
+                      <View style={styles.orderNumRow}>
+                        <Text style={styles.orderNumBannerValue}>{orderNumDisplay}</Text>
+                        <TouchableOpacity
+                          onPress={handleCopyOrderNumber}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={styles.copyBtn}
+                          accessible={true}
+                          accessibilityLabel="Copy Order Number"
+                        >
+                          <IonIcon name="copy-outline" size={17} color="#FFFFFF" />
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={[styles.statusChip, { backgroundColor: statusBadge.bg }]}>
+
+                    {/* Subtle Vertical Divider */}
+                    <View style={styles.bannerDivider} />
+
+                    {/* Status Pill with Dot */}
+                    <View style={styles.bannerStatusPill}>
                       <View style={[styles.statusDot, { backgroundColor: statusBadge.dot }]} />
-                      <Text style={[styles.statusChipText, { color: statusBadge.text }]}>
+                      <Text style={[styles.bannerStatusPillText, { color: statusBadge.pillText }]}>
                         {statusBadge.label}
                       </Text>
                     </View>
                   </View>
 
-                  {/* Customer Information Row */}
-                  <TouchableOpacity
-                    style={[styles.customerRowCard, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      // Customer info preview
-                    }}
-                  >
-                    <View style={[styles.customerAvatarCircle, { backgroundColor: colors.primaryLight }]}>
-                      <Text style={[styles.customerAvatarText, { color: colors.primary }]}>
-                        {order.customerName
-                          ? order.customerName
-                              .trim()
-                              .split(/\s+/)
-                              .slice(0, 2)
-                              .map((p) => p[0]?.toUpperCase())
-                              .join('')
-                          : 'CU'}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1, paddingHorizontal: 10 }}>
-                      <Text style={[styles.customerName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
-                        {order.customerName}
-                      </Text>
-                      <Text style={[styles.customerPhone, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                        📞 +91 {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
-                      </Text>
-                      <Text style={[styles.customerCode, { color: colors.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
-                        🪪 ID: {order.customerCode || `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000078'}`}
-                      </Text>
-                    </View>
-                    <Text style={[styles.customerChevron, { color: colors.textMuted }]}>›</Text>
-                  </TouchableOpacity>
+                  {/* Card Content Surface (Customer Info & Date Grid) */}
+                  <View style={styles.cardContentBody}>
+                    {/* Customer Row */}
+                    <TouchableOpacity
+                      style={styles.customerRow}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        Alert.alert(
+                          order.customerName || 'Customer Details',
+                          `Phone: ${order.customerPhone ? `+91 ${order.customerPhone.replace(/^\+?91/, '')}` : 'Not provided'}\nID: ${order.customerCode || 'N/A'}`,
+                          [{ text: 'OK' }],
+                        );
+                      }}
+                      accessible={true}
+                      accessibilityLabel="View Customer Details"
+                    >
+                      <View style={[styles.customerAvatarCircle, { backgroundColor: isDark ? colors.surfaceSecondary : '#DDEBFF' }]}>
+                        <Text style={[styles.customerAvatarText, { color: '#1E69F5' }]}>
+                          {order.customerName
+                            ? order.customerName
+                                .trim()
+                                .split(/\s+/)
+                                .slice(0, 2)
+                                .map((p) => p[0]?.toUpperCase())
+                                .join('')
+                            : 'CU'}
+                        </Text>
+                      </View>
 
-                  {/* Dates Grid */}
-                  <View style={[styles.datesGrid, { borderTopColor: colors.border }]}>
-                    <View style={[styles.dateCol, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                      <View style={styles.dateLabelRow}>
-                        <Text style={{ fontSize: 13, marginRight: 4 }}>📅</Text>
-                        <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>Created On</Text>
+                      <View style={styles.customerMetaColumn}>
+                        <Text style={[styles.customerName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+                          {order.customerName}
+                        </Text>
+                        <View style={styles.customerDetailRow}>
+                          <IonIcon name="call" size={13} color={colors.textSecondary} style={{ marginRight: 5 }} />
+                          <Text style={[styles.customerDetailText, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
+                            +91 {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
+                          </Text>
+                        </View>
+                        <View style={styles.customerDetailRow}>
+                          <IonIcon name="card-outline" size={13} color={colors.textSecondary} style={{ marginRight: 5 }} />
+                          <Text style={[styles.customerDetailText, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
+                            ID: {order.customerCode || `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000081'}`}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={[styles.dateVal, { color: colors.textPrimary }]}>{formatDateTime(order.orderDate)}</Text>
-                      <Text style={[styles.creatorVal, { color: colors.textSecondary }]} testID="mobile-order-created-by">
-                        {order.createdByName
-                          ? `by ${order.createdByName}`
-                          : 'Creator: Not recorded'}
-                      </Text>
-                    </View>
-                    <View style={[styles.dateCol, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                      <View style={styles.dateLabelRow}>
-                        <Text style={{ fontSize: 13, marginRight: 4 }}>📅</Text>
-                        <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>Due Date</Text>
+
+                      <IonIcon name="chevron-forward" size={18} color={colors.textMuted} />
+                    </TouchableOpacity>
+
+                    {/* Dates Grid (Created On & Due Date side-by-side) */}
+                    <View style={styles.datesGrid}>
+                      <View style={[styles.dateBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC', borderColor: colors.border }]}>
+                        <View style={styles.dateLabelRow}>
+                          <View style={[styles.calendarIconSquare, { backgroundColor: isDark ? colors.surface : '#EBF3FF' }]}>
+                            <IonIcon name="calendar-outline" size={14} color="#1E69F5" />
+                          </View>
+                          <Text style={[styles.dateBoxLabel, { color: colors.textSecondary }]}>Created On</Text>
+                        </View>
+                        <Text style={[styles.dateBoxValue, { color: colors.textPrimary }]}>{formatDateTime(order.orderDate)}</Text>
+                        <Text style={[styles.dateBoxSubtext, { color: colors.textSecondary }]} testID="mobile-order-created-by">
+                          {order.createdByName ? `by ${order.createdByName}` : 'Creator: Not recorded'}
+                        </Text>
                       </View>
-                      <Text style={[styles.dateVal, { color: colors.textPrimary }]}>{formatDateOnly(order.effectiveDueDate)}</Text>
-                      <Text style={[styles.dueRemainingVal, { color: colors.textSecondary }]}>
-                        {getRelativeDueText(order.effectiveDueDate)}
-                      </Text>
+
+                      <View style={[styles.dateBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC', borderColor: colors.border }]}>
+                        <View style={styles.dateLabelRow}>
+                          <View style={[styles.calendarIconSquare, { backgroundColor: isDark ? colors.surface : '#EBF3FF' }]}>
+                            <IonIcon name="calendar-outline" size={14} color="#1E69F5" />
+                          </View>
+                          <Text style={[styles.dateBoxLabel, { color: colors.textSecondary }]}>Due Date</Text>
+                        </View>
+                        <Text style={[styles.dateBoxValue, { color: colors.textPrimary }]}>{formatDateOnly(order.effectiveDueDate)}</Text>
+                        <Text
+                          style={[
+                            styles.dateBoxDueStatus,
+                            {
+                              color:
+                                getRelativeDueText(order.effectiveDueDate).includes('overdue')
+                                  ? colors.error
+                                  : '#1E69F5',
+                            },
+                          ]}
+                        >
+                          {getRelativeDueText(order.effectiveDueDate)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
 
-                {/* Segmented Tabs matching Screen 11 / Screenshot 9 */}
-                <View style={[styles.tabBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {/* Segmented Tabs Control matching Target Design */}
+                <View style={styles.tabBar}>
                   <TouchableOpacity
-                    style={[styles.tabItem, activeTab === 'ITEMS' && [styles.tabItemActive, { backgroundColor: colors.primary }]]}
+                    style={[
+                      styles.tabItem,
+                      activeTab === 'ITEMS'
+                        ? styles.tabItemActive
+                        : [styles.tabItemInactive, { backgroundColor: colors.surface, borderColor: colors.border }],
+                    ]}
                     onPress={() => setActiveTab('ITEMS')}
+                    activeOpacity={0.7}
+                    accessible={true}
+                    accessibilityLabel={`Items Tab (${order.items.length})`}
                   >
+                    <MciIcon
+                      name="layers-outline"
+                      size={16}
+                      color={activeTab === 'ITEMS' ? '#FFFFFF' : colors.textSecondary}
+                    />
                     <Text
                       style={[
                         styles.tabItemText,
-                        { color: colors.textSecondary },
-                        activeTab === 'ITEMS' && styles.tabItemTextActive,
+                        activeTab === 'ITEMS' ? styles.tabItemTextActive : { color: colors.textSecondary },
                       ]}
                     >
-                      👕 Items ({order.items.length})
+                      Items ({order.items.length})
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.tabItem, activeTab === 'PHOTOS' && [styles.tabItemActive, { backgroundColor: colors.primary }]]}
+                    style={[
+                      styles.tabItem,
+                      activeTab === 'PHOTOS'
+                        ? styles.tabItemActive
+                        : [styles.tabItemInactive, { backgroundColor: colors.surface, borderColor: colors.border }],
+                    ]}
                     onPress={() => setActiveTab('PHOTOS')}
+                    activeOpacity={0.7}
+                    accessible={true}
+                    accessibilityLabel={`Photos Tab (${orderPhotos.length})`}
                   >
+                    <IonIcon
+                      name="image-outline"
+                      size={16}
+                      color={activeTab === 'PHOTOS' ? '#FFFFFF' : colors.textSecondary}
+                    />
                     <Text
                       style={[
                         styles.tabItemText,
-                        { color: colors.textSecondary },
-                        activeTab === 'PHOTOS' && styles.tabItemTextActive,
+                        activeTab === 'PHOTOS' ? styles.tabItemTextActive : { color: colors.textSecondary },
                       ]}
                     >
-                      🖼 Photos ({orderPhotos.length})
+                      Photos ({orderPhotos.length})
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.tabItem, activeTab === 'HISTORY' && [styles.tabItemActive, { backgroundColor: colors.primary }]]}
+                    style={[
+                      styles.tabItem,
+                      activeTab === 'HISTORY'
+                        ? styles.tabItemActive
+                        : [styles.tabItemInactive, { backgroundColor: colors.surface, borderColor: colors.border }],
+                    ]}
                     onPress={() => setActiveTab('HISTORY')}
+                    activeOpacity={0.7}
+                    accessible={true}
+                    accessibilityLabel="History Tab"
                   >
+                    <IonIcon
+                      name="time-outline"
+                      size={16}
+                      color={activeTab === 'HISTORY' ? '#FFFFFF' : colors.textSecondary}
+                    />
                     <Text
                       style={[
                         styles.tabItemText,
-                        { color: colors.textSecondary },
-                        activeTab === 'HISTORY' && styles.tabItemTextActive,
+                        activeTab === 'HISTORY' ? styles.tabItemTextActive : { color: colors.textSecondary },
                       ]}
                     >
-                      ⏱ History
+                      History
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -770,13 +927,22 @@ export function OrderDetailModal({
                       const maxThumbnails = 3;
                       const visibleThumbnails = itemPhotos.slice(0, maxThumbnails);
                       const extraPhotosCount = Math.max(0, itemPhotos.length - maxThumbnails);
+                      const isExpanded = !collapsedItemIds[item.id];
+                      const iconName = getGarmentVectorIcon(item.garmentName, isWeight);
 
                       return (
                         <View key={item.id} style={[styles.itemRowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                          <View style={styles.itemMainRow}>
-                            <View style={[styles.garmentIconBox, { backgroundColor: colors.primaryBg }]}>
-                              <Text style={styles.garmentEmoji}>{isWeight ? '⚖️' : '👔'}</Text>
+                          <TouchableOpacity
+                            style={styles.itemMainRow}
+                            onPress={() => toggleItemExpanded(item.id)}
+                            activeOpacity={0.7}
+                            accessible={true}
+                            accessibilityLabel={`${item.garmentName}, tap to ${isExpanded ? 'collapse' : 'expand'}`}
+                          >
+                            <View style={[styles.garmentIconBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#EBF3FF' }]}>
+                              <MciIcon name={iconName} size={22} color="#1E69F5" />
                             </View>
+
                             <View style={{ flex: 1, paddingHorizontal: 12 }}>
                               <Text style={[styles.itemGarmentName, { color: colors.textPrimary }]}>{item.garmentName}</Text>
                               <Text style={[styles.itemServiceName, { color: colors.textSecondary }]}>
@@ -786,119 +952,149 @@ export function OrderDetailModal({
                                   : `${item.quantity} pc${item.quantity > 1 ? 's' : ''}`}
                               </Text>
                             </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>₹ {item.lineTotal.toFixed(0)}</Text>
-                              <Text style={[styles.itemChevronIcon, { color: colors.textSecondary }]}>^</Text>
-                            </View>
-                          </View>
 
-                          {/* Compact Photo Preview Strip */}
-                          <View style={[styles.itemPhotoStripContainer, { borderTopColor: colors.border }]}>
-                            {itemPhotos.length > 0 ? (
-                              <View>
-                                <View style={styles.itemThumbnailsRow}>
-                                  {visibleThumbnails.map((photo, phIdx) => {
-                                    const fullUrl = resolvePhotoUrl(photo.url);
-                                    return (
+                            <View style={styles.itemPriceChevronGroup}>
+                              <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>₹ {item.lineTotal.toFixed(0)}</Text>
+                              <IonIcon
+                                name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                size={18}
+                                color={colors.textSecondary}
+                              />
+                            </View>
+                          </TouchableOpacity>
+
+                          {/* Expanded Photo Preview Strip */}
+                          {isExpanded && (
+                            <View style={[styles.itemPhotoStripContainer, { borderTopColor: colors.border }]}>
+                              {itemPhotos.length > 0 ? (
+                                <View style={styles.photoStripWithViewAllRow}>
+                                  <View style={styles.itemThumbnailsRow}>
+                                    {visibleThumbnails.map((photo, phIdx) => {
+                                      const fullUrl = resolvePhotoUrl(photo.url);
+                                      return (
+                                        <TouchableOpacity
+                                          key={photo.id || phIdx}
+                                          style={[styles.compactThumbBtn, { borderColor: colors.border }]}
+                                          onPress={() =>
+                                            openLightbox(
+                                              itemPhotos.map((p) => p.url),
+                                              phIdx,
+                                            )
+                                          }
+                                          accessible={true}
+                                          accessibilityLabel={`View photo ${phIdx + 1} for ${item.garmentName}`}
+                                          activeOpacity={0.8}
+                                        >
+                                          <Image
+                                            source={{ uri: fullUrl }}
+                                            style={styles.compactThumbImage}
+                                            resizeMode="cover"
+                                          />
+                                        </TouchableOpacity>
+                                      );
+                                    })}
+
+                                    {extraPhotosCount > 0 ? (
                                       <TouchableOpacity
-                                        key={photo.id || phIdx}
-                                        style={styles.compactThumbBtn}
+                                        style={styles.compactExtraBadgeBtn}
                                         onPress={() =>
                                           openLightbox(
                                             itemPhotos.map((p) => p.url),
-                                            phIdx,
+                                            maxThumbnails,
                                           )
                                         }
                                         accessible={true}
-                                        accessibilityLabel={`View photo ${phIdx + 1} for ${item.garmentName}`}
+                                        accessibilityLabel={`View ${extraPhotosCount} more photos`}
                                         activeOpacity={0.8}
                                       >
-                                        <Image
-                                          source={{ uri: fullUrl }}
-                                          style={styles.compactThumbImage}
-                                          resizeMode="cover"
-                                        />
+                                        <Text style={styles.compactExtraBadgeText}>
+                                          +{extraPhotosCount}
+                                        </Text>
                                       </TouchableOpacity>
-                                    );
-                                  })}
+                                    ) : null}
 
-                                  {extraPhotosCount > 0 ? (
+                                    {/* Dashed Add Photo Box */}
                                     <TouchableOpacity
-                                      style={styles.compactExtraBadgeBtn}
-                                      onPress={() =>
-                                        openLightbox(
-                                          itemPhotos.map((p) => p.url),
-                                          maxThumbnails,
-                                        )
-                                      }
+                                      style={[
+                                        styles.dashedAddPhotoBox,
+                                        { backgroundColor: isDark ? colors.surfaceSecondary : '#F0F7FF' },
+                                      ]}
+                                      onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                       accessible={true}
-                                      accessibilityLabel={`View ${extraPhotosCount} more photos`}
-                                      activeOpacity={0.8}
+                                      accessibilityLabel={`Add photo for ${item.garmentName}`}
+                                      activeOpacity={0.7}
                                     >
-                                      <Text style={styles.compactExtraBadgeText}>
-                                        +{extraPhotosCount}
-                                      </Text>
+                                      <IonIcon name="camera-outline" size={18} color="#1E69F5" />
+                                      <Text style={styles.dashedAddPhotoText}>Add Photo</Text>
                                     </TouchableOpacity>
-                                  ) : null}
+                                  </View>
 
                                   <TouchableOpacity
-                                    style={[styles.compactAddMorePhotoBtn, { backgroundColor: colors.primaryBg, borderColor: colors.primaryLight }]}
+                                    style={styles.compactViewAllLink}
+                                    onPress={() => setActiveTab('PHOTOS')}
+                                    accessible={true}
+                                    accessibilityLabel="View all order photos in Photos tab"
+                                  >
+                                    <Text style={[styles.compactViewAllText, { color: '#1E69F5' }]}>
+                                      {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} • View All →
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              ) : (
+                                <View style={styles.noPhotosRow}>
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.addPhotoInlineBtn,
+                                      { backgroundColor: isDark ? colors.surfaceSecondary : '#F0F7FF' },
+                                    ]}
                                     onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                     accessible={true}
                                     accessibilityLabel={`Add photo for ${item.garmentName}`}
                                     activeOpacity={0.7}
                                   >
-                                    <Text style={styles.compactAddCameraIcon}>📷</Text>
-                                    <Text style={[styles.compactAddMorePhotoText, { color: colors.primary }]}>Add</Text>
+                                    <IonIcon name="camera-outline" size={16} color="#1E69F5" style={{ marginRight: 6 }} />
+                                    <Text style={[styles.addPhotoInlineText, { color: '#1E69F5' }]}>Add Photo</Text>
                                   </TouchableOpacity>
+                                  <Text style={[styles.noPhotosLabel, { color: colors.textMuted }]}>No photos attached</Text>
                                 </View>
-
-                                <TouchableOpacity
-                                  style={styles.compactViewAllLink}
-                                  onPress={() => setActiveTab('PHOTOS')}
-                                  accessible={true}
-                                  accessibilityLabel="View all order photos in Photos tab"
-                                >
-                                  <Text style={[styles.compactViewAllText, { color: colors.primary }]}>
-                                    {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} • View All →
-                                  </Text>
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <View style={styles.noPhotosRow}>
-                                <TouchableOpacity
-                                  style={[styles.addPhotoInlineBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
-                                  onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
-                                  accessible={true}
-                                  accessibilityLabel={`Add photo for ${item.garmentName}`}
-                                  activeOpacity={0.7}
-                                >
-                                  <Text style={[styles.addPhotoInlineText, { color: colors.textPrimary }]}>📷 + Add Photo</Text>
-                                </TouchableOpacity>
-                                <Text style={[styles.noPhotosLabel, { color: colors.textMuted }]}>No photos attached</Text>
-                              </View>
-                            )}
-                          </View>
+                              )}
+                            </View>
+                          )}
                         </View>
                       );
                     })}
 
-                    {/* Physical Garments Processing checklist */}
+                    {/* Garment Readiness Checklist Card matching Target Design */}
                     {order.items.some(
                       (i) => i.physicalGarments && i.physicalGarments.length > 0,
                     ) ? (
                       <View style={[styles.garmentChecklistCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <View style={styles.checklistHeaderRow}>
                           <View style={styles.checklistTitleGroup}>
-                            <Text style={styles.checklistCheckIcon}>☑</Text>
+                            <IonIcon name="checkbox" size={20} color="#1E69F5" />
                             <Text style={[styles.checklistTitle, { color: colors.textPrimary }]}>Garment Readiness Checklist</Text>
                           </View>
-                          <View style={styles.checklistBadgePill}>
-                            <Text style={styles.checklistBadgeText}>
+                          <View
+                            style={[
+                              styles.checklistBadgePill,
+                              {
+                                backgroundColor: readyGarments === totalGarments ? '#DCFCE7' : '#EBF3FF',
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.checklistBadgeText,
+                                {
+                                  color: readyGarments === totalGarments ? '#15803D' : '#1E69F5',
+                                },
+                              ]}
+                            >
                               {readyGarments} / {totalGarments} Ready
                             </Text>
                           </View>
                         </View>
+
                         {order.items.map((item) =>
                           item.physicalGarments?.map((g) => {
                             const pgPhotos = getGarmentPhotos(g.id, item, g);
@@ -909,17 +1105,15 @@ export function OrderDetailModal({
                                 onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
                                 disabled={operatingGarmentId === g.id}
                                 activeOpacity={0.7}
+                                accessible={true}
+                                accessibilityLabel={`Toggle readiness for ${item.garmentName} #${g.unitNumber}`}
                               >
-                                <View
-                                  style={[
-                                    styles.checkboxCircle,
-                                    g.isReady && styles.checkboxCircleActive,
-                                  ]}
-                                >
-                                  {Boolean(g.isReady) ? (
-                                    <Text style={styles.checkmarkIcon}>✓</Text>
-                                  ) : null}
-                                </View>
+                                {Boolean(g.isReady) ? (
+                                  <IonIcon name="checkmark-circle" size={22} color="#10B981" />
+                                ) : (
+                                  <IonIcon name="square-outline" size={22} color="#94A3B8" />
+                                )}
+
                                 <Text
                                   style={[styles.garmentCheckText, { color: colors.textPrimary }]}
                                   numberOfLines={1}
@@ -931,7 +1125,7 @@ export function OrderDetailModal({
 
                                 {pgPhotos.length > 0 ? (
                                   <TouchableOpacity
-                                    style={styles.garmentPiecePhotoBtn}
+                                    style={[styles.garmentPiecePhotoBtn, { borderColor: colors.border }]}
                                     onPress={(e) => {
                                       e.stopPropagation?.();
                                       openLightbox(
@@ -959,7 +1153,7 @@ export function OrderDetailModal({
                                   </TouchableOpacity>
                                 ) : (
                                   <TouchableOpacity
-                                    style={styles.garmentPiecePlaceholderBtn}
+                                    style={[styles.garmentPiecePlaceholderBtn, { borderColor: colors.border }]}
                                     onPress={(e) => {
                                       e.stopPropagation?.();
                                       handleAddPhotoAction({
@@ -972,7 +1166,7 @@ export function OrderDetailModal({
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     activeOpacity={0.7}
                                   >
-                                    <Text style={styles.garmentPiecePlaceholderIcon}>📷</Text>
+                                    <IonIcon name="camera-outline" size={16} color={colors.textMuted} />
                                   </TouchableOpacity>
                                 )}
 
@@ -998,10 +1192,10 @@ export function OrderDetailModal({
                       </View>
                     ) : null}
 
-                    {/* Financial Summary / Payment Summary */}
-                    <View style={[styles.financialSummaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {/* Payment Summary Card matching Target Design */}
+                    <View style={[styles.paymentSummaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <View style={styles.paymentSummaryHeaderRow}>
-                        <Text style={{ fontSize: 18, marginRight: 6 }}>👛</Text>
+                        <IonIcon name="card" size={18} color="#1E69F5" />
                         <Text style={[styles.paymentSummaryTitle, { color: colors.textPrimary }]}>Payment Summary</Text>
                       </View>
 
@@ -1009,15 +1203,31 @@ export function OrderDetailModal({
                         <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total Amount</Text>
                         <Text style={[styles.summaryVal, { color: colors.textPrimary }]}>₹ {effectiveTotal.toFixed(2)}</Text>
                       </View>
+
                       <View style={styles.summaryRow}>
                         <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Amount Paid</Text>
-                        <Text style={[styles.summaryVal, { color: colors.success }]}>
+                        <Text style={[styles.summaryVal, { color: '#16A34A' }]}>
                           ₹ {effectivePaid.toFixed(2)}
                         </Text>
                       </View>
-                      <View style={[styles.balanceDueHighlightBox, { backgroundColor: colors.errorBg, borderColor: colors.error }]}>
-                        <Text style={[styles.summaryDueLabel, { color: colors.textPrimary }]}>Balance Due</Text>
-                        <Text style={[styles.summaryDueVal, { color: colors.error }]}>₹ {effectiveDue.toFixed(2)}</Text>
+
+                      {/* Highlighted Balance Due Box with Left Blue Accent Bar */}
+                      <View
+                        style={[
+                          styles.balanceDueHighlightBox,
+                          {
+                            backgroundColor: isDark ? colors.surfaceSecondary : '#F0F6FF',
+                            borderColor: isDark ? colors.border : '#DBEAFE',
+                          },
+                        ]}
+                      >
+                        <View style={styles.balanceDueLeftGroup}>
+                          <View style={styles.balanceDueBlueBar} />
+                          <Text style={[styles.summaryDueLabel, { color: isDark ? colors.textPrimary : '#1E3A8A' }]}>
+                            Balance Due
+                          </Text>
+                        </View>
+                        <Text style={[styles.summaryDueVal, { color: '#1E69F5' }]}>₹ {effectiveDue.toFixed(2)}</Text>
                       </View>
                     </View>
                   </View>
@@ -1033,14 +1243,16 @@ export function OrderDetailModal({
                       </View>
                       <View style={styles.photosActionRow}>
                         <TouchableOpacity
-                          style={[styles.actionBtnSmall, { backgroundColor: colors.primary }]}
+                          style={[styles.actionBtnSmall, { backgroundColor: '#1E69F5' }]}
                           onPress={() => handleTakePhoto()}
                           disabled={isUploadingPhoto}
                           accessible={true}
                           accessibilityLabel="Take Photo with Camera"
                         >
-                          <Text style={styles.actionBtnSmallText}>📷 Camera</Text>
+                          <IonIcon name="camera-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.actionBtnSmallText}>Camera</Text>
                         </TouchableOpacity>
+
                         <TouchableOpacity
                           style={[styles.actionBtnSmall, styles.actionBtnSmallSecondary, { backgroundColor: colors.surfaceSecondary }]}
                           onPress={() => handlePickGallery()}
@@ -1048,21 +1260,22 @@ export function OrderDetailModal({
                           accessible={true}
                           accessibilityLabel="Select from Gallery"
                         >
-                          <Text style={[styles.actionBtnSmallText, { color: colors.textPrimary }]}>🖼️ Gallery</Text>
+                          <IonIcon name="images-outline" size={14} color={colors.textPrimary} style={{ marginRight: 4 }} />
+                          <Text style={[styles.actionBtnSmallText, { color: colors.textPrimary }]}>Gallery</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
 
                     {isUploadingPhoto && (
                       <View style={[styles.uploadingBox, { backgroundColor: colors.primaryBg }]}>
-                        <ActivityIndicator size="small" color={colors.primary} />
-                        <Text style={[styles.uploadingText, { color: colors.primary }]}>Uploading photo to server...</Text>
+                        <ActivityIndicator size="small" color="#1E69F5" />
+                        <Text style={[styles.uploadingText, { color: '#1E69F5' }]}>Uploading photo to server...</Text>
                       </View>
                     )}
 
                     {orderPhotos.length === 0 ? (
                       <View style={[styles.emptyPhotosContainer, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                        <Text style={styles.emptyPhotosIcon}>📷</Text>
+                        <IonIcon name="camera-outline" size={40} color={colors.textMuted} style={{ marginBottom: 8 }} />
                         <Text style={[styles.emptyPhotosText, { color: colors.textPrimary }]}>
                           No photos recorded for this order yet.
                         </Text>
@@ -1113,7 +1326,7 @@ export function OrderDetailModal({
                       amountDue={effectiveDue}
                     />
 
-                    {/* Notification Dispatch History (Task 4) */}
+                    {/* Notification Dispatch History */}
                     <View style={[styles.notificationHistorySection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <Text style={[styles.notificationHistoryTitle, { color: colors.textPrimary }]}>Customer Notifications</Text>
                       {notifications.length > 0 ? (
@@ -1132,9 +1345,12 @@ export function OrderDetailModal({
                                 <Text style={styles.notifStatusText}>{notif.status}</Text>
                               </View>
                             </View>
-                            <Text style={[styles.notifRecipientText, { color: colors.textSecondary }]}>
-                              📱 {notif.recipient} via {notif.channel}
-                            </Text>
+                            <View style={styles.notifRecipientRow}>
+                              <IonIcon name="phone-portrait-outline" size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                              <Text style={[styles.notifRecipientText, { color: colors.textSecondary }]}>
+                                {notif.recipient} via {notif.channel}
+                              </Text>
+                            </View>
                             <Text style={[styles.notifDateText, { color: colors.textMuted }]}>
                               {new Date(notif.createdAt).toLocaleDateString('en-IN', {
                                 day: '2-digit',
@@ -1155,37 +1371,44 @@ export function OrderDetailModal({
                 )}
               </ScrollView>
 
-              {/* Bottom Action Bar matching Screen 11 */}
+              {/* Fixed Bottom Action Bar matching Target Design */}
               <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.addPhotoBtn, { backgroundColor: colors.surface, borderColor: colors.primary }]}
+                  style={[styles.addPhotoBtn, { backgroundColor: colors.surface, borderColor: '#1E69F5' }]}
                   onPress={() => handleAddPhotoAction()}
                   activeOpacity={0.8}
                   disabled={isUploadingPhoto}
                   accessible={true}
                   accessibilityLabel="Add Photo to Order"
                 >
-                  <Text style={[styles.addPhotoBtnText, { color: colors.primary }]}>
-                    {isUploadingPhoto ? '⏳ Uploading...' : '📷 Add Photo'}
+                  <IonIcon name="camera-outline" size={18} color="#1E69F5" />
+                  <Text style={[styles.addPhotoBtnText, { color: '#1E69F5' }]}>
+                    {isUploadingPhoto ? 'Uploading...' : 'Add Photo'}
                   </Text>
                 </TouchableOpacity>
 
                 {effectiveDue > 0 ? (
                   <TouchableOpacity
-                    style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
+                    style={[styles.primaryActionBtn, { backgroundColor: '#1E69F5' }]}
                     onPress={() => setPaymentModalVisible(true)}
                     activeOpacity={0.8}
+                    accessible={true}
+                    accessibilityLabel={`Collect Payment ₹${effectiveDue.toFixed(0)}`}
                   >
+                    <IonIcon name="card-outline" size={18} color="#FFFFFF" />
                     <Text style={styles.primaryActionBtnText}>
                       Collect Payment (₹{effectiveDue.toFixed(0)})
                     </Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
-                    style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
+                    style={[styles.primaryActionBtn, { backgroundColor: '#1E69F5' }]}
                     onPress={() => setMarkDeliveredVisible(true)}
                     activeOpacity={0.8}
+                    accessible={true}
+                    accessibilityLabel="Mark Order as Delivered"
                   >
+                    <IonIcon name="checkmark-done-outline" size={18} color="#FFFFFF" />
                     <Text style={styles.primaryActionBtnText}>Mark as Delivered</Text>
                   </TouchableOpacity>
                 )}
@@ -1209,7 +1432,7 @@ export function OrderDetailModal({
             />
           ) : null}
 
-          {/* Mark as Delivered Sub-Modal matching Screen 12 */}
+          {/* Mark as Delivered Sub-Modal */}
           <MarkAsDeliveredModal
             visible={markDeliveredVisible}
             order={order}
@@ -1239,7 +1462,8 @@ export function OrderDetailModal({
                     accessible={true}
                     accessibilityLabel="Close photo preview"
                   >
-                    <Text style={styles.lightboxCloseText}>✕ Close</Text>
+                    <IonIcon name="close" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
+                    <Text style={styles.lightboxCloseText}>Close</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1264,7 +1488,8 @@ export function OrderDetailModal({
                         accessible={true}
                         accessibilityLabel="Previous Photo"
                       >
-                        <Text style={styles.lightboxNavBtnText}>‹ Previous</Text>
+                        <IonIcon name="chevron-back" size={16} color="#FFFFFF" style={{ marginRight: 2 }} />
+                        <Text style={styles.lightboxNavBtnText}>Previous</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1278,7 +1503,8 @@ export function OrderDetailModal({
                         accessible={true}
                         accessibilityLabel="Next Photo"
                       >
-                        <Text style={styles.lightboxNavBtnText}>Next ›</Text>
+                        <Text style={styles.lightboxNavBtnText}>Next</Text>
+                        <IonIcon name="chevron-forward" size={16} color="#FFFFFF" style={{ marginLeft: 2 }} />
                       </TouchableOpacity>
                     </View>
                   ) : null}
@@ -1323,132 +1549,123 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  headerBackBtn: {
-    flexDirection: 'row',
+  headerIconBtn: {
+    minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
-    gap: 4,
-  },
-  backArrow: {
-    fontSize: 24,
-    color: '#1765f5',
-    fontWeight: '700',
-    marginTop: -2,
-  },
-  backBtnText: {
-    fontSize: 15,
-    color: '#1765f5',
-    fontWeight: '700',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#0f172a',
   },
-  dotsIcon: {
-    fontSize: 22,
-    color: '#64748b',
-    fontWeight: 'bold',
-    paddingHorizontal: 4,
-  },
   scrollContent: {
     padding: 16,
     paddingBottom: 24,
   },
-  orderHeaderCard: {
+  unifiedOrderCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    marginBottom: 16,
+    overflow: 'hidden',
+    marginBottom: 14,
   },
-  orderTopRow: {
+  topBlueBanner: {
+    backgroundColor: '#1E69F5',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
   },
-  orderIconAndNumberGroup: {
+  orderNumberGroup: {
+    flex: 1,
+  },
+  orderNumBannerLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.82)',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  orderNumRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
   },
-  orderDocSquircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orderNumLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  orderNumBig: {
+  orderNumBannerValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
-  statusChip: {
+  copyBtn: {
+    marginLeft: 6,
+    padding: 4,
+  },
+  bannerDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    marginHorizontal: 12,
+  },
+  bannerStatusPill: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
-    gap: 5,
+    gap: 6,
   },
   statusDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
   },
-  statusChipText: {
+  bannerStatusPillText: {
     fontSize: 12,
     fontWeight: '700',
   },
-  customerRowCard: {
+  cardContentBody: {
+    padding: 14,
+  },
+  customerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    marginTop: 12,
+    paddingBottom: 12,
   },
   customerAvatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#dbeafe',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#DDEBFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   customerAvatarText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#1d4ed8',
+    color: '#1E69F5',
+  },
+  customerMetaColumn: {
+    flex: 1,
+    paddingHorizontal: 12,
   },
   customerName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0f172a',
+    marginBottom: 2,
   },
-  customerPhone: {
-    fontSize: 13,
-    color: '#475569',
+  customerDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
   },
-  customerCode: {
+  customerDetailText: {
     fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  customerChevron: {
-    fontSize: 20,
-    color: '#94a3b8',
-    fontWeight: 'bold',
+    color: '#475569',
   },
   datesGrid: {
     flexDirection: 'row',
@@ -1456,9 +1673,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     paddingTop: 12,
-    marginTop: 4,
   },
-  dateCol: {
+  dateBox: {
     flex: 1,
     backgroundColor: '#f8fafc',
     padding: 10,
@@ -1469,127 +1685,69 @@ const styles = StyleSheet.create({
   dateLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
   },
-  dateLabel: {
-    fontSize: 12,
+  calendarIconSquare: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: '#ebf3ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  dateBoxLabel: {
+    fontSize: 11,
     color: '#64748b',
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  dateVal: {
+  dateBoxValue: {
     fontSize: 13,
     fontWeight: '700',
     color: '#0f172a',
-    marginTop: 2,
+    marginTop: 4,
   },
-  creatorVal: {
+  dateBoxSubtext: {
     fontSize: 11,
     color: '#64748b',
     fontWeight: '500',
     marginTop: 2,
   },
-  dueRemainingVal: {
+  dateBoxDueStatus: {
     fontSize: 11,
-    color: '#64748b',
     fontWeight: '600',
     marginTop: 2,
   },
-  itemChevronIcon: {
-    fontSize: 16,
-    color: '#64748b',
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  compactAddCameraIcon: {
-    fontSize: 16,
-    marginBottom: 2,
-  },
-  checklistHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  checklistTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  checklistCheckIcon: {
-    fontSize: 16,
-    color: '#1765f5',
-  },
-  checklistBadgePill: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  checklistBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#166534',
-  },
-  garmentStatusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  statusPillReady: {
-    backgroundColor: '#dcfce7',
-  },
-  statusPillWaiting: {
-    backgroundColor: '#fef3c7',
-  },
-  paymentSummaryHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  paymentSummaryTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  balanceDueHighlightBox: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fecaca',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 6,
+    gap: 8,
+    marginBottom: 14,
   },
   tabItem: {
     flex: 1,
-    height: 38,
+    height: 40,
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
   tabItemActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1E69F5',
+    borderWidth: 1,
+    borderColor: '#1E69F5',
+  },
+  tabItemInactive: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   tabItemText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748b',
   },
   tabItemTextActive: {
     color: '#ffffff',
+    fontWeight: '700',
   },
   itemsListContainer: {
     gap: 10,
@@ -1605,21 +1763,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  garmentIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#ebf3ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemGarmentName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  itemServiceName: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  itemPriceChevronGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  itemPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
   itemPhotoStripContainer: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
+  },
+  photoStripWithViewAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   itemThumbnailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexWrap: 'wrap',
   },
   compactThumbBtn: {
-    width: 48,
-    height: 48,
+    width: 54,
+    height: 54,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#cbd5e1',
@@ -1631,8 +1821,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   compactExtraBadgeBtn: {
-    width: 48,
-    height: 48,
+    width: 54,
+    height: 54,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#94a3b8',
@@ -1645,30 +1835,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1e293b',
   },
-  compactAddMorePhotoBtn: {
-    width: 48,
-    height: 48,
+  dashedAddPhotoBox: {
+    width: 58,
+    height: 54,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    backgroundColor: '#eff6ff',
+    borderWidth: 1.5,
+    borderColor: '#93c5fd',
+    borderStyle: 'dashed',
+    backgroundColor: '#f0f7ff',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 2,
   },
-  compactAddMorePhotoText: {
-    fontSize: 14,
+  dashedAddPhotoText: {
+    fontSize: 9,
     fontWeight: '700',
-    color: '#2563eb',
+    color: '#1e69f5',
   },
   compactViewAllLink: {
     minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingLeft: 6,
   },
   compactViewAllText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#1e69f5',
   },
   noPhotosRow: {
     flexDirection: 'row',
@@ -1679,32 +1871,81 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#f0f7ff',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderWidth: 1.5,
+    borderColor: '#93c5fd',
+    borderStyle: 'dashed',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   addPhotoInlineText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    fontWeight: '700',
+    color: '#1e69f5',
   },
   noPhotosLabel: {
     fontSize: 12,
     color: '#94a3b8',
     fontStyle: 'italic',
   },
+  garmentChecklistCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 4,
+  },
+  checklistHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  checklistTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  checklistTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  checklistBadgePill: {
+    backgroundColor: '#ebf3ff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  checklistBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  garmentCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 8,
+  },
+  garmentCheckText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
   garmentPiecePhotoBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     overflow: 'hidden',
     backgroundColor: '#f8fafc',
-    marginRight: 6,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1714,20 +1955,15 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   garmentPiecePlaceholderBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#cbd5e1',
     borderStyle: 'dashed',
     backgroundColor: '#f8fafc',
-    marginRight: 6,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  garmentPiecePlaceholderIcon: {
-    fontSize: 15,
-    opacity: 0.6,
   },
   garmentPieceBadge: {
     position: 'absolute',
@@ -1743,77 +1979,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
   },
-  garmentIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#eff6ff',
-    alignItems: 'center',
-    justifyContent: 'center',
+  garmentStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  garmentEmoji: {
-    fontSize: 20,
+  statusPillReady: {
+    backgroundColor: '#dcfce7',
   },
-  itemGarmentName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  itemServiceName: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  itemPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  garmentChecklistCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 8,
-  },
-  checklistTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 10,
-  },
-  garmentCheckRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    gap: 10,
-  },
-  checkboxCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxCircleActive: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
-  },
-  checkmarkIcon: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  garmentCheckText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1e293b',
+  statusPillWaiting: {
+    backgroundColor: '#fef3c7',
   },
   garmentStatusLabel: {
     fontSize: 11,
@@ -1825,14 +2000,25 @@ const styles = StyleSheet.create({
   statusWaiting: {
     color: '#b45309',
   },
-  financialSummaryCard: {
+  paymentSummaryCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    marginTop: 8,
+    marginTop: 4,
     gap: 8,
+  },
+  paymentSummaryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  paymentSummaryTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -1848,15 +2034,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
+  balanceDueHighlightBox: {
+    backgroundColor: '#f0f6ff',
+    borderColor: '#dbeafe',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  balanceDueLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  balanceDueBlueBar: {
+    width: 4,
+    height: 22,
+    borderRadius: 2,
+    backgroundColor: '#1E69F5',
+    marginRight: 10,
+  },
   summaryDueLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#1e3a8a',
   },
   summaryDueVal: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#b91c1c',
+    color: '#1e69f5',
   },
   photosTabContainer: {
     backgroundColor: '#ffffff',
@@ -1886,11 +2095,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionBtnSmall: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1E69F5',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     minHeight: 36,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1913,7 +2123,7 @@ const styles = StyleSheet.create({
   },
   uploadingText: {
     fontSize: 12,
-    color: '#2563eb',
+    color: '#1E69F5',
     fontWeight: '600',
   },
   emptyPhotosContainer: {
@@ -1925,10 +2135,6 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  emptyPhotosIcon: {
-    fontSize: 32,
-    marginBottom: 8,
   },
   emptyPhotosText: {
     fontSize: 14,
@@ -2008,6 +2214,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2041,6 +2248,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
@@ -2057,7 +2265,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1E69F5',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2119,10 +2327,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#15803d',
   },
+  notifRecipientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
   notifRecipientText: {
     fontSize: 12,
     color: '#475569',
-    marginTop: 2,
   },
   notifDateText: {
     fontSize: 10,
@@ -2139,40 +2351,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     gap: 12,
   },
   addPhotoBtn: {
     flex: 1,
-    height: 50,
-    borderRadius: 25,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#2563eb',
+    borderColor: '#1E69F5',
     backgroundColor: '#ffffff',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   addPhotoBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2563eb',
+    color: '#1E69F5',
   },
   primaryActionBtn: {
     flex: 1.5,
-    height: 50,
-    borderRadius: 25,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#1E69F5',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#2563eb',
+    gap: 8,
+    shadowColor: '#1E69F5',
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     elevation: 3,
   },
   primaryActionBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
   },
@@ -2191,10 +2409,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#b91c1c',
     textAlign: 'center',
+    marginTop: 10,
     marginBottom: 12,
   },
   retryBtn: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#1E69F5',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
