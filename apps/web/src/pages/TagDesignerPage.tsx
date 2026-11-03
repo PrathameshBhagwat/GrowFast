@@ -10,8 +10,12 @@ import { friendlyErrorMessage } from '../services/api';
 import {
   REFERENCE_TAG_DESIGN,
   DEFAULT_TAG_DESIGN,
+  CANONICAL_7FIELD_TAG_DESIGN,
+  CANONICAL_7FIELD_TAG_FIELDS,
   DEFAULT_SERVICE_SHORTCUTS,
   resolveServiceShortcut,
+  resolveGarmentCategory,
+  formatPieceNumber,
   SUPPORTED_TAG_FONTS,
   SUPPORTED_TAG_PRINTERS,
   SUPPORTED_TAG_DIMENSIONS,
@@ -60,6 +64,90 @@ const CONFIGURABLE_SERVICES: { id: string; name: string; defaultShortcut: string
 
 const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
   {
+    label: 'Canonical 40×40 mm (Shirt - DC 1/5)',
+    data: {
+      orderNumber: 'ORD-000662',
+      tagId: 'GF-662-1',
+      unitNumber: 1,
+      totalPieces: 5,
+      customerName: 'Sarthak Gite',
+      serviceType: 'DRY_CLEAN',
+      garmentName: 'Shirt',
+      garmentCategory: 'SHIRT',
+      pieceNumber: '1/5',
+      shopName: 'GROWFAST',
+      serviceShortcut: 'DC',
+      storeName: 'GrowFast Laundry',
+      storeLocation: 'Airoli',
+      customerAddress: 'Flat 402, Sunshine Heights, Airoli',
+      itemTotal: '5 Pcs',
+      remarks: 'Gentle wash',
+      colour: 'White',
+      orderDate: '2026-11-03T10:00:00.000Z',
+      bookingDate: '2026-11-03T10:00:00.000Z',
+      dueDate: '2026-11-03T18:00:00.000Z',
+      barcodeValue: 'ORD000662-01',
+      qrCodeValue: 'GF-662-1',
+      isWorkshop: false,
+    },
+  },
+  {
+    label: 'Canonical 40×40 mm (Pant - DC 1/3)',
+    data: {
+      orderNumber: 'ORD-000662',
+      tagId: 'GF-662-6',
+      unitNumber: 1,
+      totalPieces: 3,
+      customerName: 'Sarthak Gite',
+      serviceType: 'DRY_CLEAN',
+      garmentName: 'Pants',
+      garmentCategory: 'PANT',
+      pieceNumber: '1/3',
+      shopName: 'GROWFAST',
+      serviceShortcut: 'DC',
+      storeName: 'GrowFast Laundry',
+      storeLocation: 'Airoli',
+      customerAddress: 'Flat 402, Sunshine Heights, Airoli',
+      itemTotal: '3 Pcs',
+      remarks: 'Crease line required',
+      colour: 'Black',
+      orderDate: '2026-11-03T10:00:00.000Z',
+      bookingDate: '2026-11-03T10:00:00.000Z',
+      dueDate: '2026-11-03T18:00:00.000Z',
+      barcodeValue: 'ORD000662-06',
+      qrCodeValue: 'GF-662-6',
+      isWorkshop: false,
+    },
+  },
+  {
+    label: 'Canonical 40×40 mm (Jacket - SI 1/2)',
+    data: {
+      orderNumber: 'ORD-000662',
+      tagId: 'GF-662-9',
+      unitNumber: 1,
+      totalPieces: 2,
+      customerName: 'Sarthak Gite',
+      serviceType: 'STEAM_PRESS',
+      garmentName: 'Jacket',
+      garmentCategory: 'JACKET',
+      pieceNumber: '1/2',
+      shopName: 'GROWFAST',
+      serviceShortcut: 'SI',
+      storeName: 'GrowFast Laundry',
+      storeLocation: 'Airoli',
+      customerAddress: 'Flat 402, Sunshine Heights, Airoli',
+      itemTotal: '2 Pcs',
+      remarks: 'Delicate lapel',
+      colour: 'Navy',
+      orderDate: '2026-11-03T10:00:00.000Z',
+      bookingDate: '2026-11-03T10:00:00.000Z',
+      dueDate: '2026-11-03T18:00:00.000Z',
+      barcodeValue: 'ORD000662-09',
+      qrCodeValue: 'GF-662-9',
+      isWorkshop: false,
+    },
+  },
+  {
     label: 'Standard Order (Silk Saree)',
     data: {
       orderNumber: 'ORD-001284',
@@ -69,6 +157,10 @@ const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
       customerName: 'Aishwarya Gangam',
       serviceType: 'DRY_CLEAN',
       garmentName: 'Silk Saree',
+      garmentCategory: 'SAREE',
+      pieceNumber: '1/5',
+      shopName: 'GROWFAST',
+      serviceShortcut: 'DC',
       storeName: 'GrowFast Laundry',
       storeLocation: 'Airoli, Navi Mumbai',
       customerAddress: 'Flat 402, Sunshine Heights, Airoli',
@@ -93,6 +185,10 @@ const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
       customerName: 'Aishwarya Gangam',
       serviceType: 'DRY_CLEAN',
       garmentName: 'Heavy Designer Sherwani',
+      garmentCategory: 'SHERWANI',
+      pieceNumber: '2/5',
+      shopName: 'GROWFAST',
+      serviceShortcut: 'DC',
       storeName: 'GrowFast Central Workshop',
       storeLocation: 'Airoli Hub',
       customerAddress: 'Flat 402, Sunshine Heights, Airoli',
@@ -117,6 +213,10 @@ const SAMPLE_PRESETS: { label: string; data: PhysicalTagData }[] = [
       customerName: 'Dr. Rajeshwari Swaminathan-Venkatesh',
       serviceType: 'WASH_IRON',
       garmentName: 'Embroidered Heavy Designer Sherwani with Dupatta',
+      garmentCategory: 'EMBROIDERED SHERWANI',
+      pieceNumber: '48/50',
+      shopName: 'GROWFAST',
+      serviceShortcut: 'WSI',
       storeName: 'GrowFast Laundry Flagship Hub',
       storeLocation: 'Navi Mumbai Central Sector 19',
       customerAddress: 'Villa 12, Palm Meadows Estate, Sector 19',
@@ -137,7 +237,7 @@ export const TagDesignerPage: React.FC = () => {
   const navigate = useNavigate();
   const { employee } = useAuth();
 
-  const [design, setDesign] = useState<TagDesignConfig>(REFERENCE_TAG_DESIGN);
+  const [design, setDesign] = useState<TagDesignConfig>(CANONICAL_7FIELD_TAG_DESIGN);
   const [initialDesignJson, setInitialDesignJson] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -263,10 +363,14 @@ export const TagDesignerPage: React.FC = () => {
   const activeSample = useMemo(() => {
     const preset = SAMPLE_PRESETS[sampleIndex] || SAMPLE_PRESETS[0];
     const base = preset.data;
+    const cat = resolveGarmentCategory(base.garmentCategory, base.garmentName);
+    const svc = resolveServiceShortcut(base.serviceType, design.serviceShortcuts);
     return {
       ...base,
       shopName: design.shopName || 'GrowFast',
-      serviceShortcut: resolveServiceShortcut(base.serviceType, design.serviceShortcuts),
+      serviceShortcut: svc,
+      garmentCategory: cat,
+      pieceNumber: base.pieceNumber || formatPieceNumber(base.unitNumber, base.totalPieces),
     };
   }, [sampleIndex, design.shopName, design.serviceShortcuts]);
 
@@ -274,10 +378,6 @@ export const TagDesignerPage: React.FC = () => {
   const handleFieldToggle = (index: number) => {
     setDesign((prev) => {
       const nextFields = [...prev.fields];
-      // Booking No. (orderNumber) is protected primary anchor
-      if (nextFields[index].field === 'orderNumber' || nextFields[index].field === 'bookingNo') {
-        return prev;
-      }
       nextFields[index] = {
         ...nextFields[index],
         enabled: !nextFields[index].enabled,
@@ -420,8 +520,8 @@ export const TagDesignerPage: React.FC = () => {
         setDesign(res.data);
         setInitialDesignJson(JSON.stringify(res.data));
       } else {
-        setDesign(REFERENCE_TAG_DESIGN);
-        setInitialDesignJson(JSON.stringify(REFERENCE_TAG_DESIGN));
+        setDesign(CANONICAL_7FIELD_TAG_DESIGN);
+        setInitialDesignJson(JSON.stringify(CANONICAL_7FIELD_TAG_DESIGN));
       }
       setSuccessMessage('Tag layout reset to canonical reference default.');
       setTimeout(() => setSuccessMessage(null), 5000);
@@ -854,7 +954,7 @@ export const TagDesignerPage: React.FC = () => {
                 </h2>
               </div>
               <span className="text-xs text-[var(--text-secondary)] font-medium">
-                11 Reference Fields
+                {design.fields.length} Configurable Fields
               </span>
             </div>
 
@@ -863,8 +963,7 @@ export const TagDesignerPage: React.FC = () => {
               {design.fields.map((fieldCfg, index) => {
                 const isFirst = index === 0;
                 const isLast = index === design.fields.length - 1;
-                const isFixedKey =
-                  fieldCfg.field === 'bookingNo' || fieldCfg.field === 'orderNumber';
+                const isFixedKey = false;
                 const supportsFont =
                   fieldCfg.field !== 'qrcode' &&
                   fieldCfg.field !== 'itemTotal' &&

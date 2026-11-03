@@ -1,11 +1,16 @@
 import React from 'react';
 import {
   DEFAULT_TAG_DESIGN,
+  CANONICAL_7FIELD_TAG_DESIGN,
   type TagDesignConfig,
   type TagFieldConfig,
   formatShopName,
   resolveServiceShortcut,
+  resolveGarmentCategory,
   formatGarmentSequence,
+  formatPieceNumber,
+  formatGarmentTagLine,
+  formatTagDueDate,
 } from '@growfast/shared-types';
 
 export interface PhysicalTagData {
@@ -16,12 +21,15 @@ export interface PhysicalTagData {
   customerName: string;
   serviceType: string;
   garmentName: string;
+  garmentCategory?: string;
+  pieceNumber?: string;
   shopName?: string;
   serviceShortcut?: string;
   storeName?: string;
   storeLocation?: string;
   orderDate?: string | Date;
   isCancelled?: boolean;
+  isDelivered?: boolean;
   // Reference Image Fields
   customerAddress?: string;
   itemTotal?: number | string;
@@ -144,6 +152,8 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
     customerName,
     serviceType,
     garmentName,
+    garmentCategory,
+    pieceNumber,
     storeName,
     storeLocation,
     orderDate,
@@ -165,7 +175,13 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
   const padding = activeDesign.containerPaddingMm || DEFAULT_TAG_DESIGN.containerPaddingMm;
   const borderStyle = activeDesign.borderStyle ?? 'dashed';
 
-  const serviceCode = getServiceCode(serviceType);
+  const serviceCode = getServiceCode(serviceType, activeDesign.serviceShortcuts);
+  const resolvedCategory = resolveGarmentCategory(garmentCategory, garmentName);
+  const resolvedPiece = pieceNumber || formatPieceNumber(unitNumber, totalPieces);
+  const resolvedShortcut =
+    data.serviceShortcut ||
+    resolveServiceShortcut(serviceType, activeDesign.serviceShortcuts);
+
   const piecePosition = `${unitNumber}/${totalPieces}`;
   const formattedOrderDate = formatTagDate(bookingDate || orderDate);
   const storeHeader = formatStoreHeader(storeName, storeLocation);
@@ -185,10 +201,10 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
     ) {
       const days = activeDesign.workshopPreponeDays || 1;
       const preponed = new Date(dateObj.getTime() - days * 24 * 60 * 60 * 1000);
-      return formatTagDate(preponed);
+      return formatTagDueDate(preponed);
     }
 
-    return formatTagDate(dateObj);
+    return formatTagDueDate(dateObj);
   }, [
     dueDate,
     orderDate,
@@ -451,27 +467,32 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
           </div>
         );
 
-      case 'dueDate':
+      case 'dueDate': {
+        const formattedDueDate =
+          resolvedDueDate || formatTagDueDate(dueDate || bookingDate || orderDate);
         return (
           <div
             key="dueDate"
             className={`overflow-hidden leading-tight ${alignClass}`}
             style={{ textAlign }}
+            data-testid="tag-due-date"
           >
             <span
-              className="truncate block"
+              className="truncate block font-bold"
               style={{
                 ...baseStyle,
                 fontFamily: getCssFontFamily(fieldCfg.font || 'Arial'),
-                fontSize: `${fieldCfg.fontSize}px`,
+                fontSize: `${fieldCfg.fontSize || 9.5}px`,
+                fontWeight: fieldCfg.isBold !== false ? 'bold' : 'normal',
               }}
             >
-              Due: {resolvedDueDate || formattedOrderDate}
+              Due: {formattedDueDate}
             </span>
           </div>
         );
+      }
 
-      // ─── Canonical 5-Line Garment Tag Fields ─────────────────────────
+      // ─── Canonical 7-Field & 5-Line Garment Tag Fields ─────────────────────────
       case 'shopName': {
         const resolvedShopName = formatShopName(
           data.shopName || activeDesign.shopName,
@@ -501,9 +522,7 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
       }
 
       case 'serviceShortcut': {
-        const shortcut =
-          data.serviceShortcut ||
-          resolveServiceShortcut(serviceType, activeDesign.serviceShortcuts);
+        const shortcut = resolvedShortcut;
         return (
           <div
             key="serviceShortcut"
@@ -521,6 +540,54 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
               title={shortcut}
             >
               {shortcut}
+            </span>
+          </div>
+        );
+      }
+
+      case 'garmentCategory': {
+        const cat = resolvedCategory;
+        return (
+          <div
+            key="garmentCategory"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+            data-testid="tag-garment-category"
+          >
+            <span
+              className="truncate block tracking-wide font-bold uppercase"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial Black'),
+                fontSize: `${fieldCfg.fontSize || 11}px`,
+              }}
+              title={cat}
+            >
+              {cat}
+            </span>
+          </div>
+        );
+      }
+
+      case 'pieceNumber': {
+        const piece = resolvedPiece;
+        return (
+          <div
+            key="pieceNumber"
+            className={`overflow-hidden leading-tight ${alignClass}`}
+            style={{ textAlign }}
+            data-testid="tag-piece-number"
+          >
+            <span
+              className="truncate block font-bold tracking-wider"
+              style={{
+                ...baseStyle,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial Black'),
+                fontSize: `${fieldCfg.fontSize || 11}px`,
+              }}
+              title={piece}
+            >
+              {piece}
             </span>
           </div>
         );
@@ -627,6 +694,114 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
       ? activeDesign.fields
       : DEFAULT_TAG_DESIGN.fields;
 
+  // Group adjacent operational fields ('serviceShortcut', 'garmentCategory', 'pieceNumber')
+  // when enabled, so they form a unified cohesive line "DC | SHIRT | 1/5"
+  const renderedElements = React.useMemo(() => {
+    const operationalKeys = new Set(['serviceShortcut', 'garmentCategory', 'pieceNumber']);
+    const elements: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < fieldsToRender.length) {
+      const fieldCfg = fieldsToRender[i];
+
+      // Check if this field starts an adjacent sequence of operational fields
+      if (operationalKeys.has(fieldCfg.field)) {
+        const group: TagFieldConfig[] = [];
+        let j = i;
+        while (j < fieldsToRender.length && operationalKeys.has(fieldsToRender[j].field)) {
+          group.push(fieldsToRender[j]);
+          j++;
+        }
+
+        const enabledInGroup = group.filter((f) => f.enabled);
+
+        if (group.length > 1) {
+          if (enabledInGroup.length > 0) {
+            const shortcutCfg = group.find((f) => f.field === 'serviceShortcut' && f.enabled);
+            const categoryCfg = group.find((f) => f.field === 'garmentCategory' && f.enabled);
+            const pieceCfg = group.find((f) => f.field === 'pieceNumber' && f.enabled);
+
+            const shortcutVal = shortcutCfg ? resolvedShortcut : undefined;
+            const categoryVal = categoryCfg ? resolvedCategory : undefined;
+            const pieceVal = pieceCfg ? resolvedPiece : undefined;
+
+            const lineText = formatGarmentTagLine({
+              serviceShortcut: shortcutVal,
+              garmentCategory: categoryVal,
+              pieceNumber: pieceVal,
+            });
+
+            if (lineText) {
+              const primaryCfg = categoryCfg || shortcutCfg || pieceCfg || group[0];
+              const textAlign = getAlignStyle(primaryCfg.alignment);
+              const alignClass =
+                textAlign === 'center'
+                  ? 'text-center'
+                  : textAlign === 'right'
+                    ? 'text-right'
+                    : 'text-left';
+
+              // Font scaling for long text
+              const baseFontSize = primaryCfg.fontSize || 11;
+              const effectiveFontSize =
+                lineText.length > 25
+                  ? Math.max(8.5, baseFontSize - 3)
+                  : lineText.length > 18
+                    ? Math.max(9.5, baseFontSize - 1.5)
+                    : baseFontSize;
+
+              elements.push(
+                <div
+                  key={`operational-group-${i}`}
+                  className={`my-0.5 overflow-hidden leading-tight ${alignClass}`}
+                  style={{ textAlign }}
+                  data-testid="tag-operational-line"
+                >
+                  <span
+                    className="block font-bold tracking-wide break-words"
+                    style={{
+                      textAlign,
+                      fontFamily: getCssFontFamily(primaryCfg.font || 'Arial Black'),
+                      fontSize: `${effectiveFontSize}px`,
+                      lineHeight: 1.15,
+                      color: '#000000',
+                      textTransform: 'uppercase',
+                    }}
+                    title={lineText}
+                  >
+                    {lineText}
+                  </span>
+                </div>,
+              );
+            }
+          }
+          i = j;
+          continue;
+        }
+      }
+
+      // Single standalone field
+      const rendered = renderField(fieldCfg);
+      if (rendered) {
+        elements.push(rendered);
+      }
+      i++;
+    }
+
+    return elements;
+  }, [
+    fieldsToRender,
+    resolvedShortcut,
+    resolvedCategory,
+    resolvedPiece,
+    resolvedDueDate,
+    activeDesign,
+    customerName,
+    displayOrderNumber,
+    formattedOrderDate,
+    storeHeader,
+  ]);
+
   // Resolve dimensions e.g. '1.5 in' -> '40mm' (calibrated for 40x40mm thermal cloth tags)
   const resolveDimension = (dim?: string, fallback = '40mm') => {
     if (!dim) return fallback;
@@ -669,7 +844,7 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
       data-tag-id={tagId}
       data-unit-number={unitNumber}
     >
-      {fieldsToRender.map(renderField)}
+      {renderedElements}
 
       {/* ─── Optional Cancelled Watermark ───────────────────────────── */}
       {isCancelled && (

@@ -62,7 +62,7 @@ export const TagPrintLayout: React.FC<TagPrintLayoutProps> = ({
     <div id={id} className="printable-tags-container" data-testid="printable-tags-container">
       {sortedTags.map((tag, idx) => (
         <div
-          key={`${tag.tagId}-${tag.unitNumber}`}
+          key={`${tag.tagId || 'tag'}-${tag.garmentCategory || tag.garmentName || 'garment'}-${tag.unitNumber}-${idx}`}
           className="printable-tag-wrapper"
           style={{
             pageBreakInside: 'avoid',

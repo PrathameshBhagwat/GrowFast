@@ -96,10 +96,20 @@ export type {
   DailyOrdersReportSummaryDTO,
   DailyOrdersReportResponseDTO,
   DailyOrdersReportQueryDTO,
+  OverdueCleanupOrderDTO,
+  OverdueCleanupSummaryResponseDTO,
+  ArchiveOrdersRequest,
+  ArchiveOrdersResponseDTO,
 } from './dto';
 
 // Order Status Contract
-export { deriveOrderStatus, ORDER_STATUS_COLORS } from './order-status';
+export {
+  deriveOrderStatus,
+  ORDER_STATUS_COLORS,
+  isOrderOverdue,
+  getOverdueDays,
+  isEligibleFor90DayCleanup,
+} from './order-status';
 export type { OrderItemStatusInput, OrderStatusDerivationContext } from './order-status';
 
 // Photo Rules Contract
@@ -156,11 +166,19 @@ export {
   REFERENCE_TAG_DESIGN,
   CANONICAL_5LINE_TAG_FIELDS,
   CANONICAL_5LINE_TAG_DESIGN,
+  CANONICAL_7FIELD_TAG_FIELDS,
+  CANONICAL_7FIELD_TAG_DESIGN,
   DEFAULT_SERVICE_SHORTCUTS,
   resolveServiceShortcut,
+  resolveGarmentCategory,
   formatGarmentSequence,
+  formatPieceNumber,
+  formatGarmentTagLine,
   formatShopName,
+  formatTagDueDate,
   sanitizeTagDesign,
+  DEPARTMENT_CATEGORY_ENUMS,
+  GARMENT_PLURAL_MAP,
   SUPPORTED_TAG_FONTS,
   SUPPORTED_TAG_PRINTERS,
   SUPPORTED_TAG_DIMENSIONS,

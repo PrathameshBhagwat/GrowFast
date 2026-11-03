@@ -8,10 +8,15 @@
  */
 
 export type TagFieldKey =
-  // ─── 5-Line Canonical Garment Tag Fields ────────────────────────────
+  // ─── Canonical Garment Tag Fields ──────────────────────────────────
   | 'shopName' // Line 1: Shop Name
-  | 'serviceShortcut' // Line 4: Service Shortcut (e.g. DC, SI, SC, ST)
-  | 'garmentSequence' // Line 5: Garment Type and Piece Sequence (e.g. Shirt 1/5, Pant 1/3)
+  | 'orderNumber' // Line 2: Order Number (Primary Anchor)
+  | 'customerName' // Line 3: Customer Name
+  | 'serviceShortcut' // Line 4/5: Service Shortcut (e.g. DC, SI, SC, ST)
+  | 'garmentCategory' // Line 4/5: Garment Category / Item Type (e.g. SHIRT, PANT, JACKET)
+  | 'pieceNumber' // Line 4/5: Piece Number position (e.g. 1/5, 1/3)
+  | 'dueDate' // Line 5: Delivery due date (e.g. Due: 03 Nov 26)
+  | 'garmentSequence' // Legacy combined garment & piece (e.g. Shirt 1/5)
   // ─── Reference Image Canonical Fields ──────────────────────────────
   | 'barcode' // BarCode (Code 39 barcode)
   | 'qrcode' // QRCode
@@ -23,12 +28,9 @@ export type TagFieldKey =
   | 'remark' // Defect notes / remarks
   | 'colour' // Color tags
   | 'bookingDate' // Order booking date
-  | 'dueDate' // Delivery due date
   // ─── Legacy Phase T4 Aliases ────────────────────────────────────────
   | 'storeHeader' // Store name / location
-  | 'orderNumber' // Primary anchor
   | 'tagId' // Authoritative internal PhysicalGarment.tagId
-  | 'customerName' // Customer name alias
   | 'serviceAndPiece' // Service & piece alias
   | 'date' // Order date alias
   | 'garmentName'; // Garment description
@@ -162,6 +164,98 @@ export const DEFAULT_SERVICE_SHORTCUTS: Record<string, string> = {
   'Laundry for White': 'LW',
   'Reprocess Cleaning': 'RC',
   'Free Shoe': 'FS',
+};
+
+/**
+ * Canonical 7-Field Physical Garment Tag Fields (Section 6 & Acceptance Criteria):
+ * 1. Shop Name (shopName)
+ * 2. Order Number (orderNumber)
+ * 3. Customer Name (customerName)
+ * 4. Service Shortcut (serviceShortcut)
+ * 5. Garment Category (garmentCategory)
+ * 6. Piece Number (pieceNumber)
+ * 7. Due Date (dueDate)
+ *
+ * All 7 fields enabled by default.
+ */
+export const CANONICAL_7FIELD_TAG_FIELDS: TagFieldConfig[] = [
+  {
+    field: 'shopName',
+    label: 'Shop Name',
+    enabled: true,
+    fontSize: 10,
+    alignment: 'center',
+    isBold: true,
+    isUppercase: true,
+  },
+  {
+    field: 'orderNumber',
+    label: 'Order Number',
+    enabled: true,
+    fontSize: 13,
+    alignment: 'center',
+    isBold: true,
+    isMono: true,
+    isUppercase: true,
+  },
+  {
+    field: 'customerName',
+    label: 'Customer Name',
+    enabled: true,
+    fontSize: 10,
+    alignment: 'center',
+    isBold: true,
+  },
+  {
+    field: 'serviceShortcut',
+    label: 'Service Shortcut',
+    enabled: true,
+    fontSize: 11,
+    alignment: 'center',
+    isBold: true,
+  },
+  {
+    field: 'garmentCategory',
+    label: 'Garment Category',
+    enabled: true,
+    fontSize: 11,
+    alignment: 'center',
+    isBold: true,
+    isUppercase: true,
+  },
+  {
+    field: 'pieceNumber',
+    label: 'Piece Number',
+    enabled: true,
+    fontSize: 11,
+    alignment: 'center',
+    isBold: true,
+  },
+  {
+    field: 'dueDate',
+    label: 'Due Date',
+    enabled: true,
+    fontSize: 9.5,
+    alignment: 'center',
+    isBold: true,
+  },
+];
+
+export const CANONICAL_7FIELD_TAG_DESIGN: TagDesignConfig = {
+  version: 1,
+  name: 'Standard 40×40 mm Physical Garment Tag',
+  shopName: 'GrowFast',
+  serviceShortcuts: { ...DEFAULT_SERVICE_SHORTCUTS },
+  width: '1.5 in',
+  height: '1.5 in',
+  printer: 'TSC TE244',
+  wetStrengthPaper: true,
+  align: 'center',
+  fields: CANONICAL_7FIELD_TAG_FIELDS,
+  containerPaddingMm: { top: 2.0, right: 2.5, bottom: 2.0, left: 2.5 },
+  borderStyle: 'dashed',
+  borderColor: '#d1d5db',
+  lineHeight: 1.15,
 };
 
 /**
@@ -347,6 +441,153 @@ export function formatShopName(
     return stripped || 'GrowFast';
   }
   return 'GrowFast';
+}
+
+/**
+ * Department/demographic categories that represent broad sections rather than specific garment item types.
+ */
+export const DEPARTMENT_CATEGORY_ENUMS = new Set([
+  'MEN',
+  'WOMEN',
+  'KIDS',
+  'HOUSEHOLD',
+  'SPECIAL',
+  'WEIGHT_BASED',
+  'OTHERS',
+  'HOME_CLEANING',
+]);
+
+/**
+ * Common plural mappings to canonical singular uppercase garment category/item names.
+ */
+export const GARMENT_PLURAL_MAP: Record<string, string> = {
+  SHIRTS: 'SHIRT',
+  PANTS: 'PANT',
+  TROUSERS: 'TROUSER',
+  'T-SHIRTS': 'T-SHIRT',
+  'T SHIRTS': 'T-SHIRT',
+  JACKETS: 'JACKET',
+  SUITS: 'SUIT',
+  SAREES: 'SAREE',
+  DRESSES: 'DRESS',
+  'BED SHEETS': 'BED SHEET',
+  BEDSHEETS: 'BED SHEET',
+  CURTAINS: 'CURTAIN',
+  BAGS: 'BAG',
+  COATS: 'COAT',
+  KURTAS: 'KURTA',
+  SWEATERS: 'SWEATER',
+  BLAZERS: 'BLAZER',
+  BLOUSES: 'BLOUSE',
+  JEANS: 'JEANS',
+  SHORTS: 'SHORTS',
+};
+
+/**
+ * Resolves the canonical uppercase garment category or item type for garment tags.
+ * Strips broad demographic categories (e.g. MEN, WOMEN) in favor of specific item names.
+ * Normalizes plurals (e.g. Shirts -> SHIRT, Pants -> PANT).
+ * Falls back to 'GARMENT' if neither category nor item name is provided.
+ */
+export function resolveGarmentCategory(
+  garmentCategory?: string | null,
+  garmentName?: string | null,
+): string {
+  let candidate = (garmentCategory || '').trim();
+  if (candidate && !DEPARTMENT_CATEGORY_ENUMS.has(candidate.toUpperCase())) {
+    // Already a specific category
+  } else {
+    // Fall back to garmentName
+    candidate = (garmentName || '').trim();
+  }
+
+  if (!candidate) {
+    return 'GARMENT';
+  }
+
+  // Remove trailing parentheses notes (e.g. "Bedsheet (Single)" -> "Bedsheet")
+  candidate = candidate.replace(/\s*\([^)]*\)/g, '').trim();
+
+  const upper = candidate.toUpperCase().replace(/\s+/g, ' ');
+
+  // Direct plural lookup
+  if (GARMENT_PLURAL_MAP[upper]) {
+    return GARMENT_PLURAL_MAP[upper];
+  }
+
+  // Handle common variants
+  if (upper === 'T SHIRT') return 'T-SHIRT';
+  if (upper === 'BEDSHEET') return 'BED SHEET';
+
+  // Suffix plural removal (e.g. "SILK SAREES" -> "SILK SAREE")
+  for (const [plural, singular] of Object.entries(GARMENT_PLURAL_MAP)) {
+    if (upper.endsWith(' ' + plural)) {
+      return upper.slice(0, -(plural.length)) + singular;
+    }
+  }
+
+  return upper || 'GARMENT';
+}
+
+/**
+ * Formats individual piece number with group denominator: e.g. "1/5", "3/3", "1/1"
+ */
+export function formatPieceNumber(
+  unitNumber?: number | null,
+  totalPieces?: number | null,
+): string {
+  const unit = typeof unitNumber === 'number' && unitNumber > 0 ? unitNumber : 1;
+  const total = typeof totalPieces === 'number' && totalPieces > 0 ? totalPieces : 1;
+  return `${unit}/${total}`;
+}
+
+/**
+ * Formats the combined operational tag line: e.g. "DC | SHIRT | 1/5", "DC | PANT | 1/3", "SI | JACKET | 1/2"
+ * Omits disabled/empty elements gracefully.
+ */
+export function formatGarmentTagLine(options: {
+  serviceShortcut?: string | null;
+  garmentCategory?: string | null;
+  pieceNumber?: string | null;
+}): string {
+  const parts: string[] = [];
+  if (options.serviceShortcut && options.serviceShortcut.trim()) {
+    parts.push(options.serviceShortcut.trim());
+  }
+  if (options.garmentCategory && options.garmentCategory.trim()) {
+    parts.push(options.garmentCategory.trim());
+  }
+  if (options.pieceNumber && options.pieceNumber.trim()) {
+    parts.push(options.pieceNumber.trim());
+  }
+  return parts.join(' | ');
+}
+
+/**
+ * Formats due date for physical tag: e.g. "03 Nov 26"
+ */
+export function formatTagDueDate(dateInput?: string | Date): string {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const day = String(d.getDate()).padStart(2, '0');
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  const month = months[d.getMonth()];
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day} ${month} ${year}`;
 }
 
 /**
@@ -581,6 +822,16 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
     return { ...DEFAULT_TAG_DESIGN };
   }
 
+  const canonical7Keys: TagFieldKey[] = [
+    'shopName',
+    'orderNumber',
+    'customerName',
+    'serviceShortcut',
+    'garmentCategory',
+    'pieceNumber',
+    'dueDate',
+  ];
+
   const canonical5Keys: TagFieldKey[] = [
     'shopName',
     'serviceShortcut',
@@ -611,7 +862,12 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
     'tagId',
   ];
 
-  const validKeys: TagFieldKey[] = [...canonical5Keys, ...referenceKeys, ...legacyKeys];
+  const validKeys: TagFieldKey[] = [
+    ...canonical7Keys,
+    ...canonical5Keys,
+    ...referenceKeys,
+    ...legacyKeys,
+  ];
 
   // Map known fields with safe clamped values
   const fields: TagFieldConfig[] = input.fields
@@ -641,27 +897,47 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
             f.field === 'garmentName' ||
             f.field === 'orderNumber' ||
             f.field === 'bookingNo' ||
-            f.field === 'shopName'),
+            f.field === 'shopName' ||
+            f.field === 'garmentCategory'),
         label:
           f.label ||
           (f.field === 'orderNumber'
-            ? 'Order Number (Primary Anchor)'
+            ? 'Order Number'
             : f.field === 'bookingNo'
               ? 'Booking No.'
               : f.field === 'shopName'
                 ? 'Shop Name'
-                : f.field === 'serviceShortcut'
-                  ? 'Service Shortcut'
-                  : f.field === 'garmentSequence'
-                    ? 'Garment Type & Piece Sequence'
-                    : f.field),
+                : f.field === 'customerName' || f.field === 'customer'
+                  ? 'Customer Name'
+                  : f.field === 'serviceShortcut'
+                    ? 'Service Shortcut'
+                    : f.field === 'garmentCategory'
+                      ? 'Garment Category'
+                      : f.field === 'pieceNumber'
+                        ? 'Piece Number'
+                        : f.field === 'dueDate'
+                          ? 'Due Date'
+                          : f.field === 'garmentSequence'
+                            ? 'Garment Type & Piece Sequence'
+                            : f.field),
       };
     });
 
   // Ensure all keys of the matching set exist
-  const isReferenceSet = fields.some((f) => referenceKeys.includes(f.field));
-  const expectedKeys = isReferenceSet ? referenceKeys : legacyKeys;
-  const defaultSource = isReferenceSet ? REFERENCE_TAG_DESIGN : DEFAULT_TAG_DESIGN;
+  const isCanonicalSet = fields.some(
+    (f) => f.field === 'garmentCategory' || f.field === 'pieceNumber' || f.field === 'shopName',
+  );
+  const isReferenceSet = !isCanonicalSet && fields.some((f) => referenceKeys.includes(f.field));
+  const expectedKeys = isCanonicalSet
+    ? canonical7Keys
+    : isReferenceSet
+      ? referenceKeys
+      : legacyKeys;
+  const defaultSource = isCanonicalSet
+    ? CANONICAL_7FIELD_TAG_DESIGN
+    : isReferenceSet
+      ? REFERENCE_TAG_DESIGN
+      : DEFAULT_TAG_DESIGN;
 
   for (const key of expectedKeys) {
     if (!fields.some((f) => f.field === key)) {

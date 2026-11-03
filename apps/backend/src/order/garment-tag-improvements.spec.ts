@@ -10,9 +10,14 @@ import {
   DEFAULT_TAG_DESIGN,
   DEFAULT_SERVICE_SHORTCUTS,
   resolveServiceShortcut,
+  resolveGarmentCategory,
   formatGarmentSequence,
+  formatPieceNumber,
+  formatGarmentTagLine,
   formatShopName,
+  formatTagDueDate,
   CANONICAL_5LINE_TAG_DESIGN,
+  CANONICAL_7FIELD_TAG_DESIGN,
 } from '@growfast/shared-types';
 
 describe('Garment Tag Generation & Printing Improvements (Tests A through J)', () => {
@@ -296,5 +301,100 @@ describe('Garment Tag Generation & Printing Improvements (Tests A through J)', (
         },
       }),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST K: Garment category resolution and plural normalization
+  // ─────────────────────────────────────────────────────────────
+  it('TEST K — GARMENT CATEGORY: resolves and normalizes uppercase item types', () => {
+    expect(resolveGarmentCategory('MEN', 'Shirts')).toBe('SHIRT');
+    expect(resolveGarmentCategory('MEN', 'Pants')).toBe('PANT');
+    expect(resolveGarmentCategory('MEN', 'Jackets')).toBe('JACKET');
+    expect(resolveGarmentCategory('WOMEN', 'Silk Sarees')).toBe('SILK SAREE');
+    expect(resolveGarmentCategory('HOUSEHOLD', 'Bed Sheets (Double)')).toBe('BED SHEET');
+    expect(resolveGarmentCategory('HOUSEHOLD', 'Curtains')).toBe('CURTAIN');
+    expect(resolveGarmentCategory(null, 'T Shirts')).toBe('T-SHIRT');
+    expect(resolveGarmentCategory(null, null)).toBe('GARMENT');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST L: Dynamic piece numbering restart per category + service
+  // ─────────────────────────────────────────────────────────────
+  it('TEST L — DYNAMIC PIECE NUMBERING: restarts per category and service combination', () => {
+    const orderItems = [
+      { garmentCategory: 'MEN', garmentName: 'Shirt', serviceType: 'Dry Cleaning', quantity: 5 },
+      { garmentCategory: 'MEN', garmentName: 'Pants', serviceType: 'Dry Cleaning', quantity: 3 },
+      { garmentCategory: 'MEN', garmentName: 'Jacket', serviceType: 'Steam Iron', quantity: 2 },
+    ];
+
+    const groupTotals = new Map<string, number>();
+    for (const item of orderItems) {
+      const cat = resolveGarmentCategory(item.garmentCategory, item.garmentName);
+      const svc = resolveServiceShortcut(item.serviceType);
+      const key = `${cat}::${svc}`;
+      groupTotals.set(key, (groupTotals.get(key) || 0) + item.quantity);
+    }
+
+    expect(groupTotals.get('SHIRT::DC')).toBe(5);
+    expect(groupTotals.get('PANT::DC')).toBe(3);
+    expect(groupTotals.get('JACKET::SI')).toBe(2);
+
+    const groupCounters = new Map<string, number>();
+    const tags: string[] = [];
+
+    for (const item of orderItems) {
+      const cat = resolveGarmentCategory(item.garmentCategory, item.garmentName);
+      const svc = resolveServiceShortcut(item.serviceType);
+      const key = `${cat}::${svc}`;
+      const total = groupTotals.get(key)!;
+
+      for (let i = 1; i <= item.quantity; i++) {
+        const current = (groupCounters.get(key) || 0) + 1;
+        groupCounters.set(key, current);
+        tags.push(formatGarmentTagLine({
+          serviceShortcut: svc,
+          garmentCategory: cat,
+          pieceNumber: formatPieceNumber(current, total),
+        }));
+      }
+    }
+
+    expect(tags).toEqual([
+      'DC | SHIRT | 1/5',
+      'DC | SHIRT | 2/5',
+      'DC | SHIRT | 3/5',
+      'DC | SHIRT | 4/5',
+      'DC | SHIRT | 5/5',
+      'DC | PANT | 1/3',
+      'DC | PANT | 2/3',
+      'DC | PANT | 3/3',
+      'SI | JACKET | 1/2',
+      'SI | JACKET | 2/2',
+    ]);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST M: 7 Configurable Fields in Tag Design Contract
+  // ─────────────────────────────────────────────────────────────
+  it('TEST M — 7 CONFIGURABLE FIELDS: CANONICAL_7FIELD_TAG_DESIGN enables all 7 fields by default', () => {
+    expect(CANONICAL_7FIELD_TAG_DESIGN.fields).toHaveLength(7);
+    const fieldKeys = CANONICAL_7FIELD_TAG_DESIGN.fields.map((f) => f.field);
+    expect(fieldKeys).toEqual([
+      'shopName',
+      'orderNumber',
+      'customerName',
+      'serviceShortcut',
+      'garmentCategory',
+      'pieceNumber',
+      'dueDate',
+    ]);
+    expect(CANONICAL_7FIELD_TAG_DESIGN.fields.every((f) => f.enabled)).toBe(true);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // TEST N: Due date format matches "03 Nov 26"
+  // ─────────────────────────────────────────────────────────────
+  it('TEST N — DUE DATE FORMAT: formats correctly as "03 Nov 26"', () => {
+    expect(formatTagDueDate('2026-11-03T14:30:00.000Z')).toBe('03 Nov 26');
   });
 });

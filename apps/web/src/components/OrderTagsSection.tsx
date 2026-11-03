@@ -5,6 +5,8 @@ import {
   OrderPhotoDTO,
   type TagDesignConfig,
   resolveServiceShortcut,
+  resolveGarmentCategory,
+  formatPieceNumber,
 } from '@growfast/shared-types';
 import { PhysicalTagData } from './PhysicalTag';
 import { TagPreviewModal } from './TagPreviewModal';
@@ -78,32 +80,69 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
   // Extract all authoritative physical garments across all order items
   const tagEntries: GarmentTagEntry[] = useMemo(() => {
     const list: GarmentTagEntry[] = [];
-    if (!order.items) return list;
+    if (!order.items || order.items.length === 0) return list;
+
+    const shortcuts = activeDesign?.serviceShortcuts;
+
+    // Pass 1: Compute total pieces per (garmentCategory + '::' + serviceShortcut)
+    const categoryTotals = new Map<string, number>();
+    for (const item of order.items) {
+      if (!item.physicalGarments || item.physicalGarments.length === 0) {
+        continue;
+      }
+      const cat = resolveGarmentCategory(item.garmentCategory, item.garmentName);
+      const svc = resolveServiceShortcut(item.serviceType, shortcuts);
+      const groupKey = `${cat}::${svc}`;
+
+      const count = item.physicalGarments.length;
+      categoryTotals.set(groupKey, (categoryTotals.get(groupKey) || 0) + count);
+    }
+
+    // Pass 2: Assign contiguous piece numbering restarting for each category + service group
+    const categoryCounters = new Map<string, number>();
 
     for (const item of order.items) {
       if (!item.physicalGarments || item.physicalGarments.length === 0) {
         continue;
       }
+      const cat = resolveGarmentCategory(item.garmentCategory, item.garmentName);
+      const svc = resolveServiceShortcut(item.serviceType, shortcuts);
+      const groupKey = `${cat}::${svc}`;
+      const totalCategoryPieces = categoryTotals.get(groupKey) || item.quantity;
 
-      // Sort physical garments within this specific item by unitNumber ascending
-      const sortedGars = [...item.physicalGarments].sort((a, b) => a.unitNumber - b.unitNumber);
+      // Sort physical garments within this item by unitNumber ascending
+      const physicalGars = [...item.physicalGarments].sort((a, b) => a.unitNumber - b.unitNumber);
 
-      for (const pg of sortedGars) {
+      for (const pg of physicalGars) {
         const pieceTagId = pg.tagId || `GF-${pg.id.slice(-6).toUpperCase()}`;
+        const currentPieceNum = (categoryCounters.get(groupKey) || 0) + 1;
+        categoryCounters.set(groupKey, currentPieceNum);
+
+        const pieceNumber = formatPieceNumber(currentPieceNum, totalCategoryPieces);
+        const resolvedDueDate =
+          (order as any).effectiveDueDate ||
+          order.systemDueDate ||
+          (order as any).dueDate ||
+          order.orderDate;
+
         const tagData: PhysicalTagData = {
           orderNumber: order.orderNumber,
           tagId: pieceTagId,
           unitNumber: pg.unitNumber,
-          totalPieces: item.quantity,
+          totalPieces: totalCategoryPieces,
+          pieceNumber,
           customerName: order.customerName,
           serviceType: item.serviceType,
           garmentName: item.garmentName,
+          garmentCategory: cat,
           shopName: activeDesign?.shopName || 'GrowFast',
-          serviceShortcut: resolveServiceShortcut(item.serviceType, activeDesign?.serviceShortcuts),
+          serviceShortcut: svc,
           storeName: order.storeName,
           storeLocation: order.storeAddress ? order.storeAddress.split(',')[0].trim() : undefined,
           orderDate: order.orderDate,
+          dueDate: resolvedDueDate,
           isCancelled: Boolean(pg.isCancelled),
+          isDelivered: Boolean(pg.isDelivered),
         };
 
         list.push({
@@ -111,7 +150,7 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
           orderItemId: item.id,
           tagId: pieceTagId,
           unitNumber: pg.unitNumber,
-          totalPieces: item.quantity,
+          totalPieces: totalCategoryPieces,
           garmentName: item.garmentName,
           serviceType: item.serviceType,
           isReady: Boolean(pg.isReady),
