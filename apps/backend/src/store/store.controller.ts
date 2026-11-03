@@ -15,12 +15,22 @@ import { UpdateTagDesignDto } from './dto/update-tag-design.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 import { Role } from '@growfast/shared-types';
 
 @Controller('store')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class StoreController {
   constructor(private readonly storeService: StoreService) {}
+
+  @Get('branches')
+  async getBranches(@Request() req: any) {
+    const branches = await this.storeService.getBranches(req.user);
+    return {
+      success: true,
+      data: branches,
+    };
+  }
 
   @Get('config')
   getStoreConfig(@Request() req: any) {

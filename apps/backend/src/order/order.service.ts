@@ -902,7 +902,7 @@ export class OrderService {
       throw new NotFoundException(`Order with ID "${id}" not found`);
     }
 
-    if (storeId && order.storeId !== storeId) {
+    if (storeId && storeId !== 'all' && order.storeId !== storeId) {
       throw new NotFoundException(`Order with ID "${id}" not found`);
     }
 
@@ -923,7 +923,7 @@ export class OrderService {
     const effectivePageSize = query.pageSize || query.limit || 10;
     const skip = (page - 1) * effectivePageSize;
 
-    const where: any = { storeId };
+    const where: any = storeId && storeId !== 'all' ? { storeId } : {};
 
     // By default, exclude archived orders unless explicitly requested
     if (!includeArchived) {
@@ -1023,7 +1023,7 @@ export class OrderService {
     const dayEnd = new Date(new Date(`${targetDateStr}T23:59:59.999Z`).getTime() + diffMs);
 
     const where: any = {
-      storeId,
+      ...(storeId && storeId !== 'all' ? { storeId } : {}),
       effectiveDueDate: {
         gte: dayStart,
         lte: dayEnd,
@@ -2419,7 +2419,7 @@ export class OrderService {
     const thresholdDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
     const where: any = {
-      storeId,
+      ...(storeId && storeId !== 'all' ? { storeId } : {}),
       effectiveDueDate: { lt: thresholdDate },
       status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
       isArchived: false,

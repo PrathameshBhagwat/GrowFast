@@ -3,6 +3,7 @@ import { NotificationService } from './notification.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 import { Role, NotificationEventType, NotificationStatus } from '@growfast/shared-types';
 
 /**
@@ -13,7 +14,7 @@ import { Role, NotificationEventType, NotificationStatus } from '@growfast/share
  * No endpoint accepts storeId from client input.
  */
 @Controller('notifications')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 

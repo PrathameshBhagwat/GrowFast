@@ -22,6 +22,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 import { PhotoService } from './photo.service';
 import { UploadPhotoDto } from './dto/upload-photo.dto';
 import { PHOTO_MAX_FILE_SIZE, PHOTO_UPLOAD_DIR } from './photo.constants';
@@ -53,7 +54,7 @@ export class PhotoController {
    * Roles: OWNER, MANAGER
    */
   @Post('photos/cleanup')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
   @Roles('OWNER', 'MANAGER')
   async triggerCleanup(
     @Body() body: { retentionDays?: number; batchSize?: number },
@@ -83,7 +84,7 @@ export class PhotoController {
    * Roles: OWNER, COUNTER (not DELIVERY — intake photos are counter tasks)
    */
   @Post('photos/upload')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
   @Roles('OWNER', 'COUNTER')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -111,7 +112,7 @@ export class PhotoController {
    * Delivery riders need to view order photos for identification.
    */
   @Get('orders/:orderId/photos')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
   @Roles('OWNER', 'MANAGER', 'COUNTER', 'DELIVERY')
   async getOrderPhotos(@Param('orderId') orderId: string, @Request() req: any) {
     const photos = await this.photoService.getOrderPhotos(orderId, req.user.storeId);

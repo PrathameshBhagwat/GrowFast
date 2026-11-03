@@ -53,7 +53,7 @@ export class PhotoService {
       select: { id: true, storeId: true },
     });
 
-    if (!order || order.storeId !== storeId) {
+    if (!order || (storeId && storeId !== 'all' && order.storeId !== storeId)) {
       throw new NotFoundException('Order not found');
     }
 
@@ -177,7 +177,7 @@ export class PhotoService {
       },
     });
 
-    if (!order || order.storeId !== storeId) {
+    if (!order || (storeId && storeId !== 'all' && order.storeId !== storeId)) {
       throw new NotFoundException('Order not found');
     }
 

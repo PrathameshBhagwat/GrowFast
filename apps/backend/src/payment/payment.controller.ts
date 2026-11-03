@@ -3,10 +3,11 @@ import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 import { RecordPaymentRequest } from '@growfast/shared-types';
 
 @Controller('payments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
@@ -22,7 +23,7 @@ export class PaymentController {
 }
 
 @Controller('orders/:orderId/payments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class OrderPaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
@@ -48,7 +49,7 @@ export class OrderPaymentController {
 }
 
 @Controller('orders/:orderId/adjustments')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class OrderAdjustmentController {
   constructor(private readonly paymentService: PaymentService) {}
 

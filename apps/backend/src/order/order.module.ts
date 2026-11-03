@@ -6,9 +6,17 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { NotificationModule } from '../notification/notification.module';
 import { PaymentModule } from '../payment/payment.module';
 import { PhotoModule } from '../photo/photo.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule, CatalogModule, NotificationModule, PaymentModule, PhotoModule],
+  imports: [
+    PrismaModule,
+    CatalogModule,
+    NotificationModule,
+    PaymentModule,
+    PhotoModule,
+    AuthModule,
+  ],
   controllers: [OrderController],
   providers: [OrderService],
   exports: [OrderService],

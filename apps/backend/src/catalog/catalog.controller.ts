@@ -6,6 +6,7 @@ import { CreateGarmentDto } from './dto/create-garment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 
 /**
  * Catalog Controller — thin HTTP layer for garment catalog endpoints.
@@ -14,6 +15,7 @@ import { Roles } from '../auth/roles.decorator';
  * PATCH /api/garments/:id  — Update garment (OWNER only)
  */
 @Controller('garments')
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 

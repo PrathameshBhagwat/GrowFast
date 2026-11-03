@@ -67,6 +67,11 @@ export class DashboardService {
    * STRICTLY READ-ONLY — zero mutations.
    */
   async getSummary(storeId: string, startDate: Date, endDate: Date): Promise<DashboardSummaryDTO> {
+    const isAll = !storeId || storeId === 'all';
+    const storeWhere: any = isAll ? {} : { storeId };
+    const orderStoreWhere: any = isAll ? {} : { order: { storeId } };
+    const customerStoreWhere: any = isAll ? {} : { orders: { some: { storeId } } };
+
     const dateFilter = {
       gte: startDate,
       lte: endDate,
@@ -87,7 +92,7 @@ export class DashboardService {
     const ordersByStatus = await this.prisma.order.groupBy({
       by: ['status'],
       where: {
-        storeId,
+        ...storeWhere,
         orderDate: dateFilter,
       },
       _count: { id: true },
@@ -103,7 +108,7 @@ export class DashboardService {
     // ─── Operational Counts (Live Store-wide by effectiveDueDate) ─
     const overdueOrders = await this.prisma.order.count({
       where: {
-        storeId,
+        ...storeWhere,
         effectiveDueDate: { lt: now },
         status: {
           notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
@@ -113,7 +118,7 @@ export class DashboardService {
 
     const dueTodayOrders = await this.prisma.order.count({
       where: {
-        storeId,
+        ...storeWhere,
         effectiveDueDate: { gte: todayStart, lte: todayEnd },
         status: {
           notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
@@ -123,7 +128,7 @@ export class DashboardService {
 
     const dueTomorrowOrders = await this.prisma.order.count({
       where: {
-        storeId,
+        ...storeWhere,
         effectiveDueDate: { gte: tomorrowStart, lte: tomorrowEnd },
         status: {
           notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
@@ -135,7 +140,7 @@ export class DashboardService {
     const totalItems = await this.prisma.orderItem.count({
       where: {
         order: {
-          storeId,
+          ...storeWhere,
           orderDate: dateFilter,
         },
       },
@@ -145,7 +150,7 @@ export class DashboardService {
     // 1. Booked Order Value in period
     const bookedAgg = await this.prisma.order.aggregate({
       where: {
-        storeId,
+        ...storeWhere,
         orderDate: dateFilter,
       },
       _sum: {
@@ -160,7 +165,7 @@ export class DashboardService {
     // 2. Collections received in period by Payment.createdAt
     const paymentsAgg = await this.prisma.payment.aggregate({
       where: {
-        order: { storeId },
+        ...orderStoreWhere,
         createdAt: dateFilter,
       },
       _sum: {
@@ -176,7 +181,7 @@ export class DashboardService {
     // 3. Completed Refunds in period by FinancialAdjustment.createdAt
     const refundsAgg = await this.prisma.financialAdjustment.aggregate({
       where: {
-        order: { storeId },
+        ...orderStoreWhere,
         type: AdjustmentType.REFUND,
         status: AdjustmentStatus.COMPLETED,
         createdAt: dateFilter,
@@ -197,7 +202,7 @@ export class DashboardService {
     // 5. Live Store-wide Outstanding Balance (non-cancelled orders with amountDue > 0)
     const outstandingAgg = await this.prisma.order.aggregate({
       where: {
-        storeId,
+        ...storeWhere,
         status: { not: OrderStatus.CANCELLED },
         amountDue: { gt: 0 },
       },
@@ -211,7 +216,7 @@ export class DashboardService {
     const paymentsByStatus = await this.prisma.order.groupBy({
       by: ['paymentStatus'],
       where: {
-        storeId,
+        ...storeWhere,
         orderDate: dateFilter,
       },
       _count: { id: true },
@@ -226,7 +231,7 @@ export class DashboardService {
     const deliveriesByStatus = await this.prisma.deliveryRecord.groupBy({
       by: ['status'],
       where: {
-        order: { storeId },
+        ...orderStoreWhere,
         createdAt: dateFilter,
       },
       _count: { id: true },
@@ -240,14 +245,14 @@ export class DashboardService {
     // ─── Customer KPIs ────────────────────────────────────────────
     const totalCustomers = await this.prisma.customer.count({
       where: {
-        orders: { some: { storeId } },
+        ...customerStoreWhere,
       },
     });
 
     const newCustomers = await this.prisma.customer.count({
       where: {
         createdAt: dateFilter,
-        orders: { some: { storeId } },
+        ...customerStoreWhere,
       },
     });
 
@@ -259,17 +264,17 @@ export class DashboardService {
 
     const [prevBookedAgg, prevPaymentsAgg, prevRefundsAgg] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { storeId, orderDate: prevDateFilter },
+        where: { ...storeWhere, orderDate: prevDateFilter },
         _sum: { totalAmount: true },
         _count: { id: true },
       }),
       this.prisma.payment.aggregate({
-        where: { order: { storeId }, createdAt: prevDateFilter },
+        where: { ...orderStoreWhere, createdAt: prevDateFilter },
         _sum: { amount: true },
       }),
       this.prisma.financialAdjustment.aggregate({
         where: {
-          order: { storeId },
+          ...orderStoreWhere,
           type: AdjustmentType.REFUND,
           status: AdjustmentStatus.COMPLETED,
           createdAt: prevDateFilter,
@@ -298,16 +303,16 @@ export class DashboardService {
     // ─── Trends (Daily Buckets) ───────────────────────────────────
     const [trendOrders, trendPayments, trendRefunds] = await Promise.all([
       this.prisma.order.findMany({
-        where: { storeId, orderDate: dateFilter },
+        where: { ...storeWhere, orderDate: dateFilter },
         select: { orderDate: true, totalAmount: true },
       }),
       this.prisma.payment.findMany({
-        where: { order: { storeId }, createdAt: dateFilter },
+        where: { ...orderStoreWhere, createdAt: dateFilter },
         select: { createdAt: true, amount: true },
       }),
       this.prisma.financialAdjustment.findMany({
         where: {
-          order: { storeId },
+          ...orderStoreWhere,
           type: AdjustmentType.REFUND,
           status: AdjustmentStatus.COMPLETED,
           createdAt: dateFilter,
@@ -376,7 +381,7 @@ export class DashboardService {
     const orderItems = await this.prisma.orderItem.findMany({
       where: {
         order: {
-          storeId,
+          ...storeWhere,
           orderDate: dateFilter,
         },
       },
@@ -461,7 +466,7 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.order.findMany({
         where: {
-          storeId,
+          ...storeWhere,
           effectiveDueDate: { lt: now },
           status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
         },
@@ -482,7 +487,7 @@ export class DashboardService {
       }),
       this.prisma.order.findMany({
         where: {
-          storeId,
+          ...storeWhere,
           effectiveDueDate: { gte: todayStart, lte: todayEnd },
           status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
         },
@@ -503,7 +508,7 @@ export class DashboardService {
       }),
       this.prisma.order.findMany({
         where: {
-          storeId,
+          ...storeWhere,
           effectiveDueDate: { gte: tomorrowStart, lte: tomorrowEnd },
           status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
         },
@@ -524,7 +529,7 @@ export class DashboardService {
       }),
       this.prisma.order.findMany({
         where: {
-          storeId,
+          ...storeWhere,
           amountDue: { gt: 0 },
           status: { not: OrderStatus.CANCELLED },
         },
@@ -545,7 +550,7 @@ export class DashboardService {
       }),
       this.prisma.order.count({
         where: {
-          storeId,
+          ...storeWhere,
           amountDue: { gt: 0 },
           status: { not: OrderStatus.CANCELLED },
         },
@@ -555,7 +560,7 @@ export class DashboardService {
     // ─── Ready Orders (orders with at least one READY item) ───────
     const readyOrdersRaw = await this.prisma.order.findMany({
       where: {
-        storeId,
+        ...storeWhere,
         orderDate: dateFilter,
         status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
         items: { some: { itemStatus: ItemStatus.READY } },
@@ -627,7 +632,7 @@ export class DashboardService {
     // ─── Recent Orders ────────────────────────────────────────────
     const recentOrdersRaw = await this.prisma.order.findMany({
       where: {
-        storeId,
+        ...storeWhere,
         orderDate: dateFilter,
       },
       include: {
@@ -654,7 +659,7 @@ export class DashboardService {
     // ─── Recent Activity (from notifications) ─────────────────────
     const recentNotifications = await this.prisma.notification.findMany({
       where: {
-        storeId,
+        ...storeWhere,
         createdAt: dateFilter,
       },
       orderBy: { createdAt: 'desc' },

@@ -429,7 +429,7 @@ export class NotificationService {
       orderId?: string;
     },
   ): Promise<NotificationDTO[]> {
-    const where: any = { storeId };
+    const where: any = storeId && storeId !== 'all' ? { storeId } : {};
 
     if (filters?.eventType) where.eventType = filters.eventType;
     if (filters?.status) where.status = filters.status;
@@ -456,7 +456,7 @@ export class NotificationService {
       throw new NotFoundException(`Notification ${id} not found`);
     }
 
-    if (notification.storeId !== storeId) {
+    if (storeId && storeId !== 'all' && notification.storeId !== storeId) {
       throw new ForbiddenException('Access denied: cross-store notification access');
     }
 

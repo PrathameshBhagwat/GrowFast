@@ -402,7 +402,7 @@ export class PaymentService {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
     }
 
-    if (order.storeId !== storeId) {
+    if (storeId && storeId !== 'all' && order.storeId !== storeId) {
       throw new ForbiddenException('Cannot access orders from a different store');
     }
 
@@ -454,7 +454,7 @@ export class PaymentService {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
     }
 
-    if (order.storeId !== storeId) {
+    if (storeId && storeId !== 'all' && order.storeId !== storeId) {
       throw new ForbiddenException('Cannot access orders from a different store');
     }
 
@@ -615,7 +615,7 @@ export class PaymentService {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
     }
 
-    if (order.storeId !== storeId) {
+    if (storeId && storeId !== 'all' && order.storeId !== storeId) {
       throw new ForbiddenException('Cannot access orders from a different store');
     }
 

@@ -4,10 +4,11 @@ import { DailyOrdersReportQueryDto } from './dto/daily-orders-report-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 import { Role, DailyOrdersReportResponseDTO } from '@growfast/shared-types';
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 

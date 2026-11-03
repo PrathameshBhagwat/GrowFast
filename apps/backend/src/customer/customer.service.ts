@@ -13,7 +13,7 @@ import type {
   UpdateCustomerRequest,
   PaginatedResponse,
 } from '@growfast/shared-types';
-import { MembershipTier } from '@growfast/shared-types';
+import { MembershipTier, Role } from '@growfast/shared-types';
 
 @Injectable()
 export class CustomerService {
@@ -26,8 +26,9 @@ export class CustomerService {
    * Create a new customer record.
    * Performs server-side validation, normalization, duplicate check, and persistence.
    * Uses WhatsApp Number as the primary contact number (stored in phone column).
+   * Binds customer to the authorized active branch (storeId).
    */
-  async createCustomer(dto: CreateCustomerRequest): Promise<CustomerDTO> {
+  async createCustomer(dto: CreateCustomerRequest, storeIdInput?: string): Promise<CustomerDTO> {
     if (!dto) {
       throw new BadRequestException('Customer creation payload is required.');
     }
@@ -35,7 +36,7 @@ export class CustomerService {
     // ── 1. Validate Name ───────────────────────────────────────────────
     const name = dto.name?.trim();
     if (!name) {
-      throw new BadRequestException('Customer name is required.');
+      throw new BadRequestException('Customer name cannot be empty.');
     }
 
     // ── 2. Validate WhatsApp Number ────────────────────────────────────
@@ -81,8 +82,8 @@ export class CustomerService {
       discountPercent = dto.discountPercent;
     }
 
-    // ── 6. Duplicate Contact Check ────────────────────────────────────
-    const storeId = dto.storeId || 'store-kp-001';
+    // ── 6. Duplicate Contact Check within active branch ────────────────
+    const storeId = storeIdInput || dto.storeId || 'store-kp-001';
     const existing = await this.prisma.customer.findUnique({
       where: {
         storeId_phone: {
@@ -137,6 +138,7 @@ export class CustomerService {
 
   /**
    * Search customers with support for:
+   * - Branch isolation (storeId)
    * - Phone (exact and partial match)
    * - Name (case-insensitive partial match)
    * - Customer ID (exact match)
@@ -146,6 +148,7 @@ export class CustomerService {
     query?: string,
     pageInput: number | string = 1,
     pageSizeInput: number | string = 10,
+    storeId?: string,
   ): Promise<PaginatedResponse<CustomerDTO>> {
     const page = typeof pageInput === 'number' ? pageInput : parseInt(String(pageInput), 10);
     const pageSize =
@@ -165,9 +168,13 @@ export class CustomerService {
     const trimmedQuery = query?.trim();
 
     let whereClause: any = {};
+    if (storeId && storeId !== 'all') {
+      whereClause.storeId = storeId;
+    }
 
     if (trimmedQuery) {
       whereClause = {
+        ...whereClause,
         OR: [
           { phone: { contains: trimmedQuery, mode: 'insensitive' } },
           { name: { contains: trimmedQuery, mode: 'insensitive' } },
@@ -199,9 +206,13 @@ export class CustomerService {
   }
 
   /**
-   * Get a single customer by technical ID or business customerCode.
+   * Get a single customer by technical ID or business customerCode with branch isolation check.
    */
-  async getCustomerById(id: string): Promise<CustomerDTO | null> {
+  async getCustomerById(
+    id: string,
+    storeId?: string,
+    userRole?: string,
+  ): Promise<CustomerDTO | null> {
     let customer = await this.prisma.customer.findUnique({
       where: { id },
     });
@@ -216,14 +227,30 @@ export class CustomerService {
       return null;
     }
 
+    // Branch isolation check: non-owners can only view customers in their assigned branch
+    if (
+      userRole &&
+      userRole !== Role.OWNER &&
+      storeId &&
+      storeId !== 'all' &&
+      customer.storeId !== storeId
+    ) {
+      return null; // Prevents cross-branch information disclosure
+    }
+
     return this.mapToDTO(customer);
   }
 
   /**
-   * Update an existing customer record by ID or customerCode.
+   * Update an existing customer record by ID or customerCode with branch isolation check.
    * Performs partial validation, duplicate phone checking (excluding self), and persistence.
    */
-  async updateCustomer(id: string, dto: UpdateCustomerRequest): Promise<CustomerDTO> {
+  async updateCustomer(
+    id: string,
+    dto: UpdateCustomerRequest,
+    storeId?: string,
+    userRole?: string,
+  ): Promise<CustomerDTO> {
     if (!id || !id.trim()) {
       throw new BadRequestException('Customer ID is required for update.');
     }
@@ -239,6 +266,17 @@ export class CustomerService {
     }
 
     if (!existingCustomer) {
+      throw new NotFoundException(`Customer with ID '${id}' not found.`);
+    }
+
+    // Branch isolation check: non-owners cannot update customers from another branch
+    if (
+      userRole &&
+      userRole !== Role.OWNER &&
+      storeId &&
+      storeId !== 'all' &&
+      existingCustomer.storeId !== storeId
+    ) {
       throw new NotFoundException(`Customer with ID '${id}' not found.`);
     }
 

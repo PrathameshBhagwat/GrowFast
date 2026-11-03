@@ -19,8 +19,10 @@ import { ArchiveOrdersDto } from './dto/archive-orders.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 
 @Controller('orders')
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 

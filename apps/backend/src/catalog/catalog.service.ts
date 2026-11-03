@@ -21,9 +21,10 @@ export class CatalogService {
    * Includes global items (storeId = null) and store-specific items.
    */
   async findAllGarments(storeId: string, category?: GarmentCategory) {
-    const where: any = {
-      OR: [{ storeId: null }, { storeId }],
-    };
+    const where: any = {};
+    if (storeId && storeId !== 'all') {
+      where.OR = [{ storeId: null }, { storeId }];
+    }
     if (category) where.category = category;
 
     return this.prisma.garmentCatalog.findMany({
@@ -74,9 +75,10 @@ export class CatalogService {
    * List service types, optionally filtered by category.
    */
   async findAllServices(storeId: string, category?: ServiceCategory) {
-    const where: any = {
-      OR: [{ storeId: null }, { storeId }],
-    };
+    const where: any = {};
+    if (storeId && storeId !== 'all') {
+      where.OR = [{ storeId: null }, { storeId }];
+    }
     if (category) where.category = category;
 
     return this.prisma.serviceType.findMany({
@@ -113,10 +115,12 @@ export class CatalogService {
    * Returns merged prices where store-specific prices override global ones.
    */
   async findAllPrices(storeId: string) {
+    const where: any = {};
+    if (storeId && storeId !== 'all') {
+      where.OR = [{ storeId: null }, { storeId }];
+    }
     const prices = await this.prisma.serviceGarmentPrice.findMany({
-      where: {
-        OR: [{ storeId: null }, { storeId }],
-      },
+      where,
       orderBy: [{ garmentCatalogId: 'asc' }, { serviceTypeId: 'asc' }],
     });
 

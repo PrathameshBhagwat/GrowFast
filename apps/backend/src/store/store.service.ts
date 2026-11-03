@@ -9,6 +9,7 @@ import {
   DEFAULT_TOP_UP_SERVICES,
   TopUpServiceItem,
   TagDesignAuditEntry,
+  Role,
 } from '@growfast/shared-types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -16,6 +17,54 @@ import * as path from 'path';
 @Injectable()
 export class StoreService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Retrieves branches accessible to the authenticated user.
+   * - OWNER: returns all branches with branch metadata and order/customer/staff counts.
+   * - Other roles: returns only their assigned branch.
+   */
+  async getBranches(currentUser: any) {
+    const isOwner = currentUser?.role === Role.OWNER;
+    const where: any = isOwner ? {} : { id: currentUser?.storeId };
+
+    const stores = await this.prisma.store.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        address: true,
+        phone: true,
+        email: true,
+        isActive: true,
+        expressSurchargePercent: true,
+        createdAt: true,
+        _count: {
+          select: {
+            orders: true,
+            customers: true,
+            employees: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return stores.map((s) => ({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      address: s.address,
+      phone: s.phone,
+      email: s.email,
+      isActive: s.isActive,
+      expressSurchargePercent: s.expressSurchargePercent,
+      ordersCount: s._count.orders,
+      customersCount: s._count.customers,
+      employeesCount: s._count.employees,
+      createdAt: s.createdAt.toISOString(),
+    }));
+  }
 
   async getStoreConfig(storeId: string) {
     const store = await this.prisma.store.findUnique({

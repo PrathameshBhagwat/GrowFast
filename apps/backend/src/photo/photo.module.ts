@@ -5,20 +5,10 @@ import { PhotoCleanupService } from './photo-cleanup.service';
 import { PhotoStorageService } from './photo-storage.service';
 import { LocalStorageProvider } from './providers/local-storage.provider';
 import { R2StorageProvider } from './providers/r2-storage.provider';
+import { AuthModule } from '../auth/auth.module';
 
-/**
- * PhotoModule — NestJS feature module for photo infrastructure.
- *
- * Provides:
- * - PhotoController (HTTP endpoints)
- * - PhotoService (business logic)
- * - PhotoCleanupService (10-day retention automated cleanup)
- * - PhotoStorageService (abstract storage, bound to R2StorageProvider or LocalStorageProvider)
- *
- * The storage provider is selected via a factory pattern reading
- * the PHOTO_STORAGE_PROVIDER environment variable.
- */
 @Module({
+  imports: [AuthModule],
   controllers: [PhotoController],
   providers: [
     PhotoService,

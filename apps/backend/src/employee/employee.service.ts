@@ -61,7 +61,7 @@ export class EmployeeService {
 
     if (currentUser && currentUser.role === Role.MANAGER) {
       where.storeId = currentUser.storeId;
-    } else if (storeId) {
+    } else if (storeId && storeId !== 'all') {
       where.storeId = storeId;
     }
 

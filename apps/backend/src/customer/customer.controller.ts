@@ -7,28 +7,33 @@ import {
   Query,
   Param,
   UseGuards,
+  Request,
   NotFoundException,
 } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { BranchAuthGuard } from '../auth/branch-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import type { CreateCustomerRequest, UpdateCustomerRequest } from '@growfast/shared-types';
 
 @Controller('customers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, BranchAuthGuard, RolesGuard)
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   /**
    * POST /api/customers
-   * Create a new customer record.
+   * Create a new customer record bound to the active branch.
    * Allowed roles: OWNER, MANAGER, COUNTER
    */
   @Post()
   @Roles('OWNER', 'MANAGER', 'COUNTER')
-  async createCustomer(@Body() dto: CreateCustomerRequest) {
-    const customer = await this.customerService.createCustomer(dto);
+  async createCustomer(@Body() dto: CreateCustomerRequest, @Request() req?: any) {
+    const storeId = req?.user?.storeId;
+    const customer = storeId
+      ? await this.customerService.createCustomer(dto, storeId)
+      : await this.customerService.createCustomer(dto);
     return {
       success: true,
       data: customer,
@@ -37,7 +42,7 @@ export class CustomerController {
 
   /**
    * GET /api/customers/search
-   * Search customers by phone, name, or ID with pagination.
+   * Search customers with branch isolation.
    * Allowed roles: ALL (OWNER, MANAGER, COUNTER, DELIVERY)
    */
   @Get('search')
@@ -46,19 +51,28 @@ export class CustomerController {
     @Query('query') query?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Request() req?: any,
   ) {
-    return this.customerService.searchCustomers(query, page, pageSize);
+    const storeId = req?.user?.storeId;
+    return storeId
+      ? this.customerService.searchCustomers(query, page, pageSize, storeId)
+      : this.customerService.searchCustomers(query, page, pageSize);
   }
 
   /**
    * GET /api/customers/:id
-   * Get single customer by ID.
+   * Get single customer by ID with branch isolation.
    * Allowed roles: ALL (OWNER, MANAGER, COUNTER, DELIVERY)
    */
   @Get(':id')
   @Roles('OWNER', 'MANAGER', 'COUNTER', 'DELIVERY')
-  async getCustomerById(@Param('id') id: string) {
-    const customer = await this.customerService.getCustomerById(id);
+  async getCustomerById(@Param('id') id: string, @Request() req?: any) {
+    const storeId = req?.user?.storeId;
+    const userRole = req?.user?.role;
+    const customer =
+      storeId || userRole
+        ? await this.customerService.getCustomerById(id, storeId, userRole)
+        : await this.customerService.getCustomerById(id);
     if (!customer) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
@@ -70,13 +84,22 @@ export class CustomerController {
 
   /**
    * PATCH /api/customers/:id
-   * Update an existing customer record.
+   * Update an existing customer record with branch ownership verification.
    * Allowed roles: OWNER, MANAGER, COUNTER
    */
   @Patch(':id')
   @Roles('OWNER', 'MANAGER', 'COUNTER')
-  async updateCustomer(@Param('id') id: string, @Body() dto: UpdateCustomerRequest) {
-    const customer = await this.customerService.updateCustomer(id, dto);
+  async updateCustomer(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerRequest,
+    @Request() req?: any,
+  ) {
+    const storeId = req?.user?.storeId;
+    const userRole = req?.user?.role;
+    const customer =
+      storeId || userRole
+        ? await this.customerService.updateCustomer(id, dto, storeId, userRole)
+        : await this.customerService.updateCustomer(id, dto);
     return {
       success: true,
       data: customer,

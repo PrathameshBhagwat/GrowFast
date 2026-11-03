@@ -161,7 +161,7 @@ export class DeliveryService {
     filters?: { status?: string },
   ) {
     const where: any = {
-      order: { storeId },
+      ...(storeId && storeId !== 'all' ? { order: { storeId } } : {}),
     };
 
     // DELIVERY role: only see own deliveries
@@ -205,7 +205,7 @@ export class DeliveryService {
     if (!delivery) {
       throw new NotFoundException(`Delivery with ID "${deliveryId}" not found`);
     }
-    if (delivery.order.storeId !== storeId) {
+    if (storeId && storeId !== 'all' && delivery.order.storeId !== storeId) {
       throw new NotFoundException(`Delivery with ID "${deliveryId}" not found`);
     }
 

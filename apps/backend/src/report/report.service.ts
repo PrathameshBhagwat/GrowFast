@@ -30,7 +30,7 @@ export class ReportService {
     const { startDate, endDate } = this.parseDateRange(query.startDate, query.endDate, timeZone);
 
     const where: any = {
-      storeId,
+      ...(storeId && storeId !== 'all' ? { storeId } : {}),
       orderDate: {
         gte: startDate,
         lte: endDate,
