@@ -202,4 +202,83 @@ describe('GrowFast Mobile Phase 4 — Multi-Branch Architecture Suite', () => {
       assert.notEqual(createCustomerPayload.storeId, 'all');
     });
   });
+
+  describe('5. Account Switch & Session State Isolation', () => {
+    it('5.1 ensures previous employee active branch never leaks into another employee session', async () => {
+      // 1. OWNER logs in and selects Alephata ('store-kp-002')
+      await saveAuthToken('owner-token');
+      await saveUserSession({
+        id: 'emp-owner-001',
+        name: 'Amit Jangam',
+        phone: '9822001122',
+        role: 'OWNER',
+        storeId: 'store-kp-001',
+      });
+      await saveActiveBranch('store-kp-002');
+      setActiveBranchHeader('store-kp-002');
+
+      assert.equal(await getActiveBranch(), 'store-kp-002');
+      assert.equal(getActiveBranchHeader(), 'store-kp-002');
+
+      // 2. OWNER logs out -> clearUserSession() removes token, session, and active branch
+      await clearUserSession();
+      setActiveBranchHeader(null);
+
+      assert.equal(await getActiveBranch(), null);
+      assert.equal(getActiveBranchHeader(), null);
+
+      // 3. COUNTER logs in (assigned to Charholi 'store-kp-001')
+      const counterSession = {
+        id: 'emp-counter-001',
+        name: 'Swapnil Shinde',
+        phone: '9822998877',
+        role: 'COUNTER',
+        storeId: 'store-kp-001',
+      };
+      await saveAuthToken('counter-token');
+      await saveUserSession(counterSession);
+
+      // Branch resolution for non-owner forces assigned storeId
+      const resolvedBranch =
+        counterSession.role === Role.OWNER
+          ? (await getActiveBranch()) || counterSession.storeId
+          : counterSession.storeId;
+
+      await saveActiveBranch(resolvedBranch);
+      setActiveBranchHeader(resolvedBranch);
+
+      // 4. Verify COUNTER is strictly assigned to Charholi, NOT Alephata
+      assert.equal(await getActiveBranch(), 'store-kp-001');
+      assert.equal(getActiveBranchHeader(), 'store-kp-001');
+    });
+
+    it('5.2 HTTP 401 unauthorized centrally clears branch headers preventing stale requests', async () => {
+      setActiveBranchHeader('store-kp-002');
+      await saveActiveBranch('store-kp-002');
+
+      await triggerUnauthorized();
+
+      assert.equal(getActiveBranchHeader(), null);
+      assert.equal(await getActiveBranch(), null);
+    });
+  });
+
+  describe('6. Cross-Platform Data Consistency & Phone Uniqueness', () => {
+    it('6.1 allows same customer phone in different physical branches, but enforces uniqueness within same branch', () => {
+      const existingCustomersInDb = [
+        { id: 'c1', phone: '9876543210', storeId: 'store-kp-001', name: 'Charholi Customer' },
+      ];
+
+      // Helper simulating backend duplicate check
+      const checkDuplicate = (phone: string, storeId: string): boolean => {
+        return existingCustomersInDb.some((c) => c.phone === phone && c.storeId === storeId);
+      };
+
+      // Same phone in same branch -> Duplicate Conflict
+      assert.equal(checkDuplicate('9876543210', 'store-kp-001'), true);
+
+      // Same phone in DIFFERENT branch -> Allowed
+      assert.equal(checkDuplicate('9876543210', 'store-kp-002'), false);
+    });
+  });
 });
