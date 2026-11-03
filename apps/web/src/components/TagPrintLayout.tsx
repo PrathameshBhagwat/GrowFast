@@ -45,8 +45,8 @@ export const TagPrintLayout: React.FC<TagPrintLayoutProps> = ({
   }
 
   // Check if unitNumbers are distinct across the batch
-  const hasDuplicateUnitNumbers = tags.some((t, i) =>
-    tags.findIndex((other) => other.unitNumber === t.unitNumber) !== i,
+  const hasDuplicateUnitNumbers = tags.some(
+    (t, i) => tags.findIndex((other) => other.unitNumber === t.unitNumber) !== i,
   );
 
   // Sort deterministically: if duplicate unitNumbers exist (multiple garment types),

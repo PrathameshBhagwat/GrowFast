@@ -172,7 +172,9 @@ export class EmployeeService {
       include: { store: true },
     });
 
-    this.logger.log(`Created employee "${employee.name}" (${employee.id}) for store ${targetStoreId}`);
+    this.logger.log(
+      `Created employee "${employee.name}" (${employee.id}) for store ${targetStoreId}`,
+    );
     return this.mapToDTO(employee, true);
   }
 
@@ -321,7 +323,9 @@ export class EmployeeService {
 
     if (effectiveSameAsCurrent) {
       const effectiveCurrentAddress =
-        updateData.currentAddress !== undefined ? updateData.currentAddress : existing.currentAddress;
+        updateData.currentAddress !== undefined
+          ? updateData.currentAddress
+          : existing.currentAddress;
       updateData.permanentAddress = effectiveCurrentAddress;
     } else if (dto.permanentAddress !== undefined) {
       updateData.permanentAddress = dto.permanentAddress ? dto.permanentAddress.trim() : null;
@@ -355,9 +359,15 @@ export class EmployeeService {
   async remove(
     id: string,
     currentUser: UserContext,
-  ): Promise<{ success: boolean; message: string; permanentDeleteType: 'HARD' | 'REDACTED_WITH_HISTORICAL_PRESERVED' }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    permanentDeleteType: 'HARD' | 'REDACTED_WITH_HISTORICAL_PRESERVED';
+  }> {
     if (this.inFlightDeletions.has(id)) {
-      throw new ConflictException('A deletion operation is already in progress for this staff member');
+      throw new ConflictException(
+        'A deletion operation is already in progress for this staff member',
+      );
     }
     this.inFlightDeletions.add(id);
 
@@ -443,7 +453,9 @@ export class EmployeeService {
           where: { id },
         });
 
-        this.logger.log(`Hard deleted employee "${existing.name}" (${id}) with zero historical records`);
+        this.logger.log(
+          `Hard deleted employee "${existing.name}" (${id}) with zero historical records`,
+        );
         return {
           success: true,
           message: `Staff member "${existing.name}" permanently deleted.`,
@@ -515,7 +527,8 @@ export class EmployeeService {
       throw new ForbiddenException('Only Store Owners and Managers can upload staff documents');
     }
 
-    const effectiveStoreId = currentUser.role === Role.MANAGER ? currentUser.storeId : storeId || currentUser.storeId;
+    const effectiveStoreId =
+      currentUser.role === Role.MANAGER ? currentUser.storeId : storeId || currentUser.storeId;
 
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     const safeUUID = crypto.randomUUID();
@@ -542,7 +555,11 @@ export class EmployeeService {
   /**
    * Get an authorized access/preview URL for a staff document.
    */
-  async getDocumentAccessUrl(id: string, docType: string, currentUser: UserContext): Promise<string> {
+  async getDocumentAccessUrl(
+    id: string,
+    docType: string,
+    currentUser: UserContext,
+  ): Promise<string> {
     const employee = await this.prisma.employee.findUnique({
       where: { id },
     });
@@ -599,17 +616,31 @@ export class EmployeeService {
       storeName: emp.store ? emp.store.name : 'Unknown Store',
       isActive: emp.isActive,
       isDeleted: Boolean(emp.isDeleted),
-      deletedAt: emp.deletedAt ? (emp.deletedAt instanceof Date ? emp.deletedAt.toISOString() : String(emp.deletedAt)) : null,
+      deletedAt: emp.deletedAt
+        ? emp.deletedAt instanceof Date
+          ? emp.deletedAt.toISOString()
+          : String(emp.deletedAt)
+        : null,
       photoUrl: emp.photoUrl ?? null,
       passportPhotoUrl: emp.passportPhotoUrl ?? null,
       // Data Minimization: In general list, sensitive Aadhaar document paths are protected
-      aadhaarFrontUrl: isDetailed ? emp.aadhaarFrontUrl ?? null : emp.aadhaarFrontUrl ? '[PROTECTED]' : null,
-      aadhaarBackUrl: isDetailed ? emp.aadhaarBackUrl ?? null : emp.aadhaarBackUrl ? '[PROTECTED]' : null,
+      aadhaarFrontUrl: isDetailed
+        ? (emp.aadhaarFrontUrl ?? null)
+        : emp.aadhaarFrontUrl
+          ? '[PROTECTED]'
+          : null,
+      aadhaarBackUrl: isDetailed
+        ? (emp.aadhaarBackUrl ?? null)
+        : emp.aadhaarBackUrl
+          ? '[PROTECTED]'
+          : null,
       currentAddress: emp.currentAddress ?? null,
       permanentAddress: emp.permanentAddress ?? null,
       sameAsCurrentAddress: Boolean(emp.sameAsCurrentAddress),
-      createdAt: emp.createdAt instanceof Date ? emp.createdAt.toISOString() : String(emp.createdAt),
-      updatedAt: emp.updatedAt instanceof Date ? emp.updatedAt.toISOString() : String(emp.updatedAt),
+      createdAt:
+        emp.createdAt instanceof Date ? emp.createdAt.toISOString() : String(emp.createdAt),
+      updatedAt:
+        emp.updatedAt instanceof Date ? emp.updatedAt.toISOString() : String(emp.updatedAt),
     };
   }
 }

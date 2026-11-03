@@ -43,8 +43,8 @@ describe('90-Day Overdue Cleanup & Overdue Filtering Service Tests', () => {
           order.amountPaid >= order.totalAmount
             ? PaymentStatus.PAID
             : order.amountPaid > 0
-            ? PaymentStatus.PARTIAL
-            : PaymentStatus.PENDING,
+              ? PaymentStatus.PARTIAL
+              : PaymentStatus.PENDING,
       })),
     };
 
@@ -238,12 +238,7 @@ describe('90-Day Overdue Cleanup & Overdue Filtering Service Tests', () => {
 
     it('7. unauthorized employees (non-owner) cannot archive orders', async () => {
       await expect(
-        orderService.archiveOverdueOrders(
-          { orderIds: ['ord-1'] },
-          STORE_ID,
-          COUNTER_ID,
-          'COUNTER',
-        ),
+        orderService.archiveOverdueOrders({ orderIds: ['ord-1'] }, STORE_ID, COUNTER_ID, 'COUNTER'),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -366,7 +361,10 @@ describe('90-Day Overdue Cleanup & Overdue Filtering Service Tests', () => {
       mockPrisma.order.findMany.mockResolvedValueOnce([]);
       mockPrisma.order.count.mockResolvedValueOnce(0);
 
-      await orderService.findAllOrders({ isOverdue: false, status: OrderStatus.PROCESSING }, STORE_ID);
+      await orderService.findAllOrders(
+        { isOverdue: false, status: OrderStatus.PROCESSING },
+        STORE_ID,
+      );
 
       const queryArg = mockPrisma.order.findMany.mock.calls[0][0];
       expect(queryArg.where.isArchived).toBe(false);

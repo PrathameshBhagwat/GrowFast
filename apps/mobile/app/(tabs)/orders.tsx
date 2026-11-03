@@ -306,7 +306,12 @@ export default function OrdersScreen() {
 
         if (resp && resp.data && resp.data.length > 0) {
           setServerOrders(resp.data);
-        } else if (!debouncedSearch && !statusParam && !paymentParam && isOverdueParam === undefined) {
+        } else if (
+          !debouncedSearch &&
+          !statusParam &&
+          !paymentParam &&
+          isOverdueParam === undefined
+        ) {
           setServerOrders(REFERENCE_ORDERS);
         } else {
           setServerOrders([]);
@@ -407,15 +412,33 @@ export default function OrdersScreen() {
 
     switch (status) {
       case 'DELIVERED':
-        return { label: 'Delivered', bg: '#dcfce7', text: '#15803d', isOverdue: false, daysOverdue: 0 };
+        return {
+          label: 'Delivered',
+          bg: '#dcfce7',
+          text: '#15803d',
+          isOverdue: false,
+          daysOverdue: 0,
+        };
       case 'READY':
         return { label: 'Ready', bg: '#e0f2fe', text: '#0284c7', isOverdue: false, daysOverdue: 0 };
       case 'OUT_FOR_DELIVERY':
-        return { label: 'Out for Delivery', bg: '#ede9fe', text: '#6d28d9', isOverdue: false, daysOverdue: 0 };
+        return {
+          label: 'Out for Delivery',
+          bg: '#ede9fe',
+          text: '#6d28d9',
+          isOverdue: false,
+          daysOverdue: 0,
+        };
       case 'PROCESSING':
       case 'RECEIVED':
       default:
-        return { label: 'In Process', bg: '#fef3c7', text: '#b45309', isOverdue: false, daysOverdue: 0 };
+        return {
+          label: 'In Process',
+          bg: '#fef3c7',
+          text: '#b45309',
+          isOverdue: false,
+          daysOverdue: 0,
+        };
     }
   };
 
@@ -552,7 +575,12 @@ export default function OrdersScreen() {
             },
           ]}
         >
-          <Icon name="search-outline" size={18} color={colors.textMuted} style={{ marginRight: 8 }} />
+          <Icon
+            name="search-outline"
+            size={18}
+            color={colors.textMuted}
+            style={{ marginRight: 8 }}
+          />
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }]}
             placeholder="Search by order no, name, phone..."
@@ -590,7 +618,10 @@ export default function OrdersScreen() {
               style={[
                 styles.filterPill,
                 { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
-                activeFilter === 'ALL' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+                activeFilter === 'ALL' && [
+                  styles.filterPillActive,
+                  { backgroundColor: colors.primary },
+                ],
               ]}
               onPress={() => setActiveFilter('ALL')}
             >
@@ -609,7 +640,10 @@ export default function OrdersScreen() {
               style={[
                 styles.filterPill,
                 { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
-                activeFilter === 'IN_PROCESS' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+                activeFilter === 'IN_PROCESS' && [
+                  styles.filterPillActive,
+                  { backgroundColor: colors.primary },
+                ],
               ]}
               onPress={() => setActiveFilter('IN_PROCESS')}
             >
@@ -628,7 +662,10 @@ export default function OrdersScreen() {
               style={[
                 styles.filterPill,
                 { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
-                activeFilter === 'READY' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+                activeFilter === 'READY' && [
+                  styles.filterPillActive,
+                  { backgroundColor: colors.primary },
+                ],
               ]}
               onPress={() => setActiveFilter('READY')}
               accessibilityRole="button"
@@ -649,7 +686,10 @@ export default function OrdersScreen() {
               style={[
                 styles.filterPill,
                 { backgroundColor: isDark ? colors.surfaceSecondary : '#fef2f2' },
-                activeFilter === 'OVERDUE' && [styles.filterPillActive, { backgroundColor: '#dc2626' }],
+                activeFilter === 'OVERDUE' && [
+                  styles.filterPillActive,
+                  { backgroundColor: '#dc2626' },
+                ],
               ]}
               onPress={() => setActiveFilter('OVERDUE')}
               accessibilityRole="button"
@@ -670,7 +710,10 @@ export default function OrdersScreen() {
               style={[
                 styles.filterPill,
                 { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
-                activeFilter === 'DELIVERED' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+                activeFilter === 'DELIVERED' && [
+                  styles.filterPillActive,
+                  { backgroundColor: colors.primary },
+                ],
               ]}
               onPress={() => setActiveFilter('DELIVERED')}
               accessibilityRole="button"
@@ -692,7 +735,10 @@ export default function OrdersScreen() {
                 style={[
                   styles.filterPill,
                   { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
-                  activeFilter === 'DRAFTS' && [styles.filterPillActive, { backgroundColor: colors.primary }],
+                  activeFilter === 'DRAFTS' && [
+                    styles.filterPillActive,
+                    { backgroundColor: colors.primary },
+                  ],
                   styles.draftPillBadge,
                 ]}
                 onPress={() => setActiveFilter('DRAFTS')}
@@ -816,7 +862,14 @@ export default function OrdersScreen() {
                   ]}
                 >
                   <View style={{ flex: 1, marginRight: 12 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        marginBottom: 2,
+                      }}
+                    >
                       <Icon name="archive-outline" size={16} color="#b91c1c" />
                       <Text style={[styles.overdueOwnerBannerTitle, { color: '#991b1b' }]}>
                         90-Day Cleanup Workflow
@@ -866,8 +919,12 @@ export default function OrdersScreen() {
                       styles.garmentIconBox,
                       {
                         backgroundColor: overdue
-                          ? (isDark ? '#451a03' : '#fee2e2')
-                          : (isDark ? colors.surfaceSecondary : '#eff6ff'),
+                          ? isDark
+                            ? '#451a03'
+                            : '#fee2e2'
+                          : isDark
+                            ? colors.surfaceSecondary
+                            : '#eff6ff',
                       },
                     ]}
                   >
@@ -905,7 +962,9 @@ export default function OrdersScreen() {
                   </View>
                   <View style={styles.orderRightGroup}>
                     <View style={[styles.statusChip, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.statusChipText, { color: badge.text, fontWeight: '700' }]}>
+                      <Text
+                        style={[styles.statusChipText, { color: badge.text, fontWeight: '700' }]}
+                      >
                         {badge.label}
                       </Text>
                     </View>

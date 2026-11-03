@@ -179,8 +179,7 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
   const resolvedCategory = resolveGarmentCategory(garmentCategory, garmentName);
   const resolvedPiece = pieceNumber || formatPieceNumber(unitNumber, totalPieces);
   const resolvedShortcut =
-    data.serviceShortcut ||
-    resolveServiceShortcut(serviceType, activeDesign.serviceShortcuts);
+    data.serviceShortcut || resolveServiceShortcut(serviceType, activeDesign.serviceShortcuts);
 
   const piecePosition = `${unitNumber}/${totalPieces}`;
   const formattedOrderDate = formatTagDate(bookingDate || orderDate);

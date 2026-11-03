@@ -77,8 +77,6 @@ describe('EmployeeService', () => {
     store: mockStore1,
   };
 
-
-
   const mockUserContextOwner = {
     id: 'emp-001',
     role: Role.OWNER,
@@ -121,7 +119,9 @@ describe('EmployeeService', () => {
 
     photoStorage = {
       store: jest.fn().mockResolvedValue('uploads/photos/staff-docs/store-001/test.jpg'),
-      getAccessUrl: jest.fn().mockImplementation((url) => Promise.resolve(`/api/photos/local/${url}`)),
+      getAccessUrl: jest
+        .fn()
+        .mockImplementation((url) => Promise.resolve(`/api/photos/local/${url}`)),
       delete: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -193,7 +193,9 @@ describe('EmployeeService', () => {
     it('should throw NotFoundException if employee is deleted', async () => {
       prisma.employee.findUnique.mockResolvedValue({ ...mockCounterStaff, isDeleted: true });
 
-      await expect(service.findOne('emp-004', mockUserContextOwner)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('emp-004', mockUserContextOwner)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -267,7 +269,9 @@ describe('EmployeeService', () => {
         role: Role.OWNER,
       };
 
-      await expect(service.create(dto, mockUserContextManager1)).rejects.toThrow(ForbiddenException);
+      await expect(service.create(dto, mockUserContextManager1)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ConflictException on duplicate email', async () => {

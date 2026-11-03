@@ -268,8 +268,12 @@ export default function DeliveriesScreen() {
               <Text style={styles.deliveryEmoji}>🚚</Text>
             </View>
             <View>
-              <Text style={[styles.orderNumberText, { color: colors.textPrimary }]}>{orderNumDisplay}</Text>
-              <Text style={[styles.customerNameText, { color: colors.textSecondary }]}>{item.customerName}</Text>
+              <Text style={[styles.orderNumberText, { color: colors.textPrimary }]}>
+                {orderNumDisplay}
+              </Text>
+              <Text style={[styles.customerNameText, { color: colors.textSecondary }]}>
+                {item.customerName}
+              </Text>
             </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -290,7 +294,9 @@ export default function DeliveriesScreen() {
 
         {/* Sub-info: Scheduled date & Driver */}
         <View style={styles.cardFooterInfo}>
-          <Text style={[styles.scheduledText, { color: colors.textSecondary }]}>📅 {formatDate(item.scheduledAt)}</Text>
+          <Text style={[styles.scheduledText, { color: colors.textSecondary }]}>
+            📅 {formatDate(item.scheduledAt)}
+          </Text>
           <Text style={[styles.riderText, { color: colors.textSecondary }]}>
             👤 {item.riderName ? item.riderName : 'No Rider Assigned'}
           </Text>
@@ -308,7 +314,9 @@ export default function DeliveriesScreen() {
               accessibilityRole="button"
               accessibilityLabel="Assign Driver"
             >
-              <Text style={[styles.cardActionBtnText, { color: colors.textPrimary }]}>👤 Assign Rider</Text>
+              <Text style={[styles.cardActionBtnText, { color: colors.textPrimary }]}>
+                👤 Assign Rider
+              </Text>
             </TouchableOpacity>
           ) : null}
 
@@ -352,9 +360,19 @@ export default function DeliveriesScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <ConnectionBanner />
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 12), backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.container,
+          { paddingTop: Math.max(insets.top, 12), backgroundColor: colors.background },
+        ]}
+      >
         {/* Top Header */}
-        <View style={[styles.headerRow, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View
+          style={[
+            styles.headerRow,
+            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          ]}
+        >
           <View style={styles.userProfileGroup}>
             <View style={styles.avatarCircle}>
               <Text style={styles.avatarText}>{staffName.charAt(0).toUpperCase()}</Text>
@@ -366,7 +384,9 @@ export default function DeliveriesScreen() {
                   <Text style={styles.roleBadgeText}>{staffRole}</Text>
                 </View>
               </View>
-              <Text style={[styles.userBranch, { color: colors.textSecondary }]}>{storeBranch}</Text>
+              <Text style={[styles.userBranch, { color: colors.textSecondary }]}>
+                {storeBranch}
+              </Text>
             </View>
           </View>
 
@@ -382,14 +402,23 @@ export default function DeliveriesScreen() {
         </View>
 
         {/* Operational Overview Counters */}
-        <View style={[styles.counterBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.counterBar,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.counterBox}>
-            <Text style={[styles.counterVal, { color: colors.textPrimary }]}>{counts.inTransit}</Text>
+            <Text style={[styles.counterVal, { color: colors.textPrimary }]}>
+              {counts.inTransit}
+            </Text>
             <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>In Transit</Text>
           </View>
           <View style={[styles.counterDivider, { backgroundColor: colors.border }]} />
           <View style={styles.counterBox}>
-            <Text style={[styles.counterVal, { color: colors.textPrimary }]}>{counts.assigned}</Text>
+            <Text style={[styles.counterVal, { color: colors.textPrimary }]}>
+              {counts.assigned}
+            </Text>
             <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Assigned</Text>
           </View>
           <View style={[styles.counterDivider, { backgroundColor: colors.border }]} />
@@ -400,7 +429,12 @@ export default function DeliveriesScreen() {
         </View>
 
         {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }]}
@@ -427,14 +461,23 @@ export default function DeliveriesScreen() {
                   style={[
                     styles.filterChip,
                     { backgroundColor: colors.surface, borderColor: colors.border },
-                    isActive && [styles.filterChipActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                    isActive && [
+                      styles.filterChipActive,
+                      { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ],
                   ]}
                   onPress={() => setActiveTab(tab.key)}
                   activeOpacity={0.7}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                 >
-                  <Text style={[styles.filterChipText, { color: colors.textSecondary }, isActive && styles.filterChipTextActive]}>
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: colors.textSecondary },
+                      isActive && styles.filterChipTextActive,
+                    ]}
+                  >
                     {tab.label}
                   </Text>
                 </TouchableOpacity>
@@ -447,7 +490,9 @@ export default function DeliveriesScreen() {
         {loading && !refreshing ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Fetching deliveries...</Text>
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+              Fetching deliveries...
+            </Text>
           </View>
         ) : error ? (
           <View style={styles.centerBox}>
@@ -460,7 +505,9 @@ export default function DeliveriesScreen() {
         ) : filteredDeliveries.length === 0 ? (
           <View style={styles.centerBox}>
             <Text style={styles.emptyEmoji}>🚚</Text>
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Deliveries Found</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+              No Deliveries Found
+            </Text>
             <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
               {searchQuery
                 ? `No delivery matching "${searchQuery}".`
@@ -529,7 +576,9 @@ export default function DeliveriesScreen() {
         <View style={styles.assignOverlay}>
           <View style={[styles.assignCard, { backgroundColor: colors.surface }]}>
             <View style={styles.assignHeaderRow}>
-              <Text style={[styles.assignTitle, { color: colors.textPrimary }]}>Assign Delivery Rider</Text>
+              <Text style={[styles.assignTitle, { color: colors.textPrimary }]}>
+                Assign Delivery Rider
+              </Text>
               <TouchableOpacity
                 onPress={() => setAssignModalVisible(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -564,18 +613,37 @@ export default function DeliveriesScreen() {
                       style={[
                         styles.riderOptionRow,
                         { borderColor: colors.border },
-                        isSelected && [styles.riderOptionRowSelected, { borderColor: colors.primary, backgroundColor: colors.primaryBg }],
+                        isSelected && [
+                          styles.riderOptionRowSelected,
+                          { borderColor: colors.primary, backgroundColor: colors.primaryBg },
+                        ],
                       ]}
                       onPress={() => setSelectedRiderId(rider.id)}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.riderOptionName, { color: colors.textPrimary }, isSelected && { color: colors.primary }]}>
+                        <Text
+                          style={[
+                            styles.riderOptionName,
+                            { color: colors.textPrimary },
+                            isSelected && { color: colors.primary },
+                          ]}
+                        >
                           {rider.name}
                         </Text>
-                        <Text style={[styles.riderOptionSub, { color: colors.textSecondary }]}>Role: {rider.role}</Text>
+                        <Text style={[styles.riderOptionSub, { color: colors.textSecondary }]}>
+                          Role: {rider.role}
+                        </Text>
                       </View>
-                      <View style={[styles.radioCircle, { borderColor: colors.textMuted }, isSelected && { borderColor: colors.primary }]}>
-                        {isSelected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}
+                      <View
+                        style={[
+                          styles.radioCircle,
+                          { borderColor: colors.textMuted },
+                          isSelected && { borderColor: colors.primary },
+                        ]}
+                      >
+                        {isSelected ? (
+                          <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
+                        ) : null}
                       </View>
                     </TouchableOpacity>
                   );
@@ -588,10 +656,16 @@ export default function DeliveriesScreen() {
                 style={styles.assignCancelBtn}
                 onPress={() => setAssignModalVisible(false)}
               >
-                <Text style={[styles.assignCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                <Text style={[styles.assignCancelText, { color: colors.textSecondary }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.assignConfirmBtn, { backgroundColor: colors.primary }, !selectedRiderId && { opacity: 0.5 }]}
+                style={[
+                  styles.assignConfirmBtn,
+                  { backgroundColor: colors.primary },
+                  !selectedRiderId && { opacity: 0.5 },
+                ]}
                 onPress={handleConfirmAssignment}
                 disabled={isAssigning || !selectedRiderId}
               >

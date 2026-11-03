@@ -911,7 +911,15 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
-    const { customerId, status, paymentStatus, page = 1, search, isOverdue, includeArchived } = query;
+    const {
+      customerId,
+      status,
+      paymentStatus,
+      page = 1,
+      search,
+      isOverdue,
+      includeArchived,
+    } = query;
     const effectivePageSize = query.pageSize || query.limit || 10;
     const skip = (page - 1) * effectivePageSize;
 
@@ -931,10 +939,7 @@ export class OrderService {
       where.status = { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] };
     } else if (isOverdue === false) {
       // Exclude overdue orders: due date in the future or not set
-      where.OR = [
-        { effectiveDueDate: { gte: new Date() } },
-        { effectiveDueDate: null },
-      ];
+      where.OR = [{ effectiveDueDate: { gte: new Date() } }, { effectiveDueDate: null }];
     }
 
     if (search?.trim()) {
@@ -2494,7 +2499,9 @@ export class OrderService {
     employeeRole: string,
   ): Promise<ArchiveOrdersResponseDTO> {
     if (employeeRole !== 'OWNER') {
-      throw new ForbiddenException('Only authorized store owners can execute overdue order cleanups.');
+      throw new ForbiddenException(
+        'Only authorized store owners can execute overdue order cleanups.',
+      );
     }
 
     if (!dto.orderIds || dto.orderIds.length === 0) {
@@ -2617,7 +2624,9 @@ export class OrderService {
       archivedReason: order.archivedReason || null,
       isOverdue: isOrderOverdue(order),
       daysOverdue: getOverdueDays(order.effectiveDueDate),
-      itemCount: order.items ? order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) : 0,
+      itemCount: order.items
+        ? order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+        : 0,
       ...calculateFulfillmentBreakdown(order.totalAmount, order.amountPaid, order.items || []),
     };
   }

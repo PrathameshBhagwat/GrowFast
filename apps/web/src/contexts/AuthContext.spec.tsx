@@ -59,7 +59,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <TestConsumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
 
     await waitFor(() => {
@@ -80,7 +80,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <TestConsumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
 
     await waitFor(() => {
@@ -90,7 +90,10 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('auth').textContent).toBe('authenticated');
     expect(screen.getByTestId('employee').textContent).toBe('Test Owner');
     expect(screen.getByTestId('token').textContent).toBe('valid-jwt-token');
-    expect(apiFetch).toHaveBeenCalledWith('/auth/me', expect.objectContaining({ token: 'valid-jwt-token', retries: 0 }));
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/auth/me',
+      expect.objectContaining({ token: 'valid-jwt-token', retries: 0 }),
+    );
   });
 
   it('deduplicates concurrent /auth/me verification calls for the same token (e.g. React StrictMode)', async () => {
@@ -110,7 +113,7 @@ describe('AuthContext', () => {
         <AuthProvider>
           <TestConsumer />
         </AuthProvider>
-      </React.StrictMode>
+      </React.StrictMode>,
     );
 
     // Only one /auth/me call should have been dispatched to apiFetch
@@ -133,7 +136,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <TestConsumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
 
     await waitFor(() => {
@@ -156,7 +159,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <TestConsumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
 
     await waitFor(() => {
@@ -177,7 +180,7 @@ describe('AuthContext', () => {
     render(
       <AuthProvider>
         <TestConsumer />
-      </AuthProvider>
+      </AuthProvider>,
     );
 
     await waitFor(() => {

@@ -326,7 +326,10 @@ export const TagDesignerPage: React.FC = () => {
   };
 
   const handleServiceShortcutChange = (serviceKey: string, code: string) => {
-    const cleanCode = code.toUpperCase().replace(/[^A-Z0-9\-\/\+]/g, '').slice(0, 6);
+    const cleanCode = code
+      .toUpperCase()
+      .replace(/[^A-Z0-9\-\/\+]/g, '')
+      .slice(0, 6);
     setDesign((prev) => {
       const shortcuts = { ...(prev.serviceShortcuts || DEFAULT_SERVICE_SHORTCUTS) };
       shortcuts[serviceKey] = cleanCode;
@@ -341,11 +344,9 @@ export const TagDesignerPage: React.FC = () => {
     const counts = new Map<string, number>();
     const activeShortcuts = design.serviceShortcuts || DEFAULT_SERVICE_SHORTCUTS;
     for (const srv of CONFIGURABLE_SERVICES) {
-      const code = (
-        activeShortcuts[srv.id] ||
-        activeShortcuts[srv.name] ||
-        srv.defaultShortcut
-      ).trim().toUpperCase();
+      const code = (activeShortcuts[srv.id] || activeShortcuts[srv.name] || srv.defaultShortcut)
+        .trim()
+        .toUpperCase();
       if (code) {
         counts.set(code, (counts.get(code) || 0) + 1);
       }
@@ -862,7 +863,8 @@ export const TagDesignerPage: React.FC = () => {
                   className="w-full min-h-[44px] px-3.5 py-2 text-xs font-bold rounded-xl border border-[var(--border)] bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 font-sans"
                 />
                 <span className="text-[11px] text-[var(--text-secondary)] mt-1 block">
-                  Configured shop name displayed at the top of every garment tag (no branch or address appended). Maximum 50 characters.
+                  Configured shop name displayed at the top of every garment tag (no branch or
+                  address appended). Maximum 50 characters.
                 </span>
               </div>
             </div>
@@ -877,7 +879,8 @@ export const TagDesignerPage: React.FC = () => {
                   Service Shortcuts Configuration
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                  Owner-configured service shortcut codes displayed on Line 4 of each garment tag (1–6 characters).
+                  Owner-configured service shortcut codes displayed on Line 4 of each garment tag
+                  (1–6 characters).
                 </p>
               </div>
             </div>
@@ -889,7 +892,8 @@ export const TagDesignerPage: React.FC = () => {
               >
                 <AlertCircle size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
                 <span>
-                  Warning: Multiple services share the same shortcut code. Unique shortcuts are recommended for accurate workshop processing.
+                  Warning: Multiple services share the same shortcut code. Unique shortcuts are
+                  recommended for accurate workshop processing.
                 </span>
               </div>
             )}
@@ -916,7 +920,9 @@ export const TagDesignerPage: React.FC = () => {
                       <tr key={srv.id} className="hover:bg-[var(--bg-surface-hover)]">
                         <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">
                           <div className="font-semibold">{srv.name}</div>
-                          <div className="text-[10px] text-[var(--text-secondary)] font-mono">{srv.id}</div>
+                          <div className="text-[10px] text-[var(--text-secondary)] font-mono">
+                            {srv.id}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3">
                           <input
@@ -927,7 +933,9 @@ export const TagDesignerPage: React.FC = () => {
                             onChange={(e) => handleServiceShortcutChange(srv.id, e.target.value)}
                             aria-label={`Shortcut for ${srv.name}`}
                             className={`w-28 min-h-[40px] px-2.5 py-1 text-xs font-mono font-bold uppercase rounded-lg border bg-[var(--bg-surface-inset)] shadow-[var(--shadow-neu-inset)] text-[var(--text-primary)] focus:ring-2 focus:ring-blue-500 ${
-                              isDup ? 'border-amber-400 focus:ring-amber-500' : 'border-[var(--border)]'
+                              isDup
+                                ? 'border-amber-400 focus:ring-amber-500'
+                                : 'border-[var(--border)]'
                             }`}
                           />
                         </td>

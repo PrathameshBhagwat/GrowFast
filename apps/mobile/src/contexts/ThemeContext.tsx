@@ -48,7 +48,11 @@ export const ThemeProvider: React.FC<{
       try {
         const adapter = getStorageAdapter();
         const stored = await adapter.getItem(THEME_STORAGE_KEY);
-        if (isMounted && stored && (stored === 'light' || stored === 'dark' || stored === 'system')) {
+        if (
+          isMounted &&
+          stored &&
+          (stored === 'light' || stored === 'dark' || stored === 'system')
+        ) {
           setThemeState(stored as ThemeMode);
         }
       } catch (err) {

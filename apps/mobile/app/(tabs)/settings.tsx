@@ -35,12 +35,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* Theme & Appearance Card */}
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Appearance & Theme</Text>
         <Text style={[styles.themeDescription, { color: colors.textSecondary }]}>
           Choose interface appearance mode
@@ -80,10 +75,7 @@ export default function SettingsScreen() {
 
       {user ? (
         <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Logged-in Staff</Text>
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>Name: {user.name}</Text>
@@ -97,12 +89,7 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
           Application Information
         </Text>

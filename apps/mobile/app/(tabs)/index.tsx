@@ -733,9 +733,7 @@ export default function HomeScreen() {
                       </View>
                     ) : null}
                   </View>
-                  <Text
-                    style={[styles.selectedCustomerPhone, { color: colors.textSecondary }]}
-                  >
+                  <Text style={[styles.selectedCustomerPhone, { color: colors.textSecondary }]}>
                     {selectedCustomer.phone}
                   </Text>
                   {selectedCustomer.customerCode ? (
@@ -868,9 +866,7 @@ export default function HomeScreen() {
                         </View>
                       ) : null}
                     </View>
-                    <Text
-                      style={[styles.resultCustomerPhone, { color: colors.textSecondary }]}
-                    >
+                    <Text style={[styles.resultCustomerPhone, { color: colors.textSecondary }]}>
                       {cust.phone}
                     </Text>
                     {cust.address ? (
@@ -930,9 +926,7 @@ export default function HomeScreen() {
                       <Icon name="shirt-outline" size={18} color="#1765F5" />
                     </View>
                     <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text
-                        style={[styles.resultOrderNumber, { color: colors.textPrimary }]}
-                      >
+                      <Text style={[styles.resultOrderNumber, { color: colors.textPrimary }]}>
                         {orderNumDisplay}
                       </Text>
                       <Text
@@ -941,9 +935,7 @@ export default function HomeScreen() {
                       >
                         {order.customerName || (order as any).customer?.name || 'Customer'}
                       </Text>
-                      <Text
-                        style={[styles.resultOrderMeta, { color: colors.textMuted }]}
-                      >
+                      <Text style={[styles.resultOrderMeta, { color: colors.textMuted }]}>
                         Due: {formatDate(order.effectiveDueDate || order.orderDate)} • ₹
                         {order.totalAmount.toFixed(0)}
                       </Text>
@@ -1055,7 +1047,7 @@ export default function HomeScreen() {
             <Text style={styles.viewDueOrdersFullBtnText}>
               {isDueOrdersExpanded
                 ? "Hide Today's Due Orders"
-                : `View Today's Due Orders ${dueTotalCount != null ? dueTotalCount : (dueOrders.length > 0 ? dueOrders.length : '')}`.trim()}
+                : `View Today's Due Orders ${dueTotalCount != null ? dueTotalCount : dueOrders.length > 0 ? dueOrders.length : ''}`.trim()}
             </Text>
           </TouchableOpacity>
 

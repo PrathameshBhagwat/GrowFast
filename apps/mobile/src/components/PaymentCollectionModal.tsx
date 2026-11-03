@@ -153,7 +153,9 @@ export function PaymentCollectionModal({
                 <Text style={{ fontSize: 20 }}>👛</Text>
               </View>
               <View>
-                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Collect Payment</Text>
+                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+                  Collect Payment
+                </Text>
                 <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                   Order #{orderNumber} • {customerName || 'Customer'}
                 </Text>
@@ -172,22 +174,44 @@ export function PaymentCollectionModal({
 
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {/* Outstanding Amount Banner matching Screenshot 10 */}
-            <View style={[styles.balanceCard, isDark && { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.balanceCard,
+                isDark && { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+              ]}
+            >
               <View style={[styles.balanceIconBox, isDark && { backgroundColor: colors.errorBg }]}>
                 <Text style={{ fontSize: 22 }}>👛</Text>
               </View>
               <View style={styles.balanceCenterCol}>
-                <Text style={[styles.balanceCardLabel, isDark && { color: colors.error }]}>Outstanding Amount</Text>
-                <Text style={[styles.balanceCardAmount, isDark && { color: colors.error }]}>₹{amountDue.toFixed(2)}</Text>
+                <Text style={[styles.balanceCardLabel, isDark && { color: colors.error }]}>
+                  Outstanding Amount
+                </Text>
+                <Text style={[styles.balanceCardAmount, isDark && { color: colors.error }]}>
+                  ₹{amountDue.toFixed(2)}
+                </Text>
                 <Text style={[styles.balanceSubtext, { color: colors.textSecondary }]}>
                   Collect the remaining amount for this order.
                 </Text>
               </View>
               <View style={[styles.balanceRightCol, isDark && { borderLeftColor: colors.border }]}>
-                <Text style={[styles.balanceSummaryLabel, { color: colors.textSecondary }]}>Total Amount</Text>
-                <Text style={[styles.balanceTotalVal, { color: colors.textPrimary }]}>₹{totalAmount.toFixed(2)}</Text>
-                <Text style={[styles.balanceSummaryLabel, { color: colors.textSecondary, marginTop: 6 }]}>Amount Paid</Text>
-                <Text style={[styles.balancePaidVal, { color: colors.success }]}>₹{effectivePaid.toFixed(2)}</Text>
+                <Text style={[styles.balanceSummaryLabel, { color: colors.textSecondary }]}>
+                  Total Amount
+                </Text>
+                <Text style={[styles.balanceTotalVal, { color: colors.textPrimary }]}>
+                  ₹{totalAmount.toFixed(2)}
+                </Text>
+                <Text
+                  style={[
+                    styles.balanceSummaryLabel,
+                    { color: colors.textSecondary, marginTop: 6 },
+                  ]}
+                >
+                  Amount Paid
+                </Text>
+                <Text style={[styles.balancePaidVal, { color: colors.success }]}>
+                  ₹{effectivePaid.toFixed(2)}
+                </Text>
               </View>
             </View>
 
@@ -201,18 +225,27 @@ export function PaymentCollectionModal({
             {/* Amount Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputLabelRow}>
-                <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Payment Amount (₹) *</Text>
+                <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
+                  Payment Amount (₹) *
+                </Text>
                 <TouchableOpacity
                   onPress={() => handleApplyPreset(amountDue)}
                   style={styles.fillFullBtn}
                   disabled={isSubmitting}
                 >
                   <Text style={{ fontSize: 13, marginRight: 4 }}>📋</Text>
-                  <Text style={[styles.fillFullBtnText, { color: colors.primary }]}>Fill Full Amount</Text>
+                  <Text style={[styles.fillFullBtnText, { color: colors.primary }]}>
+                    Fill Full Amount
+                  </Text>
                 </TouchableOpacity>
               </View>
 
-              <View style={[styles.amountInputContainer, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+              <View
+                style={[
+                  styles.amountInputContainer,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                ]}
+              >
                 <Text style={[styles.currencyPrefix, { color: colors.textSecondary }]}>₹</Text>
                 <TextInput
                   style={[styles.amountInput, { color: colors.textPrimary }]}
@@ -229,8 +262,13 @@ export function PaymentCollectionModal({
                   accessibilityLabel="Enter payment amount"
                 />
                 {amount.length > 0 ? (
-                  <TouchableOpacity onPress={() => setAmount('')} style={[styles.clearAmountBtn, { backgroundColor: colors.surfaceSecondary }]}>
-                    <Text style={[styles.clearAmountBtnText, { color: colors.textSecondary }]}>✕</Text>
+                  <TouchableOpacity
+                    onPress={() => setAmount('')}
+                    style={[styles.clearAmountBtn, { backgroundColor: colors.surfaceSecondary }]}
+                  >
+                    <Text style={[styles.clearAmountBtnText, { color: colors.textSecondary }]}>
+                      ✕
+                    </Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -241,7 +279,10 @@ export function PaymentCollectionModal({
                   style={[
                     styles.presetButton,
                     { backgroundColor: colors.surface, borderColor: colors.border },
-                    parseFloat(amount) === amountDue && [styles.presetButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                    parseFloat(amount) === amountDue && [
+                      styles.presetButtonActive,
+                      { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ],
                   ]}
                   onPress={() => handleApplyPreset(amountDue)}
                   disabled={isSubmitting || amountDue <= 0}
@@ -270,8 +311,10 @@ export function PaymentCollectionModal({
                   style={[
                     styles.presetButton,
                     { backgroundColor: colors.surface, borderColor: colors.border },
-                    parseFloat(amount) === Number((amountDue * 0.5).toFixed(2)) &&
-                      [styles.presetButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                    parseFloat(amount) === Number((amountDue * 0.5).toFixed(2)) && [
+                      styles.presetButtonActive,
+                      { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ],
                   ]}
                   onPress={() => handleApplyPreset(Number((amountDue * 0.5).toFixed(2)))}
                   disabled={isSubmitting || amountDue <= 0}
@@ -302,7 +345,10 @@ export function PaymentCollectionModal({
                   style={[
                     styles.presetButton,
                     { backgroundColor: colors.surface, borderColor: colors.border },
-                    parseFloat(amount) === amountDue && [styles.presetButtonActive, { backgroundColor: colors.primary, borderColor: colors.primary }],
+                    parseFloat(amount) === amountDue && [
+                      styles.presetButtonActive,
+                      { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ],
                   ]}
                   onPress={() => handleApplyPreset(amountDue)}
                   disabled={isSubmitting || amountDue <= 0}
@@ -328,13 +374,19 @@ export function PaymentCollectionModal({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.presetButton, styles.presetClear, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                  style={[
+                    styles.presetButton,
+                    styles.presetClear,
+                    { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                  ]}
                   onPress={() => setAmount('')}
                   disabled={isSubmitting}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={{ fontSize: 13 }}>🧹</Text>
-                    <Text style={[styles.presetClearText, { color: colors.textSecondary }]}>Clear</Text>
+                    <Text style={[styles.presetClearText, { color: colors.textSecondary }]}>
+                      Clear
+                    </Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -342,7 +394,9 @@ export function PaymentCollectionModal({
 
             {/* Payment Method Selector */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Payment Method *</Text>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
+                Payment Method *
+              </Text>
               <View style={styles.modesContainer}>
                 {SUPPORTED_MODES.map((item) => {
                   const isSelected = mode === item.mode;
@@ -352,7 +406,10 @@ export function PaymentCollectionModal({
                       style={[
                         styles.modeChip,
                         { backgroundColor: colors.surface, borderColor: colors.border },
-                        isSelected && [styles.modeChipSelected, { backgroundColor: colors.primaryBg, borderColor: colors.primary }],
+                        isSelected && [
+                          styles.modeChipSelected,
+                          { backgroundColor: colors.primaryBg, borderColor: colors.primary },
+                        ],
                       ]}
                       onPress={() => setMode(item.mode)}
                       disabled={isSubmitting}
@@ -377,8 +434,15 @@ export function PaymentCollectionModal({
 
             {/* Optional Reference / Notes Input */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Reference / Transaction ID (Optional)</Text>
-              <View style={[styles.referenceInputBox, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
+                Reference / Transaction ID (Optional)
+              </Text>
+              <View
+                style={[
+                  styles.referenceInputBox,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder },
+                ]}
+              >
                 <Text style={{ fontSize: 15, marginRight: 8 }}>📄</Text>
                 <TextInput
                   style={[styles.textInput, { color: colors.textPrimary }]}
@@ -394,7 +458,12 @@ export function PaymentCollectionModal({
             </View>
 
             {/* Idempotency Key Footnote */}
-            <View style={[styles.idempFooter, isDark && { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.idempFooter,
+                isDark && { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+              ]}
+            >
               <Text style={{ fontSize: 13, marginRight: 5 }}>✅</Text>
               <Text style={[styles.idempFooterText, isDark && { color: colors.success }]}>
                 Idempotency Protected • Key: {idempotencyKey.substring(0, 18)}...
@@ -405,7 +474,10 @@ export function PaymentCollectionModal({
           {/* Action Buttons */}
           <View style={[styles.footerActions, { borderTopColor: colors.border }]}>
             <TouchableOpacity
-              style={[styles.cancelButton, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+              style={[
+                styles.cancelButton,
+                { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+              ]}
               onPress={onClose}
               disabled={isSubmitting}
               accessible={true}

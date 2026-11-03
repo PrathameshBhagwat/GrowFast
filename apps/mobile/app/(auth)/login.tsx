@@ -325,7 +325,9 @@ export default function LoginScreen() {
             <Text style={[styles.welcomeSubheader, { color: colors.primary }]}>WELCOME BACK</Text>
 
             {/* Heading */}
-            <Text style={[styles.cardHeading, { color: colors.textPrimary }]}>Sign in to GrowFast</Text>
+            <Text style={[styles.cardHeading, { color: colors.textPrimary }]}>
+              Sign in to GrowFast
+            </Text>
 
             {/* Subtext */}
             <Text style={[styles.cardSubtext, { color: colors.textSecondary }]}>
@@ -388,7 +390,12 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Select Staff Role"
               >
-                <Icon name="person-outline" size={20} color={colors.primary} style={{ marginRight: 10 }} />
+                <Icon
+                  name="person-outline"
+                  size={20}
+                  color={colors.primary}
+                  style={{ marginRight: 10 }}
+                />
                 <Text
                   style={[
                     styles.dropdownValueText,
@@ -403,7 +410,12 @@ export default function LoginScreen() {
                       ? 'Loading staff accounts...'
                       : 'Select your role'}
                 </Text>
-                <Icon name="chevron-down" size={18} color={colors.primary} style={{ marginLeft: 8 }} />
+                <Icon
+                  name="chevron-down"
+                  size={18}
+                  color={colors.primary}
+                  style={{ marginLeft: 8 }}
+                />
               </TouchableOpacity>
             </View>
 
@@ -531,7 +543,10 @@ export default function LoginScreen() {
                     style={[
                       styles.quickChip,
                       { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
-                      selectedEmpId === 'emp-counter-001' && [styles.quickChipActive, { backgroundColor: colors.primaryBg, borderColor: colors.primary }],
+                      selectedEmpId === 'emp-counter-001' && [
+                        styles.quickChipActive,
+                        { backgroundColor: colors.primaryBg, borderColor: colors.primary },
+                      ],
                     ]}
                     onPress={() => {
                       setSelectedEmpId('emp-counter-001');
@@ -540,15 +555,22 @@ export default function LoginScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.quickChipTitle, { color: colors.textPrimary }]}>👔 Counter (Swapnil)</Text>
-                    <Text style={[styles.quickChipSubtitle, { color: colors.textSecondary }]}>PIN: 333333</Text>
+                    <Text style={[styles.quickChipTitle, { color: colors.textPrimary }]}>
+                      👔 Counter (Swapnil)
+                    </Text>
+                    <Text style={[styles.quickChipSubtitle, { color: colors.textSecondary }]}>
+                      PIN: 333333
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[
                       styles.quickChip,
                       { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
-                      selectedEmpId === 'emp-owner-001' && [styles.quickChipActive, { backgroundColor: colors.primaryBg, borderColor: colors.primary }],
+                      selectedEmpId === 'emp-owner-001' && [
+                        styles.quickChipActive,
+                        { backgroundColor: colors.primaryBg, borderColor: colors.primary },
+                      ],
                     ]}
                     onPress={() => {
                       setSelectedEmpId('emp-owner-001');
@@ -557,8 +579,12 @@ export default function LoginScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.quickChipTitle, { color: colors.textPrimary }]}>👑 Owner (Prathamesh)</Text>
-                    <Text style={[styles.quickChipSubtitle, { color: colors.textSecondary }]}>PIN: 111111</Text>
+                    <Text style={[styles.quickChipTitle, { color: colors.textPrimary }]}>
+                      👑 Owner (Prathamesh)
+                    </Text>
+                    <Text style={[styles.quickChipSubtitle, { color: colors.textSecondary }]}>
+                      PIN: 111111
+                    </Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -580,7 +606,9 @@ export default function LoginScreen() {
           >
             <View style={[styles.pickerModalCard, { backgroundColor: colors.surface }]}>
               <View style={[styles.pickerModalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.pickerModalTitle, { color: colors.textPrimary }]}>Select Your Role</Text>
+                <Text style={[styles.pickerModalTitle, { color: colors.textPrimary }]}>
+                  Select Your Role
+                </Text>
                 <TouchableOpacity
                   onPress={() => setPickerVisible(false)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -600,7 +628,10 @@ export default function LoginScreen() {
                         style={[
                           styles.staffRow,
                           { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
-                          isSelected && [styles.staffRowSelected, { borderColor: colors.primary, backgroundColor: colors.primaryBg }],
+                          isSelected && [
+                            styles.staffRowSelected,
+                            { borderColor: colors.primary, backgroundColor: colors.primaryBg },
+                          ],
                         ]}
                         onPress={() => {
                           setSelectedEmpId(emp.id);
@@ -608,14 +639,23 @@ export default function LoginScreen() {
                           setErrorMsg(null);
                         }}
                       >
-                        <View style={[styles.staffAvatarCircle, { backgroundColor: colors.primaryLight }]}>
+                        <View
+                          style={[
+                            styles.staffAvatarCircle,
+                            { backgroundColor: colors.primaryLight },
+                          ]}
+                        >
                           <Text style={[styles.staffAvatarInitials, { color: colors.primary }]}>
                             {emp.name.slice(0, 1).toUpperCase()}
                           </Text>
                         </View>
                         <View style={{ flex: 1, paddingRight: 8 }}>
-                          <Text style={[styles.staffRowName, { color: colors.textPrimary }]}>{emp.name}</Text>
-                          <Text style={[styles.staffRowId, { color: colors.textSecondary }]}>{emp.id}</Text>
+                          <Text style={[styles.staffRowName, { color: colors.textPrimary }]}>
+                            {emp.name}
+                          </Text>
+                          <Text style={[styles.staffRowId, { color: colors.textSecondary }]}>
+                            {emp.id}
+                          </Text>
                         </View>
                         <View
                           style={[

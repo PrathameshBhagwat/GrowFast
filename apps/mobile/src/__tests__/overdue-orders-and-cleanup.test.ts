@@ -134,7 +134,9 @@ describe('GrowFast Mobile POS — Overdue Orders Filter & 90-Day Cleanup Workflo
 
       // IN_PROCESS filter logic: must exclude overdue orders
       const inProcessFiltered = allOrders.filter(
-        (o) => !isOrderOverdue(o, FIXED_NOW) && (o.status === OrderStatus.PROCESSING || o.status === OrderStatus.RECEIVED),
+        (o) =>
+          !isOrderOverdue(o, FIXED_NOW) &&
+          (o.status === OrderStatus.PROCESSING || o.status === OrderStatus.RECEIVED),
       );
       assert.strictEqual(inProcessFiltered.length, 1);
       assert.strictEqual(inProcessFiltered[0].id, 'ord-2');

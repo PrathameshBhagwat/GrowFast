@@ -635,8 +635,10 @@ export const apiClient = {
       if (params?.customerId) searchParams.append('customerId', params.customerId);
       if (params?.paymentStatus) searchParams.append('paymentStatus', params.paymentStatus);
       if (params?.page) searchParams.append('page', String(params.page));
-      if (params?.isOverdue !== undefined) searchParams.append('isOverdue', String(params.isOverdue));
-      if (params?.includeArchived !== undefined) searchParams.append('includeArchived', String(params.includeArchived));
+      if (params?.isOverdue !== undefined)
+        searchParams.append('isOverdue', String(params.isOverdue));
+      if (params?.includeArchived !== undefined)
+        searchParams.append('includeArchived', String(params.includeArchived));
       const size = params?.pageSize ?? params?.limit;
       if (size) {
         searchParams.append('pageSize', String(size));
@@ -671,7 +673,9 @@ export const apiClient = {
       if (params?.page) searchParams.append('page', String(params.page));
       if (params?.pageSize) searchParams.append('pageSize', String(params.pageSize));
       const qs = searchParams.toString();
-      return await request<PaginatedResponse<OrderSummaryDTO>>(`/api/orders/archived${qs ? `?${qs}` : ''}`);
+      return await request<PaginatedResponse<OrderSummaryDTO>>(
+        `/api/orders/archived${qs ? `?${qs}` : ''}`,
+      );
     },
 
     dueToday: async (options?: {
@@ -757,14 +761,18 @@ export const apiClient = {
       if (!orderId || !orderId.trim() || orderId === 'undefined') {
         throw new ApiError('Order ID is required', 400);
       }
-      return await request<PaymentDTO[]>(`/api/orders/${encodeURIComponent(orderId.trim())}/payments`);
+      return await request<PaymentDTO[]>(
+        `/api/orders/${encodeURIComponent(orderId.trim())}/payments`,
+      );
     },
 
     getSummary: async (orderId: string): Promise<PaymentSummaryDTO> => {
       if (!orderId || !orderId.trim() || orderId === 'undefined') {
         throw new ApiError('Order ID is required', 400);
       }
-      return await request<PaymentSummaryDTO>(`/api/orders/${encodeURIComponent(orderId.trim())}/payments/summary`);
+      return await request<PaymentSummaryDTO>(
+        `/api/orders/${encodeURIComponent(orderId.trim())}/payments/summary`,
+      );
     },
   },
 
@@ -846,7 +854,9 @@ export const apiClient = {
       if (!orderId || !orderId.trim() || orderId === 'undefined') {
         throw new ApiError('Order ID is required', 400);
       }
-      return await request<OrderPhotoDTO[]>(`/api/orders/${encodeURIComponent(orderId.trim())}/photos`);
+      return await request<OrderPhotoDTO[]>(
+        `/api/orders/${encodeURIComponent(orderId.trim())}/photos`,
+      );
     },
   },
 

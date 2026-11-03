@@ -365,9 +365,10 @@ export function OrderDetailModal({
     const targetItem =
       item ||
       (order?.items
-        ? order.items.find((it: any) =>
-            Array.isArray(it.physicalGarments) &&
-            it.physicalGarments.some((cand: any) => cand.id === garmentId),
+        ? order.items.find(
+            (it: any) =>
+              Array.isArray(it.physicalGarments) &&
+              it.physicalGarments.some((cand: any) => cand.id === garmentId),
           )
         : null);
 
@@ -628,22 +629,58 @@ export function OrderDetailModal({
       return 'scale-bathroom';
     }
     const nameLower = (garmentName || '').toLowerCase();
-    if (nameLower.includes('bag') || nameLower.includes('backpack') || nameLower.includes('purse') || nameLower.includes('tote')) {
+    if (
+      nameLower.includes('bag') ||
+      nameLower.includes('backpack') ||
+      nameLower.includes('purse') ||
+      nameLower.includes('tote')
+    ) {
       return 'bag-personal-outline';
     }
-    if (nameLower.includes('shoe') || nameLower.includes('sneaker') || nameLower.includes('boot') || nameLower.includes('footwear')) {
+    if (
+      nameLower.includes('shoe') ||
+      nameLower.includes('sneaker') ||
+      nameLower.includes('boot') ||
+      nameLower.includes('footwear')
+    ) {
       return 'shoe-sneaker';
     }
-    if (nameLower.includes('bed') || nameLower.includes('sheet') || nameLower.includes('blanket') || nameLower.includes('quilt') || nameLower.includes('curtain') || nameLower.includes('comforter') || nameLower.includes('linen')) {
+    if (
+      nameLower.includes('bed') ||
+      nameLower.includes('sheet') ||
+      nameLower.includes('blanket') ||
+      nameLower.includes('quilt') ||
+      nameLower.includes('curtain') ||
+      nameLower.includes('comforter') ||
+      nameLower.includes('linen')
+    ) {
       return 'bed-outline';
     }
-    if (nameLower.includes('suit') || nameLower.includes('blazer') || nameLower.includes('coat') || nameLower.includes('jacket') || nameLower.includes('tuxedo')) {
+    if (
+      nameLower.includes('suit') ||
+      nameLower.includes('blazer') ||
+      nameLower.includes('coat') ||
+      nameLower.includes('jacket') ||
+      nameLower.includes('tuxedo')
+    ) {
       return 'tie';
     }
-    if (nameLower.includes('pant') || nameLower.includes('trouser') || nameLower.includes('jean') || nameLower.includes('short')) {
+    if (
+      nameLower.includes('pant') ||
+      nameLower.includes('trouser') ||
+      nameLower.includes('jean') ||
+      nameLower.includes('short')
+    ) {
       return 'hanger';
     }
-    if (nameLower.includes('saree') || nameLower.includes('sari') || nameLower.includes('dress') || nameLower.includes('kurta') || nameLower.includes('skirt') || nameLower.includes('gown')) {
+    if (
+      nameLower.includes('saree') ||
+      nameLower.includes('sari') ||
+      nameLower.includes('dress') ||
+      nameLower.includes('kurta') ||
+      nameLower.includes('skirt') ||
+      nameLower.includes('gown')
+    ) {
       return 'hanger';
     }
     return 'tshirt-crew-outline';
@@ -669,7 +706,12 @@ export function OrderDetailModal({
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
         <View style={[styles.container, { backgroundColor: colors.background }]}>
           {/* Header Bar matching Reference: Arrow Back, Order Details, Three Dots */}
-          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: colors.surface, borderBottomColor: colors.border },
+            ]}
+          >
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -702,13 +744,18 @@ export function OrderDetailModal({
           {loading ? (
             <View style={styles.centerBox}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={[styles.centerText, { color: colors.textSecondary }]}>Loading order details...</Text>
+              <Text style={[styles.centerText, { color: colors.textSecondary }]}>
+                Loading order details...
+              </Text>
             </View>
           ) : error ? (
             <View style={styles.centerBox}>
               <IonIcon name="alert-circle" size={40} color={colors.error} />
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={fetchOrderData}>
+              <TouchableOpacity
+                style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+                onPress={fetchOrderData}
+              >
                 <Text style={styles.retryBtnText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -719,7 +766,12 @@ export function OrderDetailModal({
                 showsVerticalScrollIndicator={false}
               >
                 {/* Unified Order Information Card matching Target Design */}
-                <View style={[styles.unifiedOrderCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.unifiedOrderCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
                   {/* Top Royal Blue Banner */}
                   <View style={styles.topBlueBanner}>
                     <View style={styles.orderNumberGroup}>
@@ -766,7 +818,12 @@ export function OrderDetailModal({
                       accessible={true}
                       accessibilityLabel="View Customer Details"
                     >
-                      <View style={[styles.customerAvatarCircle, { backgroundColor: isDark ? colors.surfaceSecondary : '#DDEBFF' }]}>
+                      <View
+                        style={[
+                          styles.customerAvatarCircle,
+                          { backgroundColor: isDark ? colors.surfaceSecondary : '#DDEBFF' },
+                        ]}
+                      >
                         <Text style={[styles.customerAvatarText, { color: '#1E69F5' }]}>
                           {order.customerName
                             ? order.customerName
@@ -780,19 +837,44 @@ export function OrderDetailModal({
                       </View>
 
                       <View style={styles.customerMetaColumn}>
-                        <Text style={[styles.customerName, { color: colors.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+                        <Text
+                          style={[styles.customerName, { color: colors.textPrimary }]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
                           {order.customerName}
                         </Text>
                         <View style={styles.customerDetailRow}>
-                          <IonIcon name="call" size={13} color={colors.textSecondary} style={{ marginRight: 5 }} />
-                          <Text style={[styles.customerDetailText, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                            +91 {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
+                          <IonIcon
+                            name="call"
+                            size={13}
+                            color={colors.textSecondary}
+                            style={{ marginRight: 5 }}
+                          />
+                          <Text
+                            style={[styles.customerDetailText, { color: colors.textSecondary }]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            +91{' '}
+                            {order.customerPhone ? order.customerPhone.replace(/^\+?91/, '') : ''}
                           </Text>
                         </View>
                         <View style={styles.customerDetailRow}>
-                          <IonIcon name="card-outline" size={13} color={colors.textSecondary} style={{ marginRight: 5 }} />
-                          <Text style={[styles.customerDetailText, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                            ID: {order.customerCode || `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000081'}`}
+                          <IonIcon
+                            name="card-outline"
+                            size={13}
+                            color={colors.textSecondary}
+                            style={{ marginRight: 5 }}
+                          />
+                          <Text
+                            style={[styles.customerDetailText, { color: colors.textSecondary }]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            ID:{' '}
+                            {order.customerCode ||
+                              `CUS-${(order.customerId || '').replace(/\D/g, '').slice(-6).padStart(6, '0') || '000081'}`}
                           </Text>
                         </View>
                       </View>
@@ -802,27 +884,66 @@ export function OrderDetailModal({
 
                     {/* Dates Grid (Created On & Due Date side-by-side) */}
                     <View style={styles.datesGrid}>
-                      <View style={[styles.dateBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC', borderColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.dateBox,
+                          {
+                            backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
                         <View style={styles.dateLabelRow}>
-                          <View style={[styles.calendarIconSquare, { backgroundColor: isDark ? colors.surface : '#EBF3FF' }]}>
+                          <View
+                            style={[
+                              styles.calendarIconSquare,
+                              { backgroundColor: isDark ? colors.surface : '#EBF3FF' },
+                            ]}
+                          >
                             <IonIcon name="calendar-outline" size={14} color="#1E69F5" />
                           </View>
-                          <Text style={[styles.dateBoxLabel, { color: colors.textSecondary }]}>Created On</Text>
+                          <Text style={[styles.dateBoxLabel, { color: colors.textSecondary }]}>
+                            Created On
+                          </Text>
                         </View>
-                        <Text style={[styles.dateBoxValue, { color: colors.textPrimary }]}>{formatDateTime(order.orderDate)}</Text>
-                        <Text style={[styles.dateBoxSubtext, { color: colors.textSecondary }]} testID="mobile-order-created-by">
-                          {order.createdByName ? `by ${order.createdByName}` : 'Creator: Not recorded'}
+                        <Text style={[styles.dateBoxValue, { color: colors.textPrimary }]}>
+                          {formatDateTime(order.orderDate)}
+                        </Text>
+                        <Text
+                          style={[styles.dateBoxSubtext, { color: colors.textSecondary }]}
+                          testID="mobile-order-created-by"
+                        >
+                          {order.createdByName
+                            ? `by ${order.createdByName}`
+                            : 'Creator: Not recorded'}
                         </Text>
                       </View>
 
-                      <View style={[styles.dateBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC', borderColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.dateBox,
+                          {
+                            backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
                         <View style={styles.dateLabelRow}>
-                          <View style={[styles.calendarIconSquare, { backgroundColor: isDark ? colors.surface : '#EBF3FF' }]}>
+                          <View
+                            style={[
+                              styles.calendarIconSquare,
+                              { backgroundColor: isDark ? colors.surface : '#EBF3FF' },
+                            ]}
+                          >
                             <IonIcon name="calendar-outline" size={14} color="#1E69F5" />
                           </View>
-                          <Text style={[styles.dateBoxLabel, { color: colors.textSecondary }]}>Due Date</Text>
+                          <Text style={[styles.dateBoxLabel, { color: colors.textSecondary }]}>
+                            Due Date
+                          </Text>
                         </View>
-                        <Text style={[styles.dateBoxValue, { color: colors.textPrimary }]}>{formatDateOnly(order.effectiveDueDate)}</Text>
+                        <Text style={[styles.dateBoxValue, { color: colors.textPrimary }]}>
+                          {formatDateOnly(order.effectiveDueDate)}
+                        </Text>
                         <Text
                           style={[
                             styles.dateBoxDueStatus,
@@ -852,7 +973,10 @@ export function OrderDetailModal({
                       styles.tabItem,
                       activeTab === 'ITEMS'
                         ? styles.tabItemActive
-                        : [styles.tabItemInactive, { backgroundColor: colors.surface, borderColor: colors.border }],
+                        : [
+                            styles.tabItemInactive,
+                            { backgroundColor: colors.surface, borderColor: colors.border },
+                          ],
                     ]}
                     onPress={() => setActiveTab('ITEMS')}
                     activeOpacity={0.7}
@@ -867,7 +991,9 @@ export function OrderDetailModal({
                     <Text
                       style={[
                         styles.tabItemText,
-                        activeTab === 'ITEMS' ? styles.tabItemTextActive : { color: colors.textSecondary },
+                        activeTab === 'ITEMS'
+                          ? styles.tabItemTextActive
+                          : { color: colors.textSecondary },
                       ]}
                     >
                       Items ({order.items.length})
@@ -879,7 +1005,10 @@ export function OrderDetailModal({
                       styles.tabItem,
                       activeTab === 'PHOTOS'
                         ? styles.tabItemActive
-                        : [styles.tabItemInactive, { backgroundColor: colors.surface, borderColor: colors.border }],
+                        : [
+                            styles.tabItemInactive,
+                            { backgroundColor: colors.surface, borderColor: colors.border },
+                          ],
                     ]}
                     onPress={() => setActiveTab('PHOTOS')}
                     activeOpacity={0.7}
@@ -894,7 +1023,9 @@ export function OrderDetailModal({
                     <Text
                       style={[
                         styles.tabItemText,
-                        activeTab === 'PHOTOS' ? styles.tabItemTextActive : { color: colors.textSecondary },
+                        activeTab === 'PHOTOS'
+                          ? styles.tabItemTextActive
+                          : { color: colors.textSecondary },
                       ]}
                     >
                       Photos ({orderPhotos.length})
@@ -906,7 +1037,10 @@ export function OrderDetailModal({
                       styles.tabItem,
                       activeTab === 'HISTORY'
                         ? styles.tabItemActive
-                        : [styles.tabItemInactive, { backgroundColor: colors.surface, borderColor: colors.border }],
+                        : [
+                            styles.tabItemInactive,
+                            { backgroundColor: colors.surface, borderColor: colors.border },
+                          ],
                     ]}
                     onPress={() => setActiveTab('HISTORY')}
                     activeOpacity={0.7}
@@ -921,7 +1055,9 @@ export function OrderDetailModal({
                     <Text
                       style={[
                         styles.tabItemText,
-                        activeTab === 'HISTORY' ? styles.tabItemTextActive : { color: colors.textSecondary },
+                        activeTab === 'HISTORY'
+                          ? styles.tabItemTextActive
+                          : { color: colors.textSecondary },
                       ]}
                     >
                       History
@@ -942,7 +1078,13 @@ export function OrderDetailModal({
                       const iconName = getGarmentVectorIcon(item.garmentName, isWeight);
 
                       return (
-                        <View key={item.id} style={[styles.itemRowCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <View
+                          key={item.id}
+                          style={[
+                            styles.itemRowCard,
+                            { backgroundColor: colors.surface, borderColor: colors.border },
+                          ]}
+                        >
                           <TouchableOpacity
                             style={styles.itemMainRow}
                             onPress={() => toggleItemExpanded(item.id)}
@@ -950,14 +1092,28 @@ export function OrderDetailModal({
                             accessible={true}
                             accessibilityLabel={`${item.garmentName}, tap to ${isExpanded ? 'collapse' : 'expand'}`}
                           >
-                            <View style={[styles.garmentIconBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#EBF3FF' }]}>
+                            <View
+                              style={[
+                                styles.garmentIconBox,
+                                { backgroundColor: isDark ? colors.surfaceSecondary : '#EBF3FF' },
+                              ]}
+                            >
                               <MciIcon name={iconName} size={22} color="#1E69F5" />
                             </View>
 
                             <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                              <Text style={[styles.itemGarmentName, { color: colors.textPrimary }]}>{item.garmentName}</Text>
-                              <Text style={[styles.itemServiceName, { color: colors.textSecondary }]}>
-                                {((item as any).serviceName || item.serviceType || 'DRY_CLEAN').toUpperCase()} •{' '}
+                              <Text style={[styles.itemGarmentName, { color: colors.textPrimary }]}>
+                                {item.garmentName}
+                              </Text>
+                              <Text
+                                style={[styles.itemServiceName, { color: colors.textSecondary }]}
+                              >
+                                {(
+                                  (item as any).serviceName ||
+                                  item.serviceType ||
+                                  'DRY_CLEAN'
+                                ).toUpperCase()}{' '}
+                                •{' '}
                                 {isWeight
                                   ? `${item.weight} kg (${item.quantity} pcs in bag)`
                                   : `${item.quantity} pc${item.quantity > 1 ? 's' : ''}`}
@@ -965,7 +1121,9 @@ export function OrderDetailModal({
                             </View>
 
                             <View style={styles.itemPriceChevronGroup}>
-                              <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>₹ {item.lineTotal.toFixed(0)}</Text>
+                              <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>
+                                ₹ {item.lineTotal.toFixed(0)}
+                              </Text>
                               <IonIcon
                                 name={isExpanded ? 'chevron-up' : 'chevron-down'}
                                 size={18}
@@ -976,7 +1134,12 @@ export function OrderDetailModal({
 
                           {/* Expanded Photo Preview Strip */}
                           {isExpanded && (
-                            <View style={[styles.itemPhotoStripContainer, { borderTopColor: colors.border }]}>
+                            <View
+                              style={[
+                                styles.itemPhotoStripContainer,
+                                { borderTopColor: colors.border },
+                              ]}
+                            >
                               {itemPhotos.length > 0 ? (
                                 <View style={styles.photoStripWithViewAllRow}>
                                   <View style={styles.itemThumbnailsRow}>
@@ -985,7 +1148,10 @@ export function OrderDetailModal({
                                       return (
                                         <TouchableOpacity
                                           key={photo.id || phIdx}
-                                          style={[styles.compactThumbBtn, { borderColor: colors.border }]}
+                                          style={[
+                                            styles.compactThumbBtn,
+                                            { borderColor: colors.border },
+                                          ]}
                                           onPress={() =>
                                             openLightbox(
                                               itemPhotos.map((p) => p.url),
@@ -1028,7 +1194,11 @@ export function OrderDetailModal({
                                     <TouchableOpacity
                                       style={[
                                         styles.dashedAddPhotoBox,
-                                        { backgroundColor: isDark ? colors.surfaceSecondary : '#F0F7FF' },
+                                        {
+                                          backgroundColor: isDark
+                                            ? colors.surfaceSecondary
+                                            : '#F0F7FF',
+                                        },
                                       ]}
                                       onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                       accessible={true}
@@ -1047,7 +1217,8 @@ export function OrderDetailModal({
                                     accessibilityLabel="View all order photos in Photos tab"
                                   >
                                     <Text style={[styles.compactViewAllText, { color: '#1E69F5' }]}>
-                                      {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} • View All →
+                                      {itemPhotos.length} photo{itemPhotos.length > 1 ? 's' : ''} •
+                                      View All →
                                     </Text>
                                   </TouchableOpacity>
                                 </View>
@@ -1056,17 +1227,30 @@ export function OrderDetailModal({
                                   <TouchableOpacity
                                     style={[
                                       styles.addPhotoInlineBtn,
-                                      { backgroundColor: isDark ? colors.surfaceSecondary : '#F0F7FF' },
+                                      {
+                                        backgroundColor: isDark
+                                          ? colors.surfaceSecondary
+                                          : '#F0F7FF',
+                                      },
                                     ]}
                                     onPress={() => handleAddPhotoAction({ orderItemId: item.id })}
                                     accessible={true}
                                     accessibilityLabel={`Add photo for ${item.garmentName}`}
                                     activeOpacity={0.7}
                                   >
-                                    <IonIcon name="camera-outline" size={16} color="#1E69F5" style={{ marginRight: 6 }} />
-                                    <Text style={[styles.addPhotoInlineText, { color: '#1E69F5' }]}>Add Photo</Text>
+                                    <IonIcon
+                                      name="camera-outline"
+                                      size={16}
+                                      color="#1E69F5"
+                                      style={{ marginRight: 6 }}
+                                    />
+                                    <Text style={[styles.addPhotoInlineText, { color: '#1E69F5' }]}>
+                                      Add Photo
+                                    </Text>
                                   </TouchableOpacity>
-                                  <Text style={[styles.noPhotosLabel, { color: colors.textMuted }]}>No photos attached</Text>
+                                  <Text style={[styles.noPhotosLabel, { color: colors.textMuted }]}>
+                                    No photos attached
+                                  </Text>
                                 </View>
                               )}
                             </View>
@@ -1079,17 +1263,25 @@ export function OrderDetailModal({
                     {order.items.some(
                       (i) => i.physicalGarments && i.physicalGarments.length > 0,
                     ) ? (
-                      <View style={[styles.garmentChecklistCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.garmentChecklistCard,
+                          { backgroundColor: colors.surface, borderColor: colors.border },
+                        ]}
+                      >
                         <View style={styles.checklistHeaderRow}>
                           <View style={styles.checklistTitleGroup}>
                             <IonIcon name="checkbox" size={20} color="#1E69F5" />
-                            <Text style={[styles.checklistTitle, { color: colors.textPrimary }]}>Garment Readiness Checklist</Text>
+                            <Text style={[styles.checklistTitle, { color: colors.textPrimary }]}>
+                              Garment Readiness Checklist
+                            </Text>
                           </View>
                           <View
                             style={[
                               styles.checklistBadgePill,
                               {
-                                backgroundColor: readyGarments === totalGarments ? '#DCFCE7' : '#EBF3FF',
+                                backgroundColor:
+                                  readyGarments === totalGarments ? '#DCFCE7' : '#EBF3FF',
                               },
                             ]}
                           >
@@ -1112,14 +1304,19 @@ export function OrderDetailModal({
                             return (
                               <TouchableOpacity
                                 key={g.id}
-                                style={[styles.garmentCheckRow, { borderBottomColor: colors.border }]}
+                                style={[
+                                  styles.garmentCheckRow,
+                                  { borderBottomColor: colors.border },
+                                ]}
                                 onPress={() => handleToggleGarmentReady(item.id, g.id, g.isReady)}
                                 disabled={operatingGarmentId === g.id}
                                 activeOpacity={0.7}
                                 accessible={true}
                                 accessibilityLabel={`Toggle readiness for ${item.garmentName} #${g.unitNumber}`}
                               >
-                                {Boolean(g.isReady) || Boolean(g.isDelivered) || isOrderDelivered ? (
+                                {Boolean(g.isReady) ||
+                                Boolean(g.isDelivered) ||
+                                isOrderDelivered ? (
                                   <IonIcon name="checkmark-circle" size={22} color="#10B981" />
                                 ) : (
                                   <IonIcon name="square-outline" size={22} color="#94A3B8" />
@@ -1136,7 +1333,10 @@ export function OrderDetailModal({
 
                                 {pgPhotos.length > 0 ? (
                                   <TouchableOpacity
-                                    style={[styles.garmentPiecePhotoBtn, { borderColor: colors.border }]}
+                                    style={[
+                                      styles.garmentPiecePhotoBtn,
+                                      { borderColor: colors.border },
+                                    ]}
                                     onPress={(e) => {
                                       e.stopPropagation?.();
                                       openLightbox(
@@ -1164,7 +1364,10 @@ export function OrderDetailModal({
                                   </TouchableOpacity>
                                 ) : (
                                   <TouchableOpacity
-                                    style={[styles.garmentPiecePlaceholderBtn, { borderColor: colors.border }]}
+                                    style={[
+                                      styles.garmentPiecePlaceholderBtn,
+                                      { borderColor: colors.border },
+                                    ]}
                                     onPress={(e) => {
                                       e.stopPropagation?.();
                                       handleAddPhotoAction({
@@ -1177,7 +1380,11 @@ export function OrderDetailModal({
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     activeOpacity={0.7}
                                   >
-                                    <IonIcon name="camera-outline" size={16} color={colors.textMuted} />
+                                    <IonIcon
+                                      name="camera-outline"
+                                      size={16}
+                                      color={colors.textMuted}
+                                    />
                                   </TouchableOpacity>
                                 )}
 
@@ -1216,19 +1423,32 @@ export function OrderDetailModal({
                     ) : null}
 
                     {/* Payment Summary Card matching Target Design */}
-                    <View style={[styles.paymentSummaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View
+                      style={[
+                        styles.paymentSummaryCard,
+                        { backgroundColor: colors.surface, borderColor: colors.border },
+                      ]}
+                    >
                       <View style={styles.paymentSummaryHeaderRow}>
                         <IonIcon name="card" size={18} color="#1E69F5" />
-                        <Text style={[styles.paymentSummaryTitle, { color: colors.textPrimary }]}>Payment Summary</Text>
+                        <Text style={[styles.paymentSummaryTitle, { color: colors.textPrimary }]}>
+                          Payment Summary
+                        </Text>
                       </View>
 
                       <View style={styles.summaryRow}>
-                        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total Amount</Text>
-                        <Text style={[styles.summaryVal, { color: colors.textPrimary }]}>₹ {effectiveTotal.toFixed(2)}</Text>
+                        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+                          Total Amount
+                        </Text>
+                        <Text style={[styles.summaryVal, { color: colors.textPrimary }]}>
+                          ₹ {effectiveTotal.toFixed(2)}
+                        </Text>
                       </View>
 
                       <View style={styles.summaryRow}>
-                        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Amount Paid</Text>
+                        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+                          Amount Paid
+                        </Text>
                         <Text style={[styles.summaryVal, { color: '#16A34A' }]}>
                           ₹ {effectivePaid.toFixed(2)}
                         </Text>
@@ -1246,20 +1466,34 @@ export function OrderDetailModal({
                       >
                         <View style={styles.balanceDueLeftGroup}>
                           <View style={styles.balanceDueBlueBar} />
-                          <Text style={[styles.summaryDueLabel, { color: isDark ? colors.textPrimary : '#1E3A8A' }]}>
+                          <Text
+                            style={[
+                              styles.summaryDueLabel,
+                              { color: isDark ? colors.textPrimary : '#1E3A8A' },
+                            ]}
+                          >
                             Balance Due
                           </Text>
                         </View>
-                        <Text style={[styles.summaryDueVal, { color: '#1E69F5' }]}>₹ {effectiveDue.toFixed(2)}</Text>
+                        <Text style={[styles.summaryDueVal, { color: '#1E69F5' }]}>
+                          ₹ {effectiveDue.toFixed(2)}
+                        </Text>
                       </View>
                     </View>
                   </View>
                 ) : activeTab === 'PHOTOS' ? (
                   /* Tab Content 2: Photos */
-                  <View style={[styles.photosTabContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View
+                    style={[
+                      styles.photosTabContainer,
+                      { backgroundColor: colors.surface, borderColor: colors.border },
+                    ]}
+                  >
                     <View style={styles.photosTabHeaderRow}>
                       <View>
-                        <Text style={[styles.photosTabTitle, { color: colors.textPrimary }]}>Order Garment Intake Photos</Text>
+                        <Text style={[styles.photosTabTitle, { color: colors.textPrimary }]}>
+                          Order Garment Intake Photos
+                        </Text>
                         <Text style={[styles.photosTabSubtitle, { color: colors.textSecondary }]}>
                           {orderPhotos.length} photo(s) recorded for this order
                         </Text>
@@ -1272,19 +1506,35 @@ export function OrderDetailModal({
                           accessible={true}
                           accessibilityLabel="Take Photo with Camera"
                         >
-                          <IonIcon name="camera-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <IonIcon
+                            name="camera-outline"
+                            size={14}
+                            color="#FFFFFF"
+                            style={{ marginRight: 4 }}
+                          />
                           <Text style={styles.actionBtnSmallText}>Camera</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.actionBtnSmall, styles.actionBtnSmallSecondary, { backgroundColor: colors.surfaceSecondary }]}
+                          style={[
+                            styles.actionBtnSmall,
+                            styles.actionBtnSmallSecondary,
+                            { backgroundColor: colors.surfaceSecondary },
+                          ]}
                           onPress={() => handlePickGallery()}
                           disabled={isUploadingPhoto}
                           accessible={true}
                           accessibilityLabel="Select from Gallery"
                         >
-                          <IonIcon name="images-outline" size={14} color={colors.textPrimary} style={{ marginRight: 4 }} />
-                          <Text style={[styles.actionBtnSmallText, { color: colors.textPrimary }]}>Gallery</Text>
+                          <IonIcon
+                            name="images-outline"
+                            size={14}
+                            color={colors.textPrimary}
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text style={[styles.actionBtnSmallText, { color: colors.textPrimary }]}>
+                            Gallery
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1292,13 +1542,25 @@ export function OrderDetailModal({
                     {isUploadingPhoto && (
                       <View style={[styles.uploadingBox, { backgroundColor: colors.primaryBg }]}>
                         <ActivityIndicator size="small" color="#1E69F5" />
-                        <Text style={[styles.uploadingText, { color: '#1E69F5' }]}>Uploading photo to server...</Text>
+                        <Text style={[styles.uploadingText, { color: '#1E69F5' }]}>
+                          Uploading photo to server...
+                        </Text>
                       </View>
                     )}
 
                     {orderPhotos.length === 0 ? (
-                      <View style={[styles.emptyPhotosContainer, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                        <IonIcon name="camera-outline" size={40} color={colors.textMuted} style={{ marginBottom: 8 }} />
+                      <View
+                        style={[
+                          styles.emptyPhotosContainer,
+                          { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
+                        ]}
+                      >
+                        <IonIcon
+                          name="camera-outline"
+                          size={40}
+                          color={colors.textMuted}
+                          style={{ marginBottom: 8 }}
+                        />
                         <Text style={[styles.emptyPhotosText, { color: colors.textPrimary }]}>
                           No photos recorded for this order yet.
                         </Text>
@@ -1313,7 +1575,13 @@ export function OrderDetailModal({
                           return (
                             <TouchableOpacity
                               key={photo.id || idx}
-                              style={[styles.photoCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                              style={[
+                                styles.photoCard,
+                                {
+                                  backgroundColor: colors.surfaceSecondary,
+                                  borderColor: colors.border,
+                                },
+                              ]}
                               onPress={() =>
                                 openLightbox(
                                   orderPhotos.map((p) => p.url),
@@ -1350,11 +1618,29 @@ export function OrderDetailModal({
                     />
 
                     {/* Notification Dispatch History */}
-                    <View style={[styles.notificationHistorySection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Text style={[styles.notificationHistoryTitle, { color: colors.textPrimary }]}>Customer Notifications</Text>
+                    <View
+                      style={[
+                        styles.notificationHistorySection,
+                        { backgroundColor: colors.surface, borderColor: colors.border },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.notificationHistoryTitle, { color: colors.textPrimary }]}
+                      >
+                        Customer Notifications
+                      </Text>
                       {notifications.length > 0 ? (
                         notifications.map((notif) => (
-                          <View key={notif.id} style={[styles.notificationCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                          <View
+                            key={notif.id}
+                            style={[
+                              styles.notificationCard,
+                              {
+                                backgroundColor: colors.surfaceSecondary,
+                                borderColor: colors.border,
+                              },
+                            ]}
+                          >
                             <View style={styles.notificationHeader}>
                               <Text style={[styles.notifEventText, { color: colors.textPrimary }]}>
                                 {notif.eventType.replace(/_/g, ' ')}
@@ -1369,8 +1655,15 @@ export function OrderDetailModal({
                               </View>
                             </View>
                             <View style={styles.notifRecipientRow}>
-                              <IonIcon name="phone-portrait-outline" size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                              <Text style={[styles.notifRecipientText, { color: colors.textSecondary }]}>
+                              <IonIcon
+                                name="phone-portrait-outline"
+                                size={13}
+                                color={colors.textSecondary}
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text
+                                style={[styles.notifRecipientText, { color: colors.textSecondary }]}
+                              >
                                 {notif.recipient} via {notif.channel}
                               </Text>
                             </View>
@@ -1395,9 +1688,17 @@ export function OrderDetailModal({
               </ScrollView>
 
               {/* Fixed Bottom Action Bar matching Target Design */}
-              <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+              <View
+                style={[
+                  styles.bottomBar,
+                  { backgroundColor: colors.surface, borderTopColor: colors.border },
+                ]}
+              >
                 <TouchableOpacity
-                  style={[styles.addPhotoBtn, { backgroundColor: colors.surface, borderColor: '#1E69F5' }]}
+                  style={[
+                    styles.addPhotoBtn,
+                    { backgroundColor: colors.surface, borderColor: '#1E69F5' },
+                  ]}
                   onPress={() => handleAddPhotoAction()}
                   activeOpacity={0.8}
                   disabled={isUploadingPhoto}
@@ -1520,7 +1821,12 @@ export function OrderDetailModal({
                         accessible={true}
                         accessibilityLabel="Previous Photo"
                       >
-                        <IonIcon name="chevron-back" size={16} color="#FFFFFF" style={{ marginRight: 2 }} />
+                        <IonIcon
+                          name="chevron-back"
+                          size={16}
+                          color="#FFFFFF"
+                          style={{ marginRight: 2 }}
+                        />
                         <Text style={styles.lightboxNavBtnText}>Previous</Text>
                       </TouchableOpacity>
 
@@ -1536,7 +1842,12 @@ export function OrderDetailModal({
                         accessibilityLabel="Next Photo"
                       >
                         <Text style={styles.lightboxNavBtnText}>Next</Text>
-                        <IonIcon name="chevron-forward" size={16} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                        <IonIcon
+                          name="chevron-forward"
+                          size={16}
+                          color="#FFFFFF"
+                          style={{ marginLeft: 2 }}
+                        />
                       </TouchableOpacity>
                     </View>
                   ) : null}

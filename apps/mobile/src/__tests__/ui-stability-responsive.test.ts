@@ -6,8 +6,12 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
     test('CustomerProfileModal has strict boolean membership and discount guards', async () => {
       // Simulate discountPercent evaluation edge cases
       const customerZeroDiscount = { membership: 'NONE', discountPercent: 0 };
-      const hasMembership = Boolean(customerZeroDiscount.membership && customerZeroDiscount.membership !== 'NONE');
-      const hasDiscount = Boolean(customerZeroDiscount.discountPercent && customerZeroDiscount.discountPercent > 0);
+      const hasMembership = Boolean(
+        customerZeroDiscount.membership && customerZeroDiscount.membership !== 'NONE',
+      );
+      const hasDiscount = Boolean(
+        customerZeroDiscount.discountPercent && customerZeroDiscount.discountPercent > 0,
+      );
 
       // Verify evaluates strictly to boolean false (not number 0)
       assert.strictEqual(hasMembership, false);
@@ -15,14 +19,18 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
       assert.strictEqual(typeof hasMembership, 'boolean');
       assert.strictEqual(typeof hasDiscount, 'boolean');
 
-      const conditionResult = (hasMembership || hasDiscount) ? 'render' : null;
+      const conditionResult = hasMembership || hasDiscount ? 'render' : null;
       assert.strictEqual(conditionResult, null);
     });
 
     test('CustomerProfileModal correctly handles active member with discount', () => {
       const activeCustomer = { membership: 'GOLD', discountPercent: 10 };
-      const hasMembership = Boolean(activeCustomer.membership && activeCustomer.membership !== 'NONE');
-      const hasDiscount = Boolean(activeCustomer.discountPercent && activeCustomer.discountPercent > 0);
+      const hasMembership = Boolean(
+        activeCustomer.membership && activeCustomer.membership !== 'NONE',
+      );
+      const hasDiscount = Boolean(
+        activeCustomer.discountPercent && activeCustomer.discountPercent > 0,
+      );
 
       assert.strictEqual(hasMembership, true);
       assert.strictEqual(hasDiscount, true);
@@ -83,7 +91,10 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
         const signInBtnHeight = 50;
 
         assert.ok(perPieceBtnHeight >= buttonMinHeight, 'Per-Piece button meets 44px touch target');
-        assert.ok(perWeightBtnHeight >= buttonMinHeight, 'Per-Weight button meets 44px touch target');
+        assert.ok(
+          perWeightBtnHeight >= buttonMinHeight,
+          'Per-Weight button meets 44px touch target',
+        );
         assert.ok(profileBtnHeight >= buttonMinHeight, 'Profile button meets 44px touch target');
         assert.ok(signInBtnHeight >= buttonMinHeight, 'Sign In button meets 44px touch target');
       });
@@ -94,7 +105,10 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
         const gap = 10;
         const halfWidth = (cardAvailableWidth - gap) / 2;
 
-        assert.ok(halfWidth >= 120, `Button width ${halfWidth}px provides ample touch area on ${vp.name}`);
+        assert.ok(
+          halfWidth >= 120,
+          `Button width ${halfWidth}px provides ample touch area on ${vp.name}`,
+        );
       });
     }
   });
@@ -235,7 +249,11 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
       };
 
       const orderPhotos: any[] = [
-        { id: 'photo-shirt-intake', url: '/uploads/orders/shirt_intake_1.jpg', orderItemId: 'item-shirt-1' },
+        {
+          id: 'photo-shirt-intake',
+          url: '/uploads/orders/shirt_intake_1.jpg',
+          orderItemId: 'item-shirt-1',
+        },
       ];
 
       function resolveGarmentPhotos(garmentId: string, targetItem: typeof item, g: any): any[] {
@@ -368,4 +386,3 @@ describe('GrowFast Mobile — Comprehensive UI Fix and Stability Verification', 
     });
   });
 });
-

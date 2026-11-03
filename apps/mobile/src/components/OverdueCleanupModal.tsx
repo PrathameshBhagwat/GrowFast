@@ -67,45 +67,48 @@ export const OverdueCleanupModal: React.FC<OverdueCleanupModalProps> = ({
   const isOwner = user?.role === 'OWNER';
 
   // Check eligibility on app entry for authorized owners
-  const checkEligibility = useCallback(async (isManualTrigger = false) => {
-    if (!isAuthenticated || isAuthLoading || !isOwner) {
-      return;
-    }
-    if (!isManualTrigger && sessionPromptTriggered) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await apiClient.orders.getCleanupEligibleOrders();
-      setCleanupData(res);
-
-      if (res && res.totalEligibleCount > 0) {
-        // Pre-select all eligible orders by default for convenient review
-        setSelectedIds(new Set(res.eligibleOrders.map((o) => o.id)));
-
-        if (!isManualTrigger && !sessionPromptTriggered) {
-          sessionPromptTriggered = true;
-          setStage('PROMPT');
-        } else if (isManualTrigger) {
-          setStage('REVIEW');
-        }
-      } else {
-        if (isManualTrigger) {
-          Alert.alert(
-            'No Long-Overdue Orders',
-            'There are currently no orders uncollected for more than 90 days.',
-            [{ text: 'OK' }],
-          );
-        }
+  const checkEligibility = useCallback(
+    async (isManualTrigger = false) => {
+      if (!isAuthenticated || isAuthLoading || !isOwner) {
+        return;
       }
-    } catch (err: any) {
-      // Non-blocking error handling
-      console.warn('[OverdueCleanupModal] Failed to check eligible orders:', err?.message || err);
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated, isAuthLoading, isOwner]);
+      if (!isManualTrigger && sessionPromptTriggered) {
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const res = await apiClient.orders.getCleanupEligibleOrders();
+        setCleanupData(res);
+
+        if (res && res.totalEligibleCount > 0) {
+          // Pre-select all eligible orders by default for convenient review
+          setSelectedIds(new Set(res.eligibleOrders.map((o) => o.id)));
+
+          if (!isManualTrigger && !sessionPromptTriggered) {
+            sessionPromptTriggered = true;
+            setStage('PROMPT');
+          } else if (isManualTrigger) {
+            setStage('REVIEW');
+          }
+        } else {
+          if (isManualTrigger) {
+            Alert.alert(
+              'No Long-Overdue Orders',
+              'There are currently no orders uncollected for more than 90 days.',
+              [{ text: 'OK' }],
+            );
+          }
+        }
+      } catch (err: any) {
+        // Non-blocking error handling
+        console.warn('[OverdueCleanupModal] Failed to check eligible orders:', err?.message || err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isAuthenticated, isAuthLoading, isOwner],
+  );
 
   useEffect(() => {
     if (forceOpenReview) {
@@ -294,7 +297,9 @@ export const OverdueCleanupModal: React.FC<OverdueCleanupModalProps> = ({
 
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={[styles.metaLabel, { color: colors.textMuted }]}>Balance Due</Text>
-            <Text style={[styles.amountDueText, { color: item.amountDue > 0 ? '#dc2626' : '#16a34a' }]}>
+            <Text
+              style={[styles.amountDueText, { color: item.amountDue > 0 ? '#dc2626' : '#16a34a' }]}
+            >
               ₹{item.amountDue.toFixed(2)}
             </Text>
           </View>
@@ -326,7 +331,9 @@ export const OverdueCleanupModal: React.FC<OverdueCleanupModalProps> = ({
           ) : null}
 
           {item.itemsSummary ? (
-            <View style={[styles.chip, { backgroundColor: isDark ? '#1e293b' : '#f8fafc', flex: 1 }]}>
+            <View
+              style={[styles.chip, { backgroundColor: isDark ? '#1e293b' : '#f8fafc', flex: 1 }]}
+            >
               <Icon name="shirt-outline" size={12} color={colors.textSecondary} />
               <Text
                 style={[styles.chipText, { color: colors.textSecondary }]}
@@ -377,15 +384,18 @@ export const OverdueCleanupModal: React.FC<OverdueCleanupModalProps> = ({
                 {cleanupData?.totalEligibleCount || 0} order
                 {(cleanupData?.totalEligibleCount || 0) > 1 ? 's' : ''}
               </Text>{' '}
-              that have remained uncollected for more than 90 days after their due date. Review these
-              orders before archiving them.
+              that have remained uncollected for more than 90 days after their due date. Review
+              these orders before archiving them.
             </Text>
 
             <View style={styles.promptActions}>
               <TouchableOpacity
                 style={[
                   styles.promptSecondaryBtn,
-                  { borderColor: colors.border, backgroundColor: isDark ? colors.surfaceSecondary : '#f8fafc' },
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: isDark ? colors.surfaceSecondary : '#f8fafc',
+                  },
                 ]}
                 onPress={handleDismissPrompt}
                 activeOpacity={0.8}
@@ -536,7 +546,10 @@ export const OverdueCleanupModal: React.FC<OverdueCleanupModalProps> = ({
               <TouchableOpacity
                 style={[
                   styles.footerSecondaryBtn,
-                  { borderColor: colors.border, backgroundColor: isDark ? colors.surfaceSecondary : '#f8fafc' },
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: isDark ? colors.surfaceSecondary : '#f8fafc',
+                  },
                 ]}
                 onPress={handleCloseReview}
                 activeOpacity={0.8}
@@ -565,7 +578,12 @@ export const OverdueCleanupModal: React.FC<OverdueCleanupModalProps> = ({
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Icon name="archive-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Icon
+                      name="archive-outline"
+                      size={18}
+                      color="#FFFFFF"
+                      style={{ marginRight: 6 }}
+                    />
                     <Text style={styles.footerPrimaryBtnText}>
                       Archive Selected ({selectedIds.size})
                     </Text>

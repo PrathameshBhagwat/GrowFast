@@ -160,16 +160,24 @@ describe('GrowFast Mobile — Draft Lifecycle & 404 Resolution Suite', () => {
         customerId: 'cust-real-2',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'garm-shirt', serviceTypeId: 'srv-dryclean', quantity: 1, unitPrice: 200 }],
+        items: [
+          {
+            garmentCatalogId: 'garm-shirt',
+            serviceTypeId: 'srv-dryclean',
+            quantity: 1,
+            unitPrice: 200,
+          },
+        ],
       },
     });
 
     const originalCreate = apiClient.orders.create;
-    apiClient.orders.create = async (payload) => ({
-      id: 'ord-conversion-999',
-      orderNumber: 'GF-ORD-000999',
-      clientDraftId: payload.clientDraftId,
-    } as any);
+    apiClient.orders.create = async (payload) =>
+      ({
+        id: 'ord-conversion-999',
+        orderNumber: 'GF-ORD-000999',
+        clientDraftId: payload.clientDraftId,
+      }) as any;
 
     try {
       const engine = new SyncEngine();
@@ -307,7 +315,11 @@ describe('GrowFast Mobile — Draft Lifecycle & 404 Resolution Suite', () => {
       assert.equal(result.recovered, true);
       assert.equal(result.orderId, 'ord-srv-recovered-777');
       assert.equal(getByDraftCallCount, 1, 'Retry must execute idempotency pre-check probe');
-      assert.equal(createCallCount, 0, 'Must not issue duplicate POST when probe finds existing order');
+      assert.equal(
+        createCallCount,
+        0,
+        'Must not issue duplicate POST when probe finds existing order',
+      );
     } finally {
       apiClient.orders.getByDraftId = originalGetByDraft;
       apiClient.orders.create = originalCreate;
@@ -326,7 +338,9 @@ describe('GrowFast Mobile — Draft Lifecycle & 404 Resolution Suite', () => {
         customerId: 'cust-real-5',
         isExpress: false,
         pickupType: PickupType.STORE_PICKUP,
-        items: [{ garmentCatalogId: 'g-bag', serviceTypeId: 's-dryclean', quantity: 1, unitPrice: 150 }],
+        items: [
+          { garmentCatalogId: 'g-bag', serviceTypeId: 's-dryclean', quantity: 1, unitPrice: 150 },
+        ],
       },
     });
 
@@ -427,11 +441,12 @@ describe('GrowFast Mobile — Draft Lifecycle & 404 Resolution Suite', () => {
         },
       });
 
-      apiClient.orders.create = async (payload) => ({
-        id: `ord-perpiece-${(payload.clientDraftId || 'draft').slice(0, 8)}`,
-        orderNumber: 'GF-ORD-000101',
-        clientDraftId: payload.clientDraftId,
-      } as any);
+      apiClient.orders.create = async (payload) =>
+        ({
+          id: `ord-perpiece-${(payload.clientDraftId || 'draft').slice(0, 8)}`,
+          orderNumber: 'GF-ORD-000101',
+          clientDraftId: payload.clientDraftId,
+        }) as any;
 
       const engine = new SyncEngine();
       const resPiece = await engine.syncDraft(perPieceDraftId);
@@ -448,7 +463,15 @@ describe('GrowFast Mobile — Draft Lifecycle & 404 Resolution Suite', () => {
           customerId: 'cust-w1',
           isExpress: true,
           pickupType: PickupType.HOME_DELIVERY,
-          items: [{ garmentCatalogId: 'g-laundry-kg', serviceTypeId: 's-wash-fold', quantity: 1, weight: 4.5, unitPrice: 80 }],
+          items: [
+            {
+              garmentCatalogId: 'g-laundry-kg',
+              serviceTypeId: 's-wash-fold',
+              quantity: 1,
+              weight: 4.5,
+              unitPrice: 80,
+            },
+          ],
         },
       });
 

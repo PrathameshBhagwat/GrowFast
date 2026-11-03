@@ -853,10 +853,36 @@ describe('Phase T2: Tag UI & 40×40 mm Tag Preview & Printing Tests', () => {
       },
       fields: [
         { field: 'shopName', label: 'Shop Name', enabled: true, fontSize: 10, alignment: 'center' },
-        { field: 'orderNumber', label: 'Order Number', enabled: true, fontSize: 14, alignment: 'center', isBold: true },
-        { field: 'customerName', label: 'Customer Name', enabled: true, fontSize: 10, alignment: 'center' },
-        { field: 'serviceShortcut', label: 'Service Shortcut', enabled: true, fontSize: 12, alignment: 'center', isBold: true },
-        { field: 'garmentSequence', label: 'Garment Sequence', enabled: true, fontSize: 11, alignment: 'center' },
+        {
+          field: 'orderNumber',
+          label: 'Order Number',
+          enabled: true,
+          fontSize: 14,
+          alignment: 'center',
+          isBold: true,
+        },
+        {
+          field: 'customerName',
+          label: 'Customer Name',
+          enabled: true,
+          fontSize: 10,
+          alignment: 'center',
+        },
+        {
+          field: 'serviceShortcut',
+          label: 'Service Shortcut',
+          enabled: true,
+          fontSize: 12,
+          alignment: 'center',
+          isBold: true,
+        },
+        {
+          field: 'garmentSequence',
+          label: 'Garment Sequence',
+          enabled: true,
+          fontSize: 11,
+          alignment: 'center',
+        },
       ],
       containerPaddingMm: { top: 2.0, right: 2.5, bottom: 2.0, left: 2.5 },
       borderStyle: 'dashed',
@@ -967,7 +993,9 @@ describe('Phase T2: Tag UI & 40×40 mm Tag Preview & Printing Tests', () => {
 
       const { container } = render(<PhysicalTag data={tagData} design={canonical5LineDesign} />);
 
-      const custSpan = container.querySelector('[title="Dr. Rajeshwari Swaminathan-Venkatesh Junior"]');
+      const custSpan = container.querySelector(
+        '[title="Dr. Rajeshwari Swaminathan-Venkatesh Junior"]',
+      );
       expect(custSpan).toBeInTheDocument();
       expect(custSpan?.className).toContain('truncate');
     });
@@ -1039,7 +1067,13 @@ describe('Phase T2: Tag UI & 40×40 mm Tag Preview & Printing Tests', () => {
       };
 
       const onViewPhotos = vi.fn();
-      render(<OrderTagsSection order={mixedOrder} onViewPhotos={onViewPhotos} design={canonical5LineDesign} />);
+      render(
+        <OrderTagsSection
+          order={mixedOrder}
+          onViewPhotos={onViewPhotos}
+          design={canonical5LineDesign}
+        />,
+      );
 
       // Shirt pieces: 1/5 through 5/5
       expect(screen.getByText('Piece 1/5')).toBeInTheDocument();

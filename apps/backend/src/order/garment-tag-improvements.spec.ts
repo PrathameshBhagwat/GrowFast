@@ -63,13 +63,7 @@ describe('Garment Tag Generation & Printing Improvements (Tests A through J)', (
   // ─────────────────────────────────────────────────────────────
   it('TEST B — FIVE SHIRTS: formats piece positions 1/5 through 5/5 independently', () => {
     const pieces = [1, 2, 3, 4, 5].map((u) => formatGarmentSequence('Shirt', u, 5));
-    expect(pieces).toEqual([
-      'Shirt 1/5',
-      'Shirt 2/5',
-      'Shirt 3/5',
-      'Shirt 4/5',
-      'Shirt 5/5',
-    ]);
+    expect(pieces).toEqual(['Shirt 1/5', 'Shirt 2/5', 'Shirt 3/5', 'Shirt 4/5', 'Shirt 5/5']);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -79,18 +73,8 @@ describe('Garment Tag Generation & Printing Improvements (Tests A through J)', (
     const shirtPieces = [1, 2, 3, 4, 5].map((u) => formatGarmentSequence('Shirt', u, 5));
     const pantPieces = [1, 2, 3].map((u) => formatGarmentSequence('Pants', u, 3));
 
-    expect(shirtPieces).toEqual([
-      'Shirt 1/5',
-      'Shirt 2/5',
-      'Shirt 3/5',
-      'Shirt 4/5',
-      'Shirt 5/5',
-    ]);
-    expect(pantPieces).toEqual([
-      'Pant 1/3',
-      'Pant 2/3',
-      'Pant 3/3',
-    ]);
+    expect(shirtPieces).toEqual(['Shirt 1/5', 'Shirt 2/5', 'Shirt 3/5', 'Shirt 4/5', 'Shirt 5/5']);
+    expect(pantPieces).toEqual(['Pant 1/3', 'Pant 2/3', 'Pant 3/3']);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -351,11 +335,13 @@ describe('Garment Tag Generation & Printing Improvements (Tests A through J)', (
       for (let i = 1; i <= item.quantity; i++) {
         const current = (groupCounters.get(key) || 0) + 1;
         groupCounters.set(key, current);
-        tags.push(formatGarmentTagLine({
-          serviceShortcut: svc,
-          garmentCategory: cat,
-          pieceNumber: formatPieceNumber(current, total),
-        }));
+        tags.push(
+          formatGarmentTagLine({
+            serviceShortcut: svc,
+            garmentCategory: cat,
+            pieceNumber: formatPieceNumber(current, total),
+          }),
+        );
       }
     }
 

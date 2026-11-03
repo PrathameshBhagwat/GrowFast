@@ -163,7 +163,11 @@ export class NotificationService {
               channel,
               recipient,
               status: {
-                in: [NotificationStatus.CREATED, NotificationStatus.QUEUED, NotificationStatus.SENT],
+                in: [
+                  NotificationStatus.CREATED,
+                  NotificationStatus.QUEUED,
+                  NotificationStatus.SENT,
+                ],
               },
             },
           });
@@ -247,14 +251,19 @@ export class NotificationService {
       }
 
       // Concurrency claim: Transition CREATED to QUEUED atomically
-      if (notification.status === NotificationStatus.CREATED && this.prisma.notification?.updateMany) {
+      if (
+        notification.status === NotificationStatus.CREATED &&
+        this.prisma.notification?.updateMany
+      ) {
         const claimResult = await this.prisma.notification.updateMany({
           where: { id: notificationId, status: NotificationStatus.CREATED },
           data: { status: NotificationStatus.QUEUED },
         });
 
         if (claimResult.count === 0) {
-          const fresh = await this.prisma.notification.findUnique({ where: { id: notificationId } });
+          const fresh = await this.prisma.notification.findUnique({
+            where: { id: notificationId },
+          });
           if (fresh?.status === NotificationStatus.SENT) return true;
           return false;
         }

@@ -136,7 +136,7 @@ export const ORDER_STATUS_COLORS: Record<
  */
 export function isOrderOverdue(
   order: { effectiveDueDate?: Date | string | null; status?: OrderStatus | string },
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
 ): boolean {
   if (!order || !order.effectiveDueDate) return false;
   const statusStr = String(order.status || '');
@@ -154,7 +154,7 @@ export function isOrderOverdue(
  */
 export function getOverdueDays(
   dueDateInput?: Date | string | null,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
 ): number {
   if (!dueDateInput) return 0;
   const due = new Date(dueDateInput);
@@ -183,7 +183,7 @@ export function isEligibleFor90DayCleanup(
     status?: OrderStatus | string;
     isArchived?: boolean | null;
   },
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
 ): boolean {
   if (!order || !order.effectiveDueDate) return false;
   if (order.isArchived) return false;
@@ -194,4 +194,3 @@ export function isEligibleFor90DayCleanup(
   const days = getOverdueDays(order.effectiveDueDate, referenceDate);
   return days > 90;
 }
-

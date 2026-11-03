@@ -33,7 +33,9 @@ const mockPrismaService = () => ({
     findUnique: jest.fn(),
   },
   store: {
-    findUnique: jest.fn().mockResolvedValue({ name: 'GrowFast', address: 'Main St', phone: '+919999999999' }),
+    findUnique: jest
+      .fn()
+      .mockResolvedValue({ name: 'GrowFast', address: 'Main St', phone: '+919999999999' }),
   },
 });
 

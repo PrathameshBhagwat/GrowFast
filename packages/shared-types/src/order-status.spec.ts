@@ -104,17 +104,11 @@ describe('OrderStatus & Overdue Business Rules', () => {
 
     it('returns false when order has no due date', () => {
       assert.strictEqual(
-        isOrderOverdue(
-          { effectiveDueDate: null, status: OrderStatus.PROCESSING },
-          FIXED_NOW,
-        ),
+        isOrderOverdue({ effectiveDueDate: null, status: OrderStatus.PROCESSING }, FIXED_NOW),
         false,
       );
       assert.strictEqual(
-        isOrderOverdue(
-          { effectiveDueDate: undefined, status: OrderStatus.READY },
-          FIXED_NOW,
-        ),
+        isOrderOverdue({ effectiveDueDate: undefined, status: OrderStatus.READY }, FIXED_NOW),
         false,
       );
     });
@@ -232,7 +226,11 @@ describe('OrderStatus & Overdue Business Rules', () => {
       const due100Days = new Date(FIXED_NOW.getTime() - 100 * 24 * 60 * 60 * 1000);
       assert.strictEqual(
         isEligibleFor90DayCleanup(
-          { effectiveDueDate: due100Days.toISOString(), status: OrderStatus.READY, isArchived: true },
+          {
+            effectiveDueDate: due100Days.toISOString(),
+            status: OrderStatus.READY,
+            isArchived: true,
+          },
           FIXED_NOW,
         ),
         false,
@@ -241,10 +239,7 @@ describe('OrderStatus & Overdue Business Rules', () => {
 
     it('orders without due dates are excluded from 90-day cleanup', () => {
       assert.strictEqual(
-        isEligibleFor90DayCleanup(
-          { effectiveDueDate: null, status: OrderStatus.READY },
-          FIXED_NOW,
-        ),
+        isEligibleFor90DayCleanup({ effectiveDueDate: null, status: OrderStatus.READY }, FIXED_NOW),
         false,
       );
     });

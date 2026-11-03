@@ -152,7 +152,7 @@ export const DEFAULT_SERVICE_SHORTCUTS: Record<string, string> = {
   'Steam Iron': 'SI',
   'Steam Press': 'SI',
   'Shoe Cleaning': 'SC',
-  'Starching': 'ST',
+  Starching: 'ST',
   'Starching Dc': 'ST',
   'Wash and Steam Iron': 'WSI',
   'Wash & Steam Iron': 'WSI',
@@ -381,7 +381,8 @@ export function resolveServiceShortcut(
   if (normKey.includes('WASH') && normKey.includes('FOLD')) return 'W+F';
   if (normKey.includes('DRY_CLEAN')) return 'DC';
   if (normKey.includes('STARCH')) return 'ST';
-  if (normKey.includes('STEAM') || normKey.includes('IRON') || normKey.includes('PRESS')) return 'SI';
+  if (normKey.includes('STEAM') || normKey.includes('IRON') || normKey.includes('PRESS'))
+    return 'SI';
   if (normKey.includes('SHOE')) return 'SC';
   if (normKey.includes('PREMIUM')) return 'PL';
   if (normKey.includes('WOOL')) return 'WL';
@@ -393,7 +394,11 @@ export function resolveServiceShortcut(
   // 4. Generate abbreviation from initials or first characters
   const words = raw.split(/\s+/).filter(Boolean);
   if (words.length >= 2) {
-    const initials = words.map((w) => w[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const initials = words
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
     if (initials.length >= 2) return initials.slice(0, 4);
   }
 
@@ -522,7 +527,7 @@ export function resolveGarmentCategory(
   // Suffix plural removal (e.g. "SILK SAREES" -> "SILK SAREE")
   for (const [plural, singular] of Object.entries(GARMENT_PLURAL_MAP)) {
     if (upper.endsWith(' ' + plural)) {
-      return upper.slice(0, -(plural.length)) + singular;
+      return upper.slice(0, -plural.length) + singular;
     }
   }
 
@@ -532,10 +537,7 @@ export function resolveGarmentCategory(
 /**
  * Formats individual piece number with group denominator: e.g. "1/5", "3/3", "1/1"
  */
-export function formatPieceNumber(
-  unitNumber?: number | null,
-  totalPieces?: number | null,
-): string {
+export function formatPieceNumber(unitNumber?: number | null, totalPieces?: number | null): string {
   const unit = typeof unitNumber === 'number' && unitNumber > 0 ? unitNumber : 1;
   const total = typeof totalPieces === 'number' && totalPieces > 0 ? totalPieces : 1;
   return `${unit}/${total}`;
@@ -832,11 +834,7 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
     'dueDate',
   ];
 
-  const canonical5Keys: TagFieldKey[] = [
-    'shopName',
-    'serviceShortcut',
-    'garmentSequence',
-  ];
+  const canonical5Keys: TagFieldKey[] = ['shopName', 'serviceShortcut', 'garmentSequence'];
 
   const referenceKeys: TagFieldKey[] = [
     'barcode',
@@ -981,7 +979,7 @@ export function sanitizeTagDesign(input?: Partial<TagDesignConfig>): TagDesignCo
     typeof input.shopName === 'string' && input.shopName.trim()
       ? input.shopName.trim().slice(0, 50)
       : input.shopName === undefined
-        ? (defaultSource.shopName || 'GrowFast')
+        ? defaultSource.shopName || 'GrowFast'
         : 'GrowFast';
 
   // Sanitize serviceShortcuts (Owner configuration)

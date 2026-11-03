@@ -265,7 +265,10 @@ describe('OrderController', () => {
       expect(res.data.totalEligibleCount).toBe(0);
 
       const reflector = new Reflector();
-      const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.getCleanupEligibleOrders);
+      const roles = reflector.get<string[]>(
+        ROLES_KEY,
+        OrderController.prototype.getCleanupEligibleOrders,
+      );
       expect(roles).toEqual(['OWNER']);
     });
 
@@ -291,7 +294,10 @@ describe('OrderController', () => {
       expect(res.archivedCount).toBe(2);
 
       const reflector = new Reflector();
-      const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.archiveOverdueOrders);
+      const roles = reflector.get<string[]>(
+        ROLES_KEY,
+        OrderController.prototype.archiveOverdueOrders,
+      );
       expect(roles).toEqual(['OWNER']);
     });
 

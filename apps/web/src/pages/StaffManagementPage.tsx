@@ -199,8 +199,12 @@ export const StaffManagementPage: React.FC = () => {
     setIsActive(emp.isActive);
     setPhotoUrl(emp.photoUrl || null);
     setPassportPhotoUrl(emp.passportPhotoUrl || null);
-    setAadhaarFrontUrl(emp.aadhaarFrontUrl && emp.aadhaarFrontUrl !== '[PROTECTED]' ? emp.aadhaarFrontUrl : null);
-    setAadhaarBackUrl(emp.aadhaarBackUrl && emp.aadhaarBackUrl !== '[PROTECTED]' ? emp.aadhaarBackUrl : null);
+    setAadhaarFrontUrl(
+      emp.aadhaarFrontUrl && emp.aadhaarFrontUrl !== '[PROTECTED]' ? emp.aadhaarFrontUrl : null,
+    );
+    setAadhaarBackUrl(
+      emp.aadhaarBackUrl && emp.aadhaarBackUrl !== '[PROTECTED]' ? emp.aadhaarBackUrl : null,
+    );
     setCurrentAddress(emp.currentAddress || '');
     setPermanentAddress(emp.permanentAddress || '');
     setSameAsCurrentAddress(Boolean(emp.sameAsCurrentAddress));
@@ -211,7 +215,7 @@ export const StaffManagementPage: React.FC = () => {
       emp.aadhaarFrontUrl ||
       emp.aadhaarBackUrl ||
       emp.currentAddress ||
-      emp.permanentAddress
+      emp.permanentAddress,
     );
     setShowAdditionalInfo(hasOptionalInfo);
     setFormError(null);
@@ -330,7 +334,9 @@ export const StaffManagementPage: React.FC = () => {
           aadhaarFrontUrl: aadhaarFrontUrl || null,
           aadhaarBackUrl: aadhaarBackUrl || null,
           currentAddress: currentAddress.trim() || null,
-          permanentAddress: sameAsCurrentAddress ? (currentAddress.trim() || null) : (permanentAddress.trim() || null),
+          permanentAddress: sameAsCurrentAddress
+            ? currentAddress.trim() || null
+            : permanentAddress.trim() || null,
           sameAsCurrentAddress,
         };
         if (pin) updatePayload.pin = pin;
@@ -367,7 +373,9 @@ export const StaffManagementPage: React.FC = () => {
           aadhaarFrontUrl: aadhaarFrontUrl || undefined,
           aadhaarBackUrl: aadhaarBackUrl || undefined,
           currentAddress: currentAddress.trim() || undefined,
-          permanentAddress: sameAsCurrentAddress ? (currentAddress.trim() || undefined) : (permanentAddress.trim() || undefined),
+          permanentAddress: sameAsCurrentAddress
+            ? currentAddress.trim() || undefined
+            : permanentAddress.trim() || undefined,
           sameAsCurrentAddress,
         };
 
@@ -477,7 +485,9 @@ export const StaffManagementPage: React.FC = () => {
       setEmployees((prev) => prev.filter((e) => e.id !== deletingEmployee.id));
       setIsDeleteModalOpen(false);
       setDeletingEmployee(null);
-      showNotice(resBody.message || `Staff member "${deletingEmployee.name}" deleted successfully.`);
+      showNotice(
+        resBody.message || `Staff member "${deletingEmployee.name}" deleted successfully.`,
+      );
     } catch (err: any) {
       setDeleteError(err.message || 'An error occurred during deletion.');
     } finally {
@@ -727,7 +737,13 @@ export const StaffManagementPage: React.FC = () => {
             }
           />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '16px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+              gap: '16px',
+            }}
+          >
             {filteredEmployees.map((emp) => {
               const isSelf = emp.id === currentEmployee?.id;
               const isManagerEditingOwner =
@@ -771,7 +787,11 @@ export const StaffManagementPage: React.FC = () => {
                             }}
                           >
                             <img
-                              src={emp.photoUrl.startsWith('/') ? `${API_URL.replace('/api', '')}${emp.photoUrl}` : emp.photoUrl}
+                              src={
+                                emp.photoUrl.startsWith('/')
+                                  ? `${API_URL.replace('/api', '')}${emp.photoUrl}`
+                                  : emp.photoUrl
+                              }
                               alt={emp.name}
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               onError={(e) => {
@@ -867,7 +887,11 @@ export const StaffManagementPage: React.FC = () => {
                       )}
                       {emp.currentAddress && (
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                          <MapPin size={13} color="#64748B" style={{ marginTop: '2px', flexShrink: 0 }} />
+                          <MapPin
+                            size={13}
+                            color="#64748B"
+                            style={{ marginTop: '2px', flexShrink: 0 }}
+                          />
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             {emp.currentAddress}
                           </span>
@@ -875,14 +899,34 @@ export const StaffManagementPage: React.FC = () => {
                       )}
 
                       {/* Documents / Verification indicator */}
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <div
+                        style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}
+                      >
                         {emp.photoUrl && (
-                          <span style={{ fontSize: '0.65rem', background: '#F0FDF4', color: '#166534', padding: '1px 6px', borderRadius: '4px', border: '1px solid #BBF7D0' }}>
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              background: '#F0FDF4',
+                              color: '#166534',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              border: '1px solid #BBF7D0',
+                            }}
+                          >
                             Photo Attached
                           </span>
                         )}
                         {(emp.aadhaarFrontUrl || emp.aadhaarBackUrl) && (
-                          <span style={{ fontSize: '0.65rem', background: '#EFF6FF', color: '#1E40AF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
+                          <span
+                            style={{
+                              fontSize: '0.65rem',
+                              background: '#EFF6FF',
+                              color: '#1E40AF',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              border: '1px solid #BFDBFE',
+                            }}
+                          >
                             Aadhaar Attached
                           </span>
                         )}
@@ -981,7 +1025,9 @@ export const StaffManagementPage: React.FC = () => {
             }}
           >
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}
+            >
               <div
                 style={{
                   width: '40px',
@@ -1017,7 +1063,9 @@ export const StaffManagementPage: React.FC = () => {
                 margin: '0 0 16px 0',
               }}
             >
-              Are you sure you want to permanently delete this staff member? This action cannot be undone. Their associated records may need to be retained where required for historical records or business operations.
+              Are you sure you want to permanently delete this staff member? This action cannot be
+              undone. Their associated records may need to be retained where required for historical
+              records or business operations.
             </p>
 
             {/* Target Staff Preview Badge */}
@@ -1199,7 +1247,10 @@ export const StaffManagementPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form
+              onSubmit={handleSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               {/* SECTION 1: Basic Information */}
               <div>
                 <label
@@ -1367,7 +1418,9 @@ export const StaffManagementPage: React.FC = () => {
               </div>
 
               {editingEmployee && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}
+                >
                   <input
                     type="checkbox"
                     id="edit-is-active"
@@ -1432,7 +1485,15 @@ export const StaffManagementPage: React.FC = () => {
                   >
                     {/* A. Staff Photograph */}
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: '#334155',
+                          marginBottom: '4px',
+                        }}
+                      >
                         Staff Photo (Optional)
                       </label>
                       <input
@@ -1447,15 +1508,38 @@ export const StaffManagementPage: React.FC = () => {
                       />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         {photoUrl ? (
-                          <div style={{ position: 'relative', width: '56px', height: '56px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              border: '1px solid #CBD5E1',
+                            }}
+                          >
                             <img
-                              src={photoUrl.startsWith('/') ? `${API_URL.replace('/api', '')}${photoUrl}` : photoUrl}
+                              src={
+                                photoUrl.startsWith('/')
+                                  ? `${API_URL.replace('/api', '')}${photoUrl}`
+                                  : photoUrl
+                              }
                               alt="Staff Photo Preview"
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                           </div>
                         ) : (
-                          <div style={{ width: '56px', height: '56px', borderRadius: '8px', background: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div
+                            style={{
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '8px',
+                              background: '#E2E8F0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
                             <Camera size={20} color="#94A3B8" />
                           </div>
                         )}
@@ -1475,7 +1559,11 @@ export const StaffManagementPage: React.FC = () => {
                               minHeight: '36px',
                             }}
                           >
-                            {uploadingDocType === 'photo' ? 'Uploading...' : photoUrl ? 'Replace Photo' : 'Select Photo'}
+                            {uploadingDocType === 'photo'
+                              ? 'Uploading...'
+                              : photoUrl
+                                ? 'Replace Photo'
+                                : 'Select Photo'}
                           </button>
                           {photoUrl && (
                             <button
@@ -1502,7 +1590,15 @@ export const StaffManagementPage: React.FC = () => {
 
                     {/* B. Passport-Size Photograph */}
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: '#334155',
+                          marginBottom: '4px',
+                        }}
+                      >
                         Passport-Size Photo (Optional)
                       </label>
                       <input
@@ -1517,15 +1613,38 @@ export const StaffManagementPage: React.FC = () => {
                       />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         {passportPhotoUrl ? (
-                          <div style={{ position: 'relative', width: '56px', height: '56px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #CBD5E1' }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              border: '1px solid #CBD5E1',
+                            }}
+                          >
                             <img
-                              src={passportPhotoUrl.startsWith('/') ? `${API_URL.replace('/api', '')}${passportPhotoUrl}` : passportPhotoUrl}
+                              src={
+                                passportPhotoUrl.startsWith('/')
+                                  ? `${API_URL.replace('/api', '')}${passportPhotoUrl}`
+                                  : passportPhotoUrl
+                              }
                               alt="Passport Photo Preview"
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                           </div>
                         ) : (
-                          <div style={{ width: '56px', height: '56px', borderRadius: '8px', background: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div
+                            style={{
+                              width: '56px',
+                              height: '56px',
+                              borderRadius: '8px',
+                              background: '#E2E8F0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
                             <Camera size={20} color="#94A3B8" />
                           </div>
                         )}
@@ -1545,7 +1664,11 @@ export const StaffManagementPage: React.FC = () => {
                               minHeight: '36px',
                             }}
                           >
-                            {uploadingDocType === 'passport' ? 'Uploading...' : passportPhotoUrl ? 'Replace' : 'Upload Passport Photo'}
+                            {uploadingDocType === 'passport'
+                              ? 'Uploading...'
+                              : passportPhotoUrl
+                                ? 'Replace'
+                                : 'Upload Passport Photo'}
                           </button>
                           {passportPhotoUrl && (
                             <button
@@ -1572,11 +1695,26 @@ export const StaffManagementPage: React.FC = () => {
 
                     {/* C. Aadhaar Card — Front */}
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '4px',
+                        }}
+                      >
                         <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
                           Aadhaar Card — Front (Optional)
                         </label>
-                        <span style={{ fontSize: '0.7rem', color: '#1E40AF', background: '#DBEAFE', padding: '1px 6px', borderRadius: '4px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            color: '#1E40AF',
+                            background: '#DBEAFE',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
                           Confidential Identity Document
                         </span>
                       </div>
@@ -1591,7 +1729,17 @@ export const StaffManagementPage: React.FC = () => {
                         style={{ display: 'none' }}
                       />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '56px', height: '40px', borderRadius: '6px', background: aadhaarFrontUrl ? '#DCFCE7' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div
+                          style={{
+                            width: '56px',
+                            height: '40px',
+                            borderRadius: '6px',
+                            background: aadhaarFrontUrl ? '#DCFCE7' : '#E2E8F0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
                           <FileText size={18} color={aadhaarFrontUrl ? '#16A34A' : '#94A3B8'} />
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1610,7 +1758,11 @@ export const StaffManagementPage: React.FC = () => {
                               minHeight: '36px',
                             }}
                           >
-                            {uploadingDocType === 'aadhaar-front' ? 'Uploading...' : aadhaarFrontUrl ? 'Replace File' : 'Upload Aadhaar Front'}
+                            {uploadingDocType === 'aadhaar-front'
+                              ? 'Uploading...'
+                              : aadhaarFrontUrl
+                                ? 'Replace File'
+                                : 'Upload Aadhaar Front'}
                           </button>
                           {aadhaarFrontUrl && (
                             <button
@@ -1637,11 +1789,26 @@ export const StaffManagementPage: React.FC = () => {
 
                     {/* D. Aadhaar Card — Back */}
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: '4px',
+                        }}
+                      >
                         <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
                           Aadhaar Card — Back (Optional)
                         </label>
-                        <span style={{ fontSize: '0.7rem', color: '#1E40AF', background: '#DBEAFE', padding: '1px 6px', borderRadius: '4px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            color: '#1E40AF',
+                            background: '#DBEAFE',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
                           Confidential Identity Document
                         </span>
                       </div>
@@ -1656,7 +1823,17 @@ export const StaffManagementPage: React.FC = () => {
                         style={{ display: 'none' }}
                       />
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '56px', height: '40px', borderRadius: '6px', background: aadhaarBackUrl ? '#DCFCE7' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div
+                          style={{
+                            width: '56px',
+                            height: '40px',
+                            borderRadius: '6px',
+                            background: aadhaarBackUrl ? '#DCFCE7' : '#E2E8F0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
                           <FileText size={18} color={aadhaarBackUrl ? '#16A34A' : '#94A3B8'} />
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1675,7 +1852,11 @@ export const StaffManagementPage: React.FC = () => {
                               minHeight: '36px',
                             }}
                           >
-                            {uploadingDocType === 'aadhaar-back' ? 'Uploading...' : aadhaarBackUrl ? 'Replace File' : 'Upload Aadhaar Back'}
+                            {uploadingDocType === 'aadhaar-back'
+                              ? 'Uploading...'
+                              : aadhaarBackUrl
+                                ? 'Replace File'
+                                : 'Upload Aadhaar Back'}
                           </button>
                           {aadhaarBackUrl && (
                             <button
@@ -1702,7 +1883,15 @@ export const StaffManagementPage: React.FC = () => {
 
                     {/* E. Current Residential Address */}
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      <label
+                        style={{
+                          display: 'block',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: '#334155',
+                          marginBottom: '4px',
+                        }}
+                      >
                         Current Residential Address (Optional)
                       </label>
                       <textarea
@@ -1726,7 +1915,14 @@ export const StaffManagementPage: React.FC = () => {
 
                     {/* F. Permanent Address */}
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '6px',
+                        }}
+                      >
                         <input
                           type="checkbox"
                           id="same-address-check"
@@ -1736,7 +1932,12 @@ export const StaffManagementPage: React.FC = () => {
                         />
                         <label
                           htmlFor="same-address-check"
-                          style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}
+                          style={{
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            color: '#334155',
+                            cursor: 'pointer',
+                          }}
                         >
                           Permanent address is the same as current address
                         </label>

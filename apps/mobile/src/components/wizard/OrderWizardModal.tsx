@@ -1070,9 +1070,19 @@ export function OrderWizardModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
-      <View style={[styles.safeContainer, { paddingTop: topInset, paddingBottom: insets.bottom, backgroundColor: colors.surface }]}>
+      <View
+        style={[
+          styles.safeContainer,
+          { paddingTop: topInset, paddingBottom: insets.bottom, backgroundColor: colors.surface },
+        ]}
+      >
         {/* Header Bar */}
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          ]}
+        >
           {currentStepIndex !== 5 ? (
             <TouchableOpacity
               style={styles.headerBackBtn}
@@ -1136,7 +1146,12 @@ export function OrderWizardModal({
                 }}
                 isConnected={isConnected}
               />
-              <View style={[styles.customerFooter, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+              <View
+                style={[
+                  styles.customerFooter,
+                  { backgroundColor: colors.surface, borderTopColor: colors.border },
+                ]}
+              >
                 <TouchableOpacity
                   style={[
                     styles.customerNextBtn,

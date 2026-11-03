@@ -143,11 +143,7 @@ describe('Phase T4 & Business ID Rework: Tag Template & Layout Configuration Con
         });
       });
 
-      assert.deepStrictEqual(lines, [
-        'DC | PANT | 1/3',
-        'DC | PANT | 2/3',
-        'DC | PANT | 3/3',
-      ]);
+      assert.deepStrictEqual(lines, ['DC | PANT | 1/3', 'DC | PANT | 2/3', 'DC | PANT | 3/3']);
     });
 
     it('Case 4: Shirts and pants in the same order -> each category gets independent numbering', () => {
@@ -182,7 +178,13 @@ describe('Phase T4 & Business ID Rework: Tag Template & Layout Configuration Con
           const current = (counters.get(key) || 0) + 1;
           counters.set(key, current);
           const piece = formatPieceNumber(current, total);
-          generatedTags.push(formatGarmentTagLine({ serviceShortcut: svc, garmentCategory: cat, pieceNumber: piece }));
+          generatedTags.push(
+            formatGarmentTagLine({
+              serviceShortcut: svc,
+              garmentCategory: cat,
+              pieceNumber: piece,
+            }),
+          );
         }
       }
 
@@ -227,11 +229,13 @@ describe('Phase T4 & Business ID Rework: Tag Template & Layout Configuration Con
         for (let i = 1; i <= item.quantity; i++) {
           const current = (counters.get(key) || 0) + 1;
           counters.set(key, current);
-          tags.push(formatGarmentTagLine({
-            serviceShortcut: svc,
-            garmentCategory: cat,
-            pieceNumber: formatPieceNumber(current, total),
-          }));
+          tags.push(
+            formatGarmentTagLine({
+              serviceShortcut: svc,
+              garmentCategory: cat,
+              pieceNumber: formatPieceNumber(current, total),
+            }),
+          );
         }
       }
 
@@ -285,7 +289,10 @@ describe('Phase T4 & Business ID Rework: Tag Template & Layout Configuration Con
         'pieceNumber',
         'dueDate',
       ]);
-      assert.strictEqual(CANONICAL_7FIELD_TAG_DESIGN.fields.every((f) => f.enabled), true);
+      assert.strictEqual(
+        CANONICAL_7FIELD_TAG_DESIGN.fields.every((f) => f.enabled),
+        true,
+      );
     });
 
     it('Case 10: sanitizeTagDesign guarantees all 7 canonical fields are present and safe', () => {
@@ -323,10 +330,7 @@ describe('Phase T4 & Business ID Rework: Tag Template & Layout Configuration Con
         'DC | 1/5',
       );
       // Category only
-      assert.strictEqual(
-        formatGarmentTagLine({ garmentCategory: 'SHIRT' }),
-        'SHIRT',
-      );
+      assert.strictEqual(formatGarmentTagLine({ garmentCategory: 'SHIRT' }), 'SHIRT');
     });
 
     it('Case 12: Jacketed orders with Steam Iron resolve to SI | JACKET | 1/2', () => {
@@ -334,7 +338,11 @@ describe('Phase T4 & Business ID Rework: Tag Template & Layout Configuration Con
       const cat = resolveGarmentCategory('MEN', 'Jackets');
       const piece = formatPieceNumber(1, 2);
       assert.strictEqual(
-        formatGarmentTagLine({ serviceShortcut: shortcut, garmentCategory: cat, pieceNumber: piece }),
+        formatGarmentTagLine({
+          serviceShortcut: shortcut,
+          garmentCategory: cat,
+          pieceNumber: piece,
+        }),
         'SI | JACKET | 1/2',
       );
     });

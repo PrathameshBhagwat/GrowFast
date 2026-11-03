@@ -325,10 +325,7 @@ describe('GrowFast Mobile — Order Creation Workflow Redesign (5 Steps)', () =>
 
     it('5.5 Enforces canonical deriveOrderStatus on completed and confirmed orders', () => {
       const status = deriveOrderStatus({
-        items: [
-          { status: ItemStatus.RECEIVED },
-          { status: ItemStatus.RECEIVED },
-        ],
+        items: [{ status: ItemStatus.RECEIVED }, { status: ItemStatus.RECEIVED }],
       });
 
       assert.equal(status, OrderStatus.RECEIVED);

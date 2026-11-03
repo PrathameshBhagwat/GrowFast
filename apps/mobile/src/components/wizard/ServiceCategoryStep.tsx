@@ -80,7 +80,13 @@ function ServiceCardIcon({ name }: { name: string }) {
     // Clean tee with water droplet matching Screenshot 5 right phone
     return (
       <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-        <WizardIcon name="tshirt-crew-outline" family="mci" size={22} color={iconColor} fallbackText="👕" />
+        <WizardIcon
+          name="tshirt-crew-outline"
+          family="mci"
+          size={22}
+          color={iconColor}
+          fallbackText="👕"
+        />
         <View style={{ position: 'absolute', bottom: -1, right: -3 }}>
           <WizardIcon name="water" family="mci" size={13} color={iconColor} fallbackText="💧" />
         </View>
@@ -90,32 +96,76 @@ function ServiceCardIcon({ name }: { name: string }) {
 
   if (lower.includes('fold')) {
     // Stack of folded laundry matching Screenshot 5 right phone
-    return <WizardIcon name="layers-triple-outline" family="mci" size={26} color={iconColor} fallbackText="📦" />;
+    return (
+      <WizardIcon
+        name="layers-triple-outline"
+        family="mci"
+        size={26}
+        color={iconColor}
+        fallbackText="📦"
+      />
+    );
   }
 
   if (lower.includes('premium')) {
     // Award ribbon / medal matching Screenshot 5 right phone
-    return <WizardIcon name="medal-outline" family="mci" size={26} color={iconColor} fallbackText="🎖️" />;
+    return (
+      <WizardIcon name="medal-outline" family="mci" size={26} color={iconColor} fallbackText="🎖️" />
+    );
   }
 
   if (lower.includes('woolen')) {
     // Woolen knit sweater / garment
-    return <WizardIcon name="tshirt-crew-outline" family="mci" size={26} color={iconColor} fallbackText="🧶" />;
+    return (
+      <WizardIcon
+        name="tshirt-crew-outline"
+        family="mci"
+        size={26}
+        color={iconColor}
+        fallbackText="🧶"
+      />
+    );
   }
 
   if (lower.includes('dry clean')) {
-    return <WizardIcon name="washing-machine" family="mci" size={26} color={iconColor} fallbackText="🧺" />;
+    return (
+      <WizardIcon
+        name="washing-machine"
+        family="mci"
+        size={26}
+        color={iconColor}
+        fallbackText="🧺"
+      />
+    );
   }
 
   if (lower.includes('shoe')) {
-    return <WizardIcon name="shoe-sneaker" family="mci" size={26} color={iconColor} fallbackText="👟" />;
+    return (
+      <WizardIcon name="shoe-sneaker" family="mci" size={26} color={iconColor} fallbackText="👟" />
+    );
   }
 
   if (lower.includes('starch')) {
-    return <WizardIcon name="tshirt-crew-outline" family="mci" size={26} color={iconColor} fallbackText="👔" />;
+    return (
+      <WizardIcon
+        name="tshirt-crew-outline"
+        family="mci"
+        size={26}
+        color={iconColor}
+        fallbackText="👔"
+      />
+    );
   }
 
-  return <WizardIcon name="sparkles-outline" family="ionicons" size={24} color={iconColor} fallbackText="✨" />;
+  return (
+    <WizardIcon
+      name="sparkles-outline"
+      family="ionicons"
+      size={24}
+      color={iconColor}
+      fallbackText="✨"
+    />
+  );
 }
 
 export function ServiceCategoryStep({
