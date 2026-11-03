@@ -15,8 +15,10 @@ datasource db {
 model Store {
   id                      String   @id @default(cuid())
   name                    String
+  code                    String?  @unique
   address                 String?
   phone                   String?
+  email                   String?
   isActive                Boolean  @default(true)
   expressSurchargePercent Float?   @map("express_surcharge_percent")
   topUpServices           Json?    @map("top_up_services")
@@ -24,6 +26,7 @@ model Store {
   updatedAt               DateTime @updatedAt
 
   employees            Employee[]
+  customers            Customer[]
   orders               Order[]
   garmentCatalogs      GarmentCatalog[]
   serviceTypes         ServiceType[]
@@ -84,7 +87,7 @@ enum Role {
 model Customer {
   id                 String         @id @default(cuid())
   name               String
-  phone              String         @unique
+  phone              String
   email              String?
   address            String?
   pincode            String?
@@ -93,11 +96,15 @@ model Customer {
   discountPercent    Float          @default(0)
   preferences        Json? // fragrance, starch, fold pref, etc.
   registrationSource String         @default("WALK_IN") @map("registration_source")
+  storeId            String         @map("store_id")
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
+  store  Store   @relation(fields: [storeId], references: [id])
   orders Order[]
 
+  @@unique([storeId, phone])
+  @@index([storeId])
   @@index([customerCode])
   @@index([phone])
   @@index([name])

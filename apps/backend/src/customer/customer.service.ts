@@ -82,13 +82,19 @@ export class CustomerService {
     }
 
     // ── 6. Duplicate Contact Check ────────────────────────────────────
+    const storeId = dto.storeId || 'store-kp-001';
     const existing = await this.prisma.customer.findUnique({
-      where: { phone: cleanPhoneDigits },
+      where: {
+        storeId_phone: {
+          storeId,
+          phone: cleanPhoneDigits,
+        },
+      },
     });
 
     if (existing) {
       throw new ConflictException(
-        `Customer with phone number '${cleanPhoneDigits}' already exists.`,
+        `Customer with phone number '${cleanPhoneDigits}' already exists in this branch.`,
       );
     }
 
@@ -114,6 +120,7 @@ export class CustomerService {
           discountPercent,
           preferences: undefined,
           registrationSource: 'WALK_IN',
+          storeId,
         },
       });
 
@@ -262,10 +269,15 @@ export class CustomerService {
         throw new BadRequestException('Invalid WhatsApp number format. Must contain 10-15 digits.');
       }
 
-      // Duplicate contact check if phone number is changing
+      // Duplicate contact check if phone number is changing within the branch
       if (cleanPhoneDigits !== existingCustomer.phone) {
         const phoneConflict = await this.prisma.customer.findUnique({
-          where: { phone: cleanPhoneDigits },
+          where: {
+            storeId_phone: {
+              storeId: existingCustomer.storeId,
+              phone: cleanPhoneDigits,
+            },
+          },
         });
 
         if (phoneConflict) {
@@ -356,6 +368,7 @@ export class CustomerService {
       discountPercent: c.discountPercent ?? 0,
       preferences: c.preferences && typeof c.preferences === 'object' ? c.preferences : null,
       registrationSource: c.registrationSource ?? 'WALK_IN',
+      storeId: c.storeId || 'store-kp-001',
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
       updatedAt: c.updatedAt instanceof Date ? c.updatedAt.toISOString() : String(c.updatedAt),
     };

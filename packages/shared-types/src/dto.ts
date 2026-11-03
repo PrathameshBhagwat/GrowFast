@@ -114,6 +114,7 @@ export interface CustomerDTO {
   discountPercent: number;
   preferences: Record<string, string> | null;
   registrationSource: string;
+  storeId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -125,6 +126,7 @@ export interface CreateCustomerRequest {
   pincode?: string;
   membership?: MembershipTier;
   discountPercent?: number;
+  storeId?: string;
 }
 
 export interface UpdateCustomerRequest {

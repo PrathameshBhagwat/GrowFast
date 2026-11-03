@@ -24,15 +24,39 @@ async function main() {
   // ─── Store ──────────────────────────────────────────────────────
   const store = await prisma.store.upsert({
     where: { id: 'store-kp-001' },
-    update: {},
+    update: {
+      name: 'Charholi Branch',
+      code: 'CHARHOLI',
+      address: 'Shop 4, Lane 7, Charholi, Pune 412105',
+      phone: '+91 20 2615 0000',
+    },
     create: {
       id: 'store-kp-001',
-      name: 'Koregaon Park Branch',
-      address: 'Shop 4, Lane 7, Koregaon Park, Pune 411001',
+      name: 'Charholi Branch',
+      code: 'CHARHOLI',
+      address: 'Shop 4, Lane 7, Charholi, Pune 412105',
       phone: '+91 20 2615 0000',
     },
   });
   console.log(`✅ Store: ${store.name}`);
+
+  const storeAlephata = await prisma.store.upsert({
+    where: { id: 'store-kp-002' },
+    update: {
+      name: 'Alephata Branch',
+      code: 'ALEPHATA',
+      address: 'Shop 10, Pune-Nashik Highway, Alephata 412411',
+      phone: '+91 20 2615 9999',
+    },
+    create: {
+      id: 'store-kp-002',
+      name: 'Alephata Branch',
+      code: 'ALEPHATA',
+      address: 'Shop 10, Pune-Nashik Highway, Alephata 412411',
+      phone: '+91 20 2615 9999',
+    },
+  });
+  console.log(`✅ Store: ${storeAlephata.name}`);
 
   // ─── Employees ────────────────────────────────────────────────
   // ⚠️ DEVELOPMENT-ONLY PINs — do NOT use in production
@@ -798,6 +822,7 @@ async function main() {
         pincode: c.pincode ?? null,
         membership: c.membership ?? 'NONE',
         discountPercent: c.discountPercent ?? 0,
+        storeId: store.id,
       },
     });
   }
