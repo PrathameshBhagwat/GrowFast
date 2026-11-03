@@ -172,6 +172,12 @@ export interface OrderSummaryDTO {
   cancelledAmount: number;
   payableAmount: number;
   createdByName?: string | null;
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedByName?: string | null;
+  archivedReason?: string | null;
+  isOverdue?: boolean;
+  daysOverdue?: number;
 }
 
 export interface OrderDetailDTO extends OrderSummaryDTO {
@@ -286,6 +292,53 @@ export interface OrderPickupRequest {
     reference?: string;
   };
   notes?: string;
+}
+
+// ─── Overdue Cleanup DTOs ──────────────────────────────────────────
+
+export interface OverdueCleanupOrderDTO {
+  id: string;
+  orderNumber: string;
+  customerId: string;
+  customerName: string;
+  customerPhone?: string | null;
+  orderDate: string;
+  effectiveDueDate: string;
+  daysOverdue: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  totalAmount: number;
+  amountPaid: number;
+  amountDue: number;
+  itemCount: number;
+  itemsSummary?: string;
+  hasPayments: boolean;
+  paymentCount: number;
+  hasPhotos: boolean;
+  photoCount: number;
+  hasDeliveryRecords: boolean;
+  deliveryRecordCount: number;
+  hasAdjustments: boolean;
+  isArchived: boolean;
+}
+
+export interface OverdueCleanupSummaryResponseDTO {
+  eligibleOrders: OverdueCleanupOrderDTO[];
+  totalEligibleCount: number;
+  thresholdDays: number;
+  referenceDate: string;
+}
+
+export interface ArchiveOrdersRequest {
+  orderIds: string[];
+  reason?: string;
+}
+
+export interface ArchiveOrdersResponseDTO {
+  success: boolean;
+  archivedCount: number;
+  orderIds: string[];
+  message: string;
 }
 
 // ─── Payment DTOs ───────────────────────────────────────────────────

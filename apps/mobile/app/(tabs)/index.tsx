@@ -101,7 +101,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const isCompact = screenWidth < 380;
+  const isCompact = screenWidth < 415;
   const isVeryNarrow = screenWidth < 340;
   const { isConnected } = useNetworkStatus();
   const { user: session, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
@@ -505,7 +505,7 @@ export default function HomeScreen() {
                     ? 'Checking orders requiring attention today...'
                     : dueOrdersError
                       ? 'Could not load today’s due orders. Tap to retry.'
-                      : `${dueTotalCount ?? 0} orders requiring attention today.\nClick below to inspect #`}
+                      : `${dueTotalCount ?? 0} orders requiring attention today.\nClick below to inspect.`}
                 </Text>
               </View>
 
@@ -581,7 +581,7 @@ export default function HomeScreen() {
             >
               <Icon
                 name="search-outline"
-                size={isCompact ? 16 : 17}
+                size={isCompact ? 15 : 17}
                 color={isDark ? '#60A5FA' : '#1765F5'}
               />
               <Text
@@ -593,7 +593,7 @@ export default function HomeScreen() {
                 numberOfLines={1}
                 ellipsizeMode="tail"
                 adjustsFontSizeToFit={true}
-                minimumFontScale={0.8}
+                minimumFontScale={0.75}
               >
                 Find / Edit Order
               </Text>
@@ -617,7 +617,7 @@ export default function HomeScreen() {
                 numberOfLines={1}
                 ellipsizeMode="tail"
                 adjustsFontSizeToFit={true}
-                minimumFontScale={0.8}
+                minimumFontScale={0.75}
               >
                 Add New Customer
               </Text>
@@ -1601,7 +1601,9 @@ const styles = StyleSheet.create({
 
   // Two Primary Action Buttons
   primaryActionsRow: {
+    width: '100%',
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     marginTop: 14,
   },
@@ -1614,6 +1616,7 @@ const styles = StyleSheet.create({
   },
   secondaryActionBtn: {
     flex: 1,
+    minWidth: 0,
     minHeight: 44,
     height: 44,
     borderRadius: 12,
@@ -1623,16 +1626,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 4,
+    paddingHorizontal: 6,
   },
   secondaryActionBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: '#1765F5',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   primaryActionBtn: {
     flex: 1,
+    minWidth: 0,
     minHeight: 44,
     height: 44,
     borderRadius: 12,
@@ -1640,8 +1646,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 4,
+    paddingHorizontal: 6,
     shadowColor: '#1765F5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1649,13 +1655,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   primaryActionBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: '#FFFFFF',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   actionBtnCompact: {
-    paddingHorizontal: 6,
-    gap: 4,
+    paddingHorizontal: 5,
+    gap: 3,
   },
   actionBtnTextCompact: {
     fontSize: 12,

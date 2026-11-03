@@ -31,8 +31,9 @@ import {
 } from '../../src/db/drafts';
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
+import { OverdueCleanupModal } from '../../src/components/OverdueCleanupModal';
 import { apiClient } from '../../src/api/client';
-import { OrderSummaryDTO } from '@growfast/shared-types';
+import { OrderSummaryDTO, isOrderOverdue, getOverdueDays } from '@growfast/shared-types';
 
 const Icon = Ionicons as unknown as React.ComponentType<{
   name: string;
@@ -149,7 +150,7 @@ const REFERENCE_ORDERS: OrderSummaryDTO[] = [
   },
 ];
 
-type FilterCategory = 'ALL' | 'IN_PROCESS' | 'READY' | 'DELIVERED' | 'DRAFTS';
+type FilterCategory = 'ALL' | 'IN_PROCESS' | 'READY' | 'OVERDUE' | 'DELIVERED' | 'DRAFTS';
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -176,6 +177,7 @@ export default function OrdersScreen() {
   const [selectedDraft, setSelectedDraft] = useState<OrderDraft | null>(null);
   const [orderDetailVisible, setOrderDetailVisible] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [cleanupReviewVisible, setCleanupReviewVisible] = useState(false);
 
   // Functional Filters State (Task 2)
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -221,6 +223,8 @@ export default function OrdersScreen() {
     // Keep horizontal quick pills synced
     if (tempStatus === 'ALL') {
       setActiveFilter('ALL');
+    } else if (tempStatus === 'OVERDUE') {
+      setActiveFilter('OVERDUE');
     } else if (tempStatus === 'PROCESSING' || tempStatus === 'RECEIVED') {
       setActiveFilter('IN_PROCESS');
     } else if (tempStatus === 'READY') {
@@ -269,11 +273,21 @@ export default function OrdersScreen() {
 
       if (isConnected) {
         let statusParam: string | undefined = undefined;
-        if (filterStatus !== 'ALL') {
+        let isOverdueParam: boolean | undefined = undefined;
+
+        if (filterStatus === 'OVERDUE' || activeFilter === 'OVERDUE') {
+          isOverdueParam = true;
+        } else if (filterStatus !== 'ALL') {
           statusParam = filterStatus;
-        } else if (activeFilter === 'READY') statusParam = 'READY';
-        else if (activeFilter === 'DELIVERED') statusParam = 'DELIVERED';
-        else if (activeFilter === 'IN_PROCESS') statusParam = 'PROCESSING';
+        } else if (activeFilter === 'READY') {
+          statusParam = 'READY';
+          isOverdueParam = false;
+        } else if (activeFilter === 'DELIVERED') {
+          statusParam = 'DELIVERED';
+        } else if (activeFilter === 'IN_PROCESS') {
+          statusParam = 'PROCESSING';
+          isOverdueParam = false;
+        }
 
         let paymentParam: string | undefined = undefined;
         if (filterPaymentStatus !== 'ALL') {
@@ -283,6 +297,7 @@ export default function OrdersScreen() {
         const resp = await apiClient.orders.list({
           search: debouncedSearch || undefined,
           status: statusParam,
+          isOverdue: isOverdueParam,
           paymentStatus: paymentParam,
           pageSize: 50,
         });
@@ -291,7 +306,7 @@ export default function OrdersScreen() {
 
         if (resp && resp.data && resp.data.length > 0) {
           setServerOrders(resp.data);
-        } else if (!debouncedSearch && !statusParam && !paymentParam) {
+        } else if (!debouncedSearch && !statusParam && !paymentParam && isOverdueParam === undefined) {
           setServerOrders(REFERENCE_ORDERS);
         } else {
           setServerOrders([]);
@@ -375,24 +390,32 @@ export default function OrdersScreen() {
   };
 
   const getStatusBadgeStyle = (status: string, dueDateStr?: string) => {
-    const isOverdue =
-      dueDateStr && new Date(dueDateStr).getTime() < Date.now() && status !== 'DELIVERED';
+    const isOverdue = isOrderOverdue({ effectiveDueDate: dueDateStr, status });
 
-    if (isOverdue && (status === 'RECEIVED' || status === 'PROCESSING')) {
-      return { label: 'Overdue', bg: '#fee2e2', text: '#b91c1c' };
+    if (isOverdue) {
+      const days = getOverdueDays(dueDateStr);
+      const daysText = days === 1 ? '1 day' : `${days} days`;
+      return {
+        label: `Overdue by ${daysText}`,
+        shortLabel: 'Overdue',
+        bg: '#fee2e2',
+        text: '#b91c1c',
+        isOverdue: true,
+        daysOverdue: days,
+      };
     }
 
     switch (status) {
       case 'DELIVERED':
-        return { label: 'Delivered', bg: '#dcfce7', text: '#15803d' };
+        return { label: 'Delivered', bg: '#dcfce7', text: '#15803d', isOverdue: false, daysOverdue: 0 };
       case 'READY':
-        return { label: 'Ready', bg: '#e0f2fe', text: '#0284c7' };
+        return { label: 'Ready', bg: '#e0f2fe', text: '#0284c7', isOverdue: false, daysOverdue: 0 };
       case 'OUT_FOR_DELIVERY':
-        return { label: 'Out for Delivery', bg: '#ede9fe', text: '#6d28d9' };
+        return { label: 'Out for Delivery', bg: '#ede9fe', text: '#6d28d9', isOverdue: false, daysOverdue: 0 };
       case 'PROCESSING':
       case 'RECEIVED':
       default:
-        return { label: 'In Process', bg: '#fef3c7', text: '#b45309' };
+        return { label: 'In Process', bg: '#fef3c7', text: '#b45309', isOverdue: false, daysOverdue: 0 };
     }
   };
 
@@ -410,8 +433,10 @@ export default function OrdersScreen() {
         if (!matchesNum && !matchesCust && !matchesPhone) return false;
       }
 
-      // 2. Status filter
-      if (filterStatus !== 'ALL') {
+      // 2. Status & Overdue filter
+      if (filterStatus === 'OVERDUE' || activeFilter === 'OVERDUE') {
+        if (!isOrderOverdue(ord)) return false;
+      } else if (filterStatus !== 'ALL') {
         if (filterStatus === 'PROCESSING') {
           if (ord.status !== 'PROCESSING' && ord.status !== 'RECEIVED') return false;
         } else if (ord.status !== filterStatus) {
@@ -419,8 +444,12 @@ export default function OrdersScreen() {
         }
       } else {
         if (activeFilter === 'IN_PROCESS') {
+          // Orders that are overdue must NOT appear under "In Process"
+          if (isOrderOverdue(ord)) return false;
           if (ord.status !== 'PROCESSING' && ord.status !== 'RECEIVED') return false;
         } else if (activeFilter === 'READY') {
+          // Orders that are overdue must NOT appear under "Ready"
+          if (isOrderOverdue(ord)) return false;
           if (ord.status !== 'READY') return false;
         } else if (activeFilter === 'DELIVERED') {
           if (ord.status !== 'DELIVERED') return false;
@@ -602,6 +631,8 @@ export default function OrdersScreen() {
                 activeFilter === 'READY' && [styles.filterPillActive, { backgroundColor: colors.primary }],
               ]}
               onPress={() => setActiveFilter('READY')}
+              accessibilityRole="button"
+              accessibilityLabel="Ready Orders Filter"
             >
               <Text
                 style={[
@@ -617,10 +648,33 @@ export default function OrdersScreen() {
             <TouchableOpacity
               style={[
                 styles.filterPill,
+                { backgroundColor: isDark ? colors.surfaceSecondary : '#fef2f2' },
+                activeFilter === 'OVERDUE' && [styles.filterPillActive, { backgroundColor: '#dc2626' }],
+              ]}
+              onPress={() => setActiveFilter('OVERDUE')}
+              accessibilityRole="button"
+              accessibilityLabel="Overdue Orders Filter"
+            >
+              <Text
+                style={[
+                  styles.filterPillText,
+                  { color: activeFilter === 'OVERDUE' ? '#FFFFFF' : '#b91c1c', fontWeight: '700' },
+                  activeFilter === 'OVERDUE' && styles.filterPillTextActive,
+                ]}
+              >
+                Overdue
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.filterPill,
                 { backgroundColor: isDark ? colors.surfaceSecondary : '#f1f5f9' },
                 activeFilter === 'DELIVERED' && [styles.filterPillActive, { backgroundColor: colors.primary }],
               ]}
               onPress={() => setActiveFilter('DELIVERED')}
+              accessibilityRole="button"
+              accessibilityLabel="Delivered Orders Filter"
             >
               <Text
                 style={[
@@ -750,9 +804,44 @@ export default function OrdersScreen() {
                 colors={[colors.primary]}
               />
             }
+            ListHeaderComponent={
+              activeFilter === 'OVERDUE' && session?.role === 'OWNER' ? (
+                <View
+                  style={[
+                    styles.overdueOwnerBanner,
+                    {
+                      backgroundColor: isDark ? '#451a03' : '#fef2f2',
+                      borderColor: isDark ? '#7f1d1d' : '#fca5a5',
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <Icon name="archive-outline" size={16} color="#b91c1c" />
+                      <Text style={[styles.overdueOwnerBannerTitle, { color: '#991b1b' }]}>
+                        90-Day Cleanup Workflow
+                      </Text>
+                    </View>
+                    <Text style={[styles.overdueOwnerBannerSubtitle, { color: '#b91c1c' }]}>
+                      Review long-overdue uncollected orders and archive them.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.overdueOwnerBannerBtn, { backgroundColor: '#dc2626' }]}
+                    onPress={() => setCleanupReviewVisible(true)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Review 90-Day Overdue Orders"
+                  >
+                    <Text style={styles.overdueOwnerBannerBtnText}>Review</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null
+            }
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
+              const overdue = isOrderOverdue(item);
               const badge = getStatusBadgeStyle(item.status, item.effectiveDueDate);
               const orderNumDisplay = item.orderNumber.startsWith('GF-')
                 ? `#${item.orderNumber}`
@@ -765,17 +854,28 @@ export default function OrdersScreen() {
                   style={[
                     styles.orderCard,
                     { backgroundColor: colors.surface, borderColor: colors.border },
+                    overdue && { borderColor: isDark ? '#7f1d1d' : '#fecaca', borderWidth: 1 },
                   ]}
                   onPress={() => handleOpenOrderDetail(item.id)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Order ${orderNumDisplay}, ${item.customerName}, ${badge.label}`}
                 >
                   <View
                     style={[
                       styles.garmentIconBox,
-                      { backgroundColor: isDark ? colors.surfaceSecondary : '#eff6ff' },
+                      {
+                        backgroundColor: overdue
+                          ? (isDark ? '#451a03' : '#fee2e2')
+                          : (isDark ? colors.surfaceSecondary : '#eff6ff'),
+                      },
                     ]}
                   >
-                    <Icon name="shirt-outline" size={20} color={colors.primary} />
+                    <Icon
+                      name={overdue ? 'alert-circle-outline' : 'shirt-outline'}
+                      size={20}
+                      color={overdue ? '#dc2626' : colors.primary}
+                    />
                   </View>
                   <View style={styles.orderCenterDetails}>
                     <Text style={[styles.orderNumberText, { color: colors.textPrimary }]}>
@@ -784,18 +884,40 @@ export default function OrdersScreen() {
                     <Text style={[styles.orderCustomerText, { color: colors.textSecondary }]}>
                       {item.customerName || (item as any).customer?.name || 'Customer'}
                     </Text>
-                    <Text style={[styles.orderSubDetails, { color: colors.textMuted }]}>
-                      {formatDate(item.orderDate)}
-                    </Text>
+                    <View style={styles.orderDateRow}>
+                      <Text style={[styles.orderSubDetails, { color: colors.textMuted }]}>
+                        {formatDate(item.orderDate)}
+                      </Text>
+                      {item.effectiveDueDate ? (
+                        <Text
+                          style={[
+                            styles.orderSubDetails,
+                            {
+                              color: overdue ? '#dc2626' : colors.textMuted,
+                              fontWeight: overdue ? '600' : '400',
+                            },
+                          ]}
+                        >
+                          • Due {formatDate(item.effectiveDueDate)}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
                   <View style={styles.orderRightGroup}>
                     <View style={[styles.statusChip, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.statusChipText, { color: badge.text }]}>
+                      <Text style={[styles.statusChipText, { color: badge.text, fontWeight: '700' }]}>
                         {badge.label}
                       </Text>
                     </View>
-                    <Text style={[styles.orderTotalText, { color: colors.textPrimary }]}>
-                      ₹ {item.totalAmount.toFixed(0)}
+                    <Text
+                      style={[
+                        styles.orderTotalText,
+                        { color: overdue && item.amountDue > 0 ? '#dc2626' : colors.textPrimary },
+                      ]}
+                    >
+                      {overdue && item.amountDue > 0
+                        ? `Due ₹${item.amountDue.toFixed(0)}`
+                        : `₹ ${item.totalAmount.toFixed(0)}`}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -847,6 +969,13 @@ export default function OrdersScreen() {
           onOrderUpdated={loadData}
         />
 
+        {/* 90-Day Overdue Cleanup Modal integration (Owner alert & review) */}
+        <OverdueCleanupModal
+          forceOpenReview={cleanupReviewVisible}
+          onCloseReview={() => setCleanupReviewVisible(false)}
+          onCleanupCompleted={() => loadData()}
+        />
+
         {/* Functional Filter Modal (Task 2) */}
         <Modal
           visible={filterModalVisible}
@@ -881,6 +1010,7 @@ export default function OrdersScreen() {
                   <View style={styles.chipsContainer}>
                     {[
                       { key: 'ALL', label: 'All Statuses' },
+                      { key: 'OVERDUE', label: 'Overdue' },
                       { key: 'RECEIVED', label: 'Received' },
                       { key: 'PROCESSING', label: 'In Process' },
                       { key: 'READY', label: 'Ready' },
@@ -1439,5 +1569,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  orderDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  overdueOwnerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  overdueOwnerBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  overdueOwnerBannerSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  overdueOwnerBannerBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overdueOwnerBannerBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

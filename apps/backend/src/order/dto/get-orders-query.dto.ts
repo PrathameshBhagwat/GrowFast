@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { OrderStatus, PaymentStatus } from '@growfast/shared-types';
 
 export class GetOrdersQueryDto {
@@ -18,6 +18,20 @@ export class GetOrdersQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true || value === '1') return true;
+    if (value === 'false' || value === false || value === '0') return false;
+    return undefined;
+  })
+  @IsBoolean()
+  isOverdue?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true || value === '1')
+  @IsBoolean()
+  includeArchived?: boolean;
 
   @IsOptional()
   @Type(() => Number)

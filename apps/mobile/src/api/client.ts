@@ -19,6 +19,9 @@ import {
   DashboardSummaryDTO,
   NotificationDTO,
   OrderPhotoDTO,
+  OverdueCleanupSummaryResponseDTO,
+  ArchiveOrdersRequest,
+  ArchiveOrdersResponseDTO,
 } from '@growfast/shared-types';
 import { getAuthToken, clearUserSession } from '../storage/secure-store';
 
@@ -623,6 +626,8 @@ export const apiClient = {
       page?: number;
       limit?: number;
       pageSize?: number;
+      isOverdue?: boolean;
+      includeArchived?: boolean;
     }): Promise<PaginatedResponse<OrderSummaryDTO>> => {
       const searchParams = new URLSearchParams();
       if (params?.search) searchParams.append('search', params.search);
@@ -630,12 +635,43 @@ export const apiClient = {
       if (params?.customerId) searchParams.append('customerId', params.customerId);
       if (params?.paymentStatus) searchParams.append('paymentStatus', params.paymentStatus);
       if (params?.page) searchParams.append('page', String(params.page));
+      if (params?.isOverdue !== undefined) searchParams.append('isOverdue', String(params.isOverdue));
+      if (params?.includeArchived !== undefined) searchParams.append('includeArchived', String(params.includeArchived));
       const size = params?.pageSize ?? params?.limit;
       if (size) {
         searchParams.append('pageSize', String(size));
       }
       const qs = searchParams.toString();
       return await request<PaginatedResponse<OrderSummaryDTO>>(`/api/orders${qs ? `?${qs}` : ''}`);
+    },
+
+    getCleanupEligibleOrders: async (): Promise<OverdueCleanupSummaryResponseDTO> => {
+      const res = await request<{ success: boolean; data: OverdueCleanupSummaryResponseDTO }>(
+        '/api/orders/cleanup/eligible',
+      );
+      return res.data;
+    },
+
+    archiveOverdueOrders: async (
+      payload: ArchiveOrdersRequest,
+    ): Promise<ArchiveOrdersResponseDTO> => {
+      return await request<ArchiveOrdersResponseDTO>('/api/orders/cleanup/archive', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    getArchivedOrders: async (params?: {
+      search?: string;
+      page?: number;
+      pageSize?: number;
+    }): Promise<PaginatedResponse<OrderSummaryDTO>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.search) searchParams.append('search', params.search);
+      if (params?.page) searchParams.append('page', String(params.page));
+      if (params?.pageSize) searchParams.append('pageSize', String(params.pageSize));
+      const qs = searchParams.toString();
+      return await request<PaginatedResponse<OrderSummaryDTO>>(`/api/orders/archived${qs ? `?${qs}` : ''}`);
     },
 
     dueToday: async (options?: {

@@ -125,3 +125,73 @@ export const ORDER_STATUS_COLORS: Record<
   [OrderStatus.DELIVERED]: { bg: '#F0FDF4', text: '#166534', border: '#BBF7D0' },
   [OrderStatus.CANCELLED]: { bg: '#FEF2F2', text: '#991B1B', border: '#FECACA' },
 };
+
+/**
+ * Canonical helper to determine if an order is overdue.
+ *
+ * Rules:
+ * 1. Must have a valid effective due date.
+ * 2. Order status cannot be DELIVERED or CANCELLED.
+ * 3. Due date must be strictly before referenceDate (defaults to now).
+ */
+export function isOrderOverdue(
+  order: { effectiveDueDate?: Date | string | null; status?: OrderStatus | string },
+  referenceDate: Date = new Date()
+): boolean {
+  if (!order || !order.effectiveDueDate) return false;
+  const statusStr = String(order.status || '');
+  if (statusStr === OrderStatus.DELIVERED || statusStr === OrderStatus.CANCELLED) {
+    return false;
+  }
+  const dueDate = new Date(order.effectiveDueDate);
+  if (isNaN(dueDate.getTime())) return false;
+  return dueDate.getTime() < referenceDate.getTime();
+}
+
+/**
+ * Calculates how many whole days an order has been overdue.
+ * Returns 0 if not overdue, if due date has not passed, or if due date is invalid.
+ */
+export function getOverdueDays(
+  dueDateInput?: Date | string | null,
+  referenceDate: Date = new Date()
+): number {
+  if (!dueDateInput) return 0;
+  const due = new Date(dueDateInput);
+  if (isNaN(due.getTime())) return 0;
+  const diffMs = referenceDate.getTime() - due.getTime();
+  if (diffMs <= 0) return 0;
+  return Math.floor(diffMs / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Checks whether an order is eligible for the 90-day overdue cleanup workflow.
+ *
+ * Rules:
+ * 1. Must not be DELIVERED or CANCELLED.
+ * 2. Must have a valid effective due date.
+ * 3. Must not already be archived.
+ * 4. Days overdue must be strictly MORE than 90 days (> 90).
+ *    - 89 days: not eligible.
+ *    - 90 days: not eligible (must be strictly > 90).
+ *    - 91 days: eligible.
+ * 5. Uses due date, not order creation date.
+ */
+export function isEligibleFor90DayCleanup(
+  order: {
+    effectiveDueDate?: Date | string | null;
+    status?: OrderStatus | string;
+    isArchived?: boolean | null;
+  },
+  referenceDate: Date = new Date()
+): boolean {
+  if (!order || !order.effectiveDueDate) return false;
+  if (order.isArchived) return false;
+  const statusStr = String(order.status || '');
+  if (statusStr === OrderStatus.DELIVERED || statusStr === OrderStatus.CANCELLED) {
+    return false;
+  }
+  const days = getOverdueDays(order.effectiveDueDate, referenceDate);
+  return days > 90;
+}
+

@@ -40,7 +40,14 @@ import {
   ExpressDeliveryOption,
   TopUpServiceItem,
   DEFAULT_TOP_UP_SERVICES,
+  isOrderOverdue,
+  getOverdueDays,
+  isEligibleFor90DayCleanup,
+  OverdueCleanupOrderDTO,
+  OverdueCleanupSummaryResponseDTO,
+  ArchiveOrdersResponseDTO,
 } from '@growfast/shared-types';
+import { ArchiveOrdersDto } from './dto/archive-orders.dto';
 import { NotificationService } from '../notification/notification.service';
 import { PaymentService } from '../payment/payment.service';
 import { PhotoStorageService } from '../photo/photo-storage.service';
@@ -904,17 +911,35 @@ export class OrderService {
   }
 
   async findAllOrders(query: GetOrdersQueryDto, storeId: string) {
-    const { customerId, status, paymentStatus, page = 1, search } = query;
+    const { customerId, status, paymentStatus, page = 1, search, isOverdue, includeArchived } = query;
     const effectivePageSize = query.pageSize || query.limit || 10;
     const skip = (page - 1) * effectivePageSize;
 
     const where: any = { storeId };
+
+    // By default, exclude archived orders unless explicitly requested
+    if (!includeArchived) {
+      where.isArchived = false;
+    }
+
     if (customerId) where.customerId = customerId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+
+    if (isOverdue === true) {
+      where.effectiveDueDate = { lt: new Date() };
+      where.status = { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] };
+    } else if (isOverdue === false) {
+      // Exclude overdue orders: due date in the future or not set
+      where.OR = [
+        { effectiveDueDate: { gte: new Date() } },
+        { effectiveDueDate: null },
+      ];
+    }
+
     if (search?.trim()) {
       const s = search.trim();
-      where.OR = [
+      const searchConditions = [
         { orderNumber: { contains: s, mode: 'insensitive' } },
         { customer: { phone: { contains: s, mode: 'insensitive' } } },
         { customer: { name: { contains: s, mode: 'insensitive' } } },
@@ -931,6 +956,13 @@ export class OrderService {
           },
         },
       ];
+
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
     }
 
     const [orders, total] = await Promise.all([
@@ -939,6 +971,8 @@ export class OrderService {
         include: {
           customer: true,
           items: true,
+          createdBy: true,
+          archivedBy: true,
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -992,6 +1026,7 @@ export class OrderService {
       status: {
         notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
       },
+      isArchived: false,
     };
 
     if (options?.countOnly) {
@@ -2368,6 +2403,183 @@ export class OrderService {
     return updatedOrder;
   }
 
+  /**
+   * 90-Day Overdue Cleanup Workflow:
+   * Returns orders for the authenticated store that are strictly more than 90 days overdue.
+   * Excludes DELIVERED, CANCELLED, and already archived orders.
+   */
+  async find90DayOverdueCleanupOrders(storeId: string): Promise<OverdueCleanupSummaryResponseDTO> {
+    const now = new Date();
+    // Strictly more than 90 days overdue (90 * 24 hours in ms)
+    const thresholdDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    const where: any = {
+      storeId,
+      effectiveDueDate: { lt: thresholdDate },
+      status: { notIn: [OrderStatus.DELIVERED, OrderStatus.CANCELLED] },
+      isArchived: false,
+    };
+
+    const orders = await this.prisma.order.findMany({
+      where,
+      include: {
+        customer: true,
+        items: {
+          include: {
+            garmentCatalog: true,
+          },
+        },
+        payments: true,
+        photos: true,
+        deliveryRecords: true,
+        adjustments: true,
+      },
+      orderBy: { effectiveDueDate: 'asc' },
+    });
+
+    const eligibleOrders: OverdueCleanupOrderDTO[] = orders
+      .filter((o) => isEligibleFor90DayCleanup(o, now))
+      .map((o) => {
+        const financial = this.paymentService.calculateOrderFinancialState(o);
+        const daysOverdue = getOverdueDays(o.effectiveDueDate, now);
+        const itemCount = o.items.reduce((sum: number, it: any) => sum + (it.quantity || 0), 0);
+        const itemsSummary = o.items
+          .map((it: any) => `${it.garmentCatalog?.name || 'Item'} (${it.quantity})`)
+          .join(', ');
+
+        return {
+          id: o.id,
+          orderNumber: o.orderNumber,
+          customerId: o.customerId,
+          customerName: o.customer ? o.customer.name : '',
+          customerPhone: o.customer ? o.customer.phone : null,
+          orderDate: o.orderDate.toISOString(),
+          effectiveDueDate: o.effectiveDueDate.toISOString(),
+          daysOverdue,
+          status: o.status as unknown as OrderStatus,
+          paymentStatus: financial.paymentStatus as unknown as PaymentStatus,
+          totalAmount: o.totalAmount,
+          amountPaid: o.amountPaid,
+          amountDue: financial.amountDue,
+          itemCount,
+          itemsSummary,
+          hasPayments: o.payments.length > 0,
+          paymentCount: o.payments.length,
+          hasPhotos: o.photos.length > 0,
+          photoCount: o.photos.length,
+          hasDeliveryRecords: o.deliveryRecords.length > 0,
+          deliveryRecordCount: o.deliveryRecords.length,
+          hasAdjustments: (o.adjustments?.length || 0) > 0,
+          isArchived: o.isArchived,
+        };
+      });
+
+    return {
+      eligibleOrders,
+      totalEligibleCount: eligibleOrders.length,
+      thresholdDays: 90,
+      referenceDate: now.toISOString(),
+    };
+  }
+
+  /**
+   * 90-Day Overdue Cleanup Workflow - Archival Action:
+   * Revalidates eligibility for each selected order and archives them inside a database transaction.
+   * Preserves all financial, payment, photo, delivery, and audit records.
+   */
+  async archiveOverdueOrders(
+    dto: ArchiveOrdersDto,
+    storeId: string,
+    employeeId: string,
+    employeeRole: string,
+  ): Promise<ArchiveOrdersResponseDTO> {
+    if (employeeRole !== 'OWNER') {
+      throw new ForbiddenException('Only authorized store owners can execute overdue order cleanups.');
+    }
+
+    if (!dto.orderIds || dto.orderIds.length === 0) {
+      throw new BadRequestException('At least one order ID must be selected for archival.');
+    }
+
+    const uniqueOrderIds = Array.from(new Set(dto.orderIds));
+    const now = new Date();
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Fetch orders locking them logically
+      const orders = await tx.order.findMany({
+        where: {
+          id: { in: uniqueOrderIds },
+          storeId,
+        },
+        include: {
+          customer: true,
+        },
+      });
+
+      if (orders.length !== uniqueOrderIds.length) {
+        const foundIds = new Set(orders.map((o) => o.id));
+        const missingIds = uniqueOrderIds.filter((id) => !foundIds.has(id));
+        throw new NotFoundException(
+          `One or more orders could not be found or do not belong to your store: ${missingIds.join(', ')}`,
+        );
+      }
+
+      // 2. Re-validate eligibility at execution time
+      for (const order of orders) {
+        if (order.isArchived) {
+          throw new BadRequestException(
+            `Order ${order.orderNumber} is already archived. Duplicate cleanup rejected.`,
+          );
+        }
+        if (order.status === OrderStatus.DELIVERED) {
+          throw new BadRequestException(
+            `Order ${order.orderNumber} is delivered and cannot be archived via overdue cleanup.`,
+          );
+        }
+        if (order.status === OrderStatus.CANCELLED) {
+          throw new BadRequestException(
+            `Order ${order.orderNumber} is cancelled and cannot be archived via overdue cleanup.`,
+          );
+        }
+        if (!isEligibleFor90DayCleanup(order, now)) {
+          const days = getOverdueDays(order.effectiveDueDate, now);
+          throw new BadRequestException(
+            `Order ${order.orderNumber} is overdue by ${days} days, which does not meet the > 90 days overdue requirement.`,
+          );
+        }
+      }
+
+      // 3. Perform archival update preserving all history
+      await tx.order.updateMany({
+        where: {
+          id: { in: uniqueOrderIds },
+          storeId,
+          isArchived: false,
+        },
+        data: {
+          isArchived: true,
+          archivedAt: now,
+          archivedById: employeeId,
+          archivedReason: dto.reason?.trim() || '90-day uncollected order cleanup',
+        },
+      });
+
+      return {
+        success: true,
+        archivedCount: uniqueOrderIds.length,
+        orderIds: uniqueOrderIds,
+        message: `Successfully archived ${uniqueOrderIds.length} long-overdue order(s).`,
+      };
+    });
+  }
+
+  /**
+   * Retrieves archived orders for authorized owner/manager historical review.
+   */
+  async findArchivedOrders(storeId: string, query: GetOrdersQueryDto) {
+    return this.findAllOrders({ ...query, includeArchived: true }, storeId);
+  }
+
   // --- Helpers ---
   private mapToSummaryDto(order: any) {
     const financial = this.paymentService.calculateOrderFinancialState(order);
@@ -2399,8 +2611,14 @@ export class OrderService {
       pickupType: order.pickupType,
       deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
       createdByName: order.createdBy?.name || null,
-      itemCount: order.items.reduce((sum: number, item: any) => sum + item.quantity, 0),
-      ...calculateFulfillmentBreakdown(order.totalAmount, order.amountPaid, order.items),
+      isArchived: Boolean(order.isArchived),
+      archivedAt: order.archivedAt ? order.archivedAt.toISOString() : null,
+      archivedByName: order.archivedBy?.name || null,
+      archivedReason: order.archivedReason || null,
+      isOverdue: isOrderOverdue(order),
+      daysOverdue: getOverdueDays(order.effectiveDueDate),
+      itemCount: order.items ? order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) : 0,
+      ...calculateFulfillmentBreakdown(order.totalAmount, order.amountPaid, order.items || []),
     };
   }
 

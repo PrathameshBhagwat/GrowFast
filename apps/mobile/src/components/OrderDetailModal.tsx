@@ -542,6 +542,8 @@ export function OrderDetailModal({
 
   const getRelativeDueText = (dueDateStr?: string) => {
     if (!dueDateStr) return '';
+    if (derivedStatus === OrderStatus.DELIVERED) return '(Delivered)';
+    if (derivedStatus === OrderStatus.CANCELLED) return '(Cancelled)';
     try {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
@@ -650,9 +652,14 @@ export function OrderDetailModal({
   const totalGarments = order?.items
     ? order.items.reduce((s, it) => s + (it.physicalGarments?.length || 0), 0)
     : 0;
+  const isOrderDelivered = derivedStatus === OrderStatus.DELIVERED;
   const readyGarments = order?.items
     ? order.items.reduce(
-        (s, it) => s + (it.physicalGarments?.filter((g) => Boolean(g.isReady)).length || 0),
+        (s, it) =>
+          s +
+          (it.physicalGarments?.filter(
+            (g) => Boolean(g.isReady) || Boolean(g.isDelivered) || isOrderDelivered,
+          ).length || 0),
         0,
       )
     : 0;
@@ -821,9 +828,13 @@ export function OrderDetailModal({
                             styles.dateBoxDueStatus,
                             {
                               color:
-                                getRelativeDueText(order.effectiveDueDate).includes('overdue')
-                                  ? colors.error
-                                  : '#1E69F5',
+                                derivedStatus === OrderStatus.DELIVERED
+                                  ? '#15803d'
+                                  : derivedStatus === OrderStatus.CANCELLED
+                                    ? colors.textMuted
+                                    : getRelativeDueText(order.effectiveDueDate).includes('overdue')
+                                      ? colors.error
+                                      : '#1E69F5',
                             },
                           ]}
                         >
@@ -1108,7 +1119,7 @@ export function OrderDetailModal({
                                 accessible={true}
                                 accessibilityLabel={`Toggle readiness for ${item.garmentName} #${g.unitNumber}`}
                               >
-                                {Boolean(g.isReady) ? (
+                                {Boolean(g.isReady) || Boolean(g.isDelivered) || isOrderDelivered ? (
                                   <IonIcon name="checkmark-circle" size={22} color="#10B981" />
                                 ) : (
                                   <IonIcon name="square-outline" size={22} color="#94A3B8" />
@@ -1173,16 +1184,28 @@ export function OrderDetailModal({
                                 <View
                                   style={[
                                     styles.garmentStatusPill,
-                                    g.isReady ? styles.statusPillReady : styles.statusPillWaiting,
+                                    Boolean(g.isDelivered) || isOrderDelivered
+                                      ? styles.statusPillDelivered
+                                      : g.isReady
+                                        ? styles.statusPillReady
+                                        : styles.statusPillWaiting,
                                   ]}
                                 >
                                   <Text
                                     style={[
                                       styles.garmentStatusLabel,
-                                      g.isReady ? styles.statusReady : styles.statusWaiting,
+                                      Boolean(g.isDelivered) || isOrderDelivered
+                                        ? styles.statusDelivered
+                                        : g.isReady
+                                          ? styles.statusReady
+                                          : styles.statusWaiting,
                                     ]}
                                   >
-                                    {g.isReady ? 'Ready' : 'In Processing'}
+                                    {Boolean(g.isDelivered) || isOrderDelivered
+                                      ? 'Delivered'
+                                      : g.isReady
+                                        ? 'Ready'
+                                        : 'In Processing'}
                                   </Text>
                                 </View>
                               </TouchableOpacity>
@@ -1400,6 +1423,15 @@ export function OrderDetailModal({
                       Collect Payment (₹{effectiveDue.toFixed(0)})
                     </Text>
                   </TouchableOpacity>
+                ) : isOrderDelivered ? (
+                  <View
+                    style={[styles.primaryActionBtn, styles.completedOrderBtn]}
+                    accessible={true}
+                    accessibilityLabel="Order Delivered and Paid"
+                  >
+                    <IonIcon name="checkmark-circle" size={18} color="#15803D" />
+                    <Text style={styles.completedOrderBtnText}>Order Completed</Text>
+                  </View>
                 ) : (
                   <TouchableOpacity
                     style={[styles.primaryActionBtn, { backgroundColor: '#1E69F5' }]}
@@ -1984,6 +2016,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
+  statusPillDelivered: {
+    backgroundColor: '#dcfce7',
+  },
   statusPillReady: {
     backgroundColor: '#dcfce7',
   },
@@ -1993,6 +2028,9 @@ const styles = StyleSheet.create({
   garmentStatusLabel: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  statusDelivered: {
+    color: '#15803d',
   },
   statusReady: {
     color: '#15803d',
@@ -2393,6 +2431,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  completedOrderBtn: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  completedOrderBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#15803D',
   },
   centerBox: {
     flex: 1,

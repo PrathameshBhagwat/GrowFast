@@ -15,6 +15,7 @@ import { GetOrdersQueryDto } from './dto/get-orders-query.dto';
 import { UpdateOrderItemDto } from './dto/update-order-item.dto';
 import { UpdateDueDateDto } from './dto/update-due-date.dto';
 import { OrderPickupDto } from './dto/order-pickup.dto';
+import { ArchiveOrdersDto } from './dto/archive-orders.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -64,6 +65,46 @@ export class OrderController {
       date,
       timezone,
     });
+    return {
+      success: true,
+      ...result,
+    };
+  }
+
+  @Get('cleanup/eligible')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER')
+  async getCleanupEligibleOrders(@Request() req: any) {
+    const storeId = req.user.storeId;
+    const result = await this.orderService.find90DayOverdueCleanupOrders(storeId);
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Post('cleanup/archive')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER')
+  async archiveOverdueOrders(@Body() dto: ArchiveOrdersDto, @Request() req: any) {
+    const storeId = req.user.storeId;
+    const employeeId = req.user.id;
+    const employeeRole = req.user.role;
+    const result = await this.orderService.archiveOverdueOrders(
+      dto,
+      storeId,
+      employeeId,
+      employeeRole,
+    );
+    return result;
+  }
+
+  @Get('archived')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'MANAGER')
+  async getArchivedOrders(@Query() query: GetOrdersQueryDto, @Request() req: any) {
+    const storeId = req.user.storeId;
+    const result = await this.orderService.findArchivedOrders(storeId, query);
     return {
       success: true,
       ...result,

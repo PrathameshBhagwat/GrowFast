@@ -17,6 +17,9 @@ const mockOrderService = {
   cancelPhysicalGarment: jest.fn(),
   recordPickup: jest.fn(),
   findDueTodayOrders: jest.fn(),
+  find90DayOverdueCleanupOrders: jest.fn(),
+  archiveOverdueOrders: jest.fn(),
+  findArchivedOrders: jest.fn(),
 };
 
 describe('OrderController', () => {
@@ -243,6 +246,71 @@ describe('OrderController', () => {
       const reflector = new Reflector();
       const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.getDueToday);
       expect(roles).toEqual(['OWNER', 'MANAGER', 'COUNTER', 'DELIVERY']);
+    });
+  });
+
+  describe('90-Day Overdue Cleanup Controller Endpoints', () => {
+    it('getCleanupEligibleOrders calls OrderService.find90DayOverdueCleanupOrders and enforces OWNER role', async () => {
+      mockOrderService.find90DayOverdueCleanupOrders.mockResolvedValueOnce({
+        eligibleOrders: [],
+        totalEligibleCount: 0,
+        thresholdDays: 90,
+      });
+
+      const req = { user: { storeId: 'store-1', id: 'emp-1', role: 'OWNER' } };
+      const res = await controller.getCleanupEligibleOrders(req);
+
+      expect(mockOrderService.find90DayOverdueCleanupOrders).toHaveBeenCalledWith('store-1');
+      expect(res.success).toBe(true);
+      expect(res.data.totalEligibleCount).toBe(0);
+
+      const reflector = new Reflector();
+      const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.getCleanupEligibleOrders);
+      expect(roles).toEqual(['OWNER']);
+    });
+
+    it('archiveOverdueOrders calls OrderService.archiveOverdueOrders and enforces OWNER role', async () => {
+      mockOrderService.archiveOverdueOrders.mockResolvedValueOnce({
+        success: true,
+        archivedCount: 2,
+        orderIds: ['ord-1', 'ord-2'],
+        message: 'Archived 2 orders',
+      });
+
+      const req = { user: { storeId: 'store-1', id: 'owner-1', role: 'OWNER' } };
+      const dto = { orderIds: ['ord-1', 'ord-2'], reason: 'Cleanup' };
+      const res = await controller.archiveOverdueOrders(dto, req);
+
+      expect(mockOrderService.archiveOverdueOrders).toHaveBeenCalledWith(
+        dto,
+        'store-1',
+        'owner-1',
+        'OWNER',
+      );
+      expect(res.success).toBe(true);
+      expect(res.archivedCount).toBe(2);
+
+      const reflector = new Reflector();
+      const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.archiveOverdueOrders);
+      expect(roles).toEqual(['OWNER']);
+    });
+
+    it('getArchivedOrders calls OrderService.findArchivedOrders and enforces OWNER, MANAGER roles', async () => {
+      mockOrderService.findArchivedOrders.mockResolvedValueOnce({
+        data: [],
+        total: 0,
+      });
+
+      const req = { user: { storeId: 'store-1', role: 'OWNER' } };
+      const query = { page: 1 };
+      const res = await controller.getArchivedOrders(query, req);
+
+      expect(mockOrderService.findArchivedOrders).toHaveBeenCalledWith('store-1', query);
+      expect(res.success).toBe(true);
+
+      const reflector = new Reflector();
+      const roles = reflector.get<string[]>(ROLES_KEY, OrderController.prototype.getArchivedOrders);
+      expect(roles).toEqual(['OWNER', 'MANAGER']);
     });
   });
 });
