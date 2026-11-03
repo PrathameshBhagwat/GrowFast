@@ -43,9 +43,11 @@ import {
   AlertTriangle,
   Shirt,
   Tag,
+  Store as StoreIcon,
 } from 'lucide-react';
 import { renderStitchGarmentIcon } from '../components/GarmentIcon';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { useBranch } from '../contexts/BranchContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -54,6 +56,7 @@ export function OrderWizardPage() {
   const navigate = useNavigate();
   const initialCustomerId = searchParams.get('customerId');
   const { token, employee } = useAuth();
+  const { branches, activeBranchId, activeBranch, isAllBranches, setActiveBranchId } = useBranch();
   const canModifyPrice = employee?.role === Role.OWNER;
 
   // Entry mode state: Weight vs Pieces (Decision B)
@@ -207,8 +210,18 @@ export function OrderWizardPage() {
   const handleSelectCustomer = (selectedCust: CustomerDTO) => {
     setCustomer(selectedCust);
     setSelectedCustomerId(selectedCust.id);
+    if (selectedCust.storeId && isAllBranches) {
+      setActiveBranchId(selectedCust.storeId);
+    }
     setShowCustomerModal(false);
   };
+
+  // Auto-align active branch with customer branch when customer is loaded/selected
+  useEffect(() => {
+    if (customer?.storeId && isAllBranches) {
+      setActiveBranchId(customer.storeId);
+    }
+  }, [customer, isAllBranches, setActiveBranchId]);
 
   // Workflow Switching Handlers
   const handleRequestWorkflowSwitch = (targetWorkflow: OrderWorkflowType) => {
@@ -926,11 +939,18 @@ export function OrderWizardPage() {
         notes: generalNote.trim() || 'Created via POS terminal',
       };
 
+      if (isAllBranches) {
+        alert('Please select a specific branch (Charholi or Alephata) before creating an order.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'x-branch-id': activeBranchId,
         },
         body: JSON.stringify(payload),
       });
@@ -1150,8 +1170,17 @@ export function OrderWizardPage() {
           </button>
         </div>
 
-        {/* Right: ThemeToggle + Customer Details Card */}
+        {/* Right: ThemeToggle + Branch Indicator + Customer Details Card */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          {!isAllBranches && activeBranch && (
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
+              title={`Creating order for ${activeBranch.name}`}
+            >
+              <StoreIcon size={14} className="text-purple-600 dark:text-purple-400" />
+              <span>{activeBranch.name}</span>
+            </div>
+          )}
           <ThemeToggle size="sm" />
           {customer ? (
             <div
@@ -1268,6 +1297,53 @@ export function OrderWizardPage() {
           )}
         </div>
       </header>
+
+      {/* Multi-Branch Order Creation Guard Banner */}
+      {isAllBranches && (
+        <div
+          role="alert"
+          style={{
+            padding: '12px 20px',
+            background: '#FEF3C7',
+            borderBottom: '1px solid #F59E0B',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400E' }}>
+            <AlertTriangle size={18} color="#D97706" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+              New orders cannot be created across &ldquo;All Branches&rdquo;. Please choose a branch
+              to continue:
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {branches.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setActiveBranchId(b.id)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  background: '#7C3AED',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                }}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Accessible Section Heading for Screen Readers & Tests */}
       <h2 className="sr-only">Add Items</h2>

@@ -45,6 +45,21 @@ export interface EmployeeSummary {
   storeName: string;
 }
 
+export interface BranchDTO {
+  id: string;
+  name: string;
+  code: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  isActive: boolean;
+  expressSurchargePercent: number | null;
+  ordersCount?: number;
+  customersCount?: number;
+  employeesCount?: number;
+  createdAt?: string;
+}
+
 export interface EmployeeDTO {
   id: string;
   name: string;
@@ -74,6 +89,7 @@ export interface CreateEmployeeRequest {
   pin: string;
   role: Role;
   storeId?: string;
+  storeName?: string;
   photoUrl?: string | null;
   passportPhotoUrl?: string | null;
   aadhaarFrontUrl?: string | null;
@@ -91,6 +107,7 @@ export interface UpdateEmployeeRequest {
   isActive?: boolean;
   pin?: string;
   storeId?: string;
+  storeName?: string;
   photoUrl?: string | null;
   passportPhotoUrl?: string | null;
   aadhaarFrontUrl?: string | null;
@@ -115,6 +132,7 @@ export interface CustomerDTO {
   preferences: Record<string, string> | null;
   registrationSource: string;
   storeId?: string;
+  storeName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -127,6 +145,7 @@ export interface CreateCustomerRequest {
   membership?: MembershipTier;
   discountPercent?: number;
   storeId?: string;
+  storeName?: string;
 }
 
 export interface UpdateCustomerRequest {

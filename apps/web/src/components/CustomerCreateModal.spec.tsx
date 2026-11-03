@@ -128,6 +128,7 @@ describe('CustomerCreateModal Component', () => {
             phone: '9876543210',
             address: '402 Sunrise Heights, Pune',
             pincode: '411001',
+            storeId: 'store-kp-001',
           }),
         }),
       );

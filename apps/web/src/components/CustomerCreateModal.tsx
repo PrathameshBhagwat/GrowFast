@@ -6,8 +6,9 @@ import {
   type CreateCustomerRequest,
   type ApiResponse,
 } from '@growfast/shared-types';
-import { UserPlus, AlertCircle } from 'lucide-react';
+import { UserPlus, AlertCircle, Store as StoreIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBranch, ALL_BRANCHES_ID } from '../contexts/BranchContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -23,12 +24,16 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   onSuccess,
 }) => {
   const { token } = useAuth();
+  const { branches, activeBranchId, isAllBranches, activeBranch } = useBranch();
 
-  // Active form field states: Customer Name, WhatsApp Number, Address, Pincode
+  // Active form field states: Customer Name, WhatsApp Number, Address, Pincode, Branch
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(() => {
+    return !isAllBranches && activeBranchId ? activeBranchId : branches[0]?.id || 'store-kp-001';
+  });
 
   // Validation and Error states
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -45,8 +50,14 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       setErrors({});
       setApiError(null);
       setIsSubmitting(false);
+
+      if (!isAllBranches && activeBranchId) {
+        setSelectedBranchId(activeBranchId);
+      } else if (branches.length > 0) {
+        setSelectedBranchId(branches[0].id);
+      }
     }
-  }, [open]);
+  }, [open, isAllBranches, activeBranchId, branches]);
 
   // Validate form client-side before API call
   const validateForm = (): boolean => {
@@ -82,12 +93,16 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
     try {
       const cleanPhone = phone.trim().replace(/[\s\-()]/g, '');
+      const targetStoreId = isAllBranches
+        ? selectedBranchId
+        : activeBranchId || selectedBranchId || 'store-kp-001';
 
       const payload: CreateCustomerRequest = {
         name: name.trim(),
         phone: cleanPhone,
         address: address.trim() || undefined,
         pincode: pincode.trim() || undefined,
+        storeId: targetStoreId,
       };
 
       let createdCustomer: CustomerDTO;
@@ -100,6 +115,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
+              'x-branch-id': targetStoreId,
             },
             body: JSON.stringify(payload),
           });
@@ -135,6 +151,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             discountPercent: 0,
             preferences: null,
             registrationSource: 'WALK_IN',
+            storeId: targetStoreId,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -152,6 +169,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
           discountPercent: 0,
           preferences: null,
           registrationSource: 'WALK_IN',
+          storeId: targetStoreId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -250,6 +268,104 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             disabled={isSubmitting}
           />
         </div>
+
+        {/* Branch Assignment */}
+        {isAllBranches ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: 'var(--text-primary, #0F172A)',
+              }}
+            >
+              Assigned Branch *
+            </label>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '8px',
+              }}
+            >
+              {branches.map((b) => {
+                const isSelected = selectedBranchId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setSelectedBranchId(b.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: isSelected ? '2px solid #7C3AED' : '1px solid var(--border, #E2E8F0)',
+                      background: isSelected
+                        ? 'rgba(124, 58, 237, 0.08)'
+                        : 'var(--bg-surface, #FFFFFF)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      minHeight: '44px',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <StoreIcon
+                      size={18}
+                      color={isSelected ? '#7C3AED' : 'var(--text-muted, #64748B)'}
+                      style={{ flexShrink: 0 }}
+                    />
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.875rem',
+                          color: isSelected ? '#7C3AED' : 'var(--text-primary, #0F172A)',
+                        }}
+                      >
+                        {b.name}
+                      </div>
+                      {b.code && (
+                        <div
+                          style={{
+                            fontSize: '0.725rem',
+                            color: 'var(--text-muted, #64748B)',
+                          }}
+                        >
+                          Code: {b.code}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: 'var(--bg-surface-muted, #F8FAFC)',
+              border: '1px solid var(--border, #E2E8F0)',
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary, #475569)',
+            }}
+          >
+            <StoreIcon size={16} color="#7C3AED" style={{ flexShrink: 0 }} />
+            <span>
+              Registering customer at{' '}
+              <strong style={{ color: 'var(--text-primary, #0F172A)' }}>
+                {activeBranch?.name || 'Selected Branch'}
+              </strong>
+              {activeBranch?.code ? ` (${activeBranch.code})` : ''}
+            </span>
+          </div>
+        )}
 
         {/* Modal Actions */}
         <div

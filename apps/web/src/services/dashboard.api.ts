@@ -6,6 +6,7 @@ export async function fetchDashboardSummary(
   startDate?: string,
   endDate?: string,
   signal?: AbortSignal,
+  branchId?: string,
 ): Promise<DashboardSummaryDTO> {
   const params = new URLSearchParams();
   if (startDate) params.set('startDate', startDate);
@@ -15,10 +16,16 @@ export async function fetchDashboardSummary(
   const url = `${API_BASE}/summary${queryString ? `?${queryString}` : ''}`;
 
   const token = localStorage.getItem('growfast_token');
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  const activeBranch = branchId || localStorage.getItem('growfast_active_branch_id');
+  if (activeBranch) {
+    headers['x-branch-id'] = activeBranch;
+  }
+
   const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
     signal,
   });
 

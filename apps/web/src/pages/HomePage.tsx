@@ -13,6 +13,8 @@ import {
 import { CustomerCreateModal } from '../components/CustomerCreateModal';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GrowFastLogo } from '../components/GrowFastLogo';
+import { BranchSelector } from '../components/BranchSelector';
+import { useBranch } from '../contexts/BranchContext';
 import { apiFetch, ApiError, friendlyErrorMessage } from '../services/api';
 import {
   LogOut,
@@ -137,6 +139,7 @@ function getStatusBadgeStyle(status: string) {
 
 export const HomePage: React.FC = () => {
   const { employee, token, logout } = useAuth();
+  const { activeBranchId, isAllBranches, branches } = useBranch();
   const navigate = useNavigate();
 
   // ─── Search State ──────────────────────────────────────────────────────────
@@ -269,7 +272,7 @@ export const HomePage: React.FC = () => {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  // Lightweight badge count fetch on mount (only counts, does NOT fetch full orders)
+  // Lightweight badge count fetch on mount and on branch change
   useEffect(() => {
     if (!token) return;
 
@@ -287,7 +290,14 @@ export const HomePage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [token, activeBranchId]);
+
+  // Re-fetch due orders if expanded when active branch changes
+  useEffect(() => {
+    if (isDueOrdersExpanded && token) {
+      fetchDueTodayOrders();
+    }
+  }, [activeBranchId]);
 
   // Fetch Customers when debouncedQuery is NOT empty
   const fetchSearchResults = useCallback(
@@ -360,10 +370,10 @@ export const HomePage: React.FC = () => {
     [token, pageSize, logout],
   );
 
-  // Trigger search ONLY when debouncedQuery changes
+  // Trigger search when debouncedQuery, page, filterMode, or activeBranchId changes
   useEffect(() => {
     fetchSearchResults(debouncedQuery, page, filterMode);
-  }, [debouncedQuery, page, filterMode, fetchSearchResults]);
+  }, [debouncedQuery, page, filterMode, activeBranchId, fetchSearchResults]);
 
   // Fetch Today's Due Orders on click
   const fetchDueTodayOrders = useCallback(async () => {
@@ -539,16 +549,19 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation Actions */}
+          {/* Navigation Actions & Branch Selector */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               flexWrap: 'wrap',
               flexShrink: 0,
             }}
           >
+            {/* Multi-Branch Selector */}
+            <BranchSelector />
+
             {employee.role === 'OWNER' && (
               <Button
                 id="home-dashboard"
@@ -1342,6 +1355,26 @@ export const HomePage: React.FC = () => {
                                   }}
                                 >
                                   {c.discountPercent}% OFF
+                                </span>
+                              )}
+                              {c.storeId && (
+                                <span
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    background: 'rgba(124, 58, 237, 0.08)',
+                                    color: '#7C3AED',
+                                    border: '1px solid rgba(124, 58, 237, 0.2)',
+                                  }}
+                                >
+                                  {branches.find((b) => b.id === c.storeId)?.name ||
+                                    (c.storeId === 'store-kp-001'
+                                      ? 'Charholi Branch'
+                                      : c.storeId === 'store-kp-002'
+                                        ? 'Alephata Branch'
+                                        : 'Branch')}
                                 </span>
                               )}
                               {(c.customerCode || c.id) && (

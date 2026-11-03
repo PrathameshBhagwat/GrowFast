@@ -8,6 +8,8 @@ import {
 } from '@growfast/shared-types';
 import { fetchDashboardSummary } from '../services/dashboard.api';
 import { useAuth } from '../contexts/AuthContext';
+import { useBranch } from '../contexts/BranchContext';
+import { BranchSelector } from '../components/BranchSelector';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { GrowFastLogo } from '../components/GrowFastLogo';
 import { DashboardTrendChart } from '../components/DashboardTrendChart';
@@ -122,6 +124,8 @@ export const DashboardPage: React.FC = () => {
   const [customError, setCustomError] = useState<string | null>(null);
   const [showCustomInputs, setShowCustomInputs] = useState<boolean>(false);
 
+  const { activeBranchId, isAllBranches, activeBranch } = useBranch();
+
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -137,40 +141,47 @@ export const DashboardPage: React.FC = () => {
 
   /* ─── Data Fetching ─────────────────────────────────────────── */
 
-  const loadDashboard = useCallback(async (range: DateRange, silent = false) => {
-    // Cancel previous in-flight request to prevent race conditions
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  const loadDashboard = useCallback(
+    async (range: DateRange, silent = false, branchOverride?: string) => {
+      // Cancel previous in-flight request to prevent race conditions
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-    const requestId = ++requestIdRef.current;
-    if (!silent) {
-      setLoading(true);
-      setError(null);
-    }
-
-    try {
-      const result = await fetchDashboardSummary(range.startDate, range.endDate, controller.signal);
-      if (requestId === requestIdRef.current && isMountedRef.current) {
-        setData(result);
+      const requestId = ++requestIdRef.current;
+      if (!silent) {
+        setLoading(true);
         setError(null);
-        setLastUpdated(new Date());
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        return;
+
+      try {
+        const result = await fetchDashboardSummary(
+          range.startDate,
+          range.endDate,
+          controller.signal,
+        );
+        if (requestId === requestIdRef.current && isMountedRef.current) {
+          setData(result);
+          setError(null);
+          setLastUpdated(new Date());
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+        if (requestId === requestIdRef.current && isMountedRef.current) {
+          setError(err?.message || 'Failed to load dashboard data. Please try again.');
+        }
+      } finally {
+        if (requestId === requestIdRef.current && isMountedRef.current) {
+          setLoading(false);
+        }
       }
-      if (requestId === requestIdRef.current && isMountedRef.current) {
-        setError(err?.message || 'Failed to load dashboard data. Please try again.');
-      }
-    } finally {
-      if (requestId === requestIdRef.current && isMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  }, []);
+    },
+    [activeBranchId],
+  );
 
   /* ─── Handlers ──────────────────────────────────────────────── */
 
@@ -229,7 +240,7 @@ export const DashboardPage: React.FC = () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [dateRange, loadDashboard, employee]);
+  }, [dateRange, loadDashboard, employee, activeBranchId]);
 
   /* ─── Render States ─────────────────────────────────────────── */
 
@@ -691,27 +702,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <div
-              id="dashboard-branch-selector"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'var(--bg-surface, #FFFFFF)',
-                border: '1px solid var(--border, #E2E8F0)',
-                borderRadius: '9999px',
-                padding: '6px 14px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                color: 'var(--text-primary, #0F172A)',
-                boxShadow: 'var(--shadow-neu-card-sm)',
-              }}
-            >
-              <Store size={15} color="#2563EB" />
-              <span>{employee?.storeName || 'Koregaon Park Branch'}</span>
-              <ChevronDown size={14} color="var(--text-muted, #64748B)" />
-            </div>
-
+            <BranchSelector />
             <ThemeToggle size="sm" />
           </div>
         </header>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useBranch } from '../contexts/BranchContext';
+import { BranchSelector } from '../components/BranchSelector';
 import {
   Calendar,
   ChevronDown,
@@ -46,6 +48,7 @@ const DEFAULT_FILTERS: FilterState = {
 export const DailyOrdersReportPage: React.FC = () => {
   const navigate = useNavigate();
   const { employee } = useAuth();
+  const { activeBranchId } = useBranch();
 
   // Role validation: OWNER has access
   const isAuthorized = employee?.role === Role.OWNER;
@@ -218,7 +221,7 @@ export const DailyOrdersReportPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [startDateStr, endDateStr, appliedFilters, page, pageSize, isAuthorized]);
+  }, [startDateStr, endDateStr, appliedFilters, page, pageSize, isAuthorized, activeBranchId]);
 
   // Fetch report on dependency changes
   useEffect(() => {
@@ -398,8 +401,10 @@ export const DailyOrdersReportPage: React.FC = () => {
           </h1>
         </div>
 
-        {/* Right Corner Controls: Language & Profile Avatar */}
+        {/* Right Corner Controls: Branch Selector, Language & Profile Avatar */}
         <div className="flex items-center gap-3">
+          <BranchSelector />
+
           {/* Language Indicator matching reference screenshot */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] bg-[var(--bg-surface-inset)] border border-[var(--border)] rounded-full select-none shadow-[var(--shadow-neu-inset)]">
             <span className="text-sm" role="img" aria-label="UK flag">

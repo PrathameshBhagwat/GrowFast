@@ -39,6 +39,7 @@ export type {
   LoginResponse,
   EmployeeSummary,
   EmployeeDTO,
+  BranchDTO,
   CreateEmployeeRequest,
   UpdateEmployeeRequest,
   CustomerDTO,

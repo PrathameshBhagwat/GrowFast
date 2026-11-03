@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, LoadingState, EmptyState, ErrorState } from '@growfast/ui';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { BranchSelector } from '../components/BranchSelector';
+import { useBranch } from '../contexts/BranchContext';
 import { Role, type EmployeeDTO, type ApiResponse } from '@growfast/shared-types';
 import {
   Users,
@@ -53,6 +55,7 @@ const getRoleBadgeClass = (role: Role) => {
 export const StaffManagementPage: React.FC = () => {
   const navigate = useNavigate();
   const { employee: currentEmployee, token } = useAuth();
+  const { activeBranchId, isAllBranches, branches } = useBranch();
 
   const [employees, setEmployees] = useState<EmployeeDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +82,9 @@ export const StaffManagementPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>(Role.COUNTER);
+  const [formStoreId, setFormStoreId] = useState<string>(
+    currentEmployee?.storeId || 'store-kp-001',
+  );
   const [pin, setPin] = useState('');
   const [isActive, setIsActive] = useState(true);
 
@@ -162,7 +168,7 @@ export const StaffManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, [fetchEmployees]);
+  }, [fetchEmployees, activeBranchId]);
 
   const openCreateModal = () => {
     setEditingEmployee(null);
@@ -170,6 +176,11 @@ export const StaffManagementPage: React.FC = () => {
     setPhone('');
     setEmail('');
     setRole(Role.COUNTER);
+    const defaultStoreId =
+      !isAllBranches && activeBranchId
+        ? activeBranchId
+        : branches[0]?.id || currentEmployee?.storeId || 'store-kp-001';
+    setFormStoreId(defaultStoreId);
     setPin('');
     setIsActive(true);
     setPhotoUrl(null);
@@ -195,6 +206,7 @@ export const StaffManagementPage: React.FC = () => {
     setPhone(emp.phone || '');
     setEmail(emp.email || '');
     setRole(emp.role);
+    setFormStoreId(emp.storeId || currentEmployee?.storeId || 'store-kp-001');
     setPin(''); // Blank unless updating
     setIsActive(emp.isActive);
     setPhotoUrl(emp.photoUrl || null);
@@ -328,6 +340,7 @@ export const StaffManagementPage: React.FC = () => {
           phone: phone.trim() || null,
           email: email.trim() || null,
           role,
+          storeId: formStoreId,
           isActive,
           photoUrl: photoUrl || null,
           passportPhotoUrl: passportPhotoUrl || null,
@@ -367,7 +380,7 @@ export const StaffManagementPage: React.FC = () => {
           email: email.trim() || undefined,
           pin,
           role,
-          storeId: currentEmployee?.storeId,
+          storeId: formStoreId || currentEmployee?.storeId || 'store-kp-001',
           photoUrl: photoUrl || undefined,
           passportPhotoUrl: passportPhotoUrl || undefined,
           aadhaarFrontUrl: aadhaarFrontUrl || undefined,
@@ -605,7 +618,8 @@ export const StaffManagementPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <BranchSelector />
             <ThemeToggle />
             <Button
               variant="primary"
@@ -1416,6 +1430,68 @@ export const StaffManagementPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Branch Assignment */}
+              {currentEmployee?.role === Role.OWNER ? (
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary, #334155)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Assigned Store / Branch *
+                  </label>
+                  <select
+                    value={formStoreId}
+                    onChange={(e) => setFormStoreId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      minHeight: '44px',
+                      padding: '0 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border, #CBD5E1)',
+                      fontSize: '0.875rem',
+                      background: 'var(--bg-input, #FFFFFF)',
+                      color: 'var(--text-primary, #0F172A)',
+                      outline: 'none',
+                    }}
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.code ? `(${b.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-surface-muted, #F8FAFC)',
+                    border: '1px solid var(--border, #E2E8F0)',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary, #475569)',
+                  }}
+                >
+                  <StoreIcon size={14} color="#7C3AED" />
+                  <span>
+                    Assigned Store:{' '}
+                    <strong>
+                      {branches.find((b) => b.id === formStoreId)?.name ||
+                        currentEmployee?.storeName ||
+                        'Current Store'}
+                    </strong>
+                  </span>
+                </div>
+              )}
 
               {editingEmployee && (
                 <div

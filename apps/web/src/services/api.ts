@@ -9,6 +9,121 @@
  */
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+export const ACTIVE_BRANCH_KEY = 'growfast_active_branch_id';
+
+/**
+ * Returns the currently active branch ID from localStorage.
+ */
+export function getActiveBranchId(): string {
+  try {
+    return localStorage.getItem(ACTIVE_BRANCH_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Sets the active branch ID in localStorage.
+ */
+export function setActiveBranchId(branchId: string): void {
+  try {
+    if (branchId) {
+      localStorage.setItem(ACTIVE_BRANCH_KEY, branchId);
+    } else {
+      localStorage.removeItem(ACTIVE_BRANCH_KEY);
+    }
+  } catch {
+    // Ignore localStorage errors (e.g. private browsing quota)
+  }
+}
+
+/**
+ * Returns authorization and branch headers for API calls.
+ */
+export function getBranchHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(extraHeaders || {}),
+  };
+  const token = localStorage.getItem('growfast_token');
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const branchId = getActiveBranchId();
+  if (branchId && !headers['x-branch-id']) {
+    headers['x-branch-id'] = branchId;
+  }
+  return headers;
+}
+
+/**
+ * Sets up a transparent fetch interceptor on window.fetch.
+ * Automatically injects the selected branch header (`x-branch-id`)
+ * into all requests targeting the backend API.
+ */
+export function setupFetchInterceptor(): void {
+  if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+  if ((window.fetch as any).__gf_intercepted) return;
+
+  const originalFetch = window.fetch;
+  const interceptedFetch: typeof window.fetch = async (input, init = {}) => {
+    let url = '';
+    if (typeof input === 'string') {
+      url = input;
+    } else if (input instanceof URL) {
+      url = input.toString();
+    } else if (input && typeof (input as any).url === 'string') {
+      url = (input as any).url;
+    }
+
+    const isApiCall =
+      url.includes('/api/') ||
+      url.startsWith('/api') ||
+      (API_URL && API_URL !== '/api' && url.includes(API_URL));
+
+    if (isApiCall) {
+      const activeBranchId = getActiveBranchId();
+      if (activeBranchId) {
+        if (init.headers instanceof Headers) {
+          if (!init.headers.has('x-branch-id')) {
+            init.headers.set('x-branch-id', activeBranchId);
+          }
+        } else if (Array.isArray(init.headers)) {
+          const hasBranch = init.headers.some(([k]) => k.toLowerCase() === 'x-branch-id');
+          if (!hasBranch) {
+            init.headers.push(['x-branch-id', activeBranchId]);
+          }
+        } else {
+          init.headers = {
+            ...(init.headers || {}),
+          };
+          const hasBranch = Object.keys(init.headers).some(
+            (k) => k.toLowerCase() === 'x-branch-id',
+          );
+          if (!hasBranch) {
+            (init.headers as Record<string, string>)['x-branch-id'] = activeBranchId;
+          }
+        }
+      }
+    }
+
+    const res = await originalFetch(input, init);
+
+    if (res.status === 401 && isApiCall) {
+      window.dispatchEvent(new CustomEvent('growfast:auth-expired'));
+    }
+
+    return res;
+  };
+
+  (interceptedFetch as any).__gf_intercepted = true;
+  window.fetch = interceptedFetch;
+}
+
+// Automatically initialize fetch interceptor when this module loads
+if (typeof window !== 'undefined') {
+  setupFetchInterceptor();
+}
 
 // ── Error Classification ────────────────────────────────────────────────
 
@@ -128,6 +243,10 @@ export async function apiFetch<T = unknown>(
     const authToken = token ?? localStorage.getItem('growfast_token');
     if (authToken) {
       resolvedHeaders['Authorization'] = `Bearer ${authToken}`;
+    }
+    const branchId = getActiveBranchId();
+    if (branchId && !resolvedHeaders['x-branch-id']) {
+      resolvedHeaders['x-branch-id'] = branchId;
     }
   }
 
