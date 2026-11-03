@@ -1,5 +1,6 @@
 export const TOKEN_KEY = 'growfast_auth_token';
 export const USER_KEY = 'growfast_user_session';
+export const BRANCH_KEY = 'growfast_active_branch_id';
 
 export interface MobileUserSession {
   id: string;
@@ -277,6 +278,34 @@ export async function removeUserSession(): Promise<void> {
   }
 }
 
+export async function saveActiveBranch(branchId: string): Promise<void> {
+  if (!branchId || typeof branchId !== 'string') return;
+  const adapter = getStorageAdapter();
+  await adapter.setItem(BRANCH_KEY, branchId.trim());
+}
+
+export async function getActiveBranch(): Promise<string | null> {
+  try {
+    const adapter = getStorageAdapter();
+    const branch = await adapter.getItem(BRANCH_KEY);
+    if (!branch || typeof branch !== 'string' || branch.trim() === '') {
+      return null;
+    }
+    return branch.trim();
+  } catch {
+    return null;
+  }
+}
+
+export async function removeActiveBranch(): Promise<void> {
+  try {
+    const adapter = getStorageAdapter();
+    await adapter.removeItem(BRANCH_KEY);
+  } catch {
+    // Ignore removal errors
+  }
+}
+
 export async function clearUserSession(): Promise<void> {
-  await Promise.all([removeAuthToken(), removeUserSession()]);
+  await Promise.all([removeAuthToken(), removeUserSession(), removeActiveBranch()]);
 }

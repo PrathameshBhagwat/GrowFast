@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme, ThemeMode } from '../../src/contexts/ThemeContext';
 import { GrowFastLogo } from '../../src/components/GrowFastLogo';
+import { BranchSelector } from '../../src/components/BranchSelector';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -70,6 +71,17 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             );
           })}
+        </View>
+      </View>
+
+      {/* Active Branch Card */}
+      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Operating Branch</Text>
+        <Text style={[styles.themeDescription, { color: colors.textSecondary }]}>
+          Current operating store or consolidated view
+        </Text>
+        <View style={{ marginTop: 10 }}>
+          <BranchSelector />
         </View>
       </View>
 

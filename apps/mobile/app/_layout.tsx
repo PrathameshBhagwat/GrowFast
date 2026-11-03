@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ConnectionBanner } from '../src/components/ConnectionBanner';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
+import { BranchProvider } from '../src/contexts/BranchContext';
 import { getDatabase } from '../src/db/sqlite';
 import { onUnauthorized } from '../src/api/client';
 
@@ -116,9 +117,11 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <ProtectedRoutes>
-              <ThemedAppContainer />
-            </ProtectedRoutes>
+            <BranchProvider>
+              <ProtectedRoutes>
+                <ThemedAppContainer />
+              </ProtectedRoutes>
+            </BranchProvider>
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>

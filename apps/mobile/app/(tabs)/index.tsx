@@ -29,10 +29,12 @@ import {
 } from '@growfast/shared-types';
 
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useBranch } from '../../src/contexts/BranchContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { apiClient } from '../../src/api/client';
 import { ConnectionBanner } from '../../src/components/ConnectionBanner';
+import { BranchSelector } from '../../src/components/BranchSelector';
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { CustomerProfileModal } from '../../src/components/CustomerProfileModal';
@@ -105,6 +107,7 @@ export default function HomeScreen() {
   const isVeryNarrow = screenWidth < 340;
   const { isConnected } = useNetworkStatus();
   const { user: session, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
+  const { activeBranchId, isAllBranches, activeBranch, setActiveBranchId } = useBranch();
   const { isDark, colors, toggleTheme } = useTheme();
 
   // 1. Operational Screen Notice State
@@ -316,6 +319,11 @@ export default function HomeScreen() {
     setOrderResults([]);
   };
 
+  useEffect(() => {
+    loadDueTodayOrders();
+    loadOfflineDraftCount();
+  }, [activeBranchId, loadDueTodayOrders, loadOfflineDraftCount]);
+
   /**
    * Start New Order workflow for selected or general customer with specific entry mode and workflow.
    */
@@ -324,6 +332,36 @@ export default function HomeScreen() {
     mode: OrderEntryMode = 'PIECES',
     wf: OrderWorkflowType = 'LAUNDRY',
   ) => {
+    if (isAllBranches) {
+      Alert.alert(
+        'Branch Selection Required',
+        'Cannot create an order under "All Branches". Please switch to a specific branch first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Charholi',
+            onPress: async () => {
+              await setActiveBranchId('store-kp-001');
+              setWizardCustomer(cust);
+              setWizardEntryMode(mode);
+              setWizardWorkflow(wf);
+              setWizardVisible(true);
+            },
+          },
+          {
+            text: 'Alephata',
+            onPress: async () => {
+              await setActiveBranchId('store-kp-002');
+              setWizardCustomer(cust);
+              setWizardEntryMode(mode);
+              setWizardWorkflow(wf);
+              setWizardVisible(true);
+            },
+          },
+        ],
+      );
+      return;
+    }
     setWizardCustomer(cust);
     setWizardEntryMode(mode);
     setWizardWorkflow(wf);
@@ -414,12 +452,15 @@ export default function HomeScreen() {
                 <Text style={[styles.brandTitleText, { color: colors.textPrimary }]}>
                   GrowFast <Text style={styles.brandAccentText}>Laundry</Text>
                 </Text>
-                <Text
-                  style={[styles.branchSubtitleText, { color: colors.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {storeBranch}
-                </Text>
+                <View style={{ marginTop: 4 }}>
+                  <BranchSelector
+                    compact
+                    onBranchChange={() => {
+                      loadDueTodayOrders();
+                      loadOfflineDraftCount();
+                    }}
+                  />
+                </View>
               </View>
             </View>
 
@@ -1318,7 +1359,7 @@ export default function HomeScreen() {
         initialCustomer={wizardCustomer}
         initialEntryMode={wizardEntryMode}
         initialWorkflow={wizardWorkflow}
-        storeId={session?.storeId || 'store-1'}
+        storeId={(!isAllBranches && activeBranchId) || session?.storeId || 'store-kp-001'}
         userRole={session?.role || 'COUNTER'}
         onClose={() => {
           setWizardVisible(false);

@@ -24,6 +24,8 @@ import { ConnectionBanner } from '../../src/components/ConnectionBanner';
 import { DeliveryDetailModal } from '../../src/components/DeliveryDetailModal';
 import { DeliveryCompletionModal } from '../../src/components/DeliveryCompletionModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useBranch } from '../../src/contexts/BranchContext';
+import { BranchSelector } from '../../src/components/BranchSelector';
 
 type FilterTab = 'ALL' | DeliveryStatus;
 
@@ -41,6 +43,7 @@ export default function DeliveriesScreen() {
   const { colors, isDark } = useTheme();
   const { isConnected } = useNetworkStatus();
   const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { activeBranchId, isAllBranches, activeBranch } = useBranch();
   const session = authUser;
 
   // Deliveries State
@@ -110,7 +113,7 @@ export default function DeliveriesScreen() {
       setDeliveries([]);
       setLoading(false);
     }
-  }, [fetchDeliveries, isAuthenticated, isAuthLoading]);
+  }, [fetchDeliveries, activeBranchId, isAuthenticated, isAuthLoading]);
 
   const handleRefresh = () => {
     if (!isAuthenticated || isAuthLoading) return;
@@ -384,9 +387,9 @@ export default function DeliveriesScreen() {
                   <Text style={styles.roleBadgeText}>{staffRole}</Text>
                 </View>
               </View>
-              <Text style={[styles.userBranch, { color: colors.textSecondary }]}>
-                {storeBranch}
-              </Text>
+              <View style={{ marginTop: 2 }}>
+                <BranchSelector compact onBranchChange={() => fetchDeliveries()} />
+              </View>
             </View>
           </View>
 

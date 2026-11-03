@@ -21,6 +21,7 @@ import {
   setOnUnauthorized,
   AuthEmployeeProfile,
   ApiError,
+  setActiveBranchHeader,
 } from '../api/client';
 
 export interface AuthContextType {
@@ -79,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      setActiveBranchHeader(null);
       await clearUserSession();
     } finally {
       setToken(null);
@@ -90,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Subscribe to centralized HTTP 401 unauthorized events from apiClient
   useEffect(() => {
     const unsubscribe = onUnauthorized(() => {
+      setActiveBranchHeader(null);
       setToken(null);
       setUser(null);
       setIsAuthenticated(false);

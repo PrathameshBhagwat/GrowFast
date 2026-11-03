@@ -22,6 +22,7 @@ import {
   OverdueCleanupSummaryResponseDTO,
   ArchiveOrdersRequest,
   ArchiveOrdersResponseDTO,
+  BranchDTO,
 } from '@growfast/shared-types';
 import { getAuthToken, clearUserSession } from '../storage/secure-store';
 
@@ -54,6 +55,15 @@ export function onUnauthorized(handler: UnauthorizedHandler): () => void {
 }
 
 let unauthorizedPromise: Promise<void> | null = null;
+let activeBranchId: string | null = null;
+
+export function setActiveBranchHeader(branchId: string | null): void {
+  activeBranchId = branchId && branchId.trim() ? branchId.trim() : null;
+}
+
+export function getActiveBranchHeader(): string | null {
+  return activeBranchId;
+}
 
 /**
  * Centrally handle an HTTP 401 Unauthorized response from a protected endpoint.
@@ -73,6 +83,7 @@ export async function triggerUnauthorized(): Promise<void> {
           console.error('[apiClient] Error in unauthorized handler:', err);
         }
       });
+      setActiveBranchHeader(null);
       await clearUserSession();
     } finally {
       setTimeout(() => {
@@ -362,6 +373,10 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (activeBranchId && !headers['x-branch-id']) {
+    headers['x-branch-id'] = activeBranchId;
   }
 
   const baseUrl = getBaseUrl();
@@ -823,11 +838,15 @@ export const apiClient = {
       }
 
       const url = normalizeApiUrl(getBaseUrl(), '/photos/upload');
+      const uploadHeaders: Record<string, string> = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (activeBranchId && !uploadHeaders['x-branch-id']) {
+        uploadHeaders['x-branch-id'] = activeBranchId;
+      }
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: uploadHeaders,
         body: formData,
       });
 
@@ -919,6 +938,15 @@ export const apiClient = {
         expressSurchargePercent?: number | null;
         topUpServices?: any[];
       }>('/api/store/config');
+    },
+
+    getBranches: async (): Promise<BranchDTO[]> => {
+      const res = await request<{ success: boolean; data: BranchDTO[] } | BranchDTO[]>(
+        '/api/store/branches',
+      );
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray((res as any).data)) return (res as any).data;
+      return [];
     },
   },
 

@@ -32,6 +32,8 @@ import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { CustomerProfileModal } from '../../src/components/CustomerProfileModal';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useBranch } from '../../src/contexts/BranchContext';
+import { BranchSelector } from '../../src/components/BranchSelector';
 
 export default function CustomersScreen() {
   const router = useRouter();
@@ -39,6 +41,8 @@ export default function CustomersScreen() {
   const { colors, isDark } = useTheme();
   const { isConnected } = useNetworkStatus();
   const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { activeBranchId, isAllBranches, branches, setActiveBranchId } = useBranch();
+  const [targetBranchForCreate, setTargetBranchForCreate] = useState<string>('store-kp-001');
   const session = authUser;
 
   // Tab: 'FIND' | 'NEW'
@@ -177,6 +181,13 @@ export default function CustomersScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery, loadCustomers, isAuthenticated, isAuthLoading]);
 
+  // Refresh customer directory whenever the active branch changes
+  useEffect(() => {
+    if (isAuthenticated && !isAuthLoading) {
+      loadCustomers(searchQuery, 1, false);
+    }
+  }, [activeBranchId, loadCustomers, isAuthenticated, isAuthLoading]);
+
   const onRefresh = () => {
     if (!isAuthenticated || isAuthLoading) return;
     loadCustomers(searchQuery, 1, true);
@@ -195,6 +206,38 @@ export default function CustomersScreen() {
   };
 
   const startPerPieceOrder = (cust: CustomerDTO) => {
+    if (isAllBranches) {
+      Alert.alert(
+        'Branch Selection Required',
+        'Cannot create an order under "All Branches". Please switch to a specific branch first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Charholi',
+            onPress: async () => {
+              await setActiveBranchId('store-kp-001');
+              setOrderTargetCustomer(cust);
+              setOrderTargetMode('PIECES');
+              setOrderTargetWorkflow('LAUNDRY');
+              setSelectedCustomer(null);
+              setWizardVisible(true);
+            },
+          },
+          {
+            text: 'Alephata',
+            onPress: async () => {
+              await setActiveBranchId('store-kp-002');
+              setOrderTargetCustomer(cust);
+              setOrderTargetMode('PIECES');
+              setOrderTargetWorkflow('LAUNDRY');
+              setSelectedCustomer(null);
+              setWizardVisible(true);
+            },
+          },
+        ],
+      );
+      return;
+    }
     setOrderTargetCustomer(cust);
     setOrderTargetMode('PIECES');
     setOrderTargetWorkflow('LAUNDRY');
@@ -203,6 +246,38 @@ export default function CustomersScreen() {
   };
 
   const startPerWeightOrder = (cust: CustomerDTO) => {
+    if (isAllBranches) {
+      Alert.alert(
+        'Branch Selection Required',
+        'Cannot create an order under "All Branches". Please switch to a specific branch first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Charholi',
+            onPress: async () => {
+              await setActiveBranchId('store-kp-001');
+              setOrderTargetCustomer(cust);
+              setOrderTargetMode('WEIGHT');
+              setOrderTargetWorkflow('LAUNDRY');
+              setSelectedCustomer(null);
+              setWizardVisible(true);
+            },
+          },
+          {
+            text: 'Alephata',
+            onPress: async () => {
+              await setActiveBranchId('store-kp-002');
+              setOrderTargetCustomer(cust);
+              setOrderTargetMode('WEIGHT');
+              setOrderTargetWorkflow('LAUNDRY');
+              setSelectedCustomer(null);
+              setWizardVisible(true);
+            },
+          },
+        ],
+      );
+      return;
+    }
     setOrderTargetCustomer(cust);
     setOrderTargetMode('WEIGHT');
     setOrderTargetWorkflow('LAUNDRY');
@@ -253,11 +328,18 @@ export default function CustomersScreen() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
+      const targetStoreId =
+        (!isAllBranches && activeBranchId) ||
+        targetBranchForCreate ||
+        session?.storeId ||
+        'store-kp-001';
+
       const payload: CreateCustomerRequest = {
         name: trimmedName,
         phone: cleanPhone,
         address: trimmedAddress,
         pincode: trimmedPincode,
+        storeId: targetStoreId,
       };
 
       const created = await apiClient.customers.create(payload);
@@ -361,15 +443,13 @@ export default function CustomersScreen() {
       >
         {/* Header matching Screenshot 5 */}
         <View style={[styles.header, { backgroundColor: colors.surface }]}>
-          <View>
+          <View style={{ flex: 1, marginRight: 8 }}>
             <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Customers</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
               Directory & Quick Order Intake
             </Text>
           </View>
-          <View style={[styles.headerGraphicBox, { backgroundColor: colors.primaryBg }]}>
-            <Text style={{ fontSize: 24 }}>👥</Text>
-          </View>
+          <BranchSelector compact onBranchChange={() => loadCustomers('', 1, false)} />
         </View>
 
         {/* Segmented Control matching Screenshot 5 */}
@@ -868,6 +948,50 @@ export default function CustomersScreen() {
                   ) : null}
                 </View>
 
+                {isAllBranches && (
+                  <View style={styles.inputGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>
+                      Assign to Branch *
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                      {branches.map((b) => {
+                        const isSelected = targetBranchForCreate === b.id;
+                        return (
+                          <TouchableOpacity
+                            key={b.id}
+                            style={{
+                              flex: 1,
+                              height: 44,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isSelected
+                                ? colors.primary
+                                : colors.surfaceSecondary,
+                              borderColor: isSelected ? colors.primary : colors.border,
+                            }}
+                            onPress={() => setTargetBranchForCreate(b.id)}
+                            activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Assign to ${b.name}`}
+                          >
+                            <Text
+                              style={{
+                                color: isSelected ? '#FFFFFF' : colors.textPrimary,
+                                fontWeight: '700',
+                                fontSize: 13,
+                              }}
+                            >
+                              {b.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
                 <TouchableOpacity
                   style={[
                     styles.submitCustomerBtn,
@@ -915,7 +1039,7 @@ export default function CustomersScreen() {
           initialCustomer={orderTargetCustomer}
           initialEntryMode={orderTargetMode}
           initialWorkflow={orderTargetWorkflow}
-          storeId={session?.storeId || 'store-kp-001'}
+          storeId={(!isAllBranches && activeBranchId) || session?.storeId || 'store-kp-001'}
           userRole={session?.role || 'COUNTER'}
           onClose={() => {
             setWizardVisible(false);

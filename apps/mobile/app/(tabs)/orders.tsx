@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 import { useSyncManager } from '../../src/hooks/useSyncManager';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useBranch } from '../../src/contexts/BranchContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { getUserSession, MobileUserSession } from '../../src/storage/secure-store';
 import {
@@ -32,6 +33,7 @@ import {
 import { OrderWizardModal } from '../../src/components/wizard/OrderWizardModal';
 import { OrderDetailModal } from '../../src/components/OrderDetailModal';
 import { OverdueCleanupModal } from '../../src/components/OverdueCleanupModal';
+import { BranchSelector } from '../../src/components/BranchSelector';
 import { apiClient } from '../../src/api/client';
 import { OrderSummaryDTO, isOrderOverdue, getOverdueDays } from '@growfast/shared-types';
 
@@ -158,6 +160,7 @@ export default function OrdersScreen() {
   const { isConnected } = useNetworkStatus();
   const { syncDraft, syncAll, isSyncingAll } = useSyncManager();
   const { user: authUser, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { activeBranchId, isAllBranches, branches, setActiveBranchId } = useBranch();
   const { isDark, colors } = useTheme();
   const session = authUser;
 
@@ -347,7 +350,7 @@ export default function OrdersScreen() {
       setServerOrders([]);
       setDrafts([]);
     }
-  }, [isAuthenticated, isAuthLoading, session, loadData]);
+  }, [isAuthenticated, isAuthLoading, session, activeBranchId, loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -543,7 +546,9 @@ export default function OrdersScreen() {
           >
             <Icon name="chevron-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Search Orders</Text>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <BranchSelector compact onBranchChange={() => loadData()} />
+          </View>
           <TouchableOpacity
             style={styles.filterIconBtn}
             onPress={openFilterModal}
@@ -989,6 +994,32 @@ export default function OrdersScreen() {
         <TouchableOpacity
           style={styles.floatingCreateBtn}
           onPress={() => {
+            if (isAllBranches) {
+              Alert.alert(
+                'Branch Selection Required',
+                'Cannot create an order under "All Branches". Please switch to a specific branch first.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Charholi',
+                    onPress: async () => {
+                      await setActiveBranchId('store-kp-001');
+                      setSelectedDraft(null);
+                      setEditorVisible(true);
+                    },
+                  },
+                  {
+                    text: 'Alephata',
+                    onPress: async () => {
+                      await setActiveBranchId('store-kp-002');
+                      setSelectedDraft(null);
+                      setEditorVisible(true);
+                    },
+                  },
+                ],
+              );
+              return;
+            }
             setSelectedDraft(null);
             setEditorVisible(true);
           }}
@@ -1003,7 +1034,7 @@ export default function OrdersScreen() {
         <OrderWizardModal
           visible={editorVisible}
           draft={selectedDraft}
-          storeId={session?.storeId || 'store-1'}
+          storeId={(!isAllBranches && activeBranchId) || session?.storeId || 'store-kp-001'}
           userRole={session?.role || 'COUNTER'}
           onClose={() => setEditorVisible(false)}
           onOrderSavedOrSubmitted={() => {
