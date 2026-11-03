@@ -1,6 +1,7 @@
 import { apiFetch } from './api';
 import {
   DEFAULT_TAG_DESIGN,
+  CANONICAL_7FIELD_TAG_DESIGN,
   type ApiResponse,
   type TagDesignConfig,
   type UpdateTagDesignRequest,
@@ -13,7 +14,7 @@ import {
 export const TagDesignApi = {
   /**
    * Fetch the current active physical tag design for the authenticated user's store.
-   * If no custom design has been saved, falls back to DEFAULT_TAG_DESIGN.
+   * If no custom design has been saved, falls back to CANONICAL_7FIELD_TAG_DESIGN.
    */
   async getDesign(): Promise<TagDesignConfig> {
     try {
@@ -21,9 +22,9 @@ export const TagDesignApi = {
       if (response && response.data) {
         return response.data;
       }
-      return DEFAULT_TAG_DESIGN;
+      return CANONICAL_7FIELD_TAG_DESIGN;
     } catch {
-      return DEFAULT_TAG_DESIGN;
+      return CANONICAL_7FIELD_TAG_DESIGN;
     }
   },
 

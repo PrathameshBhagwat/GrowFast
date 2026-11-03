@@ -128,7 +128,7 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
         const tagData: PhysicalTagData = {
           orderNumber: order.orderNumber,
           tagId: pieceTagId,
-          unitNumber: pg.unitNumber,
+          unitNumber: currentPieceNum,
           totalPieces: totalCategoryPieces,
           pieceNumber,
           customerName: order.customerName,
@@ -149,7 +149,7 @@ export const OrderTagsSection: React.FC<OrderTagsSectionProps> = ({
           garmentId: pg.id,
           orderItemId: item.id,
           tagId: pieceTagId,
-          unitNumber: pg.unitNumber,
+          unitNumber: currentPieceNum,
           totalPieces: totalCategoryPieces,
           garmentName: item.garmentName,
           serviceType: item.serviceType,

@@ -203,7 +203,7 @@ describe('DailyOrdersReportPage', () => {
 
     // Click Date range trigger
     const popoverTrigger = screen.getByRole('button', {
-      name: /oct \d{1,2}, \d{4} - oct \d{1,2}, \d{4}|select date range/i,
+      name: /[a-z]{3} \d{1,2}, \d{4} - [a-z]{3} \d{1,2}, \d{4}|select date range/i,
     });
     fireEvent.click(popoverTrigger);
 
@@ -236,7 +236,7 @@ describe('DailyOrdersReportPage', () => {
     await waitFor(() => expect(fetchReportSpy).toHaveBeenCalledTimes(1));
 
     const popoverTrigger = screen.getByRole('button', {
-      name: /oct \d{1,2}, \d{4} - oct \d{1,2}, \d{4}|select date range/i,
+      name: /[a-z]{3} \d{1,2}, \d{4} - [a-z]{3} \d{1,2}, \d{4}|select date range/i,
     });
     fireEvent.click(popoverTrigger);
 

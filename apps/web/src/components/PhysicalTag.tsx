@@ -366,25 +366,43 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
         );
 
       case 'process':
-      case 'serviceAndPiece':
+      case 'serviceAndPiece': {
+        const lineText = formatGarmentTagLine({
+          serviceShortcut: serviceCode,
+          garmentCategory: resolvedCategory,
+          pieceNumber: resolvedPiece,
+        });
+        const baseFontSize = fieldCfg.fontSize || 12;
+        const effectiveFontSize =
+          lineText.length > 25
+            ? Math.max(8.5, baseFontSize - 3)
+            : lineText.length > 18
+              ? Math.max(9.5, baseFontSize - 1.5)
+              : baseFontSize;
+
         return (
           <div
-            key="process"
+            key={fieldCfg.field}
             className={`my-0.5 overflow-hidden leading-tight ${alignClass}`}
             style={{ textAlign }}
+            data-testid="tag-operational-line"
           >
             <span
-              className="block truncate"
+              className="block truncate uppercase font-bold tracking-wide break-words"
               style={{
                 ...baseStyle,
-                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial'),
-                fontSize: `${fieldCfg.fontSize}px`,
+                fontFamily: getCssFontFamily(fieldCfg.font || 'Arial Black'),
+                fontSize: `${effectiveFontSize}px`,
+                fontWeight: fieldCfg.isBold !== false ? 'bold' : 'normal',
+                textTransform: 'uppercase',
               }}
+              title={lineText}
             >
-              {serviceCode} <span className="ml-1 tracking-tight">{piecePosition}</span>
+              {lineText}
             </span>
           </div>
         );
+      }
 
       case 'itemTotal':
         return (
@@ -688,10 +706,30 @@ export const PhysicalTag: React.FC<PhysicalTagProps> = ({
     }
   };
 
-  const fieldsToRender =
-    activeDesign.fields && activeDesign.fields.length > 0
-      ? activeDesign.fields
-      : DEFAULT_TAG_DESIGN.fields;
+  const fieldsToRender = React.useMemo(() => {
+    const raw =
+      activeDesign.fields && activeDesign.fields.length > 0
+        ? activeDesign.fields
+        : CANONICAL_7FIELD_TAG_DESIGN.fields;
+
+    const hasShopHeader = raw.some(
+      (f) => (f.field === 'shopName' || f.field === 'storeHeader') && f.enabled,
+    );
+
+    if (!hasShopHeader) {
+      const defaultShopHeader: TagFieldConfig = {
+        field: 'shopName',
+        label: 'Shop Name',
+        enabled: true,
+        fontSize: 10,
+        alignment: 'center',
+        isBold: true,
+        isUppercase: true,
+      };
+      return [defaultShopHeader, ...raw];
+    }
+    return raw;
+  }, [activeDesign.fields]);
 
   // Group adjacent operational fields ('serviceShortcut', 'garmentCategory', 'pieceNumber')
   // when enabled, so they form a unified cohesive line "DC | SHIRT | 1/5"

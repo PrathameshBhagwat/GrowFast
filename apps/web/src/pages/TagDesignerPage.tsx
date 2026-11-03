@@ -262,7 +262,7 @@ export const TagDesignerPage: React.FC = () => {
     TagDesignApi.getDesign()
       .then((loaded) => {
         if (isMounted) {
-          const active = loaded || REFERENCE_TAG_DESIGN;
+          const active = loaded || CANONICAL_7FIELD_TAG_DESIGN;
           setDesign(active);
           setInitialDesignJson(JSON.stringify(active));
         }
